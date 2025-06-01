@@ -8,6 +8,8 @@ from datetime import datetime, timedelta, UTC
 from multiprocessing import Process
 from typing import Dict, List
 
+from dr_exp.core.client_provider import get_supabase_client
+from dr_exp.core.supabase_client import SupabaseClient
 from dr_exp.mock.supabase_mock_client import SupabaseMockClient
 
 # Attempt to import the worker implementation from scripts.run_worker
@@ -53,16 +55,19 @@ class Manager:
         heartbeat_interval: int,
         idle_timeout_mins: int,
         base_dir: str,
-        client: SupabaseMockClient | None = None,
+        client: SupabaseClient | SupabaseMockClient | None = None,
     ) -> None:
         self.gpus = gpus
         self.workers_per_gpu = workers_per_gpu
         self.heartbeat_interval = heartbeat_interval
         self.idle_timeout = timedelta(minutes=idle_timeout_mins)
         self.base_dir = base_dir
-        self.client = client or SupabaseMockClient()
+        self.client = client or get_supabase_client()
         # Base path for SupabaseMockClient used by workers
-        self.base_path = os.path.dirname(self.client.mock_db_path)
+        if hasattr(self.client, "mock_db_path"):
+            self.base_path = os.path.dirname(self.client.mock_db_path)
+        else:
+            self.base_path = "."
         self.workers: Dict[str, Dict[str, object]] = {}
         self.last_activity = datetime.now(UTC)
         self.shutdown = False
@@ -105,6 +110,8 @@ class Manager:
     # ---------------- Job & Heartbeat ------------------
     def _list_running_jobs(self) -> List[Dict[str, object]]:
         jobs: List[Dict[str, object]] = []
+        if not hasattr(self.client, "jobs_dir"):
+            return jobs
         for name in os.listdir(self.client.jobs_dir):
             if not name.endswith(".json"):
                 continue
