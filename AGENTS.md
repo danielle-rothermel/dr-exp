@@ -100,3 +100,42 @@ Considerations:
 - Focus on clear API contracts and data transformation.
 - Audit logging for admin actions (kill/requeue) should log to console/standard Python logger.
 
+#### Task 2.3 Implement Core Worker Process Logic
+
+Objective:
+Implement the core logic for the `Worker Process` (`run_worker.py`) as specified in `docs/worker.md`. This script will claim jobs, execute a mock training process, log outputs, and simulate uploading results, all interacting with the `SupabaseMockClient` and the `StructuredLogger`.
+
+Primary Specification Document:
+- `docs/worker.md`
+- Refer to Training Interface Contract (PRD Section 5).
+
+Key Functionalities to Implement:
+- [x]  **Job Claiming:**
+    - Use `SupabaseMockClient.claim_job()` to atomically claim a job.
+    - Implement exponential backoff if no job is available initially. Exit if no job claimed after N retries.
+- [x]  **Configuration & Setup:**
+    - On successful claim, retrieve the `config_json` for the job using `SupabaseMockClient.get_config_for_job()`.
+    - Assume the SLURM Manager (or a test harness for now) provides unique local working directory paths. Inject these paths into `cfg.logging` (e.g., `out_path`, `checkpoint_dir`, `artifact_dir`).
+    - Initialize `StructuredLogger` with this modified `cfg`.
+- [x]  **Execution:**
+    - Call the `Mock Trainer`'s `train(cfg, logger)` function (from Phase 1).
+    - Periodically update the job's `heartbeat` timestamp in the mock Supabase using `SupabaseMockClient.update_job()`.
+- [x]  **Result Handling & Upload (Simulated):**
+    - After `train()` completes, call `logger.finalize()` to get metadata about local outputs.
+    - Use `SupabaseMockClient.upload_artifact()` to "upload" the generated `metrics.jsonl`, checkpoints, and any other artifacts from their local paths (provided by logger) to the mock storage.
+    - Use `SupabaseMockClient.upload_artifact()` to also "upload" the worker's own operational log file.
+- [x]  **Job Finalization:**
+    - Update the job record in mock Supabase using `SupabaseMockClient.finalize_job()` or `update_job()` with the final status (from `train()` return or error), metrics from `train()`, paths to artifacts in mock storage, `upload_complete_at`, and `finalize_success`.
+- [x]  **Failure Handling:**
+    - If `train()` raises an exception or returns a failure status, record the error using `SupabaseMockClient.record_failure()`.
+    - Ensure job status is correctly updated to `failed`.
+- [x]  **Local Path Management:** The worker receives unique local paths for its outputs. It is responsible for cleaning up its local temporary working directory upon completion or critical failure.
+
+Expected Output:
+- `run_worker.py` script.
+- `pytest` unit tests for the worker's core logic, mocking its dependencies (`SupabaseMockClient`, `StructuredLogger`, `Mock Trainer`) to test different scenarios (successful run, failed run, job claim failure, etc.).
+
+Considerations:
+- The worker itself does not implement retry logic for a failed `train()` call; requeuing is external.
+- This version does not need to handle SLURM-specifics; it's the core job processing loop.
+- Interaction with `SupabaseMockClient` is key.
