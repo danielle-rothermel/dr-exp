@@ -5,3 +5,11 @@ export async function fetchJobs() {
   }
   return resp.json();
 }
+
+export async function fetchJobConfig(jobId) {
+  const resp = await fetch(`http://localhost:8000/config/${jobId}`);
+  if (!resp.ok) {
+    throw new Error(`API error ${resp.status}`);
+  }
+  return resp.json();
+}
