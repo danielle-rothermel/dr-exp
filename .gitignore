@@ -1,0 +1,32 @@
+# Python
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+.Python
+env/
+venv/
+*.egg-info/
+dist/
+build/
+
+# Node
+node_modules/
+npm-debug.log
+yarn-error.log
+package-lock.json # Or yarn.lock, depending on preference if you add package managers
+
+# Supabase
+.supabase/ # Local Supabase CLI state, if not desired in repo
+
+# IDE specific
+.idea/
+.vscode/
+*.suo
+*.ntvs*
+*.njsproj
+*.sln
+
+# OS specific
+.DS_Store
+Thumbs.db
