@@ -27,44 +27,76 @@ Finally, run the test suite from the top level and fix any issues:
 uv run pytest
 ```
 
-## 4. Phase 1 Task Breakdown: Mocks, Scaffolding & Core Local Components
-
-**Always consult `docs/product_requirement_doc.md` (especially Section 8.1 for Phase 1 details) and the specific `docs/<component_name>.md` for detailed task requirements, inputs, outputs, and expected behaviors.**
-
-### Phase 1 Tasks (Highest Priority):
-* **`Supabase Mock Client` & `Mock Reset Utility`**
-    * **Objective:** Implement `SupabaseMockClient` (Python class) to simulate Supabase DB and Storage operations using local files/directories. Create `reset_mock_db.py` script to clear this mock environment.
-    * **Primary Spec Doc:** `docs/supabase_mock.md`.
-    * **Output:** `supabase_mock_client.py`, `reset_mock_db.py`.
-    * **Context:** This client is crucial for offline development of other components (Worker, Config Generator). It should mimic the interface the real Supabase client will eventually have. The reset utility ensures repeatable test conditions.
-
-* **`Mock Trainer`**
-    * **Objective:** Implement a mock `train(cfg, logger)` function (Python) that simulates a training run, logs mock metrics, and saves mock artifacts/checkpoints using the `StructuredLogger` interface.
-    * **Primary Spec Doc:** `docs/train_mock.md`.
-    * **Output:** Python module with the mock `train` function.
-    * **Context:** Enables testing of the `Worker Process` and `StructuredLogger` without needing actual model training. Must adhere to the defined training interface contract (see PRD Section 5).
-
-* **`StructuredLogger` (Initial)**
-    * **Objective:** Implement the initial version of the `StructuredLogger` class (Python) focusing on writing metrics, checkpoints, and artifacts to unique local paths provided via configuration.
-    * **Primary Spec Doc:** `docs/logger.md`.
-    * **Output:** `structured_logger.py`.
-    * **Context:** This component is used by the `Mock Trainer` (and later the real `train()` function) to manage all local output. It does *not* upload to Supabase directly.
-
-* **`Config Generator` (Initial)**
-    * **Objective:** Implement the core logic of `upload_configs.py` (Python CLI script) to generate Hydra configurations and use the `SupabaseMockClient` (e.g., its `add_job` method) to simulate uploading/storing these configurations and creating corresponding job entries.
-    * **Primary Spec Doc:** `docs/config_upload.md`.
-    * **Output:** `upload_configs.py` script.
-    * **Context:** This script is the entry point for defining experiments. Its initial version validates the config generation process and interaction with the (mock) job store.
-
-* **`Basic Tests`**
-    * **Objective:** Create `pytest` unit tests for each of the components developed in Phase 1.
-    * **Input:** The implemented Python code for each component and its specification document.
-    * **Output:** Test files (e.g., `tests/mock/test_supabase_mock_client.py`, `tests/test_logger.py`, `tests/test_mock_trainer.py`).
-    * **Context:** Essential for verifying correctness and enabling refactoring. Tests should cover core functionalities, expected outputs, and basic error handling.
-
 ## 4. Simplified Agent Workflow (for Phase 1 Tasks)
 2.  **Understand Specs:** Thoroughly read the primary spec document for the component (e.g., `docs/supabase_mock.md`) and relevant sections of `docs/product_requirement_doc.md`.
 3.  **Code & Test:** Implement the component in Python. Write `pytest` unit tests covering its specified behavior.
 4.  **Review & Iterate:** Submit code and tests for human review. Revise based on feedback.
 5.  **Integrate (Locally):** Human developer ensures the component can be (or will be) integrated with other Phase 1 mock components.
+
+### 5. Phase 2 Tasks
+
+#### Task 2.1 Finalize Structured Logger Implementation
+
+Objective:
+Finalize the implementation of the `StructuredLogger` Python class based on the full specifications in `docs/logger.md`. This involves ensuring all features, error handling, and concurrency considerations outlined in the spec are robustly implemented.
+
+Primary Specification Document:
+- `docs/logger.md`
+
+Recap of Key Functionalities to Implement/Verify (refer to spec for full details):
+- [x]  `__init__(self, cfg: DictConfig, compress_checkpoints: bool = False, debug: bool = False)`: Ensure robust initialization using `cfg.logging` paths.
+- [x]  `log(self, metrics: dict)`: Append JSON-serializable metrics to `metrics.jsonl`, inject timestamp and run ID, handle buffering/flushing if specified.
+- [x]  `save_checkpoint(self, state_dict: dict, tag: str)`: Save checkpoint to `cfg.logging.checkpoint_dir` with correct naming and optional Gzip compression. Log metadata to internal registry.
+- [x]  `log_artifact(self, path: str)`: Register an existing file or directory path to be tracked.
+- [x]  `finalize(self) -> dict`: Close log file, flush buffers, return summary metadata (metrics_path, num_metrics, artifact_paths, num_checkpoints, finalize_success). Must be idempotent.
+- [x]  Error Handling: Implement behavior for `debug=True` (raise exceptions) and `debug=False` (log errors to `logger_error.log`, attempt safe continuation).
+- [x]  Concurrency: Ensure methods are safe for potential multiprocessing usage (though the primary design is one logger instance per worker with unique paths, ensure no internal race conditions if methods could be called rapidly). File-level locks or safe append mechanisms for any shared resources (if any, though ideally none for unique-path logger).
+- [x]  Path Management: Strictly use paths provided in `cfg.logging` (e.g., `cfg.logging.out_path`, `cfg.logging.checkpoint_dir`, `cfg.logging.artifact_dir`). These paths will be unique per worker instance.
+
+Expected Output:
+- Updated `structured_logger.py` file with the complete implementation.
+- Comprehensive `pytest` unit tests in `tests/test_logger.py` covering all functionalities, including different configurations (compression, debug mode), error conditions, and output validation.
+
+Considerations:
+- The logger does NOT handle uploads to Supabase; this is the Worker's responsibility.
+- The logger should remain agnostic to the training framework.
+- Ensure all file I/O operations are robust (e.g., handle file not found, permissions issues gracefully when `debug=False`).
+
+#### Task 2.2 Impelment Initial FastAPI Backend
+
+Objective:
+Implement the initial FastAPI backend server as specified in `docs/api_contracts.md`. This version will interact with the `SupabaseMockClient` (from Phase 1) to serve data and handle basic job control commands. Focus on the REST API endpoints.
+
+Primary Specification Document:
+- `docs/api_contracts.md`
+- Refer to `docs/supabase_schema.md` for understanding the structure of data being handled (e.g., job records, configs).
+
+Key Functionalities to Implement (interacting with `SupabaseMockClient`):
+- [ ]  FastAPI application setup (`main.py` or similar).
+- [ ]  REST API Endpoints:
+    - [ ] `GET /job/{job_id}`: Retrieve and return full job metadata (from mock job JSON files).
+    - [ ] `GET /config/{job_id}`: Retrieve and return the resolved Hydra config for a job (from mock job JSON files, assuming config is stored there or linked).
+    - [ ]`GET /metrics/{run_id}`:
+        - Retrieve and return summarized metrics for a given run.
+        - For V1 with mock client: Parse the `metrics.jsonl` file from `mock_storage/run_<run_id>/metrics.jsonl`.
+        - Implement basic summarization (e.g., last N points, or all points if small).
+        - Implement in-memory LRU caching for parsed metrics results to improve performance for repeated requests.
+    - [ ] `POST /job/kill`:
+        - Simulate flagging a job for termination. This should update the corresponding job's JSON file in `mock_db/jobs/` (e.g., add a `kill_requested: true` flag or update status).
+        - Implement basic API key authentication for this admin-only endpoint (read key from env var, check against a fixed value for now).
+    - [ ] `POST /job/requeue`:
+        - Simulate requeuing a job. This should update the job's JSON file in `mock_db/jobs/` (e.g., set `status='queued'`, increment `retry_index`).
+        - Implement basic API key authentication.
+- [ ] Use Pydantic models for request/response validation and serialization.
+- [ ]  Basic error handling and appropriate HTTP status code responses.
+
+Expected Output:
+- Python files for the FastAPI application (e.g., `main.py`, `routers/jobs.py`, `models.py`).
+- `pytest` unit tests for API endpoints, testing responses, status codes, and interaction with a `SupabaseMockClient` instance.
+- A `requirements.txt` update for FastAPI, Uvicorn, Pydantic.
+
+Considerations:
+- WebSocket endpoints are optional for this initial phase (as per PRD Phase 2 focus).
+- Focus on clear API contracts and data transformation.
+- Audit logging for admin actions (kill/requeue) should log to console/standard Python logger.
 
