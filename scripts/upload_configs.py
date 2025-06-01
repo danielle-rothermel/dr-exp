@@ -98,12 +98,12 @@ def build_arg_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(description="Generate and upload configs.")
     parser.add_argument(
         "--base-config-path",
-        required=True,
+        default="./configs",
         help="Directory containing Hydra config files",
     )
     parser.add_argument(
         "--config-name",
-        required=True,
+        default="config.yaml",
         help="Name of the main config file (e.g. config.yaml)",
     )
     parser.add_argument("--sweep", default="", help="Sweep definition")
