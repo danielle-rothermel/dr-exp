@@ -1,8 +1,8 @@
 import json
 import os
 
-from tests.mock.mock_trainer import train
-from dr_exp.structured_logger import StructuredLogger
+from dr_exp.mock.mock_trainer import train
+from tests.mock.mock_structured_logger import StructuredLogger
 
 
 def make_cfg(tmp_path, num_epochs=4):
