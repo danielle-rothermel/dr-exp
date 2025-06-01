@@ -1,35 +1,32 @@
-import { useState } from 'react'
-import reactLogo from './assets/react.svg'
-import viteLogo from '/vite.svg'
+import JobTable from './components/JobTable.jsx'
 import './App.css'
 
-function App() {
-  const [count, setCount] = useState(0)
+export default function App() {
+  const jobs = [
+    {
+      id: 'job-1',
+      status: 'running',
+      start_time: '2024-01-01T12:00:00Z',
+      final_val_acc: 0.85,
+    },
+    {
+      id: 'job-2',
+      status: 'completed',
+      start_time: '2024-01-02T09:30:00Z',
+      final_val_acc: 0.92,
+    },
+    {
+      id: 'job-3',
+      status: 'failed',
+      start_time: '2024-01-03T15:45:00Z',
+      final_val_acc: 0.4,
+    },
+  ]
 
   return (
-    <>
-      <div>
-        <a href="https://vite.dev" target="_blank">
-          <img src={viteLogo} className="logo" alt="Vite logo" />
-        </a>
-        <a href="https://react.dev" target="_blank">
-          <img src={reactLogo} className="logo react" alt="React logo" />
-        </a>
-      </div>
-      <h1>Vite + React</h1>
-      <div className="card">
-        <button onClick={() => setCount((count) => count + 1)}>
-          count is {count}
-        </button>
-        <p>
-          Edit <code>src/App.jsx</code> and save to test HMR
-        </p>
-      </div>
-      <p className="read-the-docs">
-        Click on the Vite and React logos to learn more
-      </p>
-    </>
+    <div className="p-4">
+      <h1 className="text-2xl font-bold mb-4">Babysitter UI - Job Table</h1>
+      <JobTable jobs={jobs} />
+    </div>
   )
 }
-
-export default App
