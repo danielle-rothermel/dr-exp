@@ -72,23 +72,23 @@ Primary Specification Document:
 - Refer to `docs/supabase_schema.md` for understanding the structure of data being handled (e.g., job records, configs).
 
 Key Functionalities to Implement (interacting with `SupabaseMockClient`):
-- [ ]  FastAPI application setup (`main.py` or similar).
-- [ ]  REST API Endpoints:
-    - [ ] `GET /job/{job_id}`: Retrieve and return full job metadata (from mock job JSON files).
-    - [ ] `GET /config/{job_id}`: Retrieve and return the resolved Hydra config for a job (from mock job JSON files, assuming config is stored there or linked).
-    - [ ]`GET /metrics/{run_id}`:
+ - [x]  FastAPI application setup (`main.py` or similar).
+ - [x]  REST API Endpoints:
+    - [x] `GET /job/{job_id}`: Retrieve and return full job metadata (from mock job JSON files).
+    - [x] `GET /config/{job_id}`: Retrieve and return the resolved Hydra config for a job (from mock job JSON files, assuming config is stored there or linked).
+    - [x]`GET /metrics/{run_id}`:
         - Retrieve and return summarized metrics for a given run.
         - For V1 with mock client: Parse the `metrics.jsonl` file from `mock_storage/run_<run_id>/metrics.jsonl`.
         - Implement basic summarization (e.g., last N points, or all points if small).
         - Implement in-memory LRU caching for parsed metrics results to improve performance for repeated requests.
-    - [ ] `POST /job/kill`:
+    - [x] `POST /job/kill`:
         - Simulate flagging a job for termination. This should update the corresponding job's JSON file in `mock_db/jobs/` (e.g., add a `kill_requested: true` flag or update status).
         - Implement basic API key authentication for this admin-only endpoint (read key from env var, check against a fixed value for now).
-    - [ ] `POST /job/requeue`:
+    - [x] `POST /job/requeue`:
         - Simulate requeuing a job. This should update the job's JSON file in `mock_db/jobs/` (e.g., set `status='queued'`, increment `retry_index`).
         - Implement basic API key authentication.
-- [ ] Use Pydantic models for request/response validation and serialization.
-- [ ]  Basic error handling and appropriate HTTP status code responses.
+ - [x] Use Pydantic models for request/response validation and serialization.
+ - [x]  Basic error handling and appropriate HTTP status code responses.
 
 Expected Output:
 - Python files for the FastAPI application (e.g., `main.py`, `routers/jobs.py`, `models.py`).
