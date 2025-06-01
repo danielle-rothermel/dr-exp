@@ -1,5 +1,8 @@
+import json
 import os
+import gzip
 from multiprocessing import Process
+import pytest
 
 from dr_exp.core import StructuredLogger
 
@@ -73,3 +76,61 @@ def test_logger_concurrent(tmp_path):
     with open(cfg_dict["logging"]["out_path"], "r") as f:
         lines = f.readlines()
     assert len(lines) == 40
+
+
+def test_checkpoint_compression(tmp_path):
+    cfg = SimpleCfg(
+        out_path=str(tmp_path / "metrics.jsonl"),
+        artifact_dir=str(tmp_path / "artifacts"),
+        checkpoint_dir=str(tmp_path / "ckpts"),
+    )
+    logger = StructuredLogger(cfg, compress_checkpoints=True)
+    state = {"a": 1}
+    ckpt_path = logger.save_checkpoint(state, "t1")
+    assert ckpt_path.endswith(".gz")
+    with gzip.open(ckpt_path, "rb") as f:
+        data = json.loads(f.read().decode("utf-8"))
+    assert data == state
+    logger.finalize()
+
+
+def test_error_log_non_debug(tmp_path):
+    cfg = SimpleCfg(
+        out_path=str(tmp_path / "metrics.jsonl"),
+        artifact_dir=str(tmp_path / "artifacts"),
+        checkpoint_dir=str(tmp_path / "ckpts"),
+    )
+    logger = StructuredLogger(cfg)
+    logger.log_artifact(str(tmp_path / "missing.txt"))
+    logger.log({"bad": object()})
+    summary = logger.finalize()
+    assert summary["num_metrics"] == 0
+    error_log = tmp_path / "logger_error.log"
+    assert error_log.exists()
+    log_text = error_log.read_text()
+    assert "artifact not found" in log_text
+    assert "log error" in log_text
+
+
+def test_debug_mode_raises(tmp_path):
+    cfg = SimpleCfg(
+        out_path=str(tmp_path / "metrics.jsonl"),
+        artifact_dir=str(tmp_path / "artifacts"),
+        checkpoint_dir=str(tmp_path / "ckpts"),
+    )
+    logger = StructuredLogger(cfg, debug=True)
+    with pytest.raises(FileNotFoundError):
+        logger.log_artifact(str(tmp_path / "missing.txt"))
+
+
+def test_finalize_idempotent(tmp_path):
+    cfg = SimpleCfg(
+        out_path=str(tmp_path / "metrics.jsonl"),
+        artifact_dir=str(tmp_path / "artifacts"),
+        checkpoint_dir=str(tmp_path / "ckpts"),
+    )
+    logger = StructuredLogger(cfg)
+    logger.log({"a": 1})
+    first = logger.finalize()
+    second = logger.finalize()
+    assert first == second

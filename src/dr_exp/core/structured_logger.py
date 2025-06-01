@@ -27,9 +27,14 @@ class StructuredLogger:
         self.checkpoint_dir = _get_attr(logging_cfg, "checkpoint_dir")
         self.log_file = _get_attr(logging_cfg, "log_file", None)
 
+        if not self.out_path or not self.artifact_dir or not self.checkpoint_dir:
+            raise ValueError(
+                "cfg.logging must define out_path, artifact_dir, and checkpoint_dir"
+            )
+
         self.compress_checkpoints = compress_checkpoints
         self.debug = debug
-        self.run_id = getattr(cfg, "run_id", uuid.uuid4().hex)
+        self.run_id = _get_attr(cfg, "run_id", uuid.uuid4().hex)
 
         os.makedirs(os.path.dirname(self.out_path), exist_ok=True)
         os.makedirs(self.artifact_dir, exist_ok=True)
@@ -38,14 +43,14 @@ class StructuredLogger:
         self.error_log_path = os.path.join(
             os.path.dirname(self.out_path), "logger_error.log"
         )
-        self.metrics_file = open(self.out_path, "a")
+        self.metrics_file = open(self.out_path, "a", encoding="utf-8")
         self.metrics_count = 0
         self.checkpoint_count = 0
         self.artifact_paths: List[str] = []
         self._finalized = False
 
     def _write_error(self, msg: str) -> None:
-        with open(self.error_log_path, "a") as ef:
+        with open(self.error_log_path, "a", encoding="utf-8") as ef:
             ef.write(f"{datetime.now(UTC).isoformat()}Z {msg}\n")
 
     def log(self, metrics: Dict[str, Any]) -> None:
