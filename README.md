@@ -33,7 +33,7 @@
                                                                   | (User Code)     |
                                                                   +-----------------+
       ```
-    - For a detailed breakdown, please refer to the Product Requirements Document (PRD - docs/prd_v2.md). __(Assuming prd_v2.md is the name of the PRD file in the docs folder)__
+    - For a detailed breakdown, please refer to the Product Requirements Document (PRD - `docs/product_requirement_doc.md`).
 ### Core Components:
     - **Config Generator (CLI):** Generates and uploads Hydra-based experiment configurations to Supabase.
     - **Supabase:** Central PostgreSQL database and object storage.
@@ -112,7 +112,7 @@
 ## 6. Development
 ### 6.1. Mocks
     - **SupabaseMockClient:** Simulates Supabase interactions locally. See `dr_exp/mock/supabase_mock_client.py`.
-    - Other mocks (FastAPI, Trainer) will be developed as per the PRD.
+    - Other mocks, including the FastAPI backend and mock training function, are implemented as described in the PRD.
 ### 6.2. Testing
     - Tests are written using pytest and located in the tests/ directory.
     - To run tests:
@@ -120,7 +120,7 @@
       pytest
       ```
 ## 7. Documentation
-    - **Product Requirements Document (PRD):** docs/prd_v2.md __(update filename if different)__
-    - **Component Specifications:** Detailed design documents for each component are (or will be) located in the `docs/` directory (e.g., `docs/supabase_schema.md`, `docs/worker.md`).
+    - **Product Requirements Document (PRD):** `docs/product_requirement_doc.md`
+    - **Component Specifications:** Detailed design documents for each component are located in the `docs/` directory (e.g., `docs/supabase_schema.md`, `docs/worker.md`).
     - This README provides a starting point. It should be updated as the project evolves, particularly the "Getting Started" and "Running the System" sections.
 
