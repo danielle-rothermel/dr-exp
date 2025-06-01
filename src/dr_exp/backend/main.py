@@ -16,6 +16,8 @@ from dr_exp.backend.models import (
     MetricsResponse,
     RequeueRequest,
 )
+from dr_exp.core.client_provider import get_supabase_client
+from dr_exp.core.supabase_client import SupabaseClient
 from dr_exp.mock.supabase_mock_client import SupabaseMockClient
 
 logger = logging.getLogger(__name__)
@@ -33,25 +35,31 @@ def verify_api_key(x_api_key: str = Header(...)) -> None:
 
 
 class MetricsLoader:
-    def __init__(self, client: SupabaseMockClient, maxsize: int = 32) -> None:
+    def __init__(
+        self, client: SupabaseClient | SupabaseMockClient, maxsize: int = 32
+    ) -> None:
         self.client = client
         self.cache: LRUCache[str, List[Dict[str, Any]]] = LRUCache(maxsize=maxsize)
 
     def load(self, run_id: str) -> List[Dict[str, Any]]:
         if run_id in self.cache:
             return self.cache[run_id]
-        metrics_path = os.path.join(
-            self.client.mock_storage_path,
-            f"run_{run_id}",
-            "metrics.jsonl",
-        )
-        if not os.path.exists(metrics_path):
-            raise FileNotFoundError(metrics_path)
-        metrics: List[Dict[str, Any]] = []
-        with open(metrics_path, "r") as f:
-            for line in f:
-                if line.strip():
-                    metrics.append(json.loads(line))
+        if hasattr(self.client, "mock_storage_path"):
+            metrics_path = os.path.join(
+                self.client.mock_storage_path,
+                f"run_{run_id}",
+                "metrics.jsonl",
+            )
+            if not os.path.exists(metrics_path):
+                raise FileNotFoundError(metrics_path)
+            metrics: List[Dict[str, Any]] = []
+            with open(metrics_path, "r") as f:
+                for line in f:
+                    if line.strip():
+                        metrics.append(json.loads(line))
+        else:
+            # TODO: implement real storage retrieval
+            raise NotImplementedError("Metrics loading for real client")
         if len(metrics) > 100:
             metrics = metrics[-100:]
         self.cache[run_id] = metrics
@@ -70,7 +78,7 @@ def create_app(base_path: str = ".") -> FastAPI:
         allow_headers=["*"],
     )
     
-    client = SupabaseMockClient(base_path=base_path)
+    client = get_supabase_client(base_path=base_path)
     loader = MetricsLoader(client)
 
     app.state.client = client
