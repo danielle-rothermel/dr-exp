@@ -2,7 +2,7 @@ import json
 import os
 import gzip
 import uuid
-from datetime import datetime
+from datetime import datetime, UTC
 from typing import Any, Dict, List, Optional
 
 import fcntl
@@ -46,12 +46,12 @@ class StructuredLogger:
 
     def _write_error(self, msg: str) -> None:
         with open(self.error_log_path, "a") as ef:
-            ef.write(f"{datetime.utcnow().isoformat()}Z {msg}\n")
+            ef.write(f"{datetime.now(UTC).isoformat()}Z {msg}\n")
 
     def log(self, metrics: Dict[str, Any]) -> None:
         record = dict(metrics)
         record.setdefault("run_id", self.run_id)
-        record.setdefault("timestamp", datetime.utcnow().isoformat() + "Z")
+        record.setdefault("timestamp", datetime.now(UTC).isoformat() + "Z")
         try:
             fcntl.flock(self.metrics_file.fileno(), fcntl.LOCK_EX)
             self.metrics_file.write(json.dumps(record) + "\n")
