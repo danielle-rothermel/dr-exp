@@ -1,8 +1,29 @@
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import PropTypes from 'prop-types'
-
-export default function JobTable({ jobs }) {
+import { fetchJobs } from '../api.js'
+export default function JobTable() {
+  const [jobs, setJobs] = useState([])
+  const [loading, setLoading] = useState(true)
+  const [error, setError] = useState(null)
   const [sortConfig, setSortConfig] = useState({ key: 'start_time', direction: 'asc' })
+
+  const loadJobs = async () => {
+    try {
+      const data = await fetchJobs()
+      setJobs(data)
+      setError(null)
+    } catch (e) {
+      setError(e.message)
+    } finally {
+      setLoading(false)
+    }
+  }
+
+  useEffect(() => {
+    loadJobs()
+    const id = setInterval(loadJobs, 15000)
+    return () => clearInterval(id)
+  }, [])
 
   const handleSort = (key) => {
     setSortConfig((config) => {
@@ -11,6 +32,14 @@ export default function JobTable({ jobs }) {
       }
       return { key, direction: 'asc' }
     })
+  }
+
+  if (loading) {
+    return <div>Loading...</div>
+  }
+
+  if (error) {
+    return <div className="text-red-500">Error: {error}</div>
   }
 
   const sortedJobs = [...jobs].sort((a, b) => {
@@ -59,13 +88,4 @@ export default function JobTable({ jobs }) {
   )
 }
 
-JobTable.propTypes = {
-  jobs: PropTypes.arrayOf(
-    PropTypes.shape({
-      id: PropTypes.string.isRequired,
-      status: PropTypes.string.isRequired,
-      start_time: PropTypes.string.isRequired,
-      final_val_acc: PropTypes.number,
-    }),
-  ).isRequired,
-}
+JobTable.propTypes = {}
