@@ -2,7 +2,7 @@ import os
 import time
 from typing import Any, Dict, Optional
 
-from tests.mock.mock_structured_logger import StructuredLogger
+from dr_exp.core import StructuredLogger
 
 
 def train(cfg: Any, logger: Optional[StructuredLogger] = None) -> Dict[str, Any]:
