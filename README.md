@@ -104,6 +104,25 @@
         - ```plain text
           uv run python scripts/reset_mock_db.py
           ```
+
+### 5.1 Local Backend and UI
+To experiment with the mock FastAPI backend and the React Babysitter UI together:
+
+1. **Start the backend** from the repository root:
+   ```bash
+   uv run uvicorn dr_exp.backend.main:app --reload
+   ```
+   The server listens on `http://localhost:8000`.
+
+2. **Start the React UI** in another terminal:
+   ```bash
+   cd react-babysitter-ui
+   npm install   # first time only
+   npm run dev
+   ```
+   Vite serves the app at `http://localhost:5173` and it queries `http://localhost:8000/jobs`.
+
+Opening the UI should display the jobs table fetched from the backend.
         - SLURM Mode (for actual experiments):
         - This will involve:
             1. Setting `EXPMGR_MODE="real"`.
