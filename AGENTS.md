@@ -27,6 +27,17 @@ Finally, run the test suite from the top level and fix any issues:
 uv run pytest
 ```
 
+### 3.1 Frontend Checks
+
+If you modify anything inside `react-babysitter-ui/`, ensure the React project still builds:
+
+```
+cd react-babysitter-ui
+npm install
+npm run dev
+```
+The Vite dev server should start without missing-module errors.
+
 ## 4. Simplified Agent Workflow (for Phase 1 Tasks)
 2.  **Understand Specs:** Thoroughly read the primary spec document for the component (e.g., `docs/supabase_mock.md`) and relevant sections of `docs/product_requirement_doc.md`.
 3.  **Code & Test:** Implement the component in Python. Write `pytest` unit tests covering its specified behavior.
