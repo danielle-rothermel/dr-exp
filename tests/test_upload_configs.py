@@ -5,19 +5,37 @@ from dr_exp.mock.supabase_mock_client import SupabaseMockClient
 from scripts import upload_configs
 
 
-def create_base_config(path: Path) -> None:
-    cfg = {"optim": {"lr": 0.1}, "model": {"name": "base"}}
-    path.write_text(json.dumps(cfg))
+def create_hydra_config(base_dir: Path) -> Path:
+    """Create a minimal Hydra config directory structure."""
+    cfg_dir = base_dir / "cfg"
+    (cfg_dir / "model").mkdir(parents=True)
+    (cfg_dir / "optimizer").mkdir()
+
+    (cfg_dir / "model" / "resnet.yaml").write_text("name: resnet18\n")
+    (cfg_dir / "model" / "vit.yaml").write_text("name: vit\n")
+    (cfg_dir / "optimizer" / "adam.yaml").write_text("lr: 0.001\n")
+
+    (cfg_dir / "config.yaml").write_text(
+        "\n".join(
+            [
+                "defaults:",
+                "  - model: resnet",
+                "  - optimizer: adam",
+                "  - override hydra/launcher: basic",
+            ]
+        )
+    )
+    return cfg_dir
 
 
 def test_generate_and_upload(tmp_path):
-    base = tmp_path / "base.yaml"
-    create_base_config(base)
-    client = SupabaseMockClient(base_path=str(tmp_path))
-    sweep = "optim.lr=0.01,0.02 model.name=a,b"
+    cfg_dir = create_hydra_config(tmp_path)
+    client = SupabaseMockClient(base_path=str(tmp_path / "env"))
+    sweep = "model=resnet,vit optimizer.lr=0.01,0.02"
 
     jobs = upload_configs.upload_configs(
-        base_config=str(base),
+        base_config_path=str(cfg_dir),
+        config_name="config.yaml",
         sweep=sweep,
         client=client,
         cluster_name="c1",
@@ -31,14 +49,13 @@ def test_generate_and_upload(tmp_path):
     for jf in job_files:
         data = json.loads(jf.read_text())
         cfg = data["config_json"]["config"]
-        assert cfg["optim"]["lr"] in [0.01, 0.02]
-        assert cfg["model"]["name"] in ["a", "b"]
+        assert cfg["optimizer"]["lr"] in [0.01, 0.02]
+        assert cfg["model"]["name"] in ["resnet18", "vit"]
         assert data["config_id"] == upload_configs.config_hash(cfg)
 
 
 def test_cli_main(tmp_path, capsys):
-    base = tmp_path / "base.yaml"
-    create_base_config(base)
+    cfg_dir = create_hydra_config(tmp_path)
     client_path = tmp_path / "env"
     client = SupabaseMockClient(base_path=str(client_path))
 
@@ -50,10 +67,12 @@ def test_cli_main(tmp_path, capsys):
 
     upload_configs.main(
         [
-            "--base-config",
-            str(base),
+            "--base-config-path",
+            str(cfg_dir),
+            "--config-name",
+            "config.yaml",
             "--sweep",
-            "optim.lr=0.1,0.2",
+            "model=vit optimizer.lr=0.1,0.2",
         ]
     )
     out = capsys.readouterr().out
