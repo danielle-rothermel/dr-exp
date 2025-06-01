@@ -26,6 +26,20 @@ class SupabaseMockClient:
             with open(self.errors_file, "w"):
                 pass  # Create empty file
 
+    def list_jobs(self) -> List[Dict[str, Any]]:
+        """Return a list of all job records in the mock database."""
+        jobs: List[Dict[str, Any]] = []
+        for job_file in os.listdir(self.jobs_dir):
+            if not job_file.endswith(".json"):
+                continue
+            path = os.path.join(self.jobs_dir, job_file)
+            try:
+                with open(path, "r") as f:
+                    jobs.append(json.load(f))
+            except Exception as e:  # pragma: no cover - unexpected read error
+                print(f"Error reading job file {path}: {e}")
+        return jobs
+
     # --- Interface methods based on docs/supabase_mock.md ---
 
     def claim_job(self) -> Optional[Dict[str, Any]]:

@@ -76,3 +76,15 @@ def test_admin_actions(client, sb_client):
         "/job/kill", json={"job_id": job_id}, headers={"X-API-Key": "bad"}
     )
     assert bad.status_code == 401
+
+
+def test_list_jobs_endpoint(client, sb_client):
+    job1 = sb_client.add_job({"a": 1}, "sweep1", status="queued")
+    job2 = sb_client.add_job({"b": 2}, "sweep2", status="running")
+
+    resp = client.get("/jobs")
+    assert resp.status_code == 200
+    data = resp.json()
+    ids = {j["id"] for j in data}
+    assert job1["id"] in ids
+    assert job2["id"] in ids

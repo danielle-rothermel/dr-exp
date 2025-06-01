@@ -7,6 +7,7 @@ from typing import Any, Dict, List
 
 from cachetools import LRUCache
 from fastapi import Depends, FastAPI, Header, HTTPException, status
+from fastapi.middleware.cors import CORSMiddleware
 
 from dr_exp.backend.models import (
     ConfigResponse,
@@ -67,11 +68,26 @@ class MetricsLoader:
 
 def create_app(base_path: str = ".") -> FastAPI:
     app = FastAPI()
+    
+    # Add CORS middleware
+    app.add_middleware(
+        CORSMiddleware,
+        allow_origins=["http://localhost:5173"],  # Vite dev server default port
+        allow_credentials=True,
+        allow_methods=["*"],
+        allow_headers=["*"],
+    )
+    
     client = get_supabase_client(base_path=base_path)
     loader = MetricsLoader(client)
 
     app.state.client = client
     app.state.loader = loader
+
+    @app.get("/jobs", response_model=List[JobModel])
+    async def list_jobs() -> List[JobModel]:
+        jobs = client.list_jobs()
+        return [JobModel.model_validate(j) for j in jobs]
 
     @app.get("/job/{job_id}", response_model=JobModel)
     async def get_job(job_id: str) -> JobModel:
