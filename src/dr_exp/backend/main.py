@@ -65,6 +65,11 @@ def create_app(base_path: str = ".") -> FastAPI:
     app.state.client = client
     app.state.loader = loader
 
+    @app.get("/jobs", response_model=List[JobModel])
+    async def list_jobs() -> List[JobModel]:
+        jobs = client.list_jobs()
+        return [JobModel.model_validate(j) for j in jobs]
+
     @app.get("/job/{job_id}", response_model=JobModel)
     async def get_job(job_id: str) -> JobModel:
         job = client.get_job_details(job_id)
