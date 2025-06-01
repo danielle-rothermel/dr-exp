@@ -7,6 +7,7 @@ from typing import Any, Dict, List
 
 from cachetools import LRUCache
 from fastapi import Depends, FastAPI, Header, HTTPException, status
+from fastapi.middleware.cors import CORSMiddleware
 
 from dr_exp.backend.models import (
     ConfigResponse,
@@ -59,6 +60,16 @@ class MetricsLoader:
 
 def create_app(base_path: str = ".") -> FastAPI:
     app = FastAPI()
+    
+    # Add CORS middleware
+    app.add_middleware(
+        CORSMiddleware,
+        allow_origins=["http://localhost:5173"],  # Vite dev server default port
+        allow_credentials=True,
+        allow_methods=["*"],
+        allow_headers=["*"],
+    )
+    
     client = SupabaseMockClient(base_path=base_path)
     loader = MetricsLoader(client)
 
