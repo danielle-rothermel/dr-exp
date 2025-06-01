@@ -1,0 +1,5 @@
+_target_: my_project.models.ResNetModel # Placeholder for actual class path
+name: resnet18
+pretrained: True
+num_classes: 10
+dropout_rate: 0.2 # Example parameter that can be swept
