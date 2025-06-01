@@ -5,33 +5,13 @@ from dr_exp.mock.supabase_mock_client import SupabaseMockClient
 from scripts import upload_configs
 
 
-def create_hydra_config(base_dir: Path) -> Path:
-    """Create a minimal Hydra config directory structure."""
-    cfg_dir = base_dir / "cfg"
-    (cfg_dir / "model").mkdir(parents=True)
-    (cfg_dir / "optimizer").mkdir()
-
-    (cfg_dir / "model" / "resnet.yaml").write_text("name: resnet18\n")
-    (cfg_dir / "model" / "vit.yaml").write_text("name: vit\n")
-    (cfg_dir / "optimizer" / "adam.yaml").write_text("lr: 0.001\n")
-
-    (cfg_dir / "config.yaml").write_text(
-        "\n".join(
-            [
-                "defaults:",
-                "  - model: resnet",
-                "  - optimizer: adam",
-                "  - override hydra/launcher: basic",
-            ]
-        )
-    )
-    return cfg_dir
+CONFIG_DIR = Path(__file__).resolve().parents[1] / "configs"
 
 
 def test_generate_and_upload(tmp_path):
-    cfg_dir = create_hydra_config(tmp_path)
+    cfg_dir = CONFIG_DIR
     client = SupabaseMockClient(base_path=str(tmp_path / "env"))
-    sweep = "model=resnet,vit optimizer.lr=0.01,0.02"
+    sweep = "model=resnet,vit optim.lr=0.01,0.02"
 
     jobs = upload_configs.upload_configs(
         base_config_path=str(cfg_dir),
@@ -49,13 +29,13 @@ def test_generate_and_upload(tmp_path):
     for jf in job_files:
         data = json.loads(jf.read_text())
         cfg = data["config_json"]["config"]
-        assert cfg["optimizer"]["lr"] in [0.01, 0.02]
-        assert cfg["model"]["name"] in ["resnet18", "vit"]
+        assert cfg["optim"]["lr"] in [0.01, 0.02]
+        assert cfg["model"]["name"] in ["resnet18", "vit_base_patch16_224"]
         assert data["config_id"] == upload_configs.config_hash(cfg)
 
 
 def test_cli_main(tmp_path, capsys):
-    cfg_dir = create_hydra_config(tmp_path)
+    cfg_dir = CONFIG_DIR
     client_path = tmp_path / "env"
     client = SupabaseMockClient(base_path=str(client_path))
 
@@ -72,7 +52,7 @@ def test_cli_main(tmp_path, capsys):
             "--config-name",
             "config.yaml",
             "--sweep",
-            "model=vit optimizer.lr=0.1,0.2",
+            "model=vit optim.lr=0.1,0.2",
         ]
     )
     out = capsys.readouterr().out
