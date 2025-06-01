@@ -10,9 +10,16 @@ from typing import Dict, List
 
 from dr_exp.mock.supabase_mock_client import SupabaseMockClient
 
-# Attempt to import the real worker entrypoint if it exists
+# Attempt to import the worker implementation from scripts.run_worker
 try:
-    from run_worker import main as run_worker_main  # type: ignore
+    from scripts import run_worker as _run_worker
+
+    def run_worker_main(worker_id: str, work_dir: str) -> None:
+        """Wrapper to execute the real worker with base path from env."""
+
+        base_path = os.environ.get("DR_EXP_BASE_PATH", ".")
+        _run_worker.run_worker(base_path=base_path, work_dir=work_dir)
+
 except Exception:  # pragma: no cover - worker script may not exist
 
     def run_worker_main(*args: object, **kwargs: object) -> None:
@@ -43,6 +50,8 @@ class Manager:
         self.idle_timeout = timedelta(minutes=idle_timeout_mins)
         self.base_dir = base_dir
         self.client = client or SupabaseMockClient()
+        # Base path for SupabaseMockClient used by workers
+        self.base_path = os.path.dirname(self.client.mock_db_path)
         self.workers: Dict[str, Dict[str, object]] = {}
         self.last_activity = datetime.now(UTC)
         self.shutdown = False
@@ -51,11 +60,13 @@ class Manager:
             filename=os.path.join(self.base_dir, "manager.log"),
             level=logging.INFO,
             format="%(asctime)s %(levelname)s %(message)s",
+            force=True,
         )
 
     # ---------------- Worker Management ------------------
     def _worker_target(self, worker_id: str, gpu_id: str, worker_dir: str) -> None:
         os.environ["CUDA_VISIBLE_DEVICES"] = gpu_id
+        os.environ["DR_EXP_BASE_PATH"] = self.base_path
         os.makedirs(worker_dir, exist_ok=True)
         run_worker_main(worker_id=worker_id, work_dir=worker_dir)  # type: ignore[arg-type]
 
