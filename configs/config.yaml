@@ -1,4 +1,5 @@
 defaults:
+  - _self_
   - model: resnet
   - optim: adam
   - override hydra/launcher: basic # For local execution of multirun if running a Hydra app directly

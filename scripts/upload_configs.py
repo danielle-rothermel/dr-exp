@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+from pathlib import Path
 import argparse
 import hashlib
 import itertools
@@ -95,10 +96,11 @@ def upload_configs(
 
 
 def build_arg_parser() -> argparse.ArgumentParser:
+    self_dir_absolute = Path(__file__).resolve().parents[1]
     parser = argparse.ArgumentParser(description="Generate and upload configs.")
     parser.add_argument(
         "--base-config-path",
-        default="./configs",
+        default=str(self_dir_absolute / "configs"),
         help="Directory containing Hydra config files",
     )
     parser.add_argument(
