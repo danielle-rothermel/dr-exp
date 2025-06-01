@@ -139,3 +139,42 @@ Considerations:
 - The worker itself does not implement retry logic for a failed `train()` call; requeuing is external.
 - This version does not need to handle SLURM-specifics; it's the core job processing loop.
 - Interaction with `SupabaseMockClient` is key.
+
+#### Task 2.4 Slurm Manager Logic
+
+Objective:
+Implement the core logic for the `SLURM Manager` (`run_manager.py`) as specified in `docs/manager.md`. This initial version will focus on GPU discovery, worker process spawning (using `multiprocessing`), basic heartbeat monitoring (via `SupabaseMockClient`), and logging its own operations.
+
+Primary Specification Document:
+- `docs/manager.md`
+
+Key Functionalities to Implement:
+- [ ]  **Initialization & Configuration:**
+    - Accept command-line arguments (e.g., `--gpus-per-node`, `--workers-per-gpu`, `--heartbeat-interval`, `--idle-timeout-mins`).
+    - Parse `CUDA_VISIBLE_DEVICES` (or simulate GPU discovery) to determine available GPUs.
+- [ ]  **Local Path Management:**
+    - Create a unique base directory for this SLURM job instance locally (e.g., using SLURM job ID).
+    - Log its own operational events to a file within this directory (e.g., `manager.log`). This log will eventually be uploaded by the worker or a finalization step.
+- [ ]  **Worker Spawning:**
+    - For each available GPU, spawn N `Worker Process` instances using `multiprocessing.Process`.
+    - Each worker should be configured with unique local working directory paths derived from the manager's base directory and a worker ID. These paths are then injected into the worker's config.
+    - For now, these workers will execute `run_worker.py` (from Task 2.3).
+- [ ]  **Heartbeat Monitoring (Basic):**
+    - Periodically query the `SupabaseMockClient` to check the `heartbeat` timestamps of jobs marked as `running` and presumed to be handled by its workers. (The manager will need a way to know which jobs its workers *should* be running, or which workers are its children).
+    - If a worker/job heartbeat is stale:
+        - Log the issue.
+        - Use `SupabaseMockClient` to mark the job as `failed` (e.g., `status_reason='worker_lost'`).
+        - Relaunch a new worker process to replace the one presumed lost (the new worker will claim a new job).
+- [ ]  **Idle Timeout:** Implement logic to shut down if no claimable jobs are found/processed by workers for a configurable duration.
+- [ ]  **Signal Handling (Basic):** Trap `SIGTERM` / `SIGINT` for graceful shutdown attempts (terminating child worker processes).
+
+Expected Output:
+- `run_manager.py` script.
+- `pytest` unit tests for the manager's logic, focusing on GPU discovery simulation, worker spawning (mocking the actual worker execution), heartbeat checking logic (mocking `SupabaseMockClient` responses), and idle timeout.
+
+Considerations:
+- This version interacts with `SupabaseMockClient`.
+- Full integration testing with a live `run_worker.py` is a subsequent task.
+- The manager does not directly requeue jobs; it marks them as failed due to worker issues.
+- MPS setup is mentioned in the spec but can be deferred if too complex for this initial core logic, focusing first on process management.
+
