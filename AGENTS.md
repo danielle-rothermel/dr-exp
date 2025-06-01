@@ -110,26 +110,26 @@ Primary Specification Document:
 - Refer to Training Interface Contract (PRD Section 5).
 
 Key Functionalities to Implement:
-- [ ]  **Job Claiming:**
+- [x]  **Job Claiming:**
     - Use `SupabaseMockClient.claim_job()` to atomically claim a job.
     - Implement exponential backoff if no job is available initially. Exit if no job claimed after N retries.
-- [ ]  **Configuration & Setup:**
+- [x]  **Configuration & Setup:**
     - On successful claim, retrieve the `config_json` for the job using `SupabaseMockClient.get_config_for_job()`.
     - Assume the SLURM Manager (or a test harness for now) provides unique local working directory paths. Inject these paths into `cfg.logging` (e.g., `out_path`, `checkpoint_dir`, `artifact_dir`).
     - Initialize `StructuredLogger` with this modified `cfg`.
-- [ ]  **Execution:**
+- [x]  **Execution:**
     - Call the `Mock Trainer`'s `train(cfg, logger)` function (from Phase 1).
     - Periodically update the job's `heartbeat` timestamp in the mock Supabase using `SupabaseMockClient.update_job()`.
-- [ ]  **Result Handling & Upload (Simulated):**
+- [x]  **Result Handling & Upload (Simulated):**
     - After `train()` completes, call `logger.finalize()` to get metadata about local outputs.
     - Use `SupabaseMockClient.upload_artifact()` to "upload" the generated `metrics.jsonl`, checkpoints, and any other artifacts from their local paths (provided by logger) to the mock storage.
     - Use `SupabaseMockClient.upload_artifact()` to also "upload" the worker's own operational log file.
-- [ ]  **Job Finalization:**
+- [x]  **Job Finalization:**
     - Update the job record in mock Supabase using `SupabaseMockClient.finalize_job()` or `update_job()` with the final status (from `train()` return or error), metrics from `train()`, paths to artifacts in mock storage, `upload_complete_at`, and `finalize_success`.
-- [ ]  **Failure Handling:**
+- [x]  **Failure Handling:**
     - If `train()` raises an exception or returns a failure status, record the error using `SupabaseMockClient.record_failure()`.
     - Ensure job status is correctly updated to `failed`.
-- [ ]  **Local Path Management:** The worker receives unique local paths for its outputs. It is responsible for cleaning up its local temporary working directory upon completion or critical failure.
+- [x]  **Local Path Management:** The worker receives unique local paths for its outputs. It is responsible for cleaning up its local temporary working directory upon completion or critical failure.
 
 Expected Output:
 - `run_worker.py` script.

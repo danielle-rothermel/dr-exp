@@ -225,7 +225,7 @@ class SupabaseMockClient:
         job_file_path = os.path.join(self.jobs_dir, f"{job_id}.json")
         with open(job_file_path, "w") as f:
             json.dump(job_data, f, indent=4)
-        print(f"Added new job {job_id}") # Debug
+        print(f"Added new job {job_id}")  # Debug
         print("Job Data:")
         for k, v in job_data.items():
             print(f" - {k + ':':20} {v}")
