@@ -1,0 +1,154 @@
+# Main Configuration File: config.yaml
+# This is the entry point for your Hydra configuration.
+
+# Default values for configurable groups
+defaults:
+  - model: resnet
+  - optimizer: adam
+  # Add other groups as needed, e.g., dataset, logging
+  # To use BasicSweeper for grid search via CLI, you can either:
+  # 1. Omit the hydra/sweeper override (BasicSweeper is often the default for --multirun)
+  # 2. Explicitly set it:
+  # - override hydra/sweeper: basic
+  # For this example, we'll assume BasicSweeper will be used via CLI overrides for upload_configs.py
+  - override hydra/launcher: basic # For local execution of multirun if running a Hydra app directly
+
+# Experiment-level parameters
+project_name: "my_image_classification"
+experiment_name: "initial_sweep_v1"
+seed: 42
+max_epochs: 100
+
+# Training specific parameters
+train:
+  batch_size: 64
+  num_workers: 4
+
+# Validation specific parameters
+validation:
+  batch_size: 128
+
+# Logging parameters (paths will be injected by the Experiment Manager later)
+logging:
+  log_interval: 50 # Log every 50 steps
+  # out_path, artifact_dir, checkpoint_dir will be set by the worker
+
+# Hydra specific settings
+hydra:
+  run:
+    dir: outputs/${now:%Y-%m-%d}/${now:%H-%M-%S}_${hydra.job.override_dirname}
+  sweep:
+    dir: multirun/${now:%Y-%m-%d}/${now:%H-%M-%S}_${experiment_name}
+    subdir: ${hydra.job.num} # Each run in a sweep gets its own subdirectory
+
+---
+# Model Configuration: model/resnet.yaml
+_target_: my_project.models.ResNetModel # Placeholder for actual class path
+name: resnet18
+pretrained: True
+num_classes: 10
+dropout_rate: 0.2 # Example parameter that can be swept
+
+---
+# Model Configuration: model/vit.yaml
+_target_: my_project.models.ViTModel # Placeholder for actual class path
+name: vit_base_patch16_224
+pretrained: True
+num_classes: 10
+image_size: 224
+patch_size: 16
+num_heads: 8
+dropout_rate: 0.1 # Example parameter that can be swept
+
+---
+# Optimizer Configuration: optimizer/adam.yaml
+_target_: torch.optim.Adam # Example, assuming PyTorch
+lr: 0.001 # Default learning rate, can be swept
+betas: [0.9, 0.999]
+weight_decay: 0.0001
+
+---
+# Optimizer Configuration: optimizer/sgd.yaml
+_target_: torch.optim.SGD # Example, assuming PyTorch
+lr: 0.01 # Default learning rate, can be swept
+momentum: 0.9
+weight_decay: 0.00005
+nesterov: True
+
+# --- Notes for `upload_configs.py` (Config Generator) using BasicSweeper-style CLI Overrides ---
+#
+# The `upload_configs.py` script is responsible for generating all individual, resolved
+# configurations from a base set of Hydra configs and a sweep definition.
+# When mimicking Hydra's BasicSweeper behavior (grid search via command-line overrides),
+# the script will need to:
+#
+# 1. Accept Inputs:
+#    - `--base-config-path`: Path to the directory containing `config.yaml` and subdirectories
+#      like `model/`, `optimizer/`. (e.g., `./configs`)
+#    - `--config-name`: The name of the main config file (e.g., `config.yaml`).
+#    - `--sweep`: A string defining the parameters to sweep, in Hydra's command-line
+#      multirun format. Example: "model=resnet,vit optimizer=adam,sgd optimizer.lr=0.001,0.0005,0.01"
+#    - `--cluster-name` (optional): A name for this group of sweep configurations.
+#    - Other metadata like git hash, interface version, etc.
+#
+# 2. Parse the Sweep String:
+#    The script must parse the `--sweep` string to identify each parameter being swept
+#    and its list of values.
+#    For "model=resnet,vit optimizer.lr=0.001,0.01":
+#      - Parameter 1: `model` with values `['resnet', 'vit']`
+#      - Parameter 2: `optimizer.lr` with values `['0.001', '0.01']` (note: these are strings)
+#
+# 3. Generate Override Combinations:
+#    The script needs to compute the Cartesian product of all sweep parameter values
+#    to generate a list of override sets. Each set represents one unique configuration.
+#    For the example above, the override combinations would be:
+#      - Combo 1: `["model=resnet", "optimizer.lr=0.001"]`
+#      - Combo 2: `["model=resnet", "optimizer.lr=0.01"]`
+#      - Combo 3: `["model=vit", "optimizer.lr=0.001"]`
+#      - Combo 4: `["model=vit", "optimizer.lr=0.01"]`
+#    (The `itertools.product` function in Python is useful here).
+#
+# 4. Programmatically Compose Configurations using Hydra API:
+#    For each override combination generated in step 3:
+#    - Initialize Hydra (if not already done, ensuring `GlobalHydra.instance().clear()`
+#      is called if initializing multiple times in a loop within the script).
+#      `hydra.initialize(config_path=args.base_config_path, version_base=None)`
+#    - Compose the configuration:
+#      `cfg = hydra.compose(config_name=args.config_name, overrides=override_combination)`
+#      `resolved_cfg_dict = OmegaConf.to_container(cfg, resolve=True, throw_on_missing=True)`
+#      This `resolved_cfg_dict` is a Python dictionary representing one fully resolved configuration.
+#
+# 5. Process and Store Configurations:
+#    For each `resolved_cfg_dict`:
+#    - Calculate its hash (e.g., SHA256 of its canonical JSON representation) for deduplication.
+#    - Interact with the Supabase client (or `SupabaseMockClient`):
+#      - Create/update a `sweep_config_clusters` entry.
+#      - Create a `sweep_configs` entry in Supabase, storing `resolved_cfg_dict` (as JSONB),
+#        its hash, and any associated metadata (git hash, interface version).
+#      - Create one or more corresponding `jobs` entries (status='queued') linked to this `sweep_configs` entry.
+#
+# Example of how `upload_configs.py` might be invoked:
+# ```bash
+# python upload_configs.py \
+#   --base-config-path ./path/to/hydra_configs \
+#   --config-name config.yaml \
+#   --sweep "model=resnet,vit optimizer=sgd optimizer.lr=0.01,0.05 model.dropout_rate=0.1,0.2" \
+#   --cluster-name "my_first_grid_search" \
+#   --code-version $(git rev-parse HEAD) \
+#   --interface-version "v1.0"
+# ```
+#
+# The agent implementing `upload_configs.py` will need to include robust parsing for the
+# --sweep argument and correctly use Hydra's programmatic API for composition.
+# It does NOT run a full Hydra application with `hydra.main()`; it only uses Hydra's
+# configuration loading and composition capabilities.
+#
+# Key Python Libraries/Functions for the Agent:
+# - `argparse` (for CLI arguments)
+# - `hydra.initialize`, `hydra.compose`
+# - `omegaconf.OmegaConf.to_container`
+# - `json` (for canonical representation for hashing)
+# - `hashlib` (for SHA256 hashing)
+# - `itertools.product` (for generating override combinations)
+# - The `SupabaseMockClient` (or real client) interface.
+
