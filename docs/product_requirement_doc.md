@@ -235,6 +235,18 @@
     - **`Post-Run Analysis Engine` (Optional for V1):** Script to populate `metrics` SQL table from `.jsonl` files for optimized UI queries. If not V1, UI relies solely on FastAPI parsing `.jsonl`.
 ### Agent Task Breakdown
     - Each component and sub-feature within these phases can be broken down into specific, testable tasks suitable for agentic implementation, referencing their detailed specification documents (e.g., `docs/worker.md`, `docs/supabase_schema.md`, etc.).
+
+## Implementation Status
+The following core pieces are implemented and covered by tests:
+ - `SupabaseMockClient` and reset utility
+ - Mock trainer used for local runs
+ - Configuration upload script
+ - Full `StructuredLogger`
+ - Worker process script
+ - FastAPI backend with job, config, metrics, kill, and requeue endpoints
+ - SLURM manager with worker spawning, heartbeat monitoring, idle timeout, and signal handling
+
+Remaining work includes the Babysitter React UI, integration with a real Supabase instance, the production `sbatch` launch script, and end-to-end testing on a cluster.
 ## 9. Future Considerations (Post-V1)
     - Advanced UI features (config diffing, detailed plot customization).
     - Automated environment fingerprinting for reproducibility.

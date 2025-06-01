@@ -62,7 +62,7 @@ Considerations:
 - The logger should remain agnostic to the training framework.
 - Ensure all file I/O operations are robust (e.g., handle file not found, permissions issues gracefully when `debug=False`).
 
-#### Task 2.2 Impelment Initial FastAPI Backend
+#### Task 2.2 Implement Initial FastAPI Backend
 
 Objective:
 Implement the initial FastAPI backend server as specified in `docs/api_contracts.md`. This version will interact with the `SupabaseMockClient` (from Phase 1) to serve data and handle basic job control commands. Focus on the REST API endpoints.
@@ -148,25 +148,25 @@ Implement the core logic for the `SLURM Manager` (`run_manager.py`) as specified
 Primary Specification Document:
 - `docs/manager.md`
 
-Key Functionalities to Implement:
-- [ ]  **Initialization & Configuration:**
+Key Functionalities Implemented:
+- [x]  **Initialization & Configuration:**
     - Accept command-line arguments (e.g., `--gpus-per-node`, `--workers-per-gpu`, `--heartbeat-interval`, `--idle-timeout-mins`).
     - Parse `CUDA_VISIBLE_DEVICES` (or simulate GPU discovery) to determine available GPUs.
-- [ ]  **Local Path Management:**
+- [x]  **Local Path Management:**
     - Create a unique base directory for this SLURM job instance locally (e.g., using SLURM job ID).
     - Log its own operational events to a file within this directory (e.g., `manager.log`). This log will eventually be uploaded by the worker or a finalization step.
-- [ ]  **Worker Spawning:**
+- [x]  **Worker Spawning:**
     - For each available GPU, spawn N `Worker Process` instances using `multiprocessing.Process`.
     - Each worker should be configured with unique local working directory paths derived from the manager's base directory and a worker ID. These paths are then injected into the worker's config.
     - For now, these workers will execute `run_worker.py` (from Task 2.3).
-- [ ]  **Heartbeat Monitoring (Basic):**
+- [x]  **Heartbeat Monitoring (Basic):**
     - Periodically query the `SupabaseMockClient` to check the `heartbeat` timestamps of jobs marked as `running` and presumed to be handled by its workers. (The manager will need a way to know which jobs its workers *should* be running, or which workers are its children).
     - If a worker/job heartbeat is stale:
         - Log the issue.
         - Use `SupabaseMockClient` to mark the job as `failed` (e.g., `status_reason='worker_lost'`).
         - Relaunch a new worker process to replace the one presumed lost (the new worker will claim a new job).
-- [ ]  **Idle Timeout:** Implement logic to shut down if no claimable jobs are found/processed by workers for a configurable duration.
-- [ ]  **Signal Handling (Basic):** Trap `SIGTERM` / `SIGINT` for graceful shutdown attempts (terminating child worker processes).
+- [x]  **Idle Timeout:** Implement logic to shut down if no claimable jobs are found/processed by workers for a configurable duration.
+- [x]  **Signal Handling (Basic):** Trap `SIGTERM` / `SIGINT` for graceful shutdown attempts (terminating child worker processes).
 
 Expected Output:
 - `run_manager.py` script.
