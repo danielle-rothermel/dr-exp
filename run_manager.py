@@ -26,6 +26,17 @@ except Exception:  # pragma: no cover - worker script may not exist
         raise RuntimeError("run_worker.py not available")
 
 
+def _worker_target(
+    base_path: str, worker_id: str, gpu_id: str, worker_dir: str
+) -> None:
+    """Entry point for spawned worker processes."""
+
+    os.environ["CUDA_VISIBLE_DEVICES"] = gpu_id
+    os.environ["DR_EXP_BASE_PATH"] = base_path
+    os.makedirs(worker_dir, exist_ok=True)
+    run_worker_main(worker_id=worker_id, work_dir=worker_dir)  # type: ignore[arg-type]
+
+
 def discover_gpus(gpus_per_node: int) -> List[str]:
     """Return list of visible GPU IDs as strings."""
     env = os.environ.get("CUDA_VISIBLE_DEVICES")
@@ -64,16 +75,15 @@ class Manager:
         )
 
     # ---------------- Worker Management ------------------
-    def _worker_target(self, worker_id: str, gpu_id: str, worker_dir: str) -> None:
-        os.environ["CUDA_VISIBLE_DEVICES"] = gpu_id
-        os.environ["DR_EXP_BASE_PATH"] = self.base_path
-        os.makedirs(worker_dir, exist_ok=True)
-        run_worker_main(worker_id=worker_id, work_dir=worker_dir)  # type: ignore[arg-type]
 
     def launch_worker(self, worker_id: str, gpu_id: str) -> None:
         """Launch a worker process."""
+
         worker_dir = os.path.join(self.base_dir, worker_id)
-        proc = Process(target=self._worker_target, args=(worker_id, gpu_id, worker_dir))
+        proc = Process(
+            target=_worker_target,
+            args=(self.base_path, worker_id, gpu_id, worker_dir),
+        )
         proc.start()
         self.workers[worker_id] = {"process": proc, "gpu": gpu_id}
         logging.info("Launched worker %s on GPU %s", worker_id, gpu_id)
