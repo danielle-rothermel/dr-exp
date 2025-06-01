@@ -15,5 +15,6 @@ It is bootstrapped with [Vite](https://vitejs.dev/) and uses Tailwind CSS for ba
    ```
    The application will be available at `http://localhost:5173` by default.
 
-The current version displays a table of mock jobs with sortable columns. Clicking
-any row will log the selected job ID to the browser console.
+The UI displays a table of mock jobs with sortable columns. Clicking a row
+navigates to a job detail page which fetches and displays the full
+configuration for that job.

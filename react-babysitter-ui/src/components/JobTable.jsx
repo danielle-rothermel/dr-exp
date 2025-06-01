@@ -1,7 +1,9 @@
 import { useEffect, useState } from 'react'
 import PropTypes from 'prop-types'
+import { useNavigate } from 'react-router-dom'
 import { fetchJobs } from '../api.js'
 export default function JobTable() {
+  const navigate = useNavigate()
   const [jobs, setJobs] = useState([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState(null)
@@ -74,7 +76,7 @@ export default function JobTable() {
         {sortedJobs.map((job) => (
           <tr
             key={job.id}
-            onClick={() => console.log('Selected job:', job.id)}
+            onClick={() => navigate(`/job/${job.id}`)}
             className="hover:bg-slate-100 dark:hover:bg-slate-700 cursor-pointer"
           >
             <td className="border px-2 py-1">{job.id}</td>
