@@ -1,7 +1,7 @@
 import gzip
 import json
 import os
-from datetime import datetime
+from datetime import datetime, UTC
 from typing import Any, Dict, List
 
 
@@ -44,7 +44,7 @@ class StructuredLogger:
 
     def log(self, metrics: Dict[str, Any]) -> None:
         entry = metrics.copy()
-        entry["timestamp"] = datetime.utcnow().isoformat() + "Z"
+        entry["timestamp"] = datetime.now(UTC).isoformat() + "Z"
         self._metrics_file.write(json.dumps(entry) + "\n")
         self._metrics_file.flush()
         self._num_metrics += 1

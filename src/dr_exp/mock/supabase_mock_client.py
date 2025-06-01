@@ -2,7 +2,7 @@ import json
 import os
 import shutil
 import uuid
-from datetime import datetime
+from datetime import datetime, UTC
 from typing import Optional, List, Dict, Any
 # For file locking - fcntl is Unix-specific. Consider a cross-platform alternative
 # or simplify if concurrency isn't a major concern for initial mock usage.
@@ -53,7 +53,7 @@ class SupabaseMockClient:
                         job_data["assigned_worker"] = (
                             f"mock_worker_{uuid.uuid4().hex[:6]}"
                         )
-                        job_data["heartbeat"] = datetime.utcnow().isoformat() + "Z"
+                        job_data["heartbeat"] = datetime.now(UTC).isoformat() + "Z"
 
                         f.seek(0)
                         json.dump(job_data, f, indent=4)
@@ -85,7 +85,7 @@ class SupabaseMockClient:
                 existing_data.update(data)
                 # Ensure heartbeat is updated if status is running
                 if existing_data.get("status") == "running" and "heartbeat" not in data:
-                    existing_data["heartbeat"] = datetime.utcnow().isoformat() + "Z"
+                    existing_data["heartbeat"] = datetime.now(UTC).isoformat() + "Z"
 
                 f.seek(0)
                 json.dump(existing_data, f, indent=4)
@@ -107,7 +107,7 @@ class SupabaseMockClient:
                         "timestamp" not in metrics_to_log
                     ):  # Add timestamp if not present
                         metrics_to_log["timestamp"] = (
-                            datetime.utcnow().isoformat() + "Z"
+                            datetime.now(UTC).isoformat() + "Z"
                         )
                     f.write(json.dumps(metrics_to_log) + "\n")
             # print(f"Logged {len(metrics_list)} metrics for job: {job_id}") # Debug
@@ -127,7 +127,7 @@ class SupabaseMockClient:
             "error_type": error_type,
             "message": message,
             "stacktrace": stacktrace,
-            "timestamp": datetime.utcnow().isoformat() + "Z",
+            "timestamp": datetime.now(UTC).isoformat() + "Z",
         }
         try:
             with open(self.errors_file, "a") as f:
@@ -140,7 +140,7 @@ class SupabaseMockClient:
         """Finalizes a job, typically setting its status and end_time, and other metadata."""
         update_data = {
             "status": final_status,
-            "end_time": datetime.utcnow().isoformat() + "Z",
+            "end_time": datetime.now(UTC).isoformat() + "Z",
         }
         update_data.update(metadata)  # e.g., upload_complete_at, finalize_success
         return self.update_job(job_id, update_data)
@@ -219,7 +219,7 @@ class SupabaseMockClient:
             "retry_index": 0,
             "assigned_worker": "unassigned",
             "config_json": job_config,  # Storing the full config here for mock simplicity
-            "created_at": datetime.utcnow().isoformat() + "Z",
+            "created_at": datetime.now(UTC).isoformat() + "Z",
             # ... other fields will be populated as the job runs
         }
         job_file_path = os.path.join(self.jobs_dir, f"{job_id}.json")
