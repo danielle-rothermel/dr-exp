@@ -13,3 +13,11 @@ export async function fetchJobConfig(jobId) {
   }
   return resp.json();
 }
+
+export async function fetchJobMetrics(jobId) {
+  const resp = await fetch(`http://localhost:8000/metrics/${jobId}`);
+  if (!resp.ok) {
+    throw new Error(`API error ${resp.status}`);
+  }
+  return resp.json();
+}
