@@ -13,8 +13,8 @@ def get_supabase_client(
     Parameters
     ----------
     base_path : str, optional
-        Base directory used when creating :class:`SupabaseMockClient`. Ignored
-        when running in real mode.
+        Base directory used when creating :class:`SupabaseMockClient` and as the
+        local storage path when running in real mode.
 
     Returns
     -------
@@ -35,5 +35,5 @@ def get_supabase_client(
         )
         if not url or not key:
             raise ValueError("SUPABASE_URL and key required for real mode")
-        return SupabaseClient(url, key)
+        return SupabaseClient(url, key, base_path=base_path)
     return SupabaseMockClient(base_path=base_path)

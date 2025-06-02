@@ -50,9 +50,10 @@ def test_get_supabase_client_modes(monkeypatch):
     assert isinstance(client, SupabaseMockClient)
 
     class Dummy:
-        def __init__(self, url, key):
+        def __init__(self, url, key, base_path="."):
             self.url = url
             self.key = key
+            self.base_path = base_path
 
     monkeypatch.setenv("EXPMGR_MODE", "real")
     monkeypatch.setenv("SUPABASE_URL", "http://x")

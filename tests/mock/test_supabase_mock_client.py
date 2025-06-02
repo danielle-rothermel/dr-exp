@@ -333,6 +333,12 @@ def test_finalize_job(mock_client, sample_job_config, sample_sweep_config_id):
     assert "end_time" in finalized_job_details
     assert finalized_job_details["final_val_acc"] == 0.95
     assert finalized_job_details["finalize_success"] is True
+    flag_path = os.path.join(
+        mock_client.mock_storage_path,
+        f"run_{job_id}",
+        "finished.flag",
+    )
+    assert os.path.exists(flag_path)
 
 
 # --- Test for Reset Utility (Implicitly via fixture, but can add explicit if needed) ---

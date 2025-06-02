@@ -29,6 +29,7 @@ def test_worker_success(tmp_path):
     storage_run = os.path.join(client.mock_storage_path, f"run_{job['id']}")
     assert os.path.exists(os.path.join(storage_run, "metrics.jsonl"))
     assert os.path.isdir(os.path.join(storage_run, "artifacts"))
+    assert os.path.exists(os.path.join(storage_run, "finished.flag"))
 
 
 def test_worker_no_job(tmp_path):

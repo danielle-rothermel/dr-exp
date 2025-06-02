@@ -177,7 +177,21 @@ class SupabaseMockClient:
             "end_time": datetime.now(UTC).isoformat() + "Z",
         }
         update_data.update(metadata)  # e.g., upload_complete_at, finalize_success
-        return self.update_job(job_id, update_data)
+        result = self.update_job(job_id, update_data)
+        if result.get("success"):
+            self._write_finished_flag(job_id)
+        return result
+
+    def _write_finished_flag(self, job_id: str) -> None:
+        """Create an empty ``finished.flag`` file for ``job_id``."""
+        run_dir = os.path.join(self.mock_storage_path, f"run_{job_id}")
+        os.makedirs(run_dir, exist_ok=True)
+        flag_path = os.path.join(run_dir, "finished.flag")
+        try:
+            with open(flag_path, "w"):
+                pass
+        except Exception as e:
+            print(f"Error writing finished flag for job {job_id}: {e}")
 
     def upload_artifact(self, job_id: str, local_path: str, remote_path_suffix: str):
         """

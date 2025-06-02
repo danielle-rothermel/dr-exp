@@ -101,3 +101,11 @@ def test_insert_helpers(monkeypatch, stub_client):
     result = client.add_job_entry("cid", status="queued")
     assert stub_client["tables"][2][0] == "jobs"
     assert result["config_id"] == "cid"
+
+
+def test_write_finished_flag(tmp_path, stub_client):
+    client = SupabaseClient("url", "key", base_path=str(tmp_path))
+    job_id = "jid3"
+    client._write_finished_flag(job_id)
+    flag_path = tmp_path / "mock_storage" / f"run_{job_id}" / "finished.flag"
+    assert flag_path.exists()
