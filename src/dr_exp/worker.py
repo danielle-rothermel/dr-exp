@@ -155,7 +155,10 @@ def run_worker(
     )
     shutil.copy2(worker_log_path, os.path.join(bundle_dir, "worker.log"))
 
-    bundle_upload = client.upload_artifact(job_id, bundle_dir, "bundle")
+    bundle_zip = shutil.make_archive(
+        os.path.join(work_dir, "bundle"), "zip", bundle_dir
+    )
+    bundle_upload = client.upload_artifact(job_id, bundle_zip, "bundle.zip")
 
     final_status = "completed" if train_status == "success" else "failed"
     metadata = {
