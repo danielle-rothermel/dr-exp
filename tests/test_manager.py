@@ -4,7 +4,7 @@ from pathlib import Path
 
 
 from dr_exp.mock.supabase_mock_client import SupabaseMockClient
-import run_manager as manager
+import dr_exp.manager as manager
 
 
 def dummy_worker(worker_id: str, work_dir: str) -> None:

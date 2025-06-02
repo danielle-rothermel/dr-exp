@@ -10,14 +10,14 @@ The Launcher initializes the execution environment (e.g., CUDA MPS) and delegate
 
 ## Responsibilities
 
-### Launcher (`slurm_job.sbatch` + `run_manager.py`):
+### Launcher (`slurm_job.sbatch` + `scripts/run_manager.py`):
 
 * Setup MPS directories and control daemon
 * Source cluster-specific environment scripts
 * Trap termination signals for clean shutdown
-* Launch `run_manager.py` with appropriate arguments
+* Launch `scripts/run_manager.py` with appropriate arguments
 
-### Manager (`run_manager.py`):
+### Manager (`scripts/run_manager.py`):
 
 * Discover available GPUs and spawn N worker processes per GPU
 * Monitor worker health via periodic heartbeats
