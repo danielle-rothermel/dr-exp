@@ -16,13 +16,13 @@ from fastapi.testclient import TestClient
 import dr_exp.manager as manager
 from dr_exp.backend.main import create_app
 from dr_exp.mock.supabase_mock_client import SupabaseMockClient
-from scripts import upload_configs
+from dr_exp import config_upload
 
 CONFIG_DIR = Path(__file__).resolve().parents[2] / "configs"
 
 
 def create_jobs(client: SupabaseMockClient, sweep: str) -> list[dict]:
-    return upload_configs.upload_configs(
+    return config_upload.upload_configs(
         base_config_path=str(CONFIG_DIR),
         config_name="config.yaml",
         sweep=sweep,
