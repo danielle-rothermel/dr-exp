@@ -1,6 +1,8 @@
 # Example: experiment_manager/core/supabase_client.py
 
 import os
+import shutil
+import tempfile
 from supabase import create_client, Client
 from typing import Optional, Dict, Any
 from datetime import datetime, timezone
@@ -304,10 +306,22 @@ class SupabaseClient:
 
         try:
             if os.path.isdir(local_path):
-                return {
-                    "success": False,
-                    "message": "Directory upload not directly supported; please zip or upload files individually.",
-                }
+                base_name = (
+                    os.path.basename(remote_path_suffix.rstrip("/")) or "artifacts"
+                )
+                temp_dir = tempfile.mkdtemp()
+                archive_path = shutil.make_archive(
+                    os.path.join(temp_dir, base_name), "zip", local_path
+                )
+                remote_full_path = f"{remote_full_path.rstrip('/')}.zip"
+                with open(archive_path, "rb") as f:
+                    self.supabase.storage.from_("experiment-artifacts").upload(
+                        file=f,
+                        path=remote_full_path,
+                        file_options={"cache-control": "3600", "upsert": True},
+                    )
+                os.remove(archive_path)
+                os.rmdir(temp_dir)
             else:  # It's a file
                 with open(local_path, "rb") as f:
                     self.supabase.storage.from_("experiment-artifacts").upload(
