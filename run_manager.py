@@ -12,20 +12,15 @@ from dr_exp.core.client_provider import get_supabase_client
 from dr_exp.core.supabase_client import SupabaseClient
 from dr_exp.mock.supabase_mock_client import SupabaseMockClient
 
-# Attempt to import the worker implementation from scripts.run_worker
-try:
-    from scripts import run_worker as _run_worker
+# Import the worker implementation
+from scripts import run_worker as _run_worker
 
-    def run_worker_main(worker_id: str, work_dir: str) -> None:
-        """Wrapper to execute the real worker with base path from env."""
 
-        base_path = os.environ.get("DR_EXP_BASE_PATH", ".")
-        _run_worker.run_worker(base_path=base_path, work_dir=work_dir)
+def run_worker_main(worker_id: str, work_dir: str) -> None:
+    """Wrapper to execute the worker with base path from env."""
 
-except Exception:  # pragma: no cover - worker script may not exist
-
-    def run_worker_main(*args: object, **kwargs: object) -> None:
-        raise RuntimeError("run_worker.py not available")
+    base_path = os.environ.get("DR_EXP_BASE_PATH", ".")
+    _run_worker.run_worker(base_path=base_path, work_dir=work_dir)
 
 
 def _worker_target(
