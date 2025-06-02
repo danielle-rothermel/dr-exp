@@ -4,11 +4,6 @@ import shutil
 import uuid
 from datetime import datetime, UTC
 from typing import Optional, List, Dict, Any
-# For file locking - fcntl is Unix-specific. Consider a cross-platform alternative
-# or simplify if concurrency isn't a major concern for initial mock usage.
-# For now, we'll note its importance from the spec.
-# import fcntl
-
 
 class SupabaseMockClient:
     def __init__(self, base_path: str = ".") -> None:
@@ -60,11 +55,6 @@ class SupabaseMockClient:
                 continue
 
             job_file_path = os.path.join(self.jobs_dir, job_file_name)
-
-            # Simplified locking: In a real concurrent scenario, proper file locking (fcntl or a lock file)
-            # would be needed around reading and writing this file.
-            # For this mock, we'll assume single-threaded access for simplicity in V1,
-            # but acknowledge the spec's requirement for fcntl for true atomicity.
             try:
                 with open(job_file_path, "r+") as f:
                     # print(f"Attempting to claim job from {job_file_path}") # Debug
@@ -86,7 +76,6 @@ class SupabaseMockClient:
                     f"Error processing job file {job_file_path}: {e}"
                 )  # Should go to a logger
                 continue
-        # print("No queued jobs found to claim.") # Debug
         return None
 
     def update_job(self, job_id: str, data: Dict[str, Any]):
