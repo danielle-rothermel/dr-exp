@@ -28,6 +28,25 @@ class StubStorage:
 class StubClient:
     def __init__(self, recorder):
         self.storage = StubStorage(recorder)
+        self.recorder = recorder
+
+    def table(self, name):
+        self.last_table = name
+        return StubTable(name, self.recorder)
+
+
+class StubTable:
+    def __init__(self, name, recorder):
+        self.name = name
+        self.recorder = recorder
+
+    def insert(self, data):
+        self.recorder.setdefault("tables", []).append((self.name, data))
+        self.data = data
+        return self
+
+    def execute(self):
+        return type("Resp", (), {"data": [self.data]})()
 
 
 @pytest.fixture
@@ -63,3 +82,22 @@ def test_empty_suffix_zips_to_default(tmp_path, stub_client):
     assert stub_client["path"] == "run_jid2/artifacts.zip"
     z = zipfile.ZipFile(io.BytesIO(stub_client["content"]))
     assert z.namelist() == ["a.txt"]
+
+
+def test_insert_helpers(monkeypatch, stub_client):
+    client = SupabaseClient("url", "key")
+
+    result = client.add_sweep_config_cluster("c1", description="d")
+    assert stub_client["tables"][0] == (
+        "sweep_config_clusters",
+        {"name": "c1", "description": "d"},
+    )
+    assert result == {"name": "c1", "description": "d"}
+
+    result = client.add_sweep_config("cid", {"a": 1}, "hash", interface_version="1")
+    assert stub_client["tables"][1][0] == "sweep_configs"
+    assert result["cluster_id"] == "cid"
+
+    result = client.add_job_entry("cid", status="queued")
+    assert stub_client["tables"][2][0] == "jobs"
+    assert result["config_id"] == "cid"

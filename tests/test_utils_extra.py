@@ -21,6 +21,14 @@ def test_parse_sweep_and_generate_combos():
     ]
 
 
+def test_parse_sweep_with_spaces():
+    params = upload_configs.parse_sweep("lr=0.1, 0.2 model = resnet, vit")
+    assert params == {
+        "lr": ["0.1", "0.2"],
+        "model": ["resnet", "vit"],
+    }
+
+
 def test_generate_configs(tmp_path):
     cfg_dir = Path(__file__).resolve().parents[1] / "configs"
     params = {"model": ["resnet", "vit"]}
