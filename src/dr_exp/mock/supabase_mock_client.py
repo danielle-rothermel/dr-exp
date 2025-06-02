@@ -1,9 +1,13 @@
 import json
 import os
 import shutil
+import tempfile
 import uuid
 from datetime import datetime, UTC
 from typing import Optional, List, Dict, Any
+
+import portalocker
+
 
 class SupabaseMockClient:
     def __init__(self, base_path: str = ".") -> None:
@@ -27,6 +31,22 @@ class SupabaseMockClient:
         if not os.path.exists(self.errors_file):
             with open(self.errors_file, "w"):
                 pass  # Create empty file
+
+    def _atomic_write(self, target_file_path: str, data: str) -> None:
+        """Write ``data`` to ``target_file_path`` atomically."""
+        target_dir = os.path.dirname(target_file_path)
+        fd, temp_file_path = tempfile.mkstemp(
+            dir=target_dir, prefix=os.path.basename(target_file_path) + "~"
+        )
+        try:
+            with os.fdopen(fd, "w") as temp_file:
+                temp_file.write(data)
+                temp_file.flush()
+                os.fsync(temp_file.fileno())
+            os.rename(temp_file_path, target_file_path)
+        finally:
+            if os.path.exists(temp_file_path):
+                os.remove(temp_file_path)
 
     def list_jobs(self) -> List[Dict[str, Any]]:
         """Return a list of all job records in the mock database."""
@@ -56,9 +76,12 @@ class SupabaseMockClient:
 
             job_file_path = os.path.join(self.jobs_dir, job_file_name)
             try:
-                with open(job_file_path, "r+") as f:
-                    # print(f"Attempting to claim job from {job_file_path}") # Debug
-                    job_data = json.load(f)
+                with portalocker.Lock(
+                    job_file_path, mode="wb", flags=portalocker.LOCK_EX
+                ):
+                    with open(job_file_path, "r") as f:
+                        job_data = json.load(f)
+
                     if job_data.get("status") == "queued":
                         job_data["status"] = "running"
                         job_data["assigned_worker"] = (
@@ -66,10 +89,9 @@ class SupabaseMockClient:
                         )
                         job_data["heartbeat"] = datetime.now(UTC).isoformat() + "Z"
 
-                        f.seek(0)
-                        json.dump(job_data, f, indent=4)
-                        f.truncate()
-                        # print(f"Claimed job: {job_data['id']}") # Debug
+                        self._atomic_write(
+                            job_file_path, json.dumps(job_data, indent=4)
+                        )
                         return job_data
             except Exception as e:
                 print(
@@ -90,17 +112,15 @@ class SupabaseMockClient:
             return {"success": False, "message": "Job not found"}
 
         try:
-            with open(job_file_path, "r+") as f:
-                existing_data = json.load(f)
+            with portalocker.Lock(job_file_path, mode="wb", flags=portalocker.LOCK_EX):
+                with open(job_file_path, "r") as f:
+                    existing_data = json.load(f)
+
                 existing_data.update(data)
-                # Ensure heartbeat is updated if status is running
                 if existing_data.get("status") == "running" and "heartbeat" not in data:
                     existing_data["heartbeat"] = datetime.now(UTC).isoformat() + "Z"
 
-                f.seek(0)
-                json.dump(existing_data, f, indent=4)
-                f.truncate()
-            # print(f"Updated job: {job_id} with data {data}") # Debug
+                self._atomic_write(job_file_path, json.dumps(existing_data, indent=4))
             return {"success": True, "message": "Job updated"}
         except Exception as e:
             print(f"Error updating job {job_id}: {e}")
@@ -110,17 +130,18 @@ class SupabaseMockClient:
         """Append metrics to the job's metrics file."""
         metric_file_path = os.path.join(self.metrics_dir, f"{job_id}.jsonl")
         try:
-            with open(metric_file_path, "a") as f:
+            with portalocker.Lock(
+                metric_file_path, mode="a", flags=portalocker.LOCK_EX
+            ) as f:
                 for metrics in metrics_list:
                     metrics_to_log = metrics.copy()
-                    if (
-                        "timestamp" not in metrics_to_log
-                    ):  # Add timestamp if not present
+                    if "timestamp" not in metrics_to_log:
                         metrics_to_log["timestamp"] = (
                             datetime.now(UTC).isoformat() + "Z"
                         )
                     f.write(json.dumps(metrics_to_log) + "\n")
-            # print(f"Logged {len(metrics_list)} metrics for job: {job_id}") # Debug
+                f.flush()
+                os.fsync(f.fileno())
         except Exception as e:
             print(f"Error logging metrics for job {job_id}: {e}")
 
@@ -140,9 +161,12 @@ class SupabaseMockClient:
             "timestamp": datetime.now(UTC).isoformat() + "Z",
         }
         try:
-            with open(self.errors_file, "a") as f:
+            with portalocker.Lock(
+                self.errors_file, mode="a", flags=portalocker.LOCK_EX
+            ) as f:
                 f.write(json.dumps(error_entry) + "\n")
-            # print(f"Recorded failure for job {job_id}: {error_type}") # Debug
+                f.flush()
+                os.fsync(f.fileno())
         except Exception as e:
             print(f"Error recording failure for job {job_id}: {e}")
 
@@ -226,8 +250,8 @@ class SupabaseMockClient:
             # ... other fields will be populated as the job runs
         }
         job_file_path = os.path.join(self.jobs_dir, f"{job_id}.json")
-        with open(job_file_path, "w") as f:
-            json.dump(job_data, f, indent=4)
+        with portalocker.Lock(job_file_path, mode="wb", flags=portalocker.LOCK_EX):
+            self._atomic_write(job_file_path, json.dumps(job_data, indent=4))
         print(f"Added new job {job_id}")  # Debug
         print("Job Data:")
         for k, v in job_data.items():
