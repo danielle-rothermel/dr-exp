@@ -9,6 +9,7 @@ from typing import Sequence
 from dr_exp.manager import Manager, discover_gpus, run_worker_main
 from dr_exp.utils.job_reaper import reap_stale_jobs
 from dr_exp.core.client_provider import get_supabase_client
+from scripts import upload_configs
 
 
 def build_arg_parser() -> argparse.ArgumentParser:
@@ -82,6 +83,12 @@ def build_arg_parser() -> argparse.ArgumentParser:
     reap_parser.add_argument(
         "--base-path", default=".", help="Base path for SupabaseMockClient"
     )
+    upload_parser = subparsers.add_parser(
+        "upload-configs",
+        help="Generate and upload sweep configs",
+        description="Generate configs and upload them using Supabase",
+    )
+    upload_configs.add_arguments(upload_parser)
 
     return parser
 
@@ -129,6 +136,9 @@ def main(argv: Sequence[str] | None = None) -> None:
         _cmd_run_worker(args)
     elif args.command == "reap-stale-jobs":
         _cmd_reap_stale_jobs(args)
+    elif args.command == "upload-configs":
+        jobs = upload_configs.run(args)
+        print(f"Created {len(jobs)} job(s)")
     else:  # pragma: no cover - fallback
         parser.print_help()
 

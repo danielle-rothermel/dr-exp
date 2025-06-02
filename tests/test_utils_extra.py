@@ -3,16 +3,16 @@ from pathlib import Path
 
 import pytest
 
-from scripts import upload_configs
+from dr_exp import config_upload
 from dr_exp.backend.main import MetricsLoader
 from dr_exp.core import client_provider
 from dr_exp.mock.supabase_mock_client import SupabaseMockClient
 
 
 def test_parse_sweep_and_generate_combos():
-    params = upload_configs.parse_sweep("lr=0.1,0.2 model=resnet,vit")
+    params = config_upload.parse_sweep("lr=0.1,0.2 model=resnet,vit")
     assert params == {"lr": ["0.1", "0.2"], "model": ["resnet", "vit"]}
-    combos = list(upload_configs._generate_override_combinations(params))
+    combos = list(config_upload._generate_override_combinations(params))
     assert combos == [
         ["lr=0.1", "model=resnet"],
         ["lr=0.1", "model=vit"],
@@ -22,7 +22,7 @@ def test_parse_sweep_and_generate_combos():
 
 
 def test_parse_sweep_with_spaces():
-    params = upload_configs.parse_sweep("lr=0.1, 0.2 model = resnet, vit")
+    params = config_upload.parse_sweep("lr=0.1, 0.2 model = resnet, vit")
     assert params == {
         "lr": ["0.1", "0.2"],
         "model": ["resnet", "vit"],
@@ -32,15 +32,15 @@ def test_parse_sweep_with_spaces():
 def test_generate_configs(tmp_path):
     cfg_dir = Path(__file__).resolve().parents[1] / "configs"
     params = {"model": ["resnet", "vit"]}
-    configs = list(upload_configs.generate_configs(str(cfg_dir), "config.yaml", params))
+    configs = list(config_upload.generate_configs(str(cfg_dir), "config.yaml", params))
     names = {cfg["model"]["name"] for cfg in configs}
     assert names == {"resnet18", "vit_base_patch16_224"}
 
 
 def test_config_hash_deterministic():
     cfg = {"a": 1, "b": [2, 3]}
-    h1 = upload_configs.config_hash(cfg)
-    h2 = upload_configs.config_hash({"b": [2, 3], "a": 1})
+    h1 = config_upload.config_hash(cfg)
+    h2 = config_upload.config_hash({"b": [2, 3], "a": 1})
     assert h1 == h2
 
 

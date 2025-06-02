@@ -87,7 +87,7 @@
 ## 4. Key Operational Flows
 ### 4.1. Experiment Configuration & Launch
 1. **User Action:** Researcher defines a base Hydra config (`.yaml`) and sweep parameters.
-2. **Config Generator (`upload_configs.py`):**
+2. **Config Generator (`manager_cli upload-configs`):**
     - Parses base config and sweep arguments.
     - Generates all individual resolved configurations.
     - Hashes each configuration for deduplication.
