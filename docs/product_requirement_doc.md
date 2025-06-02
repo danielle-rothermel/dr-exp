@@ -143,6 +143,7 @@
             - Metrics returned by `train()`.
             - Paths to artifacts in Supabase Storage.
             - `upload_complete_at` and `finalize_success` flags.
+        - Creates `run_<job_id>/finished.flag` in the local storage directory (e.g. `mock_storage/`) to mark completion.
         - If `train()` fails or critical errors occur:
             - Logs error details (type, message, stacktrace) to the `errors` table in Supabase.
             - Sets job status to `failed`.

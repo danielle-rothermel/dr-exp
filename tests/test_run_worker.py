@@ -32,6 +32,7 @@ def test_worker_success(tmp_path):
     assert os.path.exists(os.path.join(storage_run, "metrics.jsonl"))
     bundle_dir = os.path.join(storage_run, "artifacts", "bundle")
     assert os.path.isdir(bundle_dir)
+    assert os.path.exists(os.path.join(storage_run, "finished.flag"))
 
 
 def test_worker_no_job(tmp_path):

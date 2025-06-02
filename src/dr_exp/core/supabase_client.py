@@ -11,7 +11,9 @@ from datetime import datetime, timezone
 class SupabaseClient:
     """Wrapper around :mod:`supabase` providing convenience helpers."""
 
-    def __init__(self, supabase_url: str, supabase_key: str) -> None:
+    def __init__(
+        self, supabase_url: str, supabase_key: str, base_path: str = "."
+    ) -> None:
         """Initialise the client and connect to Supabase.
 
         Parameters
@@ -34,6 +36,9 @@ class SupabaseClient:
         except Exception as e:
             print(f"Failed to connect to Supabase: {e}")
             raise
+
+        self.local_storage_path = os.path.join(base_path, "mock_storage")
+        os.makedirs(self.local_storage_path, exist_ok=True)
 
     def claim_job(
         self, worker_id: str = "unassigned_worker"
@@ -268,7 +273,21 @@ class SupabaseClient:
         if "end_time" not in metadata:  # Add end_time if not already provided
             update_data["end_time"] = datetime.now(timezone.utc).isoformat()
         update_data.update(metadata)
-        return self.update_job(job_id, update_data)
+        result = self.update_job(job_id, update_data)
+        if result.get("success"):
+            self._write_finished_flag(job_id)
+        return result
+
+    def _write_finished_flag(self, job_id: str) -> None:
+        """Create an empty ``finished.flag`` file for ``job_id`` in local storage."""
+        run_dir = os.path.join(self.local_storage_path, f"run_{job_id}")
+        os.makedirs(run_dir, exist_ok=True)
+        flag_path = os.path.join(run_dir, "finished.flag")
+        try:
+            with open(flag_path, "w"):
+                pass
+        except Exception as e:  # pragma: no cover - unexpected disk error
+            print(f"Error writing finished flag for job {job_id}: {e}")
 
     def upload_artifact(
         self, job_id: str, local_path: str, remote_path_suffix: str
