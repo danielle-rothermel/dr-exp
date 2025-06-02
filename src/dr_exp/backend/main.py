@@ -108,7 +108,6 @@ class MetricsLoader:
                     if line.strip():
                         metrics.append(json.loads(line))
         else:
-            # TODO: implement real storage retrieval
             raise NotImplementedError("Metrics loading for real client")
         if len(metrics) > 100:
             metrics = metrics[-100:]
