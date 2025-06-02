@@ -50,31 +50,7 @@ class SupabaseClient:
             The claimed job record or ``None`` if no job is available.
         """
         try:
-            # Assumes a PostgreSQL function `claim_next_job(worker_id_input TEXT)` exists:
-            # SQL for function (create this in your Supabase SQL editor):
-            # CREATE OR REPLACE FUNCTION claim_next_job(worker_id_input TEXT)
-            # RETURNS SETOF jobs AS $$
-            # DECLARE
-            #   claimed_job_id UUID;
-            # BEGIN
-            #   SELECT id INTO claimed_job_id
-            #   FROM jobs
-            #   WHERE status = 'queued'
-            #   ORDER BY created_at ASC -- Or your preferred ordering
-            #   FOR UPDATE SKIP LOCKED
-            #   LIMIT 1;
-            #
-            #   IF claimed_job_id IS NOT NULL THEN
-            #     RETURN QUERY
-            #     UPDATE jobs
-            #     SET status = 'running',
-            #         assigned_worker = worker_id_input,
-            #         heartbeat = now()
-            #     WHERE id = claimed_job_id
-            #     RETURNING *;
-            #   END IF;
-            # END;
-            # $$ LANGUAGE plpgsql;
+            # Assumes a PostgreSQL function `claim_next_job(worker_id_input TEXT)` exists
             response = self.supabase.rpc(
                 "claim_next_job", {"worker_id_input": worker_id}
             ).execute()
@@ -131,11 +107,9 @@ class SupabaseClient:
             The job record if found, otherwise ``None``.
         """
         try:
-            # Example of fetching related data (config_json) directly if needed often
-            # response = self.supabase.table("jobs").select("*, sweep_configs(config_json)").eq("id", job_id).maybe_single().execute()
             response = (
                 self.supabase.table("jobs")
-                .select("*")
+                .select("*, sweep_configs(config_json)")
                 .eq("id", job_id)
                 .maybe_single()
                 .execute()
@@ -330,10 +304,6 @@ class SupabaseClient:
 
         try:
             if os.path.isdir(local_path):
-                # supabase-py storage client currently does not have a direct 'upload_folder' method.
-                # You'd need to iterate and upload files individually or zip then upload the zip.
-                # For simplicity, this example will raise an error for directory uploads.
-                # Consider zipping the directory and uploading the zip file.
                 return {
                     "success": False,
                     "message": "Directory upload not directly supported; please zip or upload files individually.",
@@ -476,24 +446,3 @@ class SupabaseClient:
         except Exception as e:
             print(f"Error adding job entry: {e}")
             return None
-
-
-# Example Usage (Illustrative - not part of the class)
-if __name__ == "__main__":
-    # These would typically come from environment variables or a config file
-    # SUPABASE_URL = os.environ.get("SUPABASE_URL")
-    # SUPABASE_KEY = os.environ.get("SUPABASE_SERVICE_ROLE_KEY") # Use service role for backend operations
-
-    # try:
-    #     # client = SupabaseClient(SUPABASE_URL, SUPABASE_KEY)
-    #     # print("Client initialized.")
-    #     # Example: claimed_job = client.claim_job(worker_id="test_worker_01")
-    #     # if claimed_job:
-    #     #     print("Claimed job:", claimed_job)
-    #     # else:
-    #     #     print("No job claimed.")
-    # except ValueError as ve:
-    #     print(ve)
-    # except Exception as e:
-    #     print(f"An unexpected error occurred during example usage: {e}")
-    pass
