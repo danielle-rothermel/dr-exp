@@ -24,10 +24,17 @@ from dr_exp.mock.supabase_mock_client import SupabaseMockClient
 
 
 def parse_sweep(sweep: str) -> Dict[str, List[str]]:
-    """Parse a sweep definition string into a mapping.
+    """Parse a Hydra-style sweep string.
 
-    The sweep string uses Hydra's multirun CLI style where each item is of the
-    form ``param=val1,val2`` separated by spaces.
+    Parameters
+    ----------
+    sweep : str
+        Sweep specification like ``"lr=0.1,0.01 batch=32,64"``.
+
+    Returns
+    -------
+    dict[str, list[str]]
+        Mapping of parameter names to value lists.
     """
     sweep = sweep.strip()
     if not sweep:
@@ -45,7 +52,7 @@ def parse_sweep(sweep: str) -> Dict[str, List[str]]:
 def _generate_override_combinations(
     sweep_params: Dict[str, List[str]],
 ) -> Iterable[List[str]]:
-    """Yield lists of override strings for all parameter combinations."""
+    """Yield override strings for all sweep combinations."""
     if not sweep_params:
         yield []
         return
@@ -103,6 +110,8 @@ def upload_configs(
 
 
 def build_arg_parser() -> argparse.ArgumentParser:
+    """Return the argument parser for this script."""
+
     self_dir_absolute = Path(__file__).resolve().parents[1]
     parser = argparse.ArgumentParser(description="Generate and upload configs.")
     parser.add_argument(
@@ -124,6 +133,8 @@ def build_arg_parser() -> argparse.ArgumentParser:
 
 
 def main(argv: Sequence[str] | None = None) -> None:
+    """Entry point for configuration upload CLI."""
+
     parser = build_arg_parser()
     args = parser.parse_args(argv)
 
