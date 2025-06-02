@@ -131,8 +131,9 @@ Opening the UI should display the jobs table fetched from the backend.
         - SLURM Mode (for actual experiments):
         - This will involve:
             1. Setting `EXPMGR_MODE="real"`.
-            2. Using `upload_configs.py` to populate Supabase with experiment configurations.
-            3. Submitting jobs to SLURM via an `sbatch` script that runs the `SLURM Manager`.
+           2. Using `dr_exp.manager_cli upload-configs` to populate Supabase with experiment configurations.
+           3. Submitting jobs to SLURM via an `sbatch` script that runs the `SLURM Manager`.
+           4. A starter script is provided at `scripts/slurm_job.sbatch`.
 
 ## 6. Development
 ### 6.1. Mocks
