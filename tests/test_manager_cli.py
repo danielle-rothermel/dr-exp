@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import os
 from pathlib import Path
+from datetime import datetime, UTC, timedelta
 
 from dr_exp.manager_cli import main
 from dr_exp.mock.supabase_mock_client import SupabaseMockClient
@@ -51,3 +52,25 @@ def test_run_subcommand_invokes_manager(monkeypatch):
         ]
     )
     assert called.get("run")
+
+
+def test_reap_stale_jobs_subcommand(tmp_path, monkeypatch, capsys):
+    client = SupabaseMockClient(base_path=str(tmp_path))
+    job = client.add_job(make_config(), "s1", status="running")
+    old = datetime.now(UTC) - timedelta(minutes=10)
+    client.update_job(job["id"], {"heartbeat": old.isoformat() + "Z"})
+    capsys.readouterr()  # flush add_job output
+
+    def fake_get_supabase_client(base_path="."):
+        assert base_path == str(tmp_path)
+        return client
+
+    monkeypatch.setattr(
+        "dr_exp.core.client_provider.get_supabase_client", fake_get_supabase_client
+    )
+    main(["reap-stale-jobs", "--max-age-mins", "5", "--base-path", str(tmp_path)])
+    out = capsys.readouterr().out.strip()
+    assert out == "Marked 1 stale job(s) as failed"
+    data = client.get_job_details(job["id"])
+    assert data["status"] == "failed"
+    assert data["status_reason"] == "manager_died"
