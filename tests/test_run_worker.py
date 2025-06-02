@@ -18,11 +18,13 @@ def test_worker_success(tmp_path):
         work_dir=str(work_dir),
         heartbeat_interval=0.01,
         client=client,
+        worker_id="w0",
     )
 
     assert status == "completed"
     job_data = client.get_job_details(job["id"])
     assert job_data["status"] == "completed"
+    assert job_data["assigned_worker"] == "w0"
     assert "upload_complete_at" in job_data
     assert not work_dir.exists()
 
@@ -40,6 +42,7 @@ def test_worker_no_job(tmp_path):
         max_claim_attempts=2,
         heartbeat_interval=0.01,
         client=client,
+        worker_id="wid",
     )
     assert result == "no_job"
     assert not work_dir.exists()
@@ -59,6 +62,7 @@ def test_worker_training_failure(tmp_path):
         heartbeat_interval=0.01,
         trainer_fn=failing_train,
         client=client,
+        worker_id="wfail",
     )
 
     assert status == "failed"

@@ -64,7 +64,7 @@ class SupabaseMockClient:
 
     # --- Interface methods based on docs/supabase_mock.md ---
 
-    def claim_job(self) -> Optional[Dict[str, Any]]:
+    def claim_job(self, worker_id: Optional[str] = None) -> Optional[Dict[str, Any]]:
         """
         Atomically claims a job from Supabase (simulated).
         Looks for a job with status='queued', updates it to 'running'.
@@ -84,7 +84,7 @@ class SupabaseMockClient:
 
                     if job_data.get("status") == "queued":
                         job_data["status"] = "running"
-                        job_data["assigned_worker"] = (
+                        job_data["assigned_worker"] = worker_id or (
                             f"mock_worker_{uuid.uuid4().hex[:6]}"
                         )
                         job_data["heartbeat"] = datetime.now(UTC).isoformat() + "Z"
