@@ -1,4 +1,5 @@
 from multiprocessing import Process
+import zipfile
 
 from dr_exp.mock.supabase_mock_client import SupabaseMockClient
 import dr_exp.manager as manager
@@ -32,6 +33,10 @@ def test_manager_worker_flow(tmp_path):
 
     storage_run = base_path / "mock_storage" / f"run_{job['id']}"
     assert (storage_run / "metrics.jsonl").exists()
-    bundle_path = storage_run / "artifacts" / "bundle"
-    assert (bundle_path / "worker.log").exists()
+    bundle_zip = storage_run / "bundle.zip"
+    assert bundle_zip.exists()
+    with zipfile.ZipFile(bundle_zip) as zf:
+        names = zf.namelist()
+        assert "worker.log" in names
+        assert any(n.startswith("checkpoints/") for n in names)
     assert (mgr_dir / "manager.log").exists()

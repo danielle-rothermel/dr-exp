@@ -82,9 +82,7 @@
 - Supabase Storage will be used for:
     - **`experiment-artifacts` bucket:**
         - `run_<job_uuid>/metrics.jsonl`: Raw structured logs from each job.
-        - `run_<job_uuid>/checkpoints/checkpoint_<tag>.pt.gz`: Model checkpoints.
-        - `run_<job_uuid>/artifacts/...`: Other artifacts like plots, logs.
-        - `run_<job_uuid>/worker_logs/worker_<instance_id>.log`: Operational logs from the worker process itself.
+        - `run_<job_uuid>/bundle.zip`: Archive containing checkpoints, artifacts and the worker log.
         - `run_<job_uuid>/manager.log`: Operational logs from the SLURM Manager process for that job's allocation.
 ## 4. Key Operational Flows
 ### 4.1. Experiment Configuration & Launch
@@ -135,13 +133,12 @@
         - Calls `logger.finalize()` to get paths to all locally written files.
         - **Uploads:**
             - Local `metrics.jsonl` to `run_<job_id>/metrics.jsonl` in Supabase Storage.
-            - Contents of local `checkpoint_dir` to `run_<job_id>/checkpoints/` in Supabase Storage.
-            - Contents of local `artifact_dir` to `run_<job_id>/artifacts/` in Supabase Storage.
-            - Its own `worker.log` to `run_<job_id>/worker_logs/worker_<job_id>_<instance_id>.log`.
+            - Stages `checkpoint_dir`, `artifact_dir` and `worker.log` into one directory.
+            - Zips that directory and uploads the archive as `run_<job_id>/bundle.zip`.
         - Updates the `jobs` record in Supabase with:
             - Final status (`completed` or `failed` based on `train()` outcome and upload success).
             - Metrics returned by `train()`.
-            - Paths to artifacts in Supabase Storage.
+            - Path to the uploaded `bundle.zip` in Supabase Storage.
             - `upload_complete_at` and `finalize_success` flags.
         - Creates `run_<job_id>/finished.flag` in the local storage directory (e.g. `mock_storage/`) to mark completion.
         - If `train()` fails or critical errors occur:
