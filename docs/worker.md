@@ -95,7 +95,8 @@ Workers are launched by the Manager (`run_manager.py`) as subprocesses, typicall
 * Real-time metrics streaming to FastAPI via WebSocket (in parallel to `.jsonl` log)
 * Resume from previous checkpoints using `resume_training(cfg, checkpoint_path)`
 * Delayed start to stagger worker load on startup
-* Compression of checkpoints or artifacts before upload
+* Compression of checkpoints or artifacts before upload. Directories selected
+  for upload are zipped and stored as single `.zip` files in Supabase Storage.
 
 ---
 
