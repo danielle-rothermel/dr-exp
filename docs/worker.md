@@ -11,7 +11,7 @@ The Worker is the atomic unit of execution in the experiment management system. 
 * Uploading results to Supabase and Supabase Storage
 * Handling failures and retries according to system policy
 
-Workers are launched by the Manager (`run_manager.py`) as subprocesses, typically in a multi-worker-per-GPU configuration.
+Workers are launched by the Manager (`scripts/run_manager.py`) as subprocesses, typically in a multi-worker-per-GPU configuration.
 
 ---
 

@@ -77,7 +77,7 @@ class SupabaseMockClient:
             job_file_path = os.path.join(self.jobs_dir, job_file_name)
             try:
                 with portalocker.Lock(
-                    job_file_path, mode="wb", flags=portalocker.LOCK_EX
+                    job_file_path, mode="r+b", flags=portalocker.LOCK_EX
                 ):
                     with open(job_file_path, "r") as f:
                         job_data = json.load(f)
@@ -112,7 +112,7 @@ class SupabaseMockClient:
             return {"success": False, "message": "Job not found"}
 
         try:
-            with portalocker.Lock(job_file_path, mode="wb", flags=portalocker.LOCK_EX):
+            with portalocker.Lock(job_file_path, mode="r+b", flags=portalocker.LOCK_EX):
                 with open(job_file_path, "r") as f:
                     existing_data = json.load(f)
 

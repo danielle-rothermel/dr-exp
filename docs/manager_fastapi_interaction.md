@@ -2,11 +2,11 @@
 
 ## Purpose
 
-Describe how the SLURM manager (`run_manager.py`) cooperates with the FastAPI backend. The two components do not talk to each other directly; instead they share state via Supabase tables and storage. This document summarises the expected data flow and responsibilities on both sides.
+Describe how the SLURM manager (`scripts/run_manager.py`) cooperates with the FastAPI backend. The two components do not talk to each other directly; instead they share state via Supabase tables and storage. This document summarises the expected data flow and responsibilities on both sides.
 
 ## Overview
 
-* `run_manager.py` launches workers, monitors heartbeats and updates job records in Supabase.
+* `scripts/run_manager.py` launches workers, monitors heartbeats and updates job records in Supabase.
 * The FastAPI backend exposes REST endpoints which read or modify these same Supabase records.
 * Actions triggered by the UI or CLI through the FastAPI API (e.g. job kill or requeue) result in Supabase updates that the manager or workers react to.
 
