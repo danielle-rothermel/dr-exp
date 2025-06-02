@@ -39,6 +39,7 @@ def run_worker(
     trainer_fn: Callable[[Any, StructuredLogger], dict] = default_train,
     logger_cls: type[StructuredLogger] = StructuredLogger,
     client: Optional[SupabaseClient | SupabaseMockClient] = None,
+    worker_id: str = "unassigned_worker",
 ) -> str:
     """Run a single worker iteration.
 
@@ -58,6 +59,8 @@ def run_worker(
         Logger class to instantiate.
     client : SupabaseClient | SupabaseMockClient, optional
         Client to use for job operations.
+    worker_id : str, optional
+        Identifier used when claiming jobs.
 
     Returns
     -------
@@ -70,7 +73,7 @@ def run_worker(
     backoff = 1.0
     job = None
     while attempt < max_claim_attempts:
-        job = client.claim_job()
+        job = client.claim_job(worker_id)
         if job:
             break
         time.sleep(backoff)

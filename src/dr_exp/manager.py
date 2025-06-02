@@ -20,7 +20,7 @@ import dr_exp.worker as _run_worker
 def run_worker_main(worker_id: str, work_dir: str) -> None:
     """Wrapper to execute the worker with base path from env."""
     base_path = os.environ.get("DR_EXP_BASE_PATH", ".")
-    _run_worker.run_worker(base_path=base_path, work_dir=work_dir)
+    _run_worker.run_worker(base_path=base_path, work_dir=work_dir, worker_id=worker_id)
 
 
 def _worker_target(
