@@ -10,4 +10,10 @@
 python scripts/reap_stale_jobs.py --max-age-mins 30 --base-path /path/to/env
 ```
 
+Or via the manager CLI subcommand:
+
+```bash
+python -m dr_exp.manager_cli reap-stale-jobs --max-age-mins 30 --base-path /path/to/env
+```
+
 Any running job with a heartbeat older than the provided threshold is updated to `status='failed'` with `status_reason='manager_died'`.
