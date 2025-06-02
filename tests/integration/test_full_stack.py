@@ -170,3 +170,25 @@ def test_job_control_api(tmp_path, api_client, sb_client, monkeypatch):
     job_data = sb_client.get_job_details(job["id"])
     assert job_data["status"] == "queued"
     assert job_data["retry_index"] == 1
+
+
+def test_jobs_list_endpoint(tmp_path, api_client, sb_client):
+    jobs = create_jobs(sb_client, "model=resnet,vit")
+
+    mgr_dir = tmp_path / "mgr"
+    mgr = manager.Manager(
+        gpus=["0"],
+        workers_per_gpu=2,
+        heartbeat_interval=0.1,
+        idle_timeout_mins=1,
+        base_dir=str(mgr_dir),
+        client=sb_client,
+    )
+    mgr.start_workers()
+    wait_for_workers(mgr)
+
+    resp = api_client.get("/jobs")
+    assert resp.status_code == 200
+    data = {j["id"]: j for j in resp.json()}
+    for job in jobs:
+        assert data[job["id"]]["status"] == "completed"
