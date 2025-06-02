@@ -109,19 +109,30 @@ class Manager:
     def _list_running_jobs(self) -> List[Dict[str, object]]:
         """Return job records currently marked as running."""
         jobs: List[Dict[str, object]] = []
-        if not hasattr(self.client, "jobs_dir"):
-            return jobs
-        for name in os.listdir(self.client.jobs_dir):
-            if not name.endswith(".json"):
-                continue
-            path = os.path.join(self.client.jobs_dir, name)
+        if hasattr(self.client, "jobs_dir"):
+            for name in os.listdir(self.client.jobs_dir):
+                if not name.endswith(".json"):
+                    continue
+                path = os.path.join(self.client.jobs_dir, name)
+                try:
+                    with open(path, "r") as f:
+                        data = json.load(f)
+                    if data.get("status") == "running":
+                        jobs.append(data)
+                except Exception as e:  # pragma: no cover - corrupted job file
+                    logging.error("Failed to read job file %s: %s", path, e)
+        else:  # real client path
             try:
-                with open(path, "r") as f:
-                    data = json.load(f)
-                if data.get("status") == "running":
-                    jobs.append(data)
-            except Exception as e:  # pragma: no cover - corrupted job file
-                logging.error("Failed to read job file %s: %s", path, e)
+                resp = (
+                    self.client.supabase.table("jobs")
+                    .select("*")
+                    .eq("status", "running")
+                    .execute()
+                )
+                jobs = resp.data or []
+            except Exception as e:  # pragma: no cover - unexpected client error
+                logging.error("Failed to query running jobs: %s", e)
+                jobs = []
         return jobs
 
     def _restart_worker(self, worker_id: str) -> None:
