@@ -93,8 +93,15 @@ def test_job_failure(tmp_path, api_client, sb_client, monkeypatch):
             raise RuntimeError("boom")
         return orig_train(cfg, logger)
 
-    def run_worker_wrapper(base_path: str = ".", work_dir: str | None = None):
-        orig_run_worker(base_path=base_path, work_dir=work_dir, trainer_fn=maybe_fail)
+    def run_worker_wrapper(
+        base_path: str = ".", work_dir: str | None = None, worker_id: str = "id"
+    ):
+        orig_run_worker(
+            base_path=base_path,
+            work_dir=work_dir,
+            trainer_fn=maybe_fail,
+            worker_id=worker_id,
+        )
 
     monkeypatch.setattr(manager._run_worker, "run_worker", run_worker_wrapper)
 
@@ -138,8 +145,15 @@ def test_job_control_api(tmp_path, api_client, sb_client, monkeypatch):
 
     orig_run_worker = rw.run_worker
 
-    def run_worker_wrapper(base_path: str = ".", work_dir: str | None = None):
-        orig_run_worker(base_path=base_path, work_dir=work_dir, trainer_fn=slow_train)
+    def run_worker_wrapper(
+        base_path: str = ".", work_dir: str | None = None, worker_id: str = "id"
+    ):
+        orig_run_worker(
+            base_path=base_path,
+            work_dir=work_dir,
+            trainer_fn=slow_train,
+            worker_id=worker_id,
+        )
 
     monkeypatch.setattr(manager._run_worker, "run_worker", run_worker_wrapper)
 
