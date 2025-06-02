@@ -115,7 +115,7 @@
         - Restarts a new worker process, which will attempt to claim a new job.
     - Handles SLURM termination signals for graceful shutdown of workers.
     - Exits if idle for a configurable timeout (e.g., no claimable jobs for X minutes).
-3. **Worker Process (`run_worker.py`):**
+3. **Worker Process (`dr_exp.worker.run_worker`):**
     - **Job Claim:**
         - Queries Supabase for a `jobs` record with `status='queued'`, attempting to atomically update it to `status='running'` and set `assigned_worker` (using a DB transaction or `UPDATE ... RETURNING` with `SKIP LOCKED`). Uses exponential backoff on failed claim attempts.
         - If no job is claimed after several attempts, exits.
