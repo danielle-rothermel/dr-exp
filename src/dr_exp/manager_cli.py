@@ -7,6 +7,7 @@ import os
 from typing import Sequence
 
 from dr_exp.manager import Manager, discover_gpus, run_worker_main
+from scripts import upload_configs
 
 
 def build_arg_parser() -> argparse.ArgumentParser:
@@ -66,6 +67,13 @@ def build_arg_parser() -> argparse.ArgumentParser:
     worker_parser.add_argument("worker_id", help="Unique worker identifier")
     worker_parser.add_argument("work_dir", help="Working directory for temporary files")
 
+    upload_parser = subparsers.add_parser(
+        "upload-configs",
+        help="Generate and upload sweep configs",
+        description="Generate configs and upload them using Supabase",
+    )
+    upload_configs.add_arguments(upload_parser)
+
     return parser
 
 
@@ -104,6 +112,9 @@ def main(argv: Sequence[str] | None = None) -> None:
         _cmd_discover_gpus(args)
     elif args.command == "run-worker":
         _cmd_run_worker(args)
+    elif args.command == "upload-configs":
+        jobs = upload_configs.run(args)
+        print(f"Created {len(jobs)} job(s)")
     else:  # pragma: no cover - fallback
         parser.print_help()
 
