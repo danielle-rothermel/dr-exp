@@ -1,7 +1,7 @@
 from datetime import datetime, UTC, timedelta
 
 from dr_exp.mock.supabase_mock_client import SupabaseMockClient
-from scripts import reap_stale_jobs
+from dr_exp.utils import reap_stale_jobs
 
 
 def test_reap_marks_stale_job(tmp_path):
@@ -10,7 +10,7 @@ def test_reap_marks_stale_job(tmp_path):
     old = datetime.now(UTC) - timedelta(minutes=10)
     client.update_job(job["id"], {"heartbeat": old.isoformat() + "Z"})
 
-    count = reap_stale_jobs.reap_stale_jobs(client, max_age_mins=5)
+    count = reap_stale_jobs(client, max_age_mins=5)
     assert count == 1
     data = client.get_job_details(job["id"])
     assert data["status"] == "failed"
@@ -23,7 +23,7 @@ def test_reap_ignores_recent_job(tmp_path):
     now = datetime.now(UTC)
     client.update_job(job["id"], {"heartbeat": now.isoformat() + "Z"})
 
-    count = reap_stale_jobs.reap_stale_jobs(client, max_age_mins=5)
+    count = reap_stale_jobs(client, max_age_mins=5)
     assert count == 0
     data = client.get_job_details(job["id"])
     assert data["status"] == "running"
