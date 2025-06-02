@@ -68,7 +68,7 @@ class MetricsLoader:
 
 def create_app(base_path: str = ".") -> FastAPI:
     app = FastAPI()
-    
+
     # Add CORS middleware
     app.add_middleware(
         CORSMiddleware,
@@ -77,7 +77,7 @@ def create_app(base_path: str = ".") -> FastAPI:
         allow_methods=["*"],
         allow_headers=["*"],
     )
-    
+
     client = get_supabase_client(base_path=base_path)
     loader = MetricsLoader(client)
 
