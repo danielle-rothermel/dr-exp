@@ -12,6 +12,7 @@ import hashlib
 import itertools
 import json
 import os
+import re
 from typing import Any, Dict, Iterable, List, Sequence
 
 import hydra
@@ -41,11 +42,10 @@ def parse_sweep(sweep: str) -> Dict[str, List[str]]:
         return {}
 
     params: Dict[str, List[str]] = {}
-    for item in sweep.split():
-        if "=" not in item:
-            continue
-        key, values = item.split("=", 1)
-        params[key] = values.split(",")
+    pattern = r"([\w.]+)\s*=\s*([^=]+?)(?=\s+[\w.]+\s*=|$)"
+    for match in re.finditer(pattern, sweep):
+        key, values = match.groups()
+        params[key.strip()] = [v.strip() for v in values.split(",") if v.strip()]
     return params
 
 
