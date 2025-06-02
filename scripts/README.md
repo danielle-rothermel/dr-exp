@@ -1,6 +1,6 @@
 # Utility Scripts
 
-Python helper scripts used during development and testing:
+Python scripts used as future CLI endpoints, in addition to some solely for development and testing:
 
 - `reset_mock_db.py` – clears the local mock database.
 - `run_worker.py` – helper for manually launching a worker process.
