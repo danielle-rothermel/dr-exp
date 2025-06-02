@@ -32,5 +32,6 @@ def test_manager_worker_flow(tmp_path):
 
     storage_run = base_path / "mock_storage" / f"run_{job['id']}"
     assert (storage_run / "metrics.jsonl").exists()
-    assert (storage_run / "artifacts" / "worker_logs" / "worker.log").exists()
+    bundle_path = storage_run / "artifacts" / "bundle"
+    assert (bundle_path / "worker.log").exists()
     assert (mgr_dir / "manager.log").exists()
