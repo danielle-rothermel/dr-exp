@@ -94,7 +94,7 @@ cfg.logging:
   log_file: /path/to/training.log  # optional
 ```
 
-These values are injected by the experiment manager (`run_worker.py`).
+These values are injected by the experiment worker (`dr_exp.worker.run_worker`).
 
 ---
 
