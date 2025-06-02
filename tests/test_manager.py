@@ -79,3 +79,56 @@ def test_idle_timeout(tmp_path):
     mgr.last_activity = datetime.now(UTC) - timedelta(minutes=1)
     mgr.check_idle_timeout()
     assert mgr.shutdown is True
+
+
+class DummyTable:
+    def __init__(self, data):
+        self.data = data
+        self.filter = None
+
+    def select(self, _fields):
+        return self
+
+    def eq(self, field, value):
+        self.filter = (field, value)
+        return self
+
+    def execute(self):
+        if self.filter:
+            field, value = self.filter
+            filtered = [j for j in self.data if j.get(field) == value]
+        else:
+            filtered = self.data
+        return type("Resp", (), {"data": filtered})()
+
+
+class DummySupabase:
+    def __init__(self, data):
+        self._data = data
+
+    def table(self, name):
+        assert name == "jobs"
+        return DummyTable(self._data)
+
+
+class DummyRealClient:
+    def __init__(self, data):
+        self.supabase = DummySupabase(data)
+
+
+def test_list_running_jobs_real_client(tmp_path):
+    jobs = [
+        {"id": "j1", "status": "running"},
+        {"id": "j2", "status": "queued"},
+    ]
+    client = DummyRealClient(jobs)
+    mgr = manager.Manager(
+        gpus=[],
+        workers_per_gpu=0,
+        heartbeat_interval=1,
+        idle_timeout_mins=1,
+        base_dir=str(tmp_path),
+        client=client,
+    )
+    running = mgr._list_running_jobs()
+    assert running == [jobs[0]]
