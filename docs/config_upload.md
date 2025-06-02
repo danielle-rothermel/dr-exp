@@ -45,8 +45,8 @@ This enables scalable sweep orchestration with full version control.
 ## Command Line Interface (Proposed)
 
 ```bash
-upload_configs.py \
-  --base-config configs/base.yaml \
+python -m dr_exp.manager_cli upload-configs \
+  --base-config-path configs/base.yaml \
   --sweep "optim.lr=0.001,0.01 model.name=resnet" \
   --cluster-name "lr_vs_model" \
   --description "Sweep over learning rates and model variants" \

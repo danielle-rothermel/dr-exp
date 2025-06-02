@@ -74,3 +74,23 @@ def test_reap_stale_jobs_subcommand(tmp_path, monkeypatch, capsys):
     data = client.get_job_details(job["id"])
     assert data["status"] == "failed"
     assert data["status_reason"] == "manager_died"
+
+def test_upload_configs_subcommand(tmp_path, monkeypatch, capsys):
+    cfg_dir = Path(__file__).resolve().parents[1] / "configs"
+    client = SupabaseMockClient(base_path=str(tmp_path))
+
+    monkeypatch.setattr("scripts.upload_configs.SupabaseMockClient", lambda: client)
+
+    main(
+        [
+            "upload-configs",
+            "--base-config-path",
+            str(cfg_dir),
+            "--config-name",
+            "config.yaml",
+            "--sweep",
+            "model=vit",
+        ]
+    )
+    out = capsys.readouterr().out
+    assert "Created 1 job" in out
