@@ -13,7 +13,7 @@ from multiprocessing import Process
 import pytest
 from fastapi.testclient import TestClient
 
-import run_manager as manager
+import dr_exp.manager as manager
 from dr_exp.backend.main import create_app
 from dr_exp.mock.supabase_mock_client import SupabaseMockClient
 from scripts import upload_configs
