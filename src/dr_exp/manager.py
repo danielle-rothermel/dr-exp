@@ -1,4 +1,5 @@
-import argparse
+"""Manager module for orchestrating training workers."""
+
 import json
 import logging
 import os
@@ -18,7 +19,6 @@ from scripts import run_worker as _run_worker
 
 def run_worker_main(worker_id: str, work_dir: str) -> None:
     """Wrapper to execute the worker with base path from env."""
-
     base_path = os.environ.get("DR_EXP_BASE_PATH", ".")
     _run_worker.run_worker(base_path=base_path, work_dir=work_dir)
 
@@ -26,20 +26,7 @@ def run_worker_main(worker_id: str, work_dir: str) -> None:
 def _worker_target(
     base_path: str, worker_id: str, gpu_id: str, worker_dir: str
 ) -> None:
-    """Entry point for spawned worker processes.
-
-    Parameters
-    ----------
-    base_path : str
-        Base directory for mock resources.
-    worker_id : str
-        Identifier for the worker.
-    gpu_id : str
-        GPU device ID visible to the worker.
-    worker_dir : str
-        Directory where the worker writes logs and artifacts.
-    """
-
+    """Entry point for spawned worker processes."""
     os.environ["CUDA_VISIBLE_DEVICES"] = gpu_id
     os.environ["DR_EXP_BASE_PATH"] = base_path
     os.makedirs(worker_dir, exist_ok=True)
@@ -47,18 +34,7 @@ def _worker_target(
 
 
 def discover_gpus(gpus_per_node: int) -> List[str]:
-    """Return list of visible GPU IDs as strings.
-
-    Parameters
-    ----------
-    gpus_per_node : int
-        Number of GPUs to assume if ``CUDA_VISIBLE_DEVICES`` is not set.
-
-    Returns
-    -------
-    list[str]
-        GPU identifiers to use for workers.
-    """
+    """Return list of visible GPU IDs as strings."""
     env = os.environ.get("CUDA_VISIBLE_DEVICES")
     if env:
         return [g.strip() for g in env.split(",") if g.strip()]
@@ -77,24 +53,7 @@ class Manager:
         base_dir: str,
         client: SupabaseClient | SupabaseMockClient | None = None,
     ) -> None:
-        """Create a new :class:`Manager`.
-
-        Parameters
-        ----------
-        gpus : list[str]
-            GPU identifiers available on this node.
-        workers_per_gpu : int
-            Number of workers to spawn per GPU.
-        heartbeat_interval : int
-            Seconds between heartbeat checks.
-        idle_timeout_mins : int
-            Minutes before shutdown when no jobs are running.
-        base_dir : str
-            Directory where manager logs and worker outputs are stored.
-        client : SupabaseClient | SupabaseMockClient, optional
-            Client used to interact with the job database. If ``None`` a client
-            is created based on environment settings.
-        """
+        """Create a new :class:`Manager`."""
         self.gpus = gpus
         self.workers_per_gpu = workers_per_gpu
         self.heartbeat_interval = heartbeat_interval
@@ -121,7 +80,6 @@ class Manager:
 
     def launch_worker(self, worker_id: str, gpu_id: str) -> None:
         """Launch a worker process."""
-
         worker_dir = os.path.join(self.base_dir, worker_id)
         proc = Process(
             target=_worker_target,
@@ -228,33 +186,4 @@ class Manager:
         self.stop_all_workers()
 
 
-def build_arg_parser() -> argparse.ArgumentParser:
-    """Return the command line argument parser."""
-
-    parser = argparse.ArgumentParser(description="SLURM Manager")
-    parser.add_argument("--gpus-per-node", type=int, default=1)
-    parser.add_argument("--workers-per-gpu", type=int, default=1)
-    parser.add_argument("--heartbeat-interval", type=int, default=10)
-    parser.add_argument("--idle-timeout-mins", type=int, default=30)
-    return parser
-
-
-def main(argv: List[str] | None = None) -> None:
-    """Entry point for the manager command line tool."""
-
-    args = build_arg_parser().parse_args(argv)
-    gpus = discover_gpus(args.gpus_per_node)
-    slurm_job_id = os.environ.get("SLURM_JOB_ID", str(os.getpid()))
-    base_dir = os.path.join("./manager_runs", f"job_{slurm_job_id}")
-    manager = Manager(
-        gpus=gpus,
-        workers_per_gpu=args.workers_per_gpu,
-        heartbeat_interval=args.heartbeat_interval,
-        idle_timeout_mins=args.idle_timeout_mins,
-        base_dir=base_dir,
-    )
-    manager.run()
-
-
-if __name__ == "__main__":  # pragma: no cover - script entry
-    main()
+__all__ = ["Manager", "discover_gpus", "run_worker_main"]
