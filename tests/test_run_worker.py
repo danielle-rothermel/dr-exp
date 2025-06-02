@@ -1,7 +1,7 @@
 import os
 
 from dr_exp.mock.supabase_mock_client import SupabaseMockClient
-from scripts import run_worker
+import dr_exp.worker as run_worker
 
 
 def make_config():
