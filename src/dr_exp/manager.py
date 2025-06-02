@@ -14,7 +14,7 @@ from dr_exp.core.supabase_client import SupabaseClient
 from dr_exp.mock.supabase_mock_client import SupabaseMockClient
 
 # Import the worker implementation
-from scripts import run_worker as _run_worker
+import dr_exp.worker as _run_worker
 
 
 def run_worker_main(worker_id: str, work_dir: str) -> None:
