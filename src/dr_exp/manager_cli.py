@@ -1,0 +1,111 @@
+"""Command line interface for the experiment manager."""
+
+from __future__ import annotations
+
+import argparse
+import os
+from typing import Sequence
+
+from dr_exp.manager import Manager, discover_gpus, run_worker_main
+
+
+def build_arg_parser() -> argparse.ArgumentParser:
+    """Return the top-level CLI argument parser."""
+    parser = argparse.ArgumentParser(
+        description="Experiment manager command line interface"
+    )
+    subparsers = parser.add_subparsers(dest="command", required=True)
+
+    run_parser = subparsers.add_parser(
+        "run",
+        help="Start the manager process",
+        description="Launch the manager which supervises worker processes",
+    )
+    run_parser.add_argument(
+        "--gpus-per-node",
+        type=int,
+        default=1,
+        help="Number of GPUs available on this node",
+    )
+    run_parser.add_argument(
+        "--workers-per-gpu",
+        type=int,
+        default=1,
+        help="Number of worker processes to spawn per GPU",
+    )
+    run_parser.add_argument(
+        "--heartbeat-interval",
+        type=int,
+        default=10,
+        help="Seconds between heartbeat checks",
+    )
+    run_parser.add_argument(
+        "--idle-timeout-mins",
+        type=int,
+        default=30,
+        help="Minutes of inactivity before the manager shuts down",
+    )
+
+    dg_parser = subparsers.add_parser(
+        "discover-gpus",
+        help="List visible GPU IDs",
+        description="Print GPU IDs that the manager would use",
+    )
+    dg_parser.add_argument(
+        "--gpus-per-node",
+        type=int,
+        default=1,
+        help="Total GPUs on the node if CUDA_VISIBLE_DEVICES is not set",
+    )
+
+    worker_parser = subparsers.add_parser(
+        "run-worker",
+        help="Run a single worker process",
+        description="Execute a worker directly using run_worker_main",
+    )
+    worker_parser.add_argument("worker_id", help="Unique worker identifier")
+    worker_parser.add_argument("work_dir", help="Working directory for temporary files")
+
+    return parser
+
+
+def _cmd_run(args: argparse.Namespace) -> None:
+    gpus = discover_gpus(args.gpus_per_node)
+    slurm_job_id = os.environ.get("SLURM_JOB_ID", str(os.getpid()))
+    base_dir = os.path.join("./manager_runs", f"job_{slurm_job_id}")
+    mgr = Manager(
+        gpus=gpus,
+        workers_per_gpu=args.workers_per_gpu,
+        heartbeat_interval=args.heartbeat_interval,
+        idle_timeout_mins=args.idle_timeout_mins,
+        base_dir=base_dir,
+    )
+    mgr.run()
+
+
+def _cmd_discover_gpus(args: argparse.Namespace) -> None:
+    gpus = discover_gpus(args.gpus_per_node)
+    for g in gpus:
+        print(g)
+
+
+def _cmd_run_worker(args: argparse.Namespace) -> None:
+    run_worker_main(worker_id=args.worker_id, work_dir=args.work_dir)
+
+
+def main(argv: Sequence[str] | None = None) -> None:
+    """Entry point for the CLI."""
+    parser = build_arg_parser()
+    args = parser.parse_args(argv)
+
+    if args.command == "run":
+        _cmd_run(args)
+    elif args.command == "discover-gpus":
+        _cmd_discover_gpus(args)
+    elif args.command == "run-worker":
+        _cmd_run_worker(args)
+    else:  # pragma: no cover - fallback
+        parser.print_help()
+
+
+__all__ = ["main", "build_arg_parser"]
