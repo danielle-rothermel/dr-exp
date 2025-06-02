@@ -7,11 +7,22 @@ from datetime import datetime, timezone
 
 
 class SupabaseClient:
-    def __init__(self, supabase_url: str, supabase_key: str):
-        """
-        Initializes the client and connects to Supabase.
-        :param supabase_url: Your Supabase project URL.
-        :param supabase_key: Your Supabase service_role key (recommended for backend operations) or anon key.
+    """Wrapper around :mod:`supabase` providing convenience helpers."""
+
+    def __init__(self, supabase_url: str, supabase_key: str) -> None:
+        """Initialise the client and connect to Supabase.
+
+        Parameters
+        ----------
+        supabase_url : str
+            URL of the Supabase project.
+        supabase_key : str
+            API key with permissions for backend operations.
+
+        Raises
+        ------
+        ValueError
+            If ``supabase_url`` or ``supabase_key`` is missing.
         """
         if not supabase_url or not supabase_key:
             raise ValueError("Supabase URL and Key must be provided.")
@@ -25,9 +36,18 @@ class SupabaseClient:
     def claim_job(
         self, worker_id: str = "unassigned_worker"
     ) -> Optional[Dict[str, Any]]:
-        """
-        Atomically claims the next available 'queued' job.
-        This typically uses a database function for atomicity.
+        """Claim the next available queued job.
+
+        Parameters
+        ----------
+        worker_id : str, optional
+            Identifier of the worker claiming the job. Defaults to
+            ``"unassigned_worker"``.
+
+        Returns
+        -------
+        dict[str, Any] | None
+            The claimed job record or ``None`` if no job is available.
         """
         try:
             # Assumes a PostgreSQL function `claim_next_job(worker_id_input TEXT)` exists:
@@ -66,7 +86,20 @@ class SupabaseClient:
             return None
 
     def update_job(self, job_id: str, data: Dict[str, Any]) -> Dict[str, Any]:
-        """Updates a job record with new data."""
+        """Update a job record with new data.
+
+        Parameters
+        ----------
+        job_id : str
+            Identifier of the job to update.
+        data : dict[str, Any]
+            Fields to update on the job record.
+
+        Returns
+        -------
+        dict[str, Any]
+            A dictionary describing the outcome of the update operation.
+        """
         try:
             response = (
                 self.supabase.table("jobs").update(data).eq("id", job_id).execute()
@@ -85,7 +118,18 @@ class SupabaseClient:
             return {"success": False, "message": str(e)}
 
     def get_job_details(self, job_id: str) -> Optional[Dict[str, Any]]:
-        """Retrieves full details for a specific job."""
+        """Retrieve full details for a specific job.
+
+        Parameters
+        ----------
+        job_id : str
+            Identifier of the job to fetch.
+
+        Returns
+        -------
+        dict[str, Any] | None
+            The job record if found, otherwise ``None``.
+        """
         try:
             # Example of fetching related data (config_json) directly if needed often
             # response = self.supabase.table("jobs").select("*, sweep_configs(config_json)").eq("id", job_id).maybe_single().execute()
@@ -102,7 +146,18 @@ class SupabaseClient:
             return None
 
     def get_config_for_job(self, job_id: str) -> Optional[Dict[str, Any]]:
-        """Retrieves the 'config_json' for a given job by looking up its config_id."""
+        """Return the configuration associated with ``job_id``.
+
+        Parameters
+        ----------
+        job_id : str
+            Job identifier whose config should be fetched.
+
+        Returns
+        -------
+        dict[str, Any] | None
+            The configuration dictionary or ``None`` if unavailable.
+        """
         try:
             job_details = self.get_job_details(job_id)
             if job_details and job_details.get("config_id"):
@@ -127,10 +182,21 @@ class SupabaseClient:
         local_metrics_file_path: str,
         remote_metrics_filename: str = "metrics.jsonl",
     ) -> Dict[str, Any]:
-        """
-        Uploads a local metrics.jsonl file to Supabase Storage for the given job.
-        Updates the job record with the path to this file.
-        Note: Interface changed from mock (list of metrics) to path of pre-written file.
+        """Upload a metrics file to Supabase Storage.
+
+        Parameters
+        ----------
+        job_id : str
+            Job identifier.
+        local_metrics_file_path : str
+            Path to the local ``metrics.jsonl`` file.
+        remote_metrics_filename : str, optional
+            Name to use when uploading the file, by default ``"metrics.jsonl"``.
+
+        Returns
+        -------
+        dict[str, Any]
+            Result of the upload operation including the storage path.
         """
         if not os.path.exists(local_metrics_file_path):
             return {
@@ -163,7 +229,24 @@ class SupabaseClient:
         message: str,
         stacktrace: Optional[str] = None,
     ) -> Dict[str, Any]:
-        """Records a failure event in the 'errors' table and updates the job status."""
+        """Record a failure event and mark the job as failed.
+
+        Parameters
+        ----------
+        job_id : str
+            Identifier of the job that failed.
+        error_type : str
+            Short error class or type description.
+        message : str
+            Human-readable error message.
+        stacktrace : str, optional
+            Stack trace to store for debugging.
+
+        Returns
+        -------
+        dict[str, Any]
+            Result of the insert/update operations.
+        """
         failure_data = {
             "job_id": job_id,
             "error_type": error_type,
@@ -189,7 +272,22 @@ class SupabaseClient:
     def finalize_job(
         self, job_id: str, final_status: str, metadata: Dict[str, Any]
     ) -> Dict[str, Any]:
-        """Finalizes a job, typically setting its status, end_time, and other result metadata."""
+        """Finalize a job with the given status and metadata.
+
+        Parameters
+        ----------
+        job_id : str
+            Identifier of the job.
+        final_status : str
+            Final status string to record.
+        metadata : dict[str, Any]
+            Additional fields to store on the job record.
+
+        Returns
+        -------
+        dict[str, Any]
+            Result of the update operation.
+        """
         update_data = {"status": final_status}
         if "end_time" not in metadata:  # Add end_time if not already provided
             update_data["end_time"] = datetime.now(timezone.utc).isoformat()
@@ -199,9 +297,22 @@ class SupabaseClient:
     def upload_artifact(
         self, job_id: str, local_path: str, remote_path_suffix: str
     ) -> Dict[str, Any]:
-        """
-        Uploads a single artifact file or directory to Supabase Storage.
-        remote_path_suffix is relative to the job's specific storage location.
+        """Upload an artifact file or directory to Supabase Storage.
+
+        Parameters
+        ----------
+        job_id : str
+            Job identifier.
+        local_path : str
+            Path to the local file or directory to upload.
+        remote_path_suffix : str
+            Relative path under the run directory where the artifact should be
+            stored.
+
+        Returns
+        -------
+        dict[str, Any]
+            Result of the upload operation including the storage path.
         """
         if not os.path.exists(local_path):
             return {
@@ -244,7 +355,20 @@ class SupabaseClient:
     def add_sweep_config_cluster(
         self, name: str, description: Optional[str] = None
     ) -> Optional[Dict[str, Any]]:
-        """Adds a new sweep_config_cluster."""
+        """Create a sweep configuration cluster entry.
+
+        Parameters
+        ----------
+        name : str
+            Name of the cluster.
+        description : str, optional
+            Optional human description.
+
+        Returns
+        -------
+        dict[str, Any] | None
+            Newly created record or ``None`` on failure.
+        """
         try:
             data = {"name": name}
             if description is not None:
@@ -258,7 +382,7 @@ class SupabaseClient:
             return None
 
     def check_sweep_config_exists(self, config_hash: str) -> Optional[Dict[str, Any]]:
-        """Checks if a sweep_config with the given hash already exists."""
+        """Check whether a configuration with ``config_hash`` exists."""
         try:
             response = (
                 self.supabase.table("sweep_configs")
@@ -279,7 +403,24 @@ class SupabaseClient:
         config_hash: str,
         interface_version: Optional[str] = None,
     ) -> Optional[Dict[str, Any]]:
-        """Adds a new sweep_config."""
+        """Insert a new sweep configuration entry.
+
+        Parameters
+        ----------
+        cluster_id : str
+            Identifier of the cluster this config belongs to.
+        config_json : dict[str, Any]
+            Serialized Hydra configuration.
+        config_hash : str
+            SHA256 hash of ``config_json``.
+        interface_version : str, optional
+            Optional interface version string.
+
+        Returns
+        -------
+        dict[str, Any] | None
+            The created row or ``None`` if insertion failed.
+        """
         try:
             data = {
                 "cluster_id": cluster_id,
@@ -301,7 +442,26 @@ class SupabaseClient:
         interface_version: Optional[str] = None,
         code_version: Optional[str] = None,
     ) -> Optional[Dict[str, Any]]:
-        """Adds a new job entry linked to a sweep_config."""
+        """Create a new job for the given configuration.
+
+        Parameters
+        ----------
+        config_id : str
+            Identifier of the configuration to run.
+        status : str, optional
+            Initial status value, by default ``"queued"``.
+        retry_index : int, optional
+            Retry count, by default ``0``.
+        interface_version : str, optional
+            Version of the training interface.
+        code_version : str, optional
+            Version of the code to execute.
+
+        Returns
+        -------
+        dict[str, Any] | None
+            Newly created job row or ``None`` on failure.
+        """
         try:
             data = {
                 "config_id": config_id,
