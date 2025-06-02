@@ -91,13 +91,15 @@ Workers are launched by the Manager (`scripts/run_manager.py`) as subprocesses, 
 
 ---
 
-## Optional Extensions
+## Artifact Bundling and Optional Extensions
 
+* After `logger.finalize()` the worker stages `checkpoint_dir`, `artifact_dir` and
+  `worker.log` into a single directory.
+* This directory is zipped into `bundle.zip` and uploaded to Supabase Storage
+  alongside `metrics.jsonl`.
 * Real-time metrics streaming to FastAPI via WebSocket (in parallel to `.jsonl` log)
 * Resume from previous checkpoints using `resume_training(cfg, checkpoint_path)`
 * Delayed start to stagger worker load on startup
-* Compression of checkpoints or artifacts before upload. Directories selected
-  for upload are zipped and stored as single `.zip` files in Supabase Storage.
 
 ---
 
