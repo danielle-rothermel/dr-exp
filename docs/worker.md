@@ -26,6 +26,7 @@ Workers are launched by the Manager (`scripts/run_manager.py`) as subprocesses, 
 * Catch and report NaNs, timeouts, or crashes to the `failures` and `errors` tables
 * Upload `.jsonl` log, checkpoint(s), and artifacts to Supabase Storage
 * Mark job completion with `upload_complete_at` and `finalize_success = True`
+* Create `finished.flag` in `run_<job_id>` within the local storage directory (e.g. `mock_storage/`) once uploads succeed
 
 ---
 
