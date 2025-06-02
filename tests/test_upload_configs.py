@@ -2,6 +2,7 @@ import json
 from pathlib import Path
 
 from dr_exp.mock.supabase_mock_client import SupabaseMockClient
+from dr_exp import config_upload
 from scripts import upload_configs
 
 
@@ -13,7 +14,7 @@ def test_generate_and_upload(tmp_path):
     client = SupabaseMockClient(base_path=str(tmp_path / "env"))
     sweep = "model=resnet,vit optim.lr=0.01,0.02"
 
-    jobs = upload_configs.upload_configs(
+    jobs = config_upload.upload_configs(
         base_config_path=str(cfg_dir),
         config_name="config.yaml",
         sweep=sweep,
@@ -31,7 +32,7 @@ def test_generate_and_upload(tmp_path):
         cfg = data["config_json"]["config"]
         assert cfg["optim"]["lr"] in [0.01, 0.02]
         assert cfg["model"]["name"] in ["resnet18", "vit_base_patch16_224"]
-        assert data["config_id"] == upload_configs.config_hash(cfg)
+        assert data["config_id"] == config_upload.config_hash(cfg)
 
 
 def test_cli_main(tmp_path, capsys):

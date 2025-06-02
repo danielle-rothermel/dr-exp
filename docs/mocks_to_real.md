@@ -28,7 +28,7 @@ The project provides local mock implementations of Supabase, the FastAPI backend
 - **Real trainer:** performs actual training and generates real outputs which are uploaded to Supabase.
 
 ## 4. Manager and CLI Tools
-- `scripts/run_manager.py` and scripts such as `upload_configs.py` call `get_supabase_client`, so they automatically switch according to `EXPMGR_MODE`.
+- `scripts/run_manager.py` and scripts such as `manager_cli upload-configs` call `get_supabase_client`, so they automatically switch according to `EXPMGR_MODE`.
 - When using mocks you can set `DR_EXP_BASE_PATH` to choose where `mock_db/` and `mock_storage/` are created. In real mode this variable is ignored.
 
 ## 5. Switching Steps
