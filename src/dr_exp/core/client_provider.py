@@ -8,11 +8,24 @@ from dr_exp.mock.supabase_mock_client import SupabaseMockClient
 def get_supabase_client(
     base_path: str = ".",
 ) -> Union[SupabaseClient, SupabaseMockClient]:
-    """Return a Supabase client according to ``EXPMGR_MODE``.
+    """Instantiate either a real or mock Supabase client.
 
-    If ``EXPMGR_MODE`` is ``"real"`` the :class:`SupabaseClient` will be
-    instantiated using ``SUPABASE_URL`` and ``SUPABASE_SERVICE_ROLE_KEY`` (or
-    ``SUPABASE_KEY``). Otherwise the :class:`SupabaseMockClient`` is returned.
+    Parameters
+    ----------
+    base_path : str, optional
+        Base directory used when creating :class:`SupabaseMockClient`. Ignored
+        when running in real mode.
+
+    Returns
+    -------
+    SupabaseClient | SupabaseMockClient
+        A client instance depending on the ``EXPMGR_MODE`` environment
+        variable.
+
+    Raises
+    ------
+    ValueError
+        If real mode is requested but no URL or key is provided.
     """
     mode = os.environ.get("EXPMGR_MODE", "mock").lower()
     if mode == "real":
