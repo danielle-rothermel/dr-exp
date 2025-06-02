@@ -7,6 +7,8 @@ import os
 from typing import Sequence
 
 from dr_exp.manager import Manager, discover_gpus, run_worker_main
+from dr_exp.utils.job_reaper import reap_stale_jobs
+from dr_exp.core.client_provider import get_supabase_client
 from scripts import upload_configs
 
 
@@ -67,6 +69,20 @@ def build_arg_parser() -> argparse.ArgumentParser:
     worker_parser.add_argument("worker_id", help="Unique worker identifier")
     worker_parser.add_argument("work_dir", help="Working directory for temporary files")
 
+    reap_parser = subparsers.add_parser(
+        "reap-stale-jobs",
+        help="Mark running jobs with stale heartbeats as failed",
+        description="Update stale running jobs to failed status",
+    )
+    reap_parser.add_argument(
+        "--max-age-mins",
+        type=int,
+        default=60,
+        help="Heartbeat age threshold in minutes",
+    )
+    reap_parser.add_argument(
+        "--base-path", default=".", help="Base path for SupabaseMockClient"
+    )
     upload_parser = subparsers.add_parser(
         "upload-configs",
         help="Generate and upload sweep configs",
@@ -101,6 +117,12 @@ def _cmd_run_worker(args: argparse.Namespace) -> None:
     run_worker_main(worker_id=args.worker_id, work_dir=args.work_dir)
 
 
+def _cmd_reap_stale_jobs(args: argparse.Namespace) -> None:
+    client = get_supabase_client(base_path=args.base_path)
+    count = reap_stale_jobs(client, args.max_age_mins)
+    print(f"Marked {count} stale job(s) as failed")
+
+
 def main(argv: Sequence[str] | None = None) -> None:
     """Entry point for the CLI."""
     parser = build_arg_parser()
@@ -112,6 +134,8 @@ def main(argv: Sequence[str] | None = None) -> None:
         _cmd_discover_gpus(args)
     elif args.command == "run-worker":
         _cmd_run_worker(args)
+    elif args.command == "reap-stale-jobs":
+        _cmd_reap_stale_jobs(args)
     elif args.command == "upload-configs":
         jobs = upload_configs.run(args)
         print(f"Created {len(jobs)} job(s)")
