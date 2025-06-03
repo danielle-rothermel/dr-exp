@@ -56,8 +56,8 @@
 ```plain text
 dr_exp/
 ├── dr_exp/              # Main Python package
-│   ├── mock/            # Mock components (e.g., supabase_mock_client.py)
-│   ├── core/            # Core logic (to be developed)
+│   ├── mock/            # Mock components (e.g., mock_trainer.py)
+│   ├── core/            # Core logic, including localdb_client
 │   └── ...
 ├── supabase/            # Supabase project configuration and migrations
 │   ├── config.toml
@@ -104,7 +104,7 @@ EXPMGR_MODE="mock" # Set to "real" to use actual Supabase
 ## 5. Running the System (High-Level)
     - Detailed instructions will evolve as components are built.
         - Mock Mode (for local development/testing):
-        - Set EXPMGR_MODE="mock" in your environment. This will use the SupabaseMockClient.
+        - Set EXPMGR_MODE="mock" in your environment. This will use the LocalDBClient.
         - You can reset the mock environment using:
         - ```plain text
           uv run python scripts/reset_mock_db.py
@@ -137,7 +137,7 @@ Opening the UI should display the jobs table fetched from the backend.
 
 ## 6. Development
 ### 6.1. Mocks
-- **SupabaseMockClient:** Simulates Supabase interactions locally. See `dr_exp/mock/supabase_mock_client.py`.
+- **LocalDBClient:** Simulates Supabase interactions locally. See `dr_exp/core/localdb_client.py`.
 - Other mocks, including the FastAPI backend and mock training function, are implemented as described in the PRD.
 ### 6.2. Testing
 - Tests are written using pytest and located in the tests/ directory.

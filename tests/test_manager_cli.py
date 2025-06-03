@@ -5,7 +5,7 @@ from pathlib import Path
 from datetime import datetime, UTC, timedelta
 
 from dr_exp.manager_cli import main
-from dr_exp.mock.supabase_mock_client import SupabaseMockClient
+from dr_exp.core.localdb_client import LocalDBClient
 
 
 def make_config() -> dict:
@@ -20,7 +20,7 @@ def test_discover_gpus(monkeypatch, capsys):
 
 
 def test_run_worker_subcommand(tmp_path, monkeypatch):
-    client = SupabaseMockClient(base_path=str(tmp_path))
+    client = LocalDBClient(base_path=str(tmp_path))
     client.add_job(make_config(), "s1", status="queued")
     monkeypatch.setenv("DR_EXP_BASE_PATH", str(tmp_path))
     work_dir = tmp_path / "work"
@@ -55,7 +55,7 @@ def test_run_subcommand_invokes_manager(monkeypatch):
 
 
 def test_reap_stale_jobs_subcommand(tmp_path, monkeypatch, capsys):
-    client = SupabaseMockClient(base_path=str(tmp_path))
+    client = LocalDBClient(base_path=str(tmp_path))
     job = client.add_job(make_config(), "s1", status="running")
     old = datetime.now(UTC) - timedelta(minutes=10)
     client.update_job(job["id"], {"heartbeat": old.isoformat() + "Z"})
@@ -75,11 +75,12 @@ def test_reap_stale_jobs_subcommand(tmp_path, monkeypatch, capsys):
     assert data["status"] == "failed"
     assert data["status_reason"] == "manager_died"
 
+
 def test_upload_configs_subcommand(tmp_path, monkeypatch, capsys):
     cfg_dir = Path(__file__).resolve().parents[1] / "configs"
-    client = SupabaseMockClient(base_path=str(tmp_path))
+    client = LocalDBClient(base_path=str(tmp_path))
 
-    monkeypatch.setattr("scripts.upload_configs.SupabaseMockClient", lambda: client)
+    monkeypatch.setattr("scripts.upload_configs.LocalDBClient", lambda: client)
 
     main(
         [

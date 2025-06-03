@@ -1,11 +1,11 @@
 import zipfile
 
 import dr_exp.worker as run_worker
-from dr_exp.mock.supabase_mock_client import SupabaseMockClient
+from dr_exp.core.localdb_client import LocalDBClient
 
 
 def test_bundle_upload(tmp_path):
-    client = SupabaseMockClient(base_path=str(tmp_path))
+    client = LocalDBClient(base_path=str(tmp_path))
     job = client.add_job(
         {"train": {"num_epochs": 1}, "logging": {}}, "sweep", status="queued"
     )

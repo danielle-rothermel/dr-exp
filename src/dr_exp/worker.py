@@ -15,11 +15,11 @@ from dr_exp.core import StructuredLogger
 from dr_exp.core.client_provider import get_supabase_client
 from dr_exp.core.supabase_client import SupabaseClient
 from dr_exp.mock.mock_trainer import train as default_train
-from dr_exp.mock.supabase_mock_client import SupabaseMockClient
+from dr_exp.core.localdb_client import LocalDBClient
 
 
 def _heartbeat_loop(
-    client: SupabaseClient | SupabaseMockClient,
+    client: SupabaseClient | LocalDBClient,
     job_id: str,
     interval: float,
     stop_event: threading.Event,
@@ -38,7 +38,7 @@ def run_worker(
     heartbeat_interval: float = 5.0,
     trainer_fn: Callable[[Any, StructuredLogger], dict] = default_train,
     logger_cls: type[StructuredLogger] = StructuredLogger,
-    client: Optional[SupabaseClient | SupabaseMockClient] = None,
+    client: Optional[SupabaseClient | LocalDBClient] = None,
     worker_id: str = "unassigned_worker",
 ) -> str:
     """Run a single worker iteration.
@@ -57,7 +57,7 @@ def run_worker(
         Function implementing the training loop.
     logger_cls : type[StructuredLogger], optional
         Logger class to instantiate.
-    client : SupabaseClient | SupabaseMockClient, optional
+    client : SupabaseClient | LocalDBClient, optional
         Client to use for job operations.
     worker_id : str, optional
         Identifier used when claiming jobs.
