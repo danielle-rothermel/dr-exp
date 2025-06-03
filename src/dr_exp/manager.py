@@ -11,7 +11,7 @@ from typing import Dict, List
 
 from dr_exp.core.client_provider import get_supabase_client
 from dr_exp.core.supabase_client import SupabaseClient
-from dr_exp.mock.supabase_mock_client import SupabaseMockClient
+from dr_exp.core.localdb_client import LocalDBClient
 
 # Import the worker implementation
 import dr_exp.worker as _run_worker
@@ -51,7 +51,7 @@ class Manager:
         heartbeat_interval: int,
         idle_timeout_mins: int,
         base_dir: str,
-        client: SupabaseClient | SupabaseMockClient | None = None,
+        client: SupabaseClient | LocalDBClient | None = None,
         start_method: str | None = "fork",
     ) -> None:
         """Create a new :class:`Manager`."""
@@ -61,7 +61,7 @@ class Manager:
         self.idle_timeout = timedelta(minutes=idle_timeout_mins)
         self.base_dir = base_dir
         self.client = client or get_supabase_client()
-        # Base path for SupabaseMockClient used by workers
+        # Base path for LocalDBClient used by workers
         if hasattr(self.client, "mock_db_path"):
             self.base_path = os.path.dirname(self.client.mock_db_path)
         else:

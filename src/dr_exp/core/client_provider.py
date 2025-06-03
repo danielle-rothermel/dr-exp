@@ -2,23 +2,23 @@ import os
 from typing import Union
 
 from .supabase_client import SupabaseClient
-from dr_exp.mock.supabase_mock_client import SupabaseMockClient
+from .localdb_client import LocalDBClient
 
 
 def get_supabase_client(
     base_path: str = ".",
-) -> Union[SupabaseClient, SupabaseMockClient]:
+) -> Union[SupabaseClient, LocalDBClient]:
     """Instantiate either a real or mock Supabase client.
 
     Parameters
     ----------
     base_path : str, optional
-        Base directory used when creating :class:`SupabaseMockClient` and as the
+        Base directory used when creating :class:`LocalDBClient` and as the
         local storage path when running in real mode.
 
     Returns
     -------
-    SupabaseClient | SupabaseMockClient
+    SupabaseClient | LocalDBClient
         A client instance depending on the ``EXPMGR_MODE`` environment
         variable.
 
@@ -36,4 +36,4 @@ def get_supabase_client(
         if not url or not key:
             raise ValueError("SUPABASE_URL and key required for real mode")
         return SupabaseClient(url, key, base_path=base_path)
-    return SupabaseMockClient(base_path=base_path)
+    return LocalDBClient(base_path=base_path)

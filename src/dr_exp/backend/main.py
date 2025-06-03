@@ -18,7 +18,7 @@ from dr_exp.backend.models import (
 )
 from dr_exp.core.client_provider import get_supabase_client
 from dr_exp.core.supabase_client import SupabaseClient
-from dr_exp.mock.supabase_mock_client import SupabaseMockClient
+from dr_exp.core.localdb_client import LocalDBClient
 
 logger = logging.getLogger(__name__)
 
@@ -58,13 +58,13 @@ class MetricsLoader:
     """Load and cache run metrics from storage."""
 
     def __init__(
-        self, client: SupabaseClient | SupabaseMockClient, maxsize: int = 32
+        self, client: SupabaseClient | LocalDBClient, maxsize: int = 32
     ) -> None:
         """Create a loader instance.
 
         Parameters
         ----------
-        client : SupabaseClient | SupabaseMockClient
+        client : SupabaseClient | LocalDBClient
             Client used to retrieve metrics files.
         maxsize : int, optional
             Maximum number of runs to keep in the LRU cache, by default ``32``.

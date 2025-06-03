@@ -41,7 +41,7 @@ On receiving SIGTERM or SIGINT, the manager sets a shutdown flag, waits for the 
 ## Environment Variables
 
 - `CUDA_VISIBLE_DEVICES`: Set by the manager for each worker so it only sees its assigned GPU.
-- `DR_EXP_BASE_PATH`: Base directory used by `SupabaseMockClient` when workers interact with the mock DB/Storage.
+- `DR_EXP_BASE_PATH`: Base directory used by `LocalDBClient` when workers interact with the local DB/Storage.
 
 ## Summary
 

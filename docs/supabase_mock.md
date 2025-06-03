@@ -1,8 +1,8 @@
-# Supabase Mock Specification (`docs/supabase_mock.md`)
+# LocalDB Client Specification (`docs/supabase_mock.md`)
 
 ## Purpose
 
-This document defines the contract and structure for a local, offline mock implementation of Supabase. It allows agent-based or CI-driven development and testing of the experiment management system without requiring internet access or live Supabase services.
+This document defines the contract and structure for the filesystem-backed LocalDB client. It allows agent-based or CI-driven development and testing of the experiment management system without requiring internet access or live Supabase services.
 
 The mock is intended to:
 
@@ -14,7 +14,7 @@ The mock is intended to:
 
 ## Overview
 
-The mock client will implement the same interface as the production client (`SupabaseClient`) and be selected at runtime based on an environment variable or configuration flag (e.g., `EXPMGR_MODE=mock`).
+The LocalDB client implements the same interface as the production client (`SupabaseClient`) and is selected at runtime via the `EXPMGR_MODE` environment variable (set to ``"mock"``).
 
 * Uses local disk for storage (e.g., `./mock_storage/`)
 * Optionally uses in-memory or SQLite-based metadata storage

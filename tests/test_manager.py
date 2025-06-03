@@ -3,7 +3,7 @@ from multiprocessing import Process
 from pathlib import Path
 
 
-from dr_exp.mock.supabase_mock_client import SupabaseMockClient
+from dr_exp.core.localdb_client import LocalDBClient
 import dr_exp.manager as manager
 
 
@@ -40,7 +40,7 @@ def test_worker_spawning(tmp_path, monkeypatch):
 
 
 def test_heartbeat_detection(tmp_path, monkeypatch):
-    client = SupabaseMockClient(base_path=str(tmp_path))
+    client = LocalDBClient(base_path=str(tmp_path))
     job = client.add_job({"cfg": 1}, "sweep1", status="running")
     wid = "worker_0_0"
     old_time = datetime.now(UTC) - timedelta(seconds=100)
