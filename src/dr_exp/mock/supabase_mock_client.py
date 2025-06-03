@@ -4,14 +4,16 @@ import shutil
 import uuid
 from datetime import datetime, UTC
 from typing import Optional, List, Dict, Any
-# For file locking - fcntl is Unix-specific. Consider a cross-platform alternative
-# or simplify if concurrency isn't a major concern for initial mock usage.
-# For now, we'll note its importance from the spec.
-# import fcntl
-
 
 class SupabaseMockClient:
-    def __init__(self, base_path="."):
+    def __init__(self, base_path: str = ".") -> None:
+        """Create the directories used for the mock database.
+
+        Parameters
+        ----------
+        base_path : str, optional
+            Directory under which ``mock_db`` and ``mock_storage`` are located.
+        """
         self.mock_db_path = os.path.join(base_path, "mock_db")
         self.mock_storage_path = os.path.join(base_path, "mock_storage")
         self.jobs_dir = os.path.join(self.mock_db_path, "jobs")
@@ -53,11 +55,6 @@ class SupabaseMockClient:
                 continue
 
             job_file_path = os.path.join(self.jobs_dir, job_file_name)
-
-            # Simplified locking: In a real concurrent scenario, proper file locking (fcntl or a lock file)
-            # would be needed around reading and writing this file.
-            # For this mock, we'll assume single-threaded access for simplicity in V1,
-            # but acknowledge the spec's requirement for fcntl for true atomicity.
             try:
                 with open(job_file_path, "r+") as f:
                     # print(f"Attempting to claim job from {job_file_path}") # Debug
@@ -79,11 +76,10 @@ class SupabaseMockClient:
                     f"Error processing job file {job_file_path}: {e}"
                 )  # Should go to a logger
                 continue
-        # print("No queued jobs found to claim.") # Debug
         return None
 
     def update_job(self, job_id: str, data: Dict[str, Any]):
-        """Updates a job record with new data."""
+        """Update a job record with ``data``."""
         job_file_path = os.path.join(self.jobs_dir, f"{job_id}.json")
         if not os.path.exists(job_file_path):
             # print(f"Job file not found for update: {job_file_path}") # Debug
@@ -111,7 +107,7 @@ class SupabaseMockClient:
             return {"success": False, "message": str(e)}
 
     def log_metrics(self, job_id: str, metrics_list: List[Dict[str, Any]]):
-        """Appends a list of metric dictionaries to the job's .jsonl metrics file."""
+        """Append metrics to the job's metrics file."""
         metric_file_path = os.path.join(self.metrics_dir, f"{job_id}.jsonl")
         try:
             with open(metric_file_path, "a") as f:
@@ -135,7 +131,7 @@ class SupabaseMockClient:
         message: str,
         stacktrace: Optional[str] = None,
     ):
-        """Records a failure event to a global errors.jsonl file."""
+        """Record a failure event in ``errors.jsonl``."""
         error_entry = {
             "job_id": job_id,
             "error_type": error_type,
@@ -151,7 +147,7 @@ class SupabaseMockClient:
             print(f"Error recording failure for job {job_id}: {e}")
 
     def finalize_job(self, job_id: str, final_status: str, metadata: Dict[str, Any]):
-        """Finalizes a job, typically setting its status and end_time, and other metadata."""
+        """Finalize a job and update its status."""
         update_data = {
             "status": final_status,
             "end_time": datetime.now(UTC).isoformat() + "Z",
@@ -199,6 +195,7 @@ class SupabaseMockClient:
 
     # --- Helper/Additional methods that would be needed ---
     def get_job_details(self, job_id: str) -> Optional[Dict[str, Any]]:
+        """Return the stored record for ``job_id`` if it exists."""
         job_file_path = os.path.join(self.jobs_dir, f"{job_id}.json")
         if os.path.exists(job_file_path):
             with open(job_file_path, "r") as f:
@@ -206,12 +203,7 @@ class SupabaseMockClient:
         return None
 
     def get_config_for_job(self, job_id: str) -> Optional[Dict[str, Any]]:
-        """
-        Retrieves the configuration for a given job.
-        In this mock, we'll assume the config is stored within the job's JSON file itself
-        under a 'config_json' key, or it could point to another file.
-        For simplicity, let's assume it's part of the job_data.
-        """
+        """Return the ``config_json`` stored with ``job_id`` if present."""
         job_data = self.get_job_details(job_id)
         if job_data and "config_json" in job_data:
             return job_data["config_json"]
@@ -221,10 +213,7 @@ class SupabaseMockClient:
     def add_job(
         self, job_config: Dict[str, Any], sweep_config_id: str, status: str = "queued"
     ) -> Dict[str, Any]:
-        """
-        Adds a new job to the mock database. Used by Config Generator mock interaction.
-        The job_config here is the Hydra resolved config.
-        """
+        """Add a new job entry to the mock database."""
         job_id = str(uuid.uuid4())
         job_data = {
             "id": job_id,

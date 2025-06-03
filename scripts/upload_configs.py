@@ -1,4 +1,8 @@
-"""Hydra based Config Generator and uploader using :class:`SupabaseMockClient`."""
+"""Hydra based Config Generator and uploader.
+
+The underlying Supabase client is selected based on the ``EXPMGR_MODE``
+environment variable via :func:`dr_exp.core.get_supabase_client`.
+"""
 
 from __future__ import annotations
 
@@ -7,12 +11,15 @@ import argparse
 import hashlib
 import itertools
 import json
+import os
 from typing import Any, Dict, Iterable, List, Sequence
 
 import hydra
 from hydra.core.global_hydra import GlobalHydra
 from omegaconf import OmegaConf
 
+from dr_exp.core.client_provider import get_supabase_client
+from dr_exp.core.supabase_client import SupabaseClient
 from dr_exp.mock.supabase_mock_client import SupabaseMockClient
 
 
@@ -70,13 +77,13 @@ def upload_configs(
     base_config_path: str,
     config_name: str,
     sweep: str,
-    client: SupabaseMockClient,
+    client: SupabaseClient | SupabaseMockClient,
     cluster_name: str | None = None,
     description: str | None = None,
     interface_version: str | None = None,
     code_version: str | None = None,
 ) -> List[Dict[str, Any]]:
-    """Generate configs using Hydra and upload them using the mock client."""
+    """Generate configs using Hydra and upload them using the Supabase client."""
 
     sweep_params = parse_sweep(sweep)
 
@@ -120,7 +127,10 @@ def main(argv: Sequence[str] | None = None) -> None:
     parser = build_arg_parser()
     args = parser.parse_args(argv)
 
-    client = SupabaseMockClient()
+    if os.environ.get("EXPMGR_MODE", "mock").lower() == "real":
+        client = get_supabase_client()
+    else:
+        client = SupabaseMockClient()
     jobs = upload_configs(
         base_config_path=args.base_config_path,
         config_name=args.config_name,

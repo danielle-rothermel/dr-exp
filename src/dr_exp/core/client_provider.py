@@ -1,0 +1,26 @@
+import os
+from typing import Union
+
+from .supabase_client import SupabaseClient
+from dr_exp.mock.supabase_mock_client import SupabaseMockClient
+
+
+def get_supabase_client(
+    base_path: str = ".",
+) -> Union[SupabaseClient, SupabaseMockClient]:
+    """Return a Supabase client according to ``EXPMGR_MODE``.
+
+    If ``EXPMGR_MODE`` is ``"real"`` the :class:`SupabaseClient` will be
+    instantiated using ``SUPABASE_URL`` and ``SUPABASE_SERVICE_ROLE_KEY`` (or
+    ``SUPABASE_KEY``). Otherwise the :class:`SupabaseMockClient`` is returned.
+    """
+    mode = os.environ.get("EXPMGR_MODE", "mock").lower()
+    if mode == "real":
+        url = os.environ.get("SUPABASE_URL")
+        key = os.environ.get("SUPABASE_SERVICE_ROLE_KEY") or os.environ.get(
+            "SUPABASE_KEY"
+        )
+        if not url or not key:
+            raise ValueError("SUPABASE_URL and key required for real mode")
+        return SupabaseClient(url, key)
+    return SupabaseMockClient(base_path=base_path)

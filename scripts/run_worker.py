@@ -9,12 +9,14 @@ from datetime import datetime, UTC
 from typing import Any, Callable, Optional
 
 from dr_exp.core import StructuredLogger
+from dr_exp.core.client_provider import get_supabase_client
+from dr_exp.core.supabase_client import SupabaseClient
 from dr_exp.mock.mock_trainer import train as default_train
 from dr_exp.mock.supabase_mock_client import SupabaseMockClient
 
 
 def _heartbeat_loop(
-    client: SupabaseMockClient,
+    client: SupabaseClient | SupabaseMockClient,
     job_id: str,
     interval: float,
     stop_event: threading.Event,
@@ -31,10 +33,10 @@ def run_worker(
     heartbeat_interval: float = 5.0,
     trainer_fn: Callable[[Any, StructuredLogger], dict] = default_train,
     logger_cls: type[StructuredLogger] = StructuredLogger,
-    client: Optional[SupabaseMockClient] = None,
+    client: Optional[SupabaseClient | SupabaseMockClient] = None,
 ) -> str:
     """Run a single worker iteration."""
-    client = client or SupabaseMockClient(base_path=base_path)
+    client = client or get_supabase_client(base_path=base_path)
 
     attempt = 0
     backoff = 1.0
