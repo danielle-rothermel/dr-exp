@@ -32,7 +32,7 @@ def _heartbeat_loop(
 
 
 def run_worker(
-    base_path: str = ".",
+    base_path: str = "./job_data",
     work_dir: Optional[str] = None,
     max_claim_attempts: int = 5,
     heartbeat_interval: float = 5.0,

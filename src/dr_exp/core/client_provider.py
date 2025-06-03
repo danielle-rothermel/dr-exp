@@ -1,8 +1,12 @@
 import os
 from typing import Union
 
+from dotenv import load_dotenv
+
 from .supabase_client import SupabaseClient
 from .localdb_client import LocalDBClient
+
+load_dotenv()
 
 
 def get_supabase_client(
