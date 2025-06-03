@@ -9,7 +9,7 @@ from typing import Any, Dict, List, Sequence
 
 from dr_exp.config_upload import upload_configs
 from dr_exp.core.client_provider import get_supabase_client
-from dr_exp.mock.supabase_mock_client import SupabaseMockClient
+from dr_exp.core.localdb_client import LocalDBClient
 
 
 def add_arguments(parser: argparse.ArgumentParser) -> None:
@@ -41,7 +41,7 @@ def run(args: argparse.Namespace) -> List[Dict[str, Any]]:
     if os.environ.get("EXPMGR_MODE", "mock").lower() == "real":
         client = get_supabase_client()
     else:
-        client = SupabaseMockClient()
+        client = LocalDBClient()
     return upload_configs(
         base_config_path=args.base_config_path,
         config_name=args.config_name,

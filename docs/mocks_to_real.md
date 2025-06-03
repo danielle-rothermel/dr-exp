@@ -5,7 +5,7 @@ The project provides local mock implementations of Supabase, the FastAPI backend
 
 ## 1. Supabase Client
 - The helper :func:`get_supabase_client` checks the environment variable `EXPMGR_MODE`.
-- `EXPMGR_MODE=mock` (default) instantiates :class:`SupabaseMockClient` which reads and writes to `mock_db/` and `mock_storage/` under `DR_EXP_BASE_PATH`.
+- `EXPMGR_MODE=mock` (default) instantiates :class:`LocalDBClient` which reads and writes to `mock_db/` and `mock_storage/` under `DR_EXP_BASE_PATH`.
 - `EXPMGR_MODE=real` instantiates :class:`SupabaseClient`. You must also set `SUPABASE_URL` and `SUPABASE_SERVICE_ROLE_KEY` (or `SUPABASE_KEY`).
 - All CLI utilities, the FastAPI backend, and the manager call `get_supabase_client`, so this single flag controls the entire stack.
 

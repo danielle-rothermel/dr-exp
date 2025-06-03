@@ -9,7 +9,9 @@ from typing import Optional, List, Dict, Any
 import portalocker
 
 
-class SupabaseMockClient:
+class LocalDBClient:
+    """Filesystem-backed client used for local runs."""
+
     def __init__(self, base_path: str = ".") -> None:
         """Create the directories used for the mock database.
 
@@ -271,3 +273,6 @@ class SupabaseMockClient:
         for k, v in job_data.items():
             print(f" - {k + ':':20} {v}")
         return job_data
+
+
+__all__ = ["LocalDBClient"]

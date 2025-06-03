@@ -2,7 +2,7 @@ import os
 
 import zipfile
 
-from dr_exp.mock.supabase_mock_client import SupabaseMockClient
+from dr_exp.core.localdb_client import LocalDBClient
 import dr_exp.worker as run_worker
 
 
@@ -11,7 +11,7 @@ def make_config():
 
 
 def test_worker_success(tmp_path):
-    client = SupabaseMockClient(base_path=str(tmp_path))
+    client = LocalDBClient(base_path=str(tmp_path))
     job = client.add_job(make_config(), "sweep1", status="queued")
 
     work_dir = tmp_path / "work"
@@ -43,7 +43,7 @@ def test_worker_success(tmp_path):
 
 
 def test_worker_no_job(tmp_path):
-    client = SupabaseMockClient(base_path=str(tmp_path))
+    client = LocalDBClient(base_path=str(tmp_path))
     work_dir = tmp_path / "work"
     result = run_worker.run_worker(
         base_path=str(tmp_path),
@@ -58,7 +58,7 @@ def test_worker_no_job(tmp_path):
 
 
 def test_worker_training_failure(tmp_path):
-    client = SupabaseMockClient(base_path=str(tmp_path))
+    client = LocalDBClient(base_path=str(tmp_path))
     job = client.add_job(make_config(), "sweep1", status="queued")
 
     def failing_train(cfg, logger):

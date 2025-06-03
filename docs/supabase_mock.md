@@ -1,8 +1,8 @@
-# Supabase Mock Specification (`docs/supabase_mock.md`)
+# LocalDB Client Specification (`docs/supabase_mock.md`)
 
 ## Purpose
 
-This document defines the contract and structure for a local, offline mock implementation of Supabase. It allows agent-based or CI-driven development and testing of the experiment management system without requiring internet access or live Supabase services.
+This document defines the contract and structure for the filesystem-backed LocalDB client. It allows agent-based or CI-driven development and testing of the experiment management system without requiring internet access or live Supabase services.
 
 The mock is intended to:
 
@@ -14,7 +14,7 @@ The mock is intended to:
 
 ## Overview
 
-The mock client will implement the same interface as the production client (`SupabaseClient`) and be selected at runtime based on an environment variable or configuration flag (e.g., `EXPMGR_MODE=mock`).
+The LocalDB client implements the same interface as the production client (`SupabaseClient`) and is selected at runtime via the `EXPMGR_MODE` environment variable (set to ``"mock"``).
 
 * Uses local disk for storage (e.g., `./mock_storage/`)
 * Optionally uses in-memory or SQLite-based metadata storage
@@ -32,8 +32,8 @@ class SupabaseClient:
     def update_job(self, job_id: str, data: dict): ...
     def log_metrics(self, job_id: str, metrics: list[dict]): ...
     def record_failure(self, job_id: str, error_type: str, message: str, stacktrace: Optional[str] = None): ...
-    def finalize_job(self, job_id: str, metadata: dict): ...
-    def upload_artifact(self, job_id: str, local_path: str, remote_path: str): ...
+    def finalize_job(self, job_id: str, final_status: str, metadata: dict): ...
+    def upload_artifact(self, job_id: str, local_path: str, remote_path_suffix: str): ...
 ```
 
 ---
@@ -88,7 +88,7 @@ Stacktraces may be omitted (`null`) but format must match the schema.
 
 * The mock should **not require any external dependencies** beyond Python stdlib
 * Supports concurrency-safe job claiming via file locking
-* Artifacts should be **copied** from `local_path` to `mock_storage/run_<id>/<remote_path>` to simulate upload
+* Artifacts should be **copied** from `local_path` to `mock_storage/run_<id>/<remote_path_suffix>` to simulate upload
 * Environment variable `EXPMGR_MODE=mock` should control whether the mock is used
 * Resetting the mock should **fully wipe** the mock DB and storage folders:
 

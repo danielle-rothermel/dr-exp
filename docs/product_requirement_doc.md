@@ -201,7 +201,7 @@
 
 ## Implementation Status
 The following core pieces are implemented and covered by tests:
- - `SupabaseMockClient` and reset utility
+ - `LocalDBClient` and reset utility
  - Mock trainer used for local runs
  - Configuration upload script
  - Full `StructuredLogger`

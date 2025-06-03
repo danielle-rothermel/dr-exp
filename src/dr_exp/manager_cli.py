@@ -82,7 +82,7 @@ def build_arg_parser() -> argparse.ArgumentParser:
         help="Heartbeat age threshold in minutes",
     )
     reap_parser.add_argument(
-        "--base-path", default=".", help="Base path for SupabaseMockClient"
+        "--base-path", default=".", help="Base path for LocalDBClient"
     )
 
     cleanup_parser = subparsers.add_parser(

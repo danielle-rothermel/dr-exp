@@ -1,11 +1,9 @@
-# tests/mock/test_supabase_mock_client.py
+# tests/mock/test_localdb_client.py
 import pytest
 import os
 import json
 from datetime import datetime, timezone
-from dr_exp.mock.supabase_mock_client import (
-    SupabaseMockClient,
-)  # Assuming this is the correct path
+from dr_exp.core.localdb_client import LocalDBClient
 
 # --- Test Fixtures ---
 
@@ -13,12 +11,12 @@ from dr_exp.mock.supabase_mock_client import (
 @pytest.fixture
 def mock_client(tmp_path):
     """
-    Provides a SupabaseMockClient instance initialized in a temporary directory.
+    Provides a LocalDBClient instance initialized in a temporary directory.
     This ensures each test runs with a clean mock environment.
     The tmp_path fixture is provided by pytest for creating temporary files/directories.
     """
-    # The SupabaseMockClient will create mock_db and mock_storage inside tmp_path
-    client = SupabaseMockClient(base_path=str(tmp_path))
+    # The LocalDBClient will create mock_db and mock_storage inside tmp_path
+    client = LocalDBClient(base_path=str(tmp_path))
     return client
 
 
@@ -39,7 +37,7 @@ def sample_sweep_config_id():
 
 def test_client_initialization(tmp_path):
     """Tests if the client initializes its directories correctly."""
-    client = SupabaseMockClient(base_path=str(tmp_path))
+    client = LocalDBClient(base_path=str(tmp_path))
     assert os.path.exists(client.mock_db_path)
     assert os.path.exists(client.jobs_dir)
     assert os.path.exists(client.metrics_dir)
@@ -353,7 +351,7 @@ def test_finalize_job(mock_client, sample_job_config, sample_sweep_config_id):
 # --- Test for Reset Utility (Implicitly via fixture, but can add explicit if needed) ---
 # The mock_client fixture using tmp_path ensures a clean state for each test.
 # If you had a separate reset_mock_db function, you could test it directly.
-# For now, the SupabaseMockClient's own re-initialization on a clean tmp_path serves this.
+# For now, the LocalDBClient's own re-initialization on a clean tmp_path serves this.
 
 
 def test_multiple_operations_on_same_job(

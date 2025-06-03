@@ -6,7 +6,7 @@ import pytest
 from dr_exp import config_upload
 from dr_exp.backend.main import MetricsLoader
 from dr_exp.core import client_provider
-from dr_exp.mock.supabase_mock_client import SupabaseMockClient
+from dr_exp.core.localdb_client import LocalDBClient
 
 
 def test_parse_sweep_and_generate_combos():
@@ -47,7 +47,7 @@ def test_config_hash_deterministic():
 def test_get_supabase_client_modes(monkeypatch):
     monkeypatch.delenv("EXPMGR_MODE", raising=False)
     client = client_provider.get_supabase_client(base_path=".")
-    assert isinstance(client, SupabaseMockClient)
+    assert isinstance(client, LocalDBClient)
 
     class Dummy:
         def __init__(self, url, key, base_path="."):
@@ -72,7 +72,7 @@ def test_get_supabase_client_modes(monkeypatch):
 
 
 def test_metrics_loader(tmp_path):
-    client = SupabaseMockClient(base_path=str(tmp_path))
+    client = LocalDBClient(base_path=str(tmp_path))
     loader = MetricsLoader(client, maxsize=2)
     run_id = "r1"
     run_dir = Path(client.mock_storage_path) / f"run_{run_id}"
