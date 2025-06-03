@@ -22,11 +22,11 @@ This document defines the expected endpoints, their inputs/outputs, security req
 
 ### `GET /metrics/{run_id}`
 
-Returns summarized metrics for a given run.
+Returns the parsed metrics log for a given run.
 
 * **Input**: `run_id: str`
-* **Output**: JSON summary of key metrics (e.g., final loss, accuracy, slopes)
-* **Source**: Parses metrics `.jsonl` or reads from Supabase
+* **Output**: List of metric dictionaries (truncated to the most recent 100 entries)
+* **Source**: Reads `metrics.jsonl` from storage (mock or real Supabase)
 
 ### `POST /job/kill`
 
@@ -42,7 +42,7 @@ Requeues a failed or stalled job.
 
 * **Input**: `{"job_id": "abc-123"}`
 * **Access**: Admin only
-* **Behavior**: Updates `status='queued'`, increments `retry_index`, logs a `failures` entry
+* **Behavior**: Updates `status='queued'` and increments `retry_index`
 
 ### `GET /job/{job_id}`
 

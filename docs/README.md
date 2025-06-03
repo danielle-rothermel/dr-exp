@@ -7,4 +7,5 @@ Key files include:
 - `supabase_schema.md` – database schema and migration details.
 - `worker.md` – worker process design.
 - `config_upload.md` – description of configuration generation and upload.
+- `manager_cli.md` – overview of the command line interface.
 - Additional docs covering API contracts, mocks, logging, and frontend UI.

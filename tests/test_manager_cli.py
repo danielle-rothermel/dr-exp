@@ -98,7 +98,7 @@ def test_upload_configs_subcommand(tmp_path, monkeypatch, capsys):
 
 
 def test_cleanup_run_data_subcommand(tmp_path, monkeypatch, capsys):
-    client = SupabaseMockClient(base_path=str(tmp_path))
+    client = LocalDBClient(base_path=str(tmp_path))
     run_dir = Path(client.mock_storage_path) / "run_x"
     run_dir.mkdir(parents=True)
     (run_dir / "finished.flag").touch()
