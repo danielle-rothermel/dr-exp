@@ -2,5 +2,5 @@
 
 Offline implementations used for testing without external services.
 
-- `supabase_mock_client.py` – stores data in `mock_db/` rather than a real Supabase instance.
 - `mock_trainer.py` – simple training loop used by unit tests.
+- `localdb_client.py` (in `dr_exp/core`) – filesystem based client used when running locally.

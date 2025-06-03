@@ -13,7 +13,7 @@ from hydra.core.global_hydra import GlobalHydra
 from omegaconf import OmegaConf
 
 from dr_exp.core.supabase_client import SupabaseClient
-from dr_exp.mock.supabase_mock_client import SupabaseMockClient
+from dr_exp.core.localdb_client import LocalDBClient
 
 
 # --------------------- Config Generation ---------------------
@@ -68,7 +68,7 @@ def upload_configs(
     base_config_path: str,
     config_name: str,
     sweep: str,
-    client: SupabaseClient | SupabaseMockClient,
+    client: SupabaseClient | LocalDBClient,
     cluster_name: str | None = None,
     description: str | None = None,
     interface_version: str | None = None,
