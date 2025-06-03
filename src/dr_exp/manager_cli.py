@@ -8,6 +8,7 @@ from typing import Sequence
 
 from dr_exp.manager import Manager, discover_gpus, run_worker_main
 from dr_exp.utils.job_reaper import reap_stale_jobs
+from dr_exp.utils.storage_cleanup import cleanup_uploaded_runs
 from dr_exp.core.client_provider import get_supabase_client
 from scripts import upload_configs
 
@@ -83,6 +84,15 @@ def build_arg_parser() -> argparse.ArgumentParser:
     reap_parser.add_argument(
         "--base-path", default=".", help="Base path for LocalDBClient"
     )
+
+    cleanup_parser = subparsers.add_parser(
+        "cleanup-run-data",
+        help="Delete run directories that have finished uploading",
+        description="Remove run_* folders containing finished.flag",
+    )
+    cleanup_parser.add_argument(
+        "--base-path", default=".", help="Base path for SupabaseMockClient"
+    )
     upload_parser = subparsers.add_parser(
         "upload-configs",
         help="Generate and upload sweep configs",
@@ -123,6 +133,12 @@ def _cmd_reap_stale_jobs(args: argparse.Namespace) -> None:
     print(f"Marked {count} stale job(s) as failed")
 
 
+def _cmd_cleanup_run_data(args: argparse.Namespace) -> None:
+    client = get_supabase_client(base_path=args.base_path)
+    count = cleanup_uploaded_runs(client)
+    print(f"Removed {count} run directory(s)")
+
+
 def main(argv: Sequence[str] | None = None) -> None:
     """Entry point for the CLI."""
     parser = build_arg_parser()
@@ -136,6 +152,8 @@ def main(argv: Sequence[str] | None = None) -> None:
         _cmd_run_worker(args)
     elif args.command == "reap-stale-jobs":
         _cmd_reap_stale_jobs(args)
+    elif args.command == "cleanup-run-data":
+        _cmd_cleanup_run_data(args)
     elif args.command == "upload-configs":
         jobs = upload_configs.run(args)
         print(f"Created {len(jobs)} job(s)")
