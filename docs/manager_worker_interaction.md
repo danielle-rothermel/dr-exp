@@ -1,18 +1,18 @@
 # Manager & Worker Interaction
 
-This document clarifies how `run_manager.py` and `run_worker.py` cooperate during a training run. It focuses on the runtime sequence and how data flows between the two scripts.
+This document clarifies how `scripts/run_manager.py` and `dr_exp.worker.run_worker` cooperate during a training run. It focuses on the runtime sequence and how data flows between the two components.
 
 ## Overview
 
-`run_manager.py` is launched once per SLURM job. It discovers the GPUs available to that job and spawns one or more worker processes on each GPU. Each worker process runs `run_worker.py` in its own subprocess. Workers claim jobs from Supabase (or the mock client), execute training and periodically update a heartbeat. The manager monitors these heartbeats to detect stalled or crashed workers and restarts them when needed.
+`scripts/run_manager.py` is launched once per SLURM job. It discovers the GPUs available to that job and spawns one or more worker processes on each GPU. Each worker process runs the `run_worker.py` wrapper (which calls `dr_exp.worker.run_worker`) in its own subprocess. Workers claim jobs from Supabase (or the mock client), execute training and periodically update a heartbeat. The manager monitors these heartbeats to detect stalled or crashed workers and restarts them when needed.
 
 ## Launch Sequence
 
-1. **Manager start**: `run_manager.py` is executed with parameters such as `--gpus-per-node`, `--workers-per-gpu` and `--heartbeat-interval`.
+1. **Manager start**: `scripts/run_manager.py` is executed with parameters such as `--gpus-per-node`, `--workers-per-gpu` and `--heartbeat-interval`.
 2. **GPU discovery**: The manager uses `discover_gpus()` to build a list of GPU IDs. If `CUDA_VISIBLE_DEVICES` is set, only those IDs are used.
 3. **Worker spawning**: For each GPU and configured worker count, the manager calls `launch_worker()` which in turn starts a new `multiprocessing.Process` with `_worker_target`.
 4. **Environment setup for worker**: `_worker_target` sets `CUDA_VISIBLE_DEVICES` to the assigned GPU ID and exports `DR_EXP_BASE_PATH` (used by the mock Supabase client). It then ensures the worker's directory exists and calls `run_worker_main()`.
-5. **Worker entrypoint**: `run_worker_main()` (defined in `run_manager.py`) simply loads `run_worker.run_worker()` from `scripts/run_worker.py` and passes the base path and working directory. If the real worker implementation is missing an error is raised.
+5. **Worker entrypoint**: `run_worker_main()` (defined in `dr_exp.manager`) simply loads `dr_exp.worker.run_worker()` and passes the base path and working directory. The script `scripts/run_worker.py` merely exposes a CLI for this function.
 
 ## Worker Responsibilities
 
@@ -45,5 +45,5 @@ On receiving SIGTERM or SIGINT, the manager sets a shutdown flag, waits for the 
 
 ## Summary
 
-`run_manager.py` orchestrates worker lifecycles and watches for failures via heartbeat timestamps. `run_worker.py` focuses on job execution: claiming work, running training, uploading results and sending heartbeats. Their interaction is indirect—workers communicate status exclusively through Supabase (or the mock client) while the manager supervises and restarts workers when heartbeats stop.
+`scripts/run_manager.py` orchestrates worker lifecycles and watches for failures via heartbeat timestamps. `dr_exp.worker.run_worker` focuses on job execution: claiming work, running training, uploading results and sending heartbeats. Their interaction is indirect—workers communicate status exclusively through Supabase (or the mock client) while the manager supervises and restarts workers when heartbeats stop.
 

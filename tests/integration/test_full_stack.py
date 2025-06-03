@@ -13,7 +13,7 @@ from multiprocessing import Process
 import pytest
 from fastapi.testclient import TestClient
 
-import run_manager as manager
+import dr_exp.manager as manager
 from dr_exp.backend.main import create_app
 from dr_exp.mock.supabase_mock_client import SupabaseMockClient
 from scripts import upload_configs
@@ -83,7 +83,7 @@ def test_job_failure(tmp_path, api_client, sb_client, monkeypatch):
     data["config_json"]["fail"] = True
     path.write_text(json.dumps(data))
 
-    from scripts import run_worker as rw
+    import dr_exp.worker as rw
 
     orig_run_worker = rw.run_worker
     orig_train = rw.default_train
@@ -123,7 +123,7 @@ def test_job_failure(tmp_path, api_client, sb_client, monkeypatch):
 def test_job_control_api(tmp_path, api_client, sb_client, monkeypatch):
     [job] = create_jobs(sb_client, "model=resnet")
 
-    from scripts import run_worker as rw
+    import dr_exp.worker as rw
 
     def slow_train(cfg, logger):
         for _ in range(5):

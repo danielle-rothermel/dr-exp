@@ -102,8 +102,8 @@
 1. **SLURM `sbatch` Script:**
     - Sets up the necessary environment (modules, Python environment).
     - Exports required secrets (Supabase URL/keys) as environment variables.
-    - Launches the `SLURM Manager` script (`run_manager.py`) on the allocated node.
-2. **SLURM Manager (`run_manager.py`):**
+    - Launches the `SLURM Manager` script (`scripts/run_manager.py`) on the allocated node.
+2. **SLURM Manager (`scripts/run_manager.py`):**
     - Parses `CUDA_VISIBLE_DEVICES` or similar to discover allocated GPUs.
     - Creates a unique base directory for this SLURM job instance locally (e.g., `/tmp/exp_mgr_slurm/<slurm_job_id>/`).
     - Logs its own operational events to a file within its unique job directory, later uploaded to `run_<job_uuid>/manager.log`.
@@ -115,7 +115,7 @@
         - Restarts a new worker process, which will attempt to claim a new job.
     - Handles SLURM termination signals for graceful shutdown of workers.
     - Exits if idle for a configurable timeout (e.g., no claimable jobs for X minutes).
-3. **Worker Process (`run_worker.py`):**
+3. **Worker Process (`dr_exp.worker.run_worker`):**
     - **Job Claim:**
         - Queries Supabase for a `jobs` record with `status='queued'`, attempting to atomically update it to `status='running'` and set `assigned_worker` (using a DB transaction or `UPDATE ... RETURNING` with `SKIP LOCKED`). Uses exponential backoff on failed claim attempts.
         - If no job is claimed after several attempts, exits.

@@ -19,7 +19,7 @@ The project provides local mock implementations of Supabase, the FastAPI backend
 - With `EXPMGR_MODE=real`, the same endpoints interact with Supabase via :class:`SupabaseClient`.
 
 ## 3. Worker and Training Function
-- `scripts/run_worker.py` exposes a `run_worker` function whose `trainer_fn` argument defaults to `dr_exp.mock.mock_trainer.train`.
+- `dr_exp.worker` provides the `run_worker()` function whose `trainer_fn` argument defaults to `dr_exp.mock.mock_trainer.train`. The script `scripts/run_worker.py` is a thin wrapper around this function.
 - To run real training, invoke `run_worker` (or the manager) with your own training function passed to `trainer_fn`.
 - The worker itself still obeys `EXPMGR_MODE`, so in real mode it logs and uploads through :class:`SupabaseClient`.
 
@@ -28,7 +28,7 @@ The project provides local mock implementations of Supabase, the FastAPI backend
 - **Real trainer:** performs actual training and generates real outputs which are uploaded to Supabase.
 
 ## 4. Manager and CLI Tools
-- `run_manager.py` and scripts such as `upload_configs.py` call `get_supabase_client`, so they automatically switch according to `EXPMGR_MODE`.
+- `scripts/run_manager.py` and scripts such as `upload_configs.py` call `get_supabase_client`, so they automatically switch according to `EXPMGR_MODE`.
 - When using mocks you can set `DR_EXP_BASE_PATH` to choose where `mock_db/` and `mock_storage/` are created. In real mode this variable is ignored.
 
 ## 5. Switching Steps
