@@ -1,5 +1,7 @@
 import os
 
+import zipfile
+
 from dr_exp.mock.supabase_mock_client import SupabaseMockClient
 import dr_exp.worker as run_worker
 
@@ -30,7 +32,14 @@ def test_worker_success(tmp_path):
 
     storage_run = os.path.join(client.mock_storage_path, f"run_{job['id']}")
     assert os.path.exists(os.path.join(storage_run, "metrics.jsonl"))
-    assert os.path.isdir(os.path.join(storage_run, "artifacts"))
+    bundle_zip = os.path.join(storage_run, "bundle.zip")
+    assert os.path.exists(bundle_zip)
+    with zipfile.ZipFile(bundle_zip) as zf:
+        names = zf.namelist()
+        assert "worker.log" in names
+        assert "artifacts/loss_plot.txt" in names
+        assert any(n.startswith("checkpoints/") for n in names)
+    assert os.path.exists(os.path.join(storage_run, "finished.flag"))
 
 
 def test_worker_no_job(tmp_path):

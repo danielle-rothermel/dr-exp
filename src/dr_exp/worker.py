@@ -142,13 +142,23 @@ def run_worker(
     metrics_upload = client.upload_artifact(
         job_id, logger_meta["metrics_path"], "metrics.jsonl"
     )
-    ckpt_upload = client.upload_artifact(
-        job_id, cfg["logging"]["checkpoint_dir"], "checkpoints"
+
+    bundle_dir = os.path.join(work_dir, "bundle")
+    os.makedirs(bundle_dir, exist_ok=True)
+    shutil.copytree(
+        cfg["logging"]["checkpoint_dir"],
+        os.path.join(bundle_dir, "checkpoints"),
     )
-    art_upload = client.upload_artifact(job_id, cfg["logging"]["artifact_dir"], "")
-    log_upload = client.upload_artifact(
-        job_id, worker_log_path, f"worker_logs/{os.path.basename(worker_log_path)}"
+    shutil.copytree(
+        cfg["logging"]["artifact_dir"],
+        os.path.join(bundle_dir, "artifacts"),
     )
+    shutil.copy2(worker_log_path, os.path.join(bundle_dir, "worker.log"))
+
+    bundle_zip = shutil.make_archive(
+        os.path.join(work_dir, "bundle"), "zip", bundle_dir
+    )
+    bundle_upload = client.upload_artifact(job_id, bundle_zip, "bundle.zip")
 
     final_status = "completed" if train_status == "success" else "failed"
     metadata = {
@@ -157,9 +167,7 @@ def run_worker(
         "num_epochs": result.get("num_epochs"),
         "train_status": train_status,
         "metrics_storage_path": metrics_upload.get("storage_path"),
-        "checkpoint_storage_path": ckpt_upload.get("storage_path"),
-        "artifact_storage_path": art_upload.get("storage_path"),
-        "worker_log_path": log_upload.get("storage_path"),
+        "bundle_storage_path": bundle_upload.get("storage_path"),
         "upload_complete_at": datetime.now(UTC).isoformat() + "Z",
         "finalize_success": logger_meta.get("finalize_success", False),
     }

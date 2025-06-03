@@ -52,7 +52,7 @@ Tracks training jobs with config references, current status, progress metrics, l
 | assigned\_worker         | text      | Default = `"unassigned"`; updated when a worker claims the job |
 | heartbeat                | timestamp | Last update from worker                                        |
 | metrics\_path            | text      | Path to `.jsonl` file in Supabase Storage; default = `""`      |
-| artifacts\_path          | text      | Path to artifacts folder or archive; default = `""`            |
+| artifacts\_path          | text      | Path to bundled `bundle.zip` archive; default = `""`            |
 | num\_epochs              | int       | Reported by `train()`                                          |
 | final\_val\_acc          | float     | Final reported accuracy                                        |
 | final\_train\_loss       | float     | Final reported train loss                                      |

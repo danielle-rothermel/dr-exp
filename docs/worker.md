@@ -26,6 +26,7 @@ Workers are launched by the Manager (`scripts/run_manager.py`) as subprocesses, 
 * Catch and report NaNs, timeouts, or crashes to the `failures` and `errors` tables
 * Upload `.jsonl` log, checkpoint(s), and artifacts to Supabase Storage
 * Mark job completion with `upload_complete_at` and `finalize_success = True`
+* Create `finished.flag` in `run_<job_id>` within the local storage directory (e.g. `mock_storage/`) once uploads succeed
 
 ---
 
@@ -90,12 +91,15 @@ Workers are launched by the Manager (`scripts/run_manager.py`) as subprocesses, 
 
 ---
 
-## Optional Extensions
+## Artifact Bundling and Optional Extensions
 
+* After `logger.finalize()` the worker stages `checkpoint_dir`, `artifact_dir` and
+  `worker.log` into a single directory.
+* This directory is zipped into `bundle.zip` and uploaded to Supabase Storage
+  alongside `metrics.jsonl`.
 * Real-time metrics streaming to FastAPI via WebSocket (in parallel to `.jsonl` log)
 * Resume from previous checkpoints using `resume_training(cfg, checkpoint_path)`
 * Delayed start to stagger worker load on startup
-* Compression of checkpoints or artifacts before upload
 
 ---
 
