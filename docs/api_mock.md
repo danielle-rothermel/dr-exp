@@ -33,7 +33,7 @@ Returns a dummy Hydra-resolved config.
 
 ### `GET /metrics/{job_id}`
 
-Returns a JSON summary, loaded from `mock_storage/run_<job_id>/metrics.jsonl` or a synthetic summary.
+Returns a list of metric dictionaries loaded from `mock_storage/run_<job_id>/metrics.jsonl`.
 
 ### `POST /job/kill`
 
