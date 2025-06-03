@@ -75,6 +75,7 @@ def test_reap_stale_jobs_subcommand(tmp_path, monkeypatch, capsys):
     assert data["status"] == "failed"
     assert data["status_reason"] == "manager_died"
 
+
 def test_upload_configs_subcommand(tmp_path, monkeypatch, capsys):
     cfg_dir = Path(__file__).resolve().parents[1] / "configs"
     client = SupabaseMockClient(base_path=str(tmp_path))
@@ -94,3 +95,22 @@ def test_upload_configs_subcommand(tmp_path, monkeypatch, capsys):
     )
     out = capsys.readouterr().out
     assert "Created 1 job" in out
+
+
+def test_cleanup_run_data_subcommand(tmp_path, monkeypatch, capsys):
+    client = SupabaseMockClient(base_path=str(tmp_path))
+    run_dir = Path(client.mock_storage_path) / "run_x"
+    run_dir.mkdir(parents=True)
+    (run_dir / "finished.flag").touch()
+
+    def fake_get_supabase_client(base_path="."):
+        assert base_path == str(tmp_path)
+        return client
+
+    monkeypatch.setattr(
+        "dr_exp.core.client_provider.get_supabase_client", fake_get_supabase_client
+    )
+    main(["cleanup-run-data", "--base-path", str(tmp_path)])
+    out = capsys.readouterr().out.strip()
+    assert out == "Removed 1 run directory(s)"
+    assert not run_dir.exists()
