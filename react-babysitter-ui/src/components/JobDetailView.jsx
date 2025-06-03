@@ -2,15 +2,40 @@ import { useEffect, useState } from 'react'
 import { useParams, Link } from 'react-router-dom'
 import { fetchJobConfig, fetchJobMetrics } from '../api.js'
 
+/**
+ * Shows the configuration and training metrics for a single job.
+ *
+ * The job identifier is read from the route parameters via {@link useParams}.
+ * Configuration and metrics are fetched from the API and displayed in a simple
+ * read-only view.
+ *
+ * @component
+ * @example
+ * ```jsx
+ * <Route path="/job/:jobId" element={<JobDetailView />} />
+ * ```
+ */
 export default function JobDetailView() {
   const { jobId } = useParams()
+  // Raw configuration for the experiment
   const [config, setConfig] = useState(null)
+  // Loading state for the configuration request
   const [loading, setLoading] = useState(true)
+  // Error message when fetching configuration fails
   const [error, setError] = useState(null)
+  // Metrics data and summary returned from the API
   const [metrics, setMetrics] = useState(null)
+  // Loading state for the metrics request
   const [metricsLoading, setMetricsLoading] = useState(true)
+  // Error message when fetching metrics fails
   const [metricsError, setMetricsError] = useState(null)
 
+  /**
+   * Derive a summary of metrics from a full metrics list.
+   *
+   * @param {Array<Object>} list - Raw metric entries ordered by epoch.
+   * @returns {Object | null} Aggregate summary or `null` when the list is empty.
+   */
   const computeSummary = (list) => {
     if (!list || list.length === 0) return null
     const last = list[list.length - 1]
@@ -22,6 +47,9 @@ export default function JobDetailView() {
   }
 
   useEffect(() => {
+    /**
+     * Fetch the job configuration from the API.
+     */
     const loadConfig = async () => {
       setLoading(true)
       try {
@@ -38,6 +66,9 @@ export default function JobDetailView() {
   }, [jobId])
 
   useEffect(() => {
+    /**
+     * Fetch metrics and derive a summary for display.
+     */
     const loadMetrics = async () => {
       setMetricsLoading(true)
       try {

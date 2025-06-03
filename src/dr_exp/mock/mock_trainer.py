@@ -6,7 +6,21 @@ from dr_exp.core import StructuredLogger
 
 
 def train(cfg: Any, logger: Optional[StructuredLogger] = None) -> Dict[str, Any]:
-    """Simulate a training run using StructuredLogger."""
+    """Simulate a training run and log metrics.
+
+    Parameters
+    ----------
+    cfg : Any
+        Configuration object for the run.
+    logger : StructuredLogger, optional
+        Logger instance used to record metrics. If ``None`` a new logger is
+        created.
+
+    Returns
+    -------
+    dict[str, Any]
+        Summary information about the run.
+    """
     train_cfg = (
         cfg.get("train", {}) if isinstance(cfg, dict) else getattr(cfg, "train", {})
     )

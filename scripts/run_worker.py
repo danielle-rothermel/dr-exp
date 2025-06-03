@@ -21,6 +21,8 @@ def _heartbeat_loop(
     interval: float,
     stop_event: threading.Event,
 ) -> None:
+    """Send heartbeats at a fixed interval until ``stop_event`` is set."""
+
     while not stop_event.is_set():
         time.sleep(interval)
         client.update_job(job_id, {"heartbeat": datetime.now(UTC).isoformat() + "Z"})
@@ -35,7 +37,30 @@ def run_worker(
     logger_cls: type[StructuredLogger] = StructuredLogger,
     client: Optional[SupabaseClient | SupabaseMockClient] = None,
 ) -> str:
-    """Run a single worker iteration."""
+    """Run a single worker iteration.
+
+    Parameters
+    ----------
+    base_path : str, optional
+        Base path for mock database files.
+    work_dir : str, optional
+        Directory used for temporary work files.
+    max_claim_attempts : int, optional
+        How many times to poll for a job before giving up.
+    heartbeat_interval : float, optional
+        Seconds between heartbeat updates.
+    trainer_fn : Callable[[Any, StructuredLogger], dict], optional
+        Function implementing the training loop.
+    logger_cls : type[StructuredLogger], optional
+        Logger class to instantiate.
+    client : SupabaseClient | SupabaseMockClient, optional
+        Client to use for job operations.
+
+    Returns
+    -------
+    str
+        Final status string.
+    """
     client = client or get_supabase_client(base_path=base_path)
 
     attempt = 0
@@ -139,6 +164,8 @@ def run_worker(
 
 
 def build_arg_parser() -> argparse.ArgumentParser:
+    """Return the argument parser for the worker script."""
+
     parser = argparse.ArgumentParser(description="Run a single worker process")
     parser.add_argument("--base-path", default=".", help="Base path for mock DB")
     parser.add_argument("--work-dir", required=True, help="Local working directory")
@@ -148,6 +175,8 @@ def build_arg_parser() -> argparse.ArgumentParser:
 
 
 def main(argv: Optional[list[str]] = None) -> None:
+    """Command line entry point for a worker."""
+
     args = build_arg_parser().parse_args(argv)
     run_worker(
         base_path=args.base_path,

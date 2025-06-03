@@ -28,6 +28,8 @@ def reset_mock_db(base_path: str = ".") -> None:
 
 
 def main() -> None:
+    """CLI wrapper for :func:`reset_mock_db`."""
+
     parser = argparse.ArgumentParser(description="Reset the mock Supabase environment.")
     parser.add_argument(
         "--base-path",

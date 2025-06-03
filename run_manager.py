@@ -12,26 +12,33 @@ from dr_exp.core.client_provider import get_supabase_client
 from dr_exp.core.supabase_client import SupabaseClient
 from dr_exp.mock.supabase_mock_client import SupabaseMockClient
 
-# Attempt to import the worker implementation from scripts.run_worker
-try:
-    from scripts import run_worker as _run_worker
+# Import the worker implementation
+from scripts import run_worker as _run_worker
 
-    def run_worker_main(worker_id: str, work_dir: str) -> None:
-        """Wrapper to execute the real worker with base path from env."""
 
-        base_path = os.environ.get("DR_EXP_BASE_PATH", ".")
-        _run_worker.run_worker(base_path=base_path, work_dir=work_dir)
+def run_worker_main(worker_id: str, work_dir: str) -> None:
+    """Wrapper to execute the worker with base path from env."""
 
-except Exception:  # pragma: no cover - worker script may not exist
-
-    def run_worker_main(*args: object, **kwargs: object) -> None:
-        raise RuntimeError("run_worker.py not available")
+    base_path = os.environ.get("DR_EXP_BASE_PATH", ".")
+    _run_worker.run_worker(base_path=base_path, work_dir=work_dir)
 
 
 def _worker_target(
     base_path: str, worker_id: str, gpu_id: str, worker_dir: str
 ) -> None:
-    """Entry point for spawned worker processes."""
+    """Entry point for spawned worker processes.
+
+    Parameters
+    ----------
+    base_path : str
+        Base directory for mock resources.
+    worker_id : str
+        Identifier for the worker.
+    gpu_id : str
+        GPU device ID visible to the worker.
+    worker_dir : str
+        Directory where the worker writes logs and artifacts.
+    """
 
     os.environ["CUDA_VISIBLE_DEVICES"] = gpu_id
     os.environ["DR_EXP_BASE_PATH"] = base_path
@@ -40,7 +47,18 @@ def _worker_target(
 
 
 def discover_gpus(gpus_per_node: int) -> List[str]:
-    """Return list of visible GPU IDs as strings."""
+    """Return list of visible GPU IDs as strings.
+
+    Parameters
+    ----------
+    gpus_per_node : int
+        Number of GPUs to assume if ``CUDA_VISIBLE_DEVICES`` is not set.
+
+    Returns
+    -------
+    list[str]
+        GPU identifiers to use for workers.
+    """
     env = os.environ.get("CUDA_VISIBLE_DEVICES")
     if env:
         return [g.strip() for g in env.split(",") if g.strip()]
@@ -48,6 +66,8 @@ def discover_gpus(gpus_per_node: int) -> List[str]:
 
 
 class Manager:
+    """Manage worker processes running training jobs."""
+
     def __init__(
         self,
         gpus: List[str],
@@ -57,6 +77,24 @@ class Manager:
         base_dir: str,
         client: SupabaseClient | SupabaseMockClient | None = None,
     ) -> None:
+        """Create a new :class:`Manager`.
+
+        Parameters
+        ----------
+        gpus : list[str]
+            GPU identifiers available on this node.
+        workers_per_gpu : int
+            Number of workers to spawn per GPU.
+        heartbeat_interval : int
+            Seconds between heartbeat checks.
+        idle_timeout_mins : int
+            Minutes before shutdown when no jobs are running.
+        base_dir : str
+            Directory where manager logs and worker outputs are stored.
+        client : SupabaseClient | SupabaseMockClient, optional
+            Client used to interact with the job database. If ``None`` a client
+            is created based on environment settings.
+        """
         self.gpus = gpus
         self.workers_per_gpu = workers_per_gpu
         self.heartbeat_interval = heartbeat_interval
@@ -94,12 +132,14 @@ class Manager:
         logging.info("Launched worker %s on GPU %s", worker_id, gpu_id)
 
     def start_workers(self) -> None:
+        """Spawn all configured worker processes."""
         for gpu in self.gpus:
             for i in range(self.workers_per_gpu):
                 worker_id = f"worker_{gpu}_{i}"
                 self.launch_worker(worker_id, gpu)
 
     def stop_all_workers(self) -> None:
+        """Terminate all running worker processes."""
         for info in self.workers.values():
             proc: Process = info["process"]  # type: ignore[assignment]
             if proc.is_alive():
@@ -109,6 +149,7 @@ class Manager:
 
     # ---------------- Job & Heartbeat ------------------
     def _list_running_jobs(self) -> List[Dict[str, object]]:
+        """Return job records currently marked as running."""
         jobs: List[Dict[str, object]] = []
         if not hasattr(self.client, "jobs_dir"):
             return jobs
@@ -126,6 +167,7 @@ class Manager:
         return jobs
 
     def _restart_worker(self, worker_id: str) -> None:
+        """Restart the given worker process."""
         info = self.workers.get(worker_id)
         if not info:
             return
@@ -137,6 +179,7 @@ class Manager:
         self.launch_worker(worker_id, gpu)
 
     def check_heartbeats(self) -> None:
+        """Check for stale worker heartbeats and restart if necessary."""
         now = datetime.now(UTC)
         for job in self._list_running_jobs():
             hb_str = job.get("heartbeat")
@@ -156,6 +199,7 @@ class Manager:
                 self._restart_worker(str(wid))
 
     def check_idle_timeout(self) -> None:
+        """Shutdown manager if idle for longer than ``idle_timeout``."""
         running = self._list_running_jobs()
         if running:
             self.last_activity = datetime.now(UTC)
@@ -168,10 +212,12 @@ class Manager:
     def _handle_signal(
         self, signum: int, frame: object
     ) -> None:  # pragma: no cover - signal path
+        """Handle termination signals to initiate shutdown."""
         logging.info("Received signal %s", signum)
         self.shutdown = True
 
     def run(self) -> None:
+        """Run the manager main loop."""
         signal.signal(signal.SIGTERM, self._handle_signal)
         signal.signal(signal.SIGINT, self._handle_signal)
         self.start_workers()
@@ -183,6 +229,8 @@ class Manager:
 
 
 def build_arg_parser() -> argparse.ArgumentParser:
+    """Return the command line argument parser."""
+
     parser = argparse.ArgumentParser(description="SLURM Manager")
     parser.add_argument("--gpus-per-node", type=int, default=1)
     parser.add_argument("--workers-per-gpu", type=int, default=1)
@@ -192,6 +240,8 @@ def build_arg_parser() -> argparse.ArgumentParser:
 
 
 def main(argv: List[str] | None = None) -> None:
+    """Entry point for the manager command line tool."""
+
     args = build_arg_parser().parse_args(argv)
     gpus = discover_gpus(args.gpus_per_node)
     slurm_job_id = os.environ.get("SLURM_JOB_ID", str(os.getpid()))

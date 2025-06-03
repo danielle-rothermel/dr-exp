@@ -2,13 +2,40 @@ import { useEffect, useState } from 'react'
 import PropTypes from 'prop-types'
 import { useNavigate } from 'react-router-dom'
 import { fetchJobs } from '../api.js'
+
+/**
+ * Displays a sortable table of jobs fetched from the backend.
+ *
+ * The component does not accept any props. Instead it polls the mock API every
+ * 15&nbsp;seconds and updates its internal state. Clicking on a row navigates to
+ * the detail view for that job.
+ *
+ * @component
+ * @example
+ * ```jsx
+ * import JobTable from './components/JobTable.js';
+ *
+ * export default function Page() {
+ *   return <JobTable />;
+ * }
+ * ```
+ */
 export default function JobTable() {
   const navigate = useNavigate()
+  // List of jobs returned from the API
   const [jobs, setJobs] = useState([])
+  // Whether jobs are currently being loaded
   const [loading, setLoading] = useState(true)
+  // Error message returned from the API, if any
   const [error, setError] = useState(null)
+  // Current sort key and direction for the table
   const [sortConfig, setSortConfig] = useState({ key: 'start_time', direction: 'asc' })
 
+  /**
+   * Fetch the latest jobs from the API and update state.
+   *
+   * Errors are captured and stored in the {@link error} state variable.
+   */
   const loadJobs = async () => {
     try {
       const data = await fetchJobs()
@@ -27,6 +54,11 @@ export default function JobTable() {
     return () => clearInterval(id)
   }, [])
 
+  /**
+   * Change the column that the table is sorted by.
+   *
+   * @param {string} key - The job field to sort by.
+   */
   const handleSort = (key) => {
     setSortConfig((config) => {
       if (config.key === key) {
@@ -90,4 +122,5 @@ export default function JobTable() {
   )
 }
 
+// No props are currently accepted.
 JobTable.propTypes = {}
