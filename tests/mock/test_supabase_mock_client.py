@@ -134,6 +134,15 @@ def test_claim_job_multiple_queued(
     assert mock_client.claim_job() is None
 
 
+def test_claim_job_with_worker_id(
+    mock_client, sample_job_config, sample_sweep_config_id
+):
+    mock_client.add_job(sample_job_config, sample_sweep_config_id, status="queued")
+    job = mock_client.claim_job(worker_id="wid1")
+    assert job is not None
+    assert job["assigned_worker"] == "wid1"
+
+
 def test_update_job(mock_client, sample_job_config, sample_sweep_config_id):
     """Tests updating an existing job."""
     added_job = mock_client.add_job(sample_job_config, sample_sweep_config_id)

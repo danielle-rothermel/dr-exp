@@ -93,8 +93,15 @@ def test_job_failure(tmp_path, api_client, sb_client, monkeypatch):
             raise RuntimeError("boom")
         return orig_train(cfg, logger)
 
-    def run_worker_wrapper(base_path: str = ".", work_dir: str | None = None):
-        orig_run_worker(base_path=base_path, work_dir=work_dir, trainer_fn=maybe_fail)
+    def run_worker_wrapper(
+        base_path: str = ".", work_dir: str | None = None, worker_id: str = "id"
+    ):
+        orig_run_worker(
+            base_path=base_path,
+            work_dir=work_dir,
+            trainer_fn=maybe_fail,
+            worker_id=worker_id,
+        )
 
     monkeypatch.setattr(manager._run_worker, "run_worker", run_worker_wrapper)
 
@@ -138,8 +145,15 @@ def test_job_control_api(tmp_path, api_client, sb_client, monkeypatch):
 
     orig_run_worker = rw.run_worker
 
-    def run_worker_wrapper(base_path: str = ".", work_dir: str | None = None):
-        orig_run_worker(base_path=base_path, work_dir=work_dir, trainer_fn=slow_train)
+    def run_worker_wrapper(
+        base_path: str = ".", work_dir: str | None = None, worker_id: str = "id"
+    ):
+        orig_run_worker(
+            base_path=base_path,
+            work_dir=work_dir,
+            trainer_fn=slow_train,
+            worker_id=worker_id,
+        )
 
     monkeypatch.setattr(manager._run_worker, "run_worker", run_worker_wrapper)
 
@@ -170,3 +184,25 @@ def test_job_control_api(tmp_path, api_client, sb_client, monkeypatch):
     job_data = sb_client.get_job_details(job["id"])
     assert job_data["status"] == "queued"
     assert job_data["retry_index"] == 1
+
+
+def test_jobs_list_endpoint(tmp_path, api_client, sb_client):
+    jobs = create_jobs(sb_client, "model=resnet,vit")
+
+    mgr_dir = tmp_path / "mgr"
+    mgr = manager.Manager(
+        gpus=["0"],
+        workers_per_gpu=2,
+        heartbeat_interval=0.1,
+        idle_timeout_mins=1,
+        base_dir=str(mgr_dir),
+        client=sb_client,
+    )
+    mgr.start_workers()
+    wait_for_workers(mgr)
+
+    resp = api_client.get("/jobs")
+    assert resp.status_code == 200
+    data = {j["id"]: j for j in resp.json()}
+    for job in jobs:
+        assert data[job["id"]]["status"] == "completed"

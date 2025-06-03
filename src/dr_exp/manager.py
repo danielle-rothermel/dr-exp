@@ -6,7 +6,7 @@ import os
 import signal
 import time
 from datetime import datetime, timedelta, UTC
-from multiprocessing import Process
+import multiprocessing as mp
 from typing import Dict, List
 
 from dr_exp.core.client_provider import get_supabase_client
@@ -20,7 +20,7 @@ import dr_exp.worker as _run_worker
 def run_worker_main(worker_id: str, work_dir: str) -> None:
     """Wrapper to execute the worker with base path from env."""
     base_path = os.environ.get("DR_EXP_BASE_PATH", ".")
-    _run_worker.run_worker(base_path=base_path, work_dir=work_dir)
+    _run_worker.run_worker(base_path=base_path, work_dir=work_dir, worker_id=worker_id)
 
 
 def _worker_target(
@@ -52,6 +52,7 @@ class Manager:
         idle_timeout_mins: int,
         base_dir: str,
         client: SupabaseClient | SupabaseMockClient | None = None,
+        start_method: str | None = "fork",
     ) -> None:
         """Create a new :class:`Manager`."""
         self.gpus = gpus
@@ -68,6 +69,12 @@ class Manager:
         self.workers: Dict[str, Dict[str, object]] = {}
         self.last_activity = datetime.now(UTC)
         self.shutdown = False
+        try:
+            self.ctx = (
+                mp.get_context(start_method) if start_method else mp.get_context()
+            )
+        except ValueError:
+            self.ctx = mp.get_context()
         os.makedirs(self.base_dir, exist_ok=True)
         logging.basicConfig(
             filename=os.path.join(self.base_dir, "manager.log"),
@@ -81,7 +88,7 @@ class Manager:
     def launch_worker(self, worker_id: str, gpu_id: str) -> None:
         """Launch a worker process."""
         worker_dir = os.path.join(self.base_dir, worker_id)
-        proc = Process(
+        proc = self.ctx.Process(
             target=_worker_target,
             args=(self.base_path, worker_id, gpu_id, worker_dir),
         )
@@ -99,7 +106,7 @@ class Manager:
     def stop_all_workers(self) -> None:
         """Terminate all running worker processes."""
         for info in self.workers.values():
-            proc: Process = info["process"]  # type: ignore[assignment]
+            proc: mp.Process = info["process"]  # type: ignore[assignment]
             if proc.is_alive():
                 proc.terminate()
             proc.join(timeout=5)
@@ -140,7 +147,7 @@ class Manager:
         info = self.workers.get(worker_id)
         if not info:
             return
-        proc: Process = info["process"]  # type: ignore[assignment]
+        proc: mp.Process = info["process"]  # type: ignore[assignment]
         gpu = info["gpu"]
         if proc.is_alive():
             proc.terminate()
