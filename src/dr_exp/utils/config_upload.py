@@ -12,8 +12,8 @@ import hydra
 from hydra.core.global_hydra import GlobalHydra
 from omegaconf import OmegaConf
 
-from dr_exp.core.supabase_client import SupabaseClient
-from dr_exp.core.localdb_client import LocalDBClient
+from dr_exp.job_db.supabase_job_db import SupabaseClient
+from dr_exp.job_db.local_job_db import LocalDBClient
 
 
 # --------------------- Config Generation ---------------------

@@ -40,7 +40,9 @@ def test_worker_spawning(tmp_path, monkeypatch):
 
 
 def test_heartbeat_detection(tmp_path, monkeypatch):
-    client = LocalDBClient(base_path=str(tmp_path))
+    client = LocalDBClient(
+        base_path=str(tmp_path), storage_path=str(tmp_path / "storage")
+    )
     job = client.add_job({"cfg": 1}, "sweep1", status="running")
     wid = "worker_0_0"
     old_time = datetime.now(UTC) - timedelta(seconds=100)
@@ -112,8 +114,9 @@ class DummySupabase:
 
 
 class DummyRealClient:
-    def __init__(self, data):
+    def __init__(self, data, base_path="."):
         self.supabase = DummySupabase(data)
+        self.base_path = base_path
 
 
 def test_list_running_jobs_real_client(tmp_path):
@@ -121,7 +124,7 @@ def test_list_running_jobs_real_client(tmp_path):
         {"id": "j1", "status": "running"},
         {"id": "j2", "status": "queued"},
     ]
-    client = DummyRealClient(jobs)
+    client = DummyRealClient(jobs, base_path=str(tmp_path))
     mgr = manager.Manager(
         gpus=[],
         workers_per_gpu=0,

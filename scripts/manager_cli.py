@@ -8,7 +8,11 @@ from typing import Sequence
 
 from dotenv import load_dotenv
 
-from dr_exp.manage.manager_logic import Manager, discover_gpus, run_worker_main
+from dr_exp.manage.manager_logic import (
+    Manager,
+    discover_gpus,
+    run_worker_main,
+)
 from dr_exp.utils.job_reaper import reap_stale_jobs
 from dr_exp.utils.storage_cleanup import cleanup_uploaded_runs
 from dr_exp.utils.jobdb_factory import get_supabase_client
