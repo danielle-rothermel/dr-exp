@@ -97,6 +97,10 @@ class MetricsLoader:
         """
         if run_id in self.cache:
             return self.cache[run_id]
+        if not hasattr(self.client, "storage_dir"):
+            raise NotImplementedError(
+                "Metrics retrieval requires a client with storage_dir"
+            )
         storage_root = self.client.storage_dir
         metrics_path = os.path.join(
             storage_root,

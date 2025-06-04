@@ -25,21 +25,33 @@ def test_run_worker_subcommand(tmp_path, monkeypatch):
     )
     client.add_job(make_config(), "s1", status="queued")
     monkeypatch.setenv("DR_EXP_BASE_PATH", str(tmp_path))
+    monkeypatch.chdir(tmp_path)
     work_dir = tmp_path / "work"
     main(["run-worker", "wid", str(work_dir)])
-    job_files = os.listdir(client.jobs_dir)
+    job_files = [f for f in os.listdir(client.jobs_dir) if f.endswith(".json")]
     job_id = Path(job_files[0]).stem
     data = client.get_job_details(job_id)
     assert data["status"] == "completed"
 
 
-def test_run_subcommand_invokes_manager(monkeypatch):
+def test_run_subcommand_invokes_manager(tmp_path, monkeypatch):
     called = {}
 
     def fake_run(self):
         called["run"] = True
 
     monkeypatch.setattr("dr_exp.manage.manager_logic.Manager.run", fake_run)
+    client = LocalDBClient(
+        base_path=str(tmp_path), storage_path=str(tmp_path / "storage")
+    )
+
+    def fake_get_client(base_path="."):
+        assert base_path == str(tmp_path)
+        return client
+
+    monkeypatch.setattr("scripts.manager_cli.get_supabase_client", fake_get_client)
+    monkeypatch.chdir(tmp_path)
+    monkeypatch.setenv("DR_EXP_BASE_PATH", str(tmp_path))
     main(
         [
             "run",

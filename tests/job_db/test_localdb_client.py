@@ -16,7 +16,9 @@ def mock_client(tmp_path):
     The tmp_path fixture is provided by pytest for creating temporary files/directories.
     """
     # The LocalDBClient will create mock_db and mock_storage inside tmp_path
-    client = LocalDBClient(base_path=str(tmp_path), storage_path=str(tmp_path / "storage"))
+    client = LocalDBClient(
+        base_path=str(tmp_path), storage_path=str(tmp_path / "storage")
+    )
     return client
 
 
@@ -37,7 +39,9 @@ def sample_sweep_config_id():
 
 def test_client_initialization(tmp_path):
     """Tests if the client initializes its directories correctly."""
-    client = LocalDBClient(base_path=str(tmp_path), storage_path=str(tmp_path / "storage"))
+    client = LocalDBClient(
+        base_path=str(tmp_path), storage_path=str(tmp_path / "storage")
+    )
     assert os.path.exists(client.storage_dir)
     assert os.path.exists(client.jobs_dir)
     assert os.path.exists(client.metrics_dir)

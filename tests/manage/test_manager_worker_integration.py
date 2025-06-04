@@ -18,6 +18,7 @@ def test_manager_worker_flow(tmp_path, monkeypatch):
     job = client.add_job(make_config(), "sweep1", status="queued")
 
     mgr_dir = tmp_path / "mgr"
+    monkeypatch.setenv("DR_EXP_BASE_PATH", str(tmp_path))
     mgr = manager.Manager(
         gpus=["0"],
         workers_per_gpu=1,
@@ -35,7 +36,7 @@ def test_manager_worker_flow(tmp_path, monkeypatch):
     data = client.get_job_details(job["id"])
     assert data["status"] == "completed"
 
-    storage_run = Path(client.storage_path) / f"run_{job['id']}"
+    storage_run = Path(client.storage_dir) / f"run_{job['id']}"
     assert (storage_run / "metrics.jsonl").exists()
     bundle_zip = storage_run / "bundle.zip"
     assert bundle_zip.exists()

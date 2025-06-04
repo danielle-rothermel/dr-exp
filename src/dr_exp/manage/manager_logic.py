@@ -64,7 +64,7 @@ class Manager:
         self.idle_timeout = timedelta(minutes=idle_timeout_mins)
         self.base_dir = base_dir
         self.client = client or get_supabase_client()
-        self.base_path = getattr(self.client, "base_path", "./job_data")
+        self.base_path = self.client.jobs_dir
         self.workers: Dict[str, Dict[str, object]] = {}
         self.last_activity = datetime.now(UTC)
         self.shutdown = False

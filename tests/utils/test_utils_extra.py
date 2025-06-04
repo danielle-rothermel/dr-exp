@@ -83,7 +83,7 @@ def test_metrics_loader(tmp_path):
     )
     loader = MetricsLoader(client, maxsize=2)
     run_id = "r1"
-    run_dir = Path(client.storage_path) / f"run_{run_id}"
+    run_dir = Path(client.storage_dir) / f"run_{run_id}"
     run_dir.mkdir(parents=True)
     metrics_file = run_dir / "metrics.jsonl"
     with open(metrics_file, "w") as f:

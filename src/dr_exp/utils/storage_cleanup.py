@@ -18,16 +18,12 @@ def cleanup_uploaded_runs(client: Any) -> int:
     int
         Number of run directories deleted.
     """
-    storage_path = (
-        getattr(client, "mock_storage_path", None)
-        or getattr(client, "local_storage_path", None)
-        or getattr(client, "storage_path", None)
-    )
-    if not storage_path or not os.path.exists(storage_path):
+    jobs_dir = client.job_dir
+    if not os.path.exists(jobs_dir):
         return 0
 
     removed = 0
-    for name in os.listdir(storage_path):
+    for name in os.listdir(jobs_dir):
         if not name.startswith("run_"):
             continue
         run_dir = os.path.join(storage_path, name)

@@ -38,7 +38,9 @@ class SupabaseClient:
             raise
 
         # Where to write any local data
+        self.jobs_dir = f"{base_path}/job_data"
         self.storage_dir = f"{base_path}/storage"
+        os.makedirs(self.jobs_dir, exist_ok=True)
         os.makedirs(self.storage_dir, exist_ok=True)
 
     def claim_job(
@@ -281,7 +283,7 @@ class SupabaseClient:
 
     def _write_finished_flag(self, job_id: str) -> None:
         """Create an empty ``finished.flag`` file for ``job_id`` in local storage."""
-        run_dir = os.path.join(self.storage_dir, f"run_{job_id}")
+        run_dir = os.path.join(self.jobs_dir, f"run_{job_id}")
         os.makedirs(run_dir, exist_ok=True)
         flag_path = os.path.join(run_dir, "finished.flag")
         try:
