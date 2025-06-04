@@ -146,7 +146,8 @@ Opening the UI should display the jobs table fetched from the backend.
 uv run pytest
 ```
 ## 7. Documentation
-- **Component Specifications:** Detailed design documents for each component are located in the `docs/` directory (e.g., `docs/supabase_schema.md`, `docs/worker.md`).
-- **Training Examples:** Example configs and a dummy training loop are documented in `docs/train_examples.md`.
+- **Component Specifications:** Detailed design documents live in the `docs/` directory.  See `docs/supabase_schema.md`, `docs/manager_flow.md`, `docs/manager_cli.md`, and `docs/frontend_ui.md`.
+- **Training Examples:** Example configs and the dummy trainer are described in `docs/train_examples.md`.
+- **Structured Logging:** The `StructuredLogger` used by workers is documented in `docs/structured_logger.md`.
 - This README provides a starting point. It should be updated as the project evolves, particularly the "Getting Started" and "Running the System" sections.
 

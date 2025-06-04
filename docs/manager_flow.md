@@ -66,7 +66,7 @@ The manager and FastAPI backend do not talk to each other directly; instead they
 1. The manager and its workers communicate only with Supabase. They never call the FastAPI server directly.
 2. When the manager spawns a worker, the worker claims a job from the Supabase `jobs` table and updates `status` and `heartbeat` fields as training progresses.
 3. The FastAPI backend reads these job records to answer `GET /job/{job_id}` and `GET /metrics/{run_id}` requests. Metrics are loaded from the same paths the worker uploaded to Supabase Storage.
-4. When an administrator issues `POST /job/kill` or `POST /job/requeue`, the FastAPI backend updates the corresponding fields in Supabase. Workers or the manager observe these changes (e.g. the `kill_requested` flag) and act accordingly.
+4. When an administrator issues `POST /job/kill` or `POST /job/requeue`, the FastAPI backend sets fields such as `kill_requested` in Supabase. The current implementation does not terminate running jobs, but the flags are recorded for future handling.
 5. Secrets such as Supabase credentials for the manager and the FastAPI admin API key are provided via environment variables as described in the environment documentation.
 
 ## 
