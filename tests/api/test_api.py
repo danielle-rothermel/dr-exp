@@ -1,9 +1,10 @@
 import json
+from pathlib import Path
 
 import pytest
 from fastapi.testclient import TestClient
 
-from dr_exp.backend.main import create_app
+from dr_exp.api.main import create_app
 
 
 @pytest.fixture
@@ -42,7 +43,7 @@ def test_get_job_and_config(client, sb_client):
 def test_metrics_endpoint(client, sb_client, tmp_path):
     job = sb_client.add_job({"a": 1}, "sweep1", status="running")
     run_id = job["id"]
-    run_dir = tmp_path / "mock_storage" / f"run_{run_id}"
+    run_dir = Path(sb_client.mock_storage_path) / f"run_{run_id}"
     run_dir.mkdir(parents=True)
     metrics_path = run_dir / "metrics.jsonl"
     with open(metrics_path, "w") as f:

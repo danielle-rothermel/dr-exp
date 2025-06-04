@@ -4,7 +4,7 @@ from pathlib import Path
 import pytest
 
 from dr_exp import config_upload
-from dr_exp.backend.main import MetricsLoader
+from dr_exp.api.main import MetricsLoader
 from dr_exp.core import client_provider
 from dr_exp.core.localdb_client import LocalDBClient
 
@@ -30,7 +30,7 @@ def test_parse_sweep_with_spaces():
 
 
 def test_generate_configs(tmp_path):
-    cfg_dir = Path(__file__).resolve().parents[1] / "configs"
+    cfg_dir = Path("src/dr_exp/train_examples/configs").resolve()
     params = {"model": ["resnet", "vit"]}
     configs = list(config_upload.generate_configs(str(cfg_dir), "config.yaml", params))
     names = {cfg["model"]["name"] for cfg in configs}
@@ -58,7 +58,7 @@ def test_get_supabase_client_modes(monkeypatch):
     monkeypatch.setenv("EXPMGR_MODE", "real")
     monkeypatch.setenv("SUPABASE_URL", "http://x")
     monkeypatch.setenv("SUPABASE_SERVICE_ROLE_KEY", "k")
-    monkeypatch.setattr(client_provider, "SupabaseClient", Dummy)
+    monkeypatch.setattr("dr_exp.utils.jobdb_factory.SupabaseClient", Dummy)
     client = client_provider.get_supabase_client()
     assert isinstance(client, Dummy)
     assert client.url == "http://x"
@@ -72,7 +72,9 @@ def test_get_supabase_client_modes(monkeypatch):
 
 
 def test_metrics_loader(tmp_path):
-    client = LocalDBClient(base_path=str(tmp_path))
+    client = LocalDBClient(
+        base_path=str(tmp_path), storage_path=str(tmp_path / "storage")
+    )
     loader = MetricsLoader(client, maxsize=2)
     run_id = "r1"
     run_dir = Path(client.mock_storage_path) / f"run_{run_id}"

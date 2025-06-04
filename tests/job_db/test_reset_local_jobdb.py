@@ -1,5 +1,5 @@
 import os
-from scripts.reset_mock_db import reset_mock_db
+from scripts.reset_local_jobdb import reset_job_db
 
 
 def create_mock_environment(base_path: str) -> None:
@@ -27,7 +27,7 @@ def test_reset_mock_db(tmp_path):
     assert os.path.exists(os.path.join(base, "mock_db", "errors.jsonl"))
     assert os.listdir(os.path.join(base, "mock_storage"))
 
-    reset_mock_db(base)
+    reset_job_db(base)
 
     # directories recreated and empty
     jobs_dir = os.path.join(base, "mock_db", "jobs")
