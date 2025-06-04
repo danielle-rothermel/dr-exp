@@ -33,7 +33,7 @@
                                                               | (User Code)     |
                                                               +-----------------+
   ```
-- For a detailed breakdown, please refer to the Product Requirements Document (PRD - `docs/product_requirement_doc.md`).
+- For a detailed breakdown, please refer to the design documents in the `docs/` directory.
 ### Core Components:
 - **Config Generator (CLI):** Generates and uploads Hydra-based experiment configurations to Supabase.
 - **Supabase:** Central PostgreSQL database and object storage.
@@ -55,21 +55,20 @@
 **Project Structure (Overview):**
 ```plain text
 dr_exp/
-├── dr_exp/              # Main Python package
-│   ├── mock/            # Mock components (e.g., mock_trainer.py)
-│   ├── core/            # Core logic, including localdb_client
-│   └── ...
+├── src/
+│   └── dr_exp/
+│       ├── api/             # FastAPI backend
+│       ├── job_db/          # Supabase and local DB clients
+│       ├── manage/          # Manager and worker logic
+│       ├── logging/         # Structured logging utilities
+│       ├── train_examples/  # Example trainer and Hydra configs
+│       └── utils/           # Helper utilities
 ├── supabase/            # Supabase project configuration and migrations
-│   ├── config.toml
-│   └── migrations/
-│       └── 0001_initial_schema.sql
 ├── react-babysitter-ui/ # React frontend
-├── scripts/             # Utility scripts (e.g., reset_mock_db.py)
+├── scripts/             # CLI entry points and helpers
 ├── tests/               # Pytest tests
-├── docs/                # Project documentation (PRD, specs)
-├── mock_db/             # Local mock database files (in .gitignore)
-├── mock_storage/        # Local mock storage files (in .gitignore)
-├── .gitignore
+├── docs/                # Project documentation
+├── pyproject.toml
 └── README.md
 ```
 ### 4.3. Environment Setup
@@ -115,7 +114,7 @@ To experiment with the mock FastAPI backend and the React Babysitter UI together
 
 1. **Start the backend** from the repository root:
    ```bash
-   uv run uvicorn dr_exp.backend.main:app --reload
+   uv run uvicorn dr_exp.api.main:app --reload
    ```
    The server listens on `http://localhost:8000`.
 
@@ -131,14 +130,14 @@ Opening the UI should display the jobs table fetched from the backend.
         - SLURM Mode (for actual experiments):
         - This will involve:
             1. Setting `EXPMGR_MODE="real"`.
-           2. Using `dr_exp.manager_cli upload-configs` to populate Supabase with experiment configurations.
+           2. Using `python scripts/manager_cli.py upload-configs` to populate Supabase with experiment configurations.
             3. Submitting jobs to SLURM via an `sbatch` script that runs the `SLURM Manager`.
            4. A starter script is provided at `scripts/slurm_job.sbatch`.
 
 ## 6. Development
 ### 6.1. Mocks
-- **LocalDBClient:** Simulates Supabase interactions locally. See `dr_exp/core/localdb_client.py`.
-- Other mocks, including the FastAPI backend and mock training function, are implemented as described in the PRD.
+- **LocalDBClient:** Simulates Supabase interactions locally. See `dr_exp/job_db/local_job_db.py`.
+- Other mocks, including the FastAPI backend and example training code, live under `src/dr_exp/train_examples`.
 ### 6.2. Testing
 - Tests are written using pytest and located in the tests/ directory.
 - To run tests:
@@ -146,7 +145,6 @@ Opening the UI should display the jobs table fetched from the backend.
 uv run pytest
 ```
 ## 7. Documentation
-- **Product Requirements Document (PRD):** `docs/product_requirement_doc.md`
 - **Component Specifications:** Detailed design documents for each component are located in the `docs/` directory (e.g., `docs/supabase_schema.md`, `docs/worker.md`).
 - This README provides a starting point. It should be updated as the project evolves, particularly the "Getting Started" and "Running the System" sections.
 

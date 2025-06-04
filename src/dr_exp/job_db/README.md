@@ -1,7 +1,9 @@
-# Core Utilities
+# Job Database Clients
 
-Contains the building blocks used by both the worker and backend.
+This package contains the database clients used by the manager, workers and the
+backend.
 
-- `supabase_client.py` – wrapper around the Supabase Python client.
-- `client_provider.py` – selects real or mock clients via environment settings.
-- `structured_logger.py` – handles local metric and artifact logging.
+- `supabase_job_db.py` – client implementation for real Supabase.
+- `local_job_db.py` – filesystem-backed client for local development.
+
+Structured logging utilities are located in :mod:`dr_exp.logging`.

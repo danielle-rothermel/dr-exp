@@ -1,7 +1,7 @@
 # Manager CLI Overview (`docs/manager_cli.md`)
 
-The `dr_exp.manager_cli` module exposes a command line interface that wraps many
-of the Experiment Manager utilities.  It is primarily used when interacting with
+The `manager_cli.py` script provides a command line interface that wraps many of
+the Experiment Manager utilities. It is primarily used when interacting with
 real or mock environments outside of SLURM job scripts.
 
 ## Commands
