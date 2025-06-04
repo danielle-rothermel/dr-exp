@@ -11,7 +11,7 @@ from cachetools import LRUCache
 from fastapi import Depends, FastAPI, Header, HTTPException, status
 from fastapi.middleware.cors import CORSMiddleware
 
-from dr_exp.backend.models import (
+from dr_exp.api.models import (
     ConfigResponse,
     JobModel,
     KillRequest,
@@ -97,9 +97,14 @@ class MetricsLoader:
         """
         if run_id in self.cache:
             return self.cache[run_id]
+        storage_root = None
         if hasattr(self.client, "mock_storage_path"):
+            storage_root = self.client.mock_storage_path
+        elif hasattr(self.client, "storage_path"):
+            storage_root = self.client.storage_path
+        if storage_root:
             metrics_path = os.path.join(
-                self.client.mock_storage_path,
+                storage_root,
                 f"run_{run_id}",
                 "metrics.jsonl",
             )

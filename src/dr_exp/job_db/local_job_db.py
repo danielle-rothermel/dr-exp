@@ -26,6 +26,8 @@ class LocalDBClient:
         self.storage_path = storage_path
         # Location to write in-progress logs
         self.base_path = base_path
+        # Backward compatibility alias
+        self.mock_storage_path = self.storage_path
         self.jobs_dir = os.path.join(self.base_path, "jobs")
         self.metrics_dir = os.path.join(self.base_path, "metrics")
         self.errors_file = os.path.join(self.base_path, "errors.jsonl")
