@@ -97,26 +97,19 @@ class MetricsLoader:
         """
         if run_id in self.cache:
             return self.cache[run_id]
-        storage_root = None
-        if hasattr(self.client, "mock_storage_path"):
-            storage_root = self.client.mock_storage_path
-        elif hasattr(self.client, "storage_path"):
-            storage_root = self.client.storage_path
-        if storage_root:
-            metrics_path = os.path.join(
-                storage_root,
-                f"run_{run_id}",
-                "metrics.jsonl",
-            )
-            if not os.path.exists(metrics_path):
-                raise FileNotFoundError(metrics_path)
-            metrics: List[Dict[str, Any]] = []
-            with open(metrics_path, "r") as f:
-                for line in f:
-                    if line.strip():
-                        metrics.append(json.loads(line))
-        else:
-            raise NotImplementedError("Metrics loading for real client")
+        storage_root = self.client.storage_dir
+        metrics_path = os.path.join(
+            storage_root,
+            f"run_{run_id}",
+            "metrics.jsonl",
+        )
+        if not os.path.exists(metrics_path):
+            raise FileNotFoundError(metrics_path)
+        metrics: List[Dict[str, Any]] = []
+        with open(metrics_path, "r") as f:
+            for line in f:
+                if line.strip():
+                    metrics.append(json.loads(line))
         if len(metrics) > 100:
             metrics = metrics[-100:]
         self.cache[run_id] = metrics
