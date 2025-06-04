@@ -16,7 +16,7 @@ def mock_client(tmp_path):
     The tmp_path fixture is provided by pytest for creating temporary files/directories.
     """
     # The LocalDBClient will create mock_db and mock_storage inside tmp_path
-    client = LocalDBClient(base_path=str(tmp_path))
+    client = LocalDBClient(base_path=str(tmp_path), storage_path=str(tmp_path / "storage"))
     return client
 
 
@@ -37,12 +37,11 @@ def sample_sweep_config_id():
 
 def test_client_initialization(tmp_path):
     """Tests if the client initializes its directories correctly."""
-    client = LocalDBClient(base_path=str(tmp_path))
-    assert os.path.exists(client.base_path)
+    client = LocalDBClient(base_path=str(tmp_path), storage_path=str(tmp_path / "storage"))
+    assert os.path.exists(client.storage_dir)
     assert os.path.exists(client.jobs_dir)
     assert os.path.exists(client.metrics_dir)
     assert os.path.exists(client.errors_file)
-    assert os.path.exists(client.storage_path)
     with open(client.errors_file, "r") as f:
         assert f.read() == ""  # Should be empty
 
@@ -242,7 +241,7 @@ def test_upload_artifact_file(
     assert result["success"] is True
 
     expected_destination_path = os.path.join(
-        mock_client.storage_path, f"run_{job_id}", "artifacts", remote_suffix
+        mock_client.storage_dir, f"run_{job_id}", "artifacts", remote_suffix
     )
     assert os.path.exists(expected_destination_path)
     assert result["storage_path"] == expected_destination_path
@@ -266,7 +265,7 @@ def test_upload_artifact_root_file(
     assert result["success"] is True
 
     expected_destination_path = os.path.join(
-        mock_client.storage_path, f"run_{job_id}", remote_suffix
+        mock_client.storage_dir, f"run_{job_id}", remote_suffix
     )
     assert os.path.exists(expected_destination_path)
     assert result["storage_path"] == expected_destination_path
@@ -294,7 +293,7 @@ def test_upload_artifact_directory(
     assert result["success"] is True
 
     expected_destination_base = os.path.join(
-        mock_client.storage_path, f"run_{job_id}", "artifacts", remote_suffix
+        mock_client.storage_dir, f"run_{job_id}", "artifacts", remote_suffix
     )
     assert os.path.exists(expected_destination_base)
     assert os.path.exists(os.path.join(expected_destination_base, "file1.txt"))
@@ -341,7 +340,7 @@ def test_finalize_job(mock_client, sample_job_config, sample_sweep_config_id):
     assert finalized_job_details["final_val_acc"] == 0.95
     assert finalized_job_details["finalize_success"] is True
     flag_path = os.path.join(
-        mock_client.storage_path,
+        mock_client.storage_dir,
         f"run_{job_id}",
         "finished.flag",
     )
@@ -410,7 +409,7 @@ def test_multiple_operations_on_same_job(
         assert len(lines) == 2  # metrics1 and metrics2
 
     artifact_path = os.path.join(
-        mock_client.storage_path,
+        mock_client.storage_dir,
         f"run_{job_id}",
         "artifacts",
         "checkpoints/final_model.pt",
