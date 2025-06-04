@@ -1,12 +1,22 @@
 import json
 from pathlib import Path
 
-from dr_exp.core.localdb_client import LocalDBClient
-from dr_exp import config_upload
+from dr_exp.job_db.local_job_db import LocalDBClient
+from dr_exp.utils import config_upload
 from scripts import upload_configs
 
 
+<<<<<<< ours
 CONFIG_DIR = Path("src/dr_exp/train_examples/configs").resolve()
+=======
+CONFIG_DIR = (
+    Path(__file__).resolve().parents[2]
+    / "src"
+    / "dr_exp"
+    / "train_examples"
+    / "configs"
+)
+>>>>>>> theirs
 
 
 def test_generate_and_upload(tmp_path):

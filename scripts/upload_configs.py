@@ -7,9 +7,9 @@ import argparse
 import os
 from typing import Any, Dict, List, Sequence
 
-from dr_exp.config_upload import upload_configs
-from dr_exp.core.client_provider import get_supabase_client
-from dr_exp.core.localdb_client import LocalDBClient
+from dr_exp.utils import config_upload
+from dr_exp.utils.jobdb_factory import get_supabase_client
+from dr_exp.job_db.local_job_db import LocalDBClient
 
 
 def add_arguments(parser: argparse.ArgumentParser) -> None:
@@ -42,7 +42,7 @@ def run(args: argparse.Namespace) -> List[Dict[str, Any]]:
         client = get_supabase_client()
     else:
         client = LocalDBClient()
-    return upload_configs(
+    return config_upload.upload_configs(
         base_config_path=args.base_config_path,
         config_name=args.config_name,
         sweep=args.sweep,

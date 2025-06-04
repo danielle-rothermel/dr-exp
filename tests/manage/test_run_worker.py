@@ -2,8 +2,8 @@ import os
 
 import zipfile
 
-from dr_exp.core.localdb_client import LocalDBClient
-import dr_exp.worker as run_worker
+from dr_exp.job_db.local_job_db import LocalDBClient
+import dr_exp.manage.worker_logic as run_worker
 
 
 def make_config():
@@ -30,7 +30,7 @@ def test_worker_success(tmp_path):
     assert "upload_complete_at" in job_data
     assert not work_dir.exists()
 
-    storage_run = os.path.join(client.mock_storage_path, f"run_{job['id']}")
+    storage_run = os.path.join(client.storage_path, f"run_{job['id']}")
     assert os.path.exists(os.path.join(storage_run, "metrics.jsonl"))
     bundle_zip = os.path.join(storage_run, "bundle.zip")
     assert os.path.exists(bundle_zip)
@@ -78,7 +78,7 @@ def test_worker_training_failure(tmp_path):
     job_data = client.get_job_details(job["id"])
     assert job_data["status"] == "failed"
 
-    errors_file = os.path.join(client.mock_db_path, "errors.jsonl")
+    errors_file = os.path.join(client.base_path, "errors.jsonl")
     with open(errors_file) as f:
         data = f.read()
     assert "RuntimeError" in data

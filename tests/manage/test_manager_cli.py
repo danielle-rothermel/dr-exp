@@ -4,8 +4,8 @@ import os
 from pathlib import Path
 from datetime import datetime, UTC, timedelta
 
-from dr_exp.manager_cli import main
-from dr_exp.core.localdb_client import LocalDBClient
+from scripts.manager_cli import main
+from dr_exp.job_db.local_job_db import LocalDBClient
 
 
 def make_config() -> dict:
@@ -37,7 +37,7 @@ def test_run_subcommand_invokes_manager(monkeypatch):
     def fake_run(self):
         called["run"] = True
 
-    monkeypatch.setattr("dr_exp.manager.Manager.run", fake_run)
+    monkeypatch.setattr("dr_exp.manage.manager_logic.Manager.run", fake_run)
     main(
         [
             "run",
@@ -66,7 +66,7 @@ def test_reap_stale_jobs_subcommand(tmp_path, monkeypatch, capsys):
         return client
 
     monkeypatch.setattr(
-        "dr_exp.core.client_provider.get_supabase_client", fake_get_supabase_client
+        "dr_exp.utils.jobdb_factory.get_supabase_client", fake_get_supabase_client
     )
     main(["reap-stale-jobs", "--max-age-mins", "5", "--base-path", str(tmp_path)])
     out = capsys.readouterr().out.strip()
@@ -77,7 +77,13 @@ def test_reap_stale_jobs_subcommand(tmp_path, monkeypatch, capsys):
 
 
 def test_upload_configs_subcommand(tmp_path, monkeypatch, capsys):
-    cfg_dir = Path(__file__).resolve().parents[1] / "configs"
+    cfg_dir = (
+        Path(__file__).resolve().parents[2]
+        / "src"
+        / "dr_exp"
+        / "train_examples"
+        / "configs"
+    )
     client = LocalDBClient(base_path=str(tmp_path))
 
     monkeypatch.setattr("scripts.upload_configs.LocalDBClient", lambda: client)
@@ -99,7 +105,7 @@ def test_upload_configs_subcommand(tmp_path, monkeypatch, capsys):
 
 def test_cleanup_run_data_subcommand(tmp_path, monkeypatch, capsys):
     client = LocalDBClient(base_path=str(tmp_path))
-    run_dir = Path(client.mock_storage_path) / "run_x"
+    run_dir = Path(client.storage_path) / "run_x"
     run_dir.mkdir(parents=True)
     (run_dir / "finished.flag").touch()
 
@@ -108,7 +114,7 @@ def test_cleanup_run_data_subcommand(tmp_path, monkeypatch, capsys):
         return client
 
     monkeypatch.setattr(
-        "dr_exp.core.client_provider.get_supabase_client", fake_get_supabase_client
+        "dr_exp.utils.jobdb_factory.get_supabase_client", fake_get_supabase_client
     )
     main(["cleanup-run-data", "--base-path", str(tmp_path)])
     out = capsys.readouterr().out.strip()

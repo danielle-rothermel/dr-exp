@@ -3,10 +3,10 @@ from pathlib import Path
 
 import pytest
 
-from dr_exp import config_upload
+from dr_exp.utils import config_upload
 from dr_exp.api.main import MetricsLoader
-from dr_exp.core import client_provider
-from dr_exp.core.localdb_client import LocalDBClient
+from dr_exp.utils import jobdb_factory as client_provider
+from dr_exp.job_db.local_job_db import LocalDBClient
 
 
 def test_parse_sweep_and_generate_combos():
@@ -30,7 +30,13 @@ def test_parse_sweep_with_spaces():
 
 
 def test_generate_configs(tmp_path):
-    cfg_dir = Path("src/dr_exp/train_examples/configs").resolve()
+    cfg_dir = (
+        Path(__file__).resolve().parents[2]
+        / "src"
+        / "dr_exp"
+        / "train_examples"
+        / "configs"
+    )
     params = {"model": ["resnet", "vit"]}
     configs = list(config_upload.generate_configs(str(cfg_dir), "config.yaml", params))
     names = {cfg["model"]["name"] for cfg in configs}
@@ -77,7 +83,7 @@ def test_metrics_loader(tmp_path):
     )
     loader = MetricsLoader(client, maxsize=2)
     run_id = "r1"
-    run_dir = Path(client.mock_storage_path) / f"run_{run_id}"
+    run_dir = Path(client.storage_path) / f"run_{run_id}"
     run_dir.mkdir(parents=True)
     metrics_file = run_dir / "metrics.jsonl"
     with open(metrics_file, "w") as f:

@@ -4,7 +4,7 @@ import argparse
 import os
 from typing import List
 
-from dr_exp.manager import Manager, discover_gpus
+from dr_exp.manage.manager_logic import Manager, discover_gpus
 
 
 def build_arg_parser() -> argparse.ArgumentParser:

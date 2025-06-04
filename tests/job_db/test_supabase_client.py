@@ -3,7 +3,7 @@ import zipfile
 
 import pytest
 
-from dr_exp.core.supabase_client import SupabaseClient
+from dr_exp.job_db.supabase_job_db import SupabaseClient
 
 
 class StubBucket:
@@ -54,7 +54,7 @@ def stub_client(monkeypatch):
     recorder = {}
     client = StubClient(recorder)
     monkeypatch.setattr(
-        "dr_exp.core.supabase_client.create_client",
+        "dr_exp.job_db.supabase_job_db.create_client",
         lambda url, key: client,
     )
     return recorder
@@ -107,5 +107,5 @@ def test_write_finished_flag(tmp_path, stub_client):
     client = SupabaseClient("url", "key", base_path=str(tmp_path))
     job_id = "jid3"
     client._write_finished_flag(job_id)
-    flag_path = tmp_path / "mock_storage" / f"run_{job_id}" / "finished.flag"
+    flag_path = tmp_path / f"run_{job_id}" / "finished.flag"
     assert flag_path.exists()

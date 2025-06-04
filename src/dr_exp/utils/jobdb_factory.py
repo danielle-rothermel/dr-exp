@@ -3,8 +3,8 @@ from typing import Union
 
 from dotenv import load_dotenv
 
-from dr_exp.jobs_db.supabase_job_db import SupabaseClient
-from dr_exp.jobs_db.local_job_db import LocalDBClient
+from dr_exp.job_db.supabase_job_db import SupabaseClient
+from dr_exp.job_db.local_job_db import LocalDBClient
 
 load_dotenv()
 

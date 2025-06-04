@@ -3,8 +3,8 @@ from multiprocessing import Process
 from pathlib import Path
 
 
-from dr_exp.core.localdb_client import LocalDBClient
-import dr_exp.manager as manager
+from dr_exp.job_db.local_job_db import LocalDBClient
+import dr_exp.manage.manager_logic as manager
 
 
 def dummy_worker(worker_id: str, work_dir: str) -> None:

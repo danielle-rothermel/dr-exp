@@ -1,6 +1,6 @@
 from datetime import datetime, UTC, timedelta
 
-from dr_exp.core.localdb_client import LocalDBClient
+from dr_exp.job_db.local_job_db import LocalDBClient
 from dr_exp.utils import reap_stale_jobs
 
 

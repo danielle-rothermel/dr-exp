@@ -4,7 +4,7 @@ import gzip
 from multiprocessing import Process
 import pytest
 
-from dr_exp.core import StructuredLogger
+from dr_exp.logging.structured_logger import StructuredLogger
 
 
 class SimpleCfg:

@@ -11,11 +11,11 @@ import traceback
 from datetime import datetime, UTC
 from typing import Any, Callable, Optional
 
-from dr_exp.core import StructuredLogger
-from dr_exp.core.client_provider import get_supabase_client
-from dr_exp.core.supabase_client import SupabaseClient
+from dr_exp.logging.structured_logger import StructuredLogger
+from dr_exp.utils.jobdb_factory import get_supabase_client
+from dr_exp.job_db.supabase_job_db import SupabaseClient
+from dr_exp.job_db.local_job_db import LocalDBClient
 from dr_exp.train_examples.dummy_trainer import train as default_train
-from dr_exp.core.localdb_client import LocalDBClient
 
 
 def _heartbeat_loop(

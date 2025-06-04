@@ -1,8 +1,8 @@
 import json
 import os
 
-from dr_exp.logging.structured_logger import StructuredLogger
 from dr_exp.train_examples.dummy_trainer import train
+from dr_exp.logging.structured_logger import StructuredLogger
 
 
 def make_cfg(tmp_path, num_epochs=4):

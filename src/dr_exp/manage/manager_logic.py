@@ -10,12 +10,12 @@ import multiprocessing as mp
 from dotenv import load_dotenv
 from typing import Dict, List
 
-from dr_exp.core.client_provider import get_supabase_client
-from dr_exp.core.supabase_client import SupabaseClient
-from dr_exp.core.localdb_client import LocalDBClient
+from dr_exp.utils.jobdb_factory import get_supabase_client
+from dr_exp.job_db.supabase_job_db import SupabaseClient
+from dr_exp.job_db.local_job_db import LocalDBClient
 
-# Import the worker implementation
-import dr_exp.worker as _run_worker
+# Import the worker implementation from this package
+from . import worker_logic as _run_worker
 
 load_dotenv()
 
@@ -64,7 +64,7 @@ class Manager:
         self.idle_timeout = timedelta(minutes=idle_timeout_mins)
         self.base_dir = base_dir
         self.client = client or get_supabase_client()
-        self.base_path = os.path.dirname(self.client.base_path)
+        self.base_path = getattr(self.client, "base_path", "./job_data")
         self.workers: Dict[str, Dict[str, object]] = {}
         self.last_activity = datetime.now(UTC)
         self.shutdown = False
