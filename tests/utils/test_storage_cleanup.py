@@ -5,7 +5,9 @@ from dr_exp.utils.storage_cleanup import cleanup_uploaded_runs
 
 
 def test_cleanup_uploaded_runs(tmp_path):
-    client = LocalDBClient(base_path=str(tmp_path), str(tmp_path / "storage"))
+    client = LocalDBClient(
+        base_path=str(tmp_path), storage_path=str(tmp_path / "storage")
+    )
     run1 = Path(client.storage_path) / "run_a"
     run1.mkdir(parents=True)
     (run1 / "finished.flag").write_text("done")
