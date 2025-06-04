@@ -135,3 +135,38 @@ def test_list_running_jobs_real_client(tmp_path):
     )
     running = mgr._list_running_jobs()
     assert running == [jobs[0]]
+
+
+def test_restart_worker(monkeypatch):
+    class DummyProc:
+        def __init__(self):
+            self.terminated = False
+            self.joined = False
+
+        def is_alive(self):
+            return True
+
+        def terminate(self):
+            self.terminated = True
+
+        def join(self, timeout=None):
+            self.joined = True
+
+    launched = {}
+
+    def fake_launch(self, worker_id, gpu_id):
+        launched["worker"] = worker_id
+
+    mgr = manager.Manager(
+        gpus=["0"],
+        workers_per_gpu=1,
+        heartbeat_interval=1,
+        idle_timeout_mins=1,
+        base_dir="/tmp",
+    )
+    mgr.workers["wid"] = {"process": DummyProc(), "gpu": "0"}
+    monkeypatch.setattr(manager.Manager, "launch_worker", fake_launch)
+
+    mgr._restart_worker("wid")
+
+    assert launched.get("worker") == "wid"

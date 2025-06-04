@@ -6,7 +6,6 @@ from datetime import datetime, UTC, timedelta
 
 from scripts.manager_cli import main
 from dr_exp.job_db.local_job_db import LocalDBClient
-import pytest
 
 
 def make_config() -> dict:
@@ -71,7 +70,7 @@ def test_reap_stale_jobs_subcommand(tmp_path, monkeypatch, capsys):
         return client
 
     monkeypatch.setattr(
-        "dr_exp.utils.jobdb_factory.get_supabase_client", fake_get_supabase_client
+        "scripts.manager_cli.get_supabase_client", fake_get_supabase_client
     )
     main(["reap-stale-jobs", "--max-age-mins", "5", "--base-path", str(tmp_path)])
     out = capsys.readouterr().out.strip()
@@ -111,7 +110,6 @@ def test_upload_configs_subcommand(tmp_path, monkeypatch, capsys):
 
 
 def test_cleanup_run_data_subcommand(tmp_path, monkeypatch, capsys):
-    pytest.skip("cleanup-run-data not yet supported")
     client = LocalDBClient(
         base_path=str(tmp_path), storage_path=str(tmp_path / "storage")
     )
@@ -124,7 +122,7 @@ def test_cleanup_run_data_subcommand(tmp_path, monkeypatch, capsys):
         return client
 
     monkeypatch.setattr(
-        "dr_exp.utils.jobdb_factory.get_supabase_client", fake_get_supabase_client
+        "scripts.manager_cli.get_supabase_client", fake_get_supabase_client
     )
     main(["cleanup-run-data", "--base-path", str(tmp_path)])
     out = capsys.readouterr().out.strip()

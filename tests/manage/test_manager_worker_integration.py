@@ -1,7 +1,6 @@
 from multiprocessing import Process
 import zipfile
 from pathlib import Path
-import pytest
 
 from dr_exp.job_db.local_job_db import LocalDBClient
 import dr_exp.manage.manager_logic as manager
@@ -11,8 +10,7 @@ def make_config():
     return {"train": {"num_epochs": 1}, "logging": {}}
 
 
-def test_manager_worker_flow(tmp_path):
-    pytest.skip("integration pending")
+def test_manager_worker_flow(tmp_path, monkeypatch):
     base_path = tmp_path
     client = LocalDBClient(
         base_path=str(base_path), storage_path=str(base_path / "storage")
@@ -28,6 +26,7 @@ def test_manager_worker_flow(tmp_path):
         base_dir=str(mgr_dir),
         client=client,
     )
+    monkeypatch.chdir(tmp_path)
     mgr.start_workers()
     for info in mgr.workers.values():
         proc: Process = info["process"]  # type: ignore[assignment]
