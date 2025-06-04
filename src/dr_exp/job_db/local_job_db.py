@@ -12,7 +12,9 @@ import portalocker
 class LocalDBClient:
     """Filesystem-backed client used for local runs."""
 
-    def __init__(self, base_path: str = "./job_data", storage_path: str = "./storage") -> None:
+    def __init__(
+        self, base_path: str = "./job_data", storage_path: str = "./storage"
+    ) -> None:
         """Create the directories used for the mock database.
 
         Parameters

@@ -137,7 +137,7 @@ Opening the UI should display the jobs table fetched from the backend.
 ## 6. Development
 ### 6.1. Mocks
 - **LocalDBClient:** Simulates Supabase interactions locally. See `dr_exp/job_db/local_job_db.py`.
-- Other mocks, including the FastAPI backend and example training code, live under `src/dr_exp/train_examples`.
+- Example training code and Hydra configs live in `src/dr_exp/train_examples`.
 ### 6.2. Testing
 - Tests are written using pytest and located in the tests/ directory.
 - To run tests:

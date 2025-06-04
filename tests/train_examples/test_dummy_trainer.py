@@ -1,8 +1,8 @@
 import json
 import os
 
-from dr_exp.mock.mock_trainer import train
-from tests.mock.mock_structured_logger import StructuredLogger
+from dr_exp.logging.structured_logger import StructuredLogger
+from dr_exp.train_examples.dummy_trainer import train
 
 
 def make_cfg(tmp_path, num_epochs=4):
@@ -47,3 +47,25 @@ def test_train_runs_and_logs(tmp_path):
         "num_checkpoints",
     ]:
         assert key in result
+
+
+class ObjCfg:
+    def __init__(self, tmp_path, num_epochs: int) -> None:
+        self.train = {"num_epochs": num_epochs}
+        self.logging = {
+            "out_path": str(tmp_path / "out.jsonl"),
+            "checkpoint_dir": str(tmp_path / "ckpt"),
+            "artifact_dir": str(tmp_path / "art"),
+        }
+
+
+def test_train_with_obj_cfg_and_default_logger(tmp_path):
+    cfg = ObjCfg(tmp_path, 2)
+    result = train(cfg)
+
+    assert result["status"] == "success"
+    assert result["num_epochs"] == 2
+    assert os.path.exists(cfg.logging["out_path"])
+    with open(cfg.logging["out_path"], "r") as f:
+        lines = f.readlines()
+    assert len(lines) == 2

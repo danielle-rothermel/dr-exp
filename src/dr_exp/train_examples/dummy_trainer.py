@@ -2,7 +2,7 @@ import os
 import time
 from typing import Any, Dict, Optional
 
-from dr_exp.core import StructuredLogger
+from dr_exp.logging.structured_logger import StructuredLogger
 
 
 def train(cfg: Any, logger: Optional[StructuredLogger] = None) -> Dict[str, Any]:
@@ -42,7 +42,8 @@ def train(cfg: Any, logger: Optional[StructuredLogger] = None) -> Dict[str, Any]
         if epoch in {num_epochs // 2, num_epochs}:
             logger.save_checkpoint({"epoch": epoch}, tag=f"epoch_{epoch}")
 
-    artifact_path = os.path.join(cfg["logging"]["artifact_dir"], "loss_plot.txt")
+    logging_cfg = cfg["logging"] if isinstance(cfg, dict) else cfg.logging
+    artifact_path = os.path.join(logging_cfg["artifact_dir"], "loss_plot.txt")
     with open(artifact_path, "w") as f:
         f.write("dummy artifact")
     logger.log_artifact(artifact_path)
@@ -55,6 +56,6 @@ def train(cfg: Any, logger: Optional[StructuredLogger] = None) -> Dict[str, Any]
         "num_epochs": num_epochs,
         "status": "success",
         "metrics_path": logger_meta["metrics_path"],
-        "artifacts_path": cfg["logging"]["artifact_dir"],
+        "artifacts_path": logging_cfg["artifact_dir"],
         "num_checkpoints": logger_meta["num_checkpoints"],
     }

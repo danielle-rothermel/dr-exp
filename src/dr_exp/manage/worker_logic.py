@@ -14,7 +14,7 @@ from typing import Any, Callable, Optional
 from dr_exp.core import StructuredLogger
 from dr_exp.core.client_provider import get_supabase_client
 from dr_exp.core.supabase_client import SupabaseClient
-from dr_exp.mock.mock_trainer import train as default_train
+from dr_exp.train_examples.dummy_trainer import train as default_train
 from dr_exp.core.localdb_client import LocalDBClient
 
 

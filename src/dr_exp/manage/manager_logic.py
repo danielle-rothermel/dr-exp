@@ -13,7 +13,6 @@ from typing import Dict, List
 from dr_exp.core.client_provider import get_supabase_client
 from dr_exp.core.supabase_client import SupabaseClient
 from dr_exp.core.localdb_client import LocalDBClient
-from dr_exp.mock.supabase_mock_client import SupabaseMockClient
 
 # Import the worker implementation
 import dr_exp.worker as _run_worker
