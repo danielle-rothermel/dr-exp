@@ -6,9 +6,6 @@ from dr_exp.utils import config_upload
 from scripts import upload_configs
 
 
-<<<<<<< ours
-CONFIG_DIR = Path("src/dr_exp/train_examples/configs").resolve()
-=======
 CONFIG_DIR = (
     Path(__file__).resolve().parents[2]
     / "src"
@@ -16,7 +13,6 @@ CONFIG_DIR = (
     / "train_examples"
     / "configs"
 )
->>>>>>> theirs
 
 
 def test_generate_and_upload(tmp_path):
