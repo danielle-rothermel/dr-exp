@@ -7,3 +7,4 @@ This folder contains Hydra configuration files used to define experiments.
 - `optim/` stores optimizer settings like `adam.yaml`, `adamw.yaml`, and `sgd.yaml`.
 
 These YAML files are combined to produce fully resolved experiment configs that are uploaded to Supabase.
+See `docs/train_examples.md` for an overview of how these configurations work with the `dummy_trainer` example.

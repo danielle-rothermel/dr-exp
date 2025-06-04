@@ -39,7 +39,7 @@
 - **Supabase:** Central PostgreSQL database and object storage.
 - **SLURM Manager:** Python script launched by SLURM `sbatch`; manages worker processes on allocated nodes/GPUs.
 - **Worker Process:** Python script that claims jobs, runs training logic, logs metrics/artifacts using `StructuredLogger`, and uploads results.
-- **StructuredLogger:** Python class used by training code to handle local logging of metrics, checkpoints, and artifacts.
+ - **StructuredLogger:** Python class in `dr_exp.logging` that handles local logging of metrics, checkpoints, and artifacts.
 - **FastAPI Backend:** Serves as the API layer between Supabase and the UI/other clients.
 - **React Babysitter UI:** Web interface for monitoring and controlling experiments.
 - **Mock Components:** Local mocks for Supabase, FastAPI, and the training function to facilitate offline development and testing.
@@ -58,7 +58,7 @@ dr_exp/
 ├── src/
 │   └── dr_exp/
 │       ├── api/             # FastAPI backend
-│       ├── job_db/          # Supabase and local DB clients
+│       ├── job_db/          # Database helpers (LocalDBClient, Supabase client)
 │       ├── manage/          # Manager and worker logic
 │       ├── logging/         # Structured logging utilities
 │       ├── train_examples/  # Example trainer and Hydra configs
@@ -138,6 +138,7 @@ Opening the UI should display the jobs table fetched from the backend.
 ### 6.1. Mocks
 - **LocalDBClient:** Simulates Supabase interactions locally. See `dr_exp/job_db/local_job_db.py`.
 - Example training code and Hydra configs live in `src/dr_exp/train_examples`.
+- Other mocks, including the FastAPI backend and mock training function, are implemented as described in the PRD.
 ### 6.2. Testing
 - Tests are written using pytest and located in the tests/ directory.
 - To run tests:
@@ -146,5 +147,6 @@ uv run pytest
 ```
 ## 7. Documentation
 - **Component Specifications:** Detailed design documents for each component are located in the `docs/` directory (e.g., `docs/supabase_schema.md`, `docs/worker.md`).
+- **Training Examples:** Example configs and a dummy training loop are documented in `docs/train_examples.md`.
 - This README provides a starting point. It should be updated as the project evolves, particularly the "Getting Started" and "Running the System" sections.
 
