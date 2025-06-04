@@ -32,7 +32,7 @@ def test_worker_success(tmp_path):
     assert "upload_complete_at" in job_data
     assert not work_dir.exists()
 
-    storage_run = os.path.join(client.storage_path, f"run_{job['id']}")
+    storage_run = os.path.join(client.storage_dir, f"run_{job['id']}")
     assert os.path.exists(os.path.join(storage_run, "metrics.jsonl"))
     bundle_zip = os.path.join(storage_run, "bundle.zip")
     assert os.path.exists(bundle_zip)
@@ -84,7 +84,7 @@ def test_worker_training_failure(tmp_path):
     job_data = client.get_job_details(job["id"])
     assert job_data["status"] == "failed"
 
-    errors_file = os.path.join(client.base_path, "errors.jsonl")
+    errors_file = os.path.join(client.jobs_dir, "errors.jsonl")
     with open(errors_file) as f:
         data = f.read()
     assert "RuntimeError" in data
