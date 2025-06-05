@@ -206,4 +206,9 @@ def create_app(base_path: str = ".") -> FastAPI:
     return app
 
 
-app = create_app()
+# Global app instance - only create when running as a script
+if __name__ == "__main__":
+    app = create_app()
+else:
+    # Create a default app for import contexts - tests should use create_app() directly
+    app = None
