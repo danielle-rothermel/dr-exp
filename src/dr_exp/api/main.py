@@ -19,8 +19,7 @@ from dr_exp.api.models import (
     RequeueRequest,
 )
 from dr_exp.utils.jobdb_factory import get_supabase_client
-from dr_exp.job_db.supabase_job_db import SupabaseClient
-from dr_exp.job_db.local_job_db import LocalDBClient
+from dr_exp.job_db.base_job_db import BaseJobDB
 
 load_dotenv()
 logger = logging.getLogger(__name__)
@@ -61,13 +60,13 @@ class MetricsLoader:
     """Load and cache run metrics from storage."""
 
     def __init__(
-        self, client: SupabaseClient | LocalDBClient, maxsize: int = 32
+        self, client: BaseJobDB, maxsize: int = 32
     ) -> None:
         """Create a loader instance.
 
         Parameters
         ----------
-        client : SupabaseClient | LocalDBClient
+        client : BaseJobDB
             Client used to retrieve metrics files.
         maxsize : int, optional
             Maximum number of runs to keep in the LRU cache, by default ``32``.

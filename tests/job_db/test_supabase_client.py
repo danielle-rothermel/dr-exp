@@ -3,7 +3,7 @@ import zipfile
 
 import pytest
 
-from dr_exp.job_db.supabase_job_db import SupabaseClient
+from dr_exp.job_db.supabase_job_db import SupabaseJobDB
 
 
 class StubBucket:
@@ -61,7 +61,7 @@ def stub_client(monkeypatch):
 
 
 def test_directory_is_zipped(tmp_path, stub_client):
-    client = SupabaseClient("url", "key")
+    client = SupabaseJobDB("url", "key")
     d = tmp_path / "artifacts"
     d.mkdir()
     (d / "file.txt").write_text("data")
@@ -73,7 +73,7 @@ def test_directory_is_zipped(tmp_path, stub_client):
 
 
 def test_empty_suffix_zips_to_default(tmp_path, stub_client):
-    client = SupabaseClient("url", "key")
+    client = SupabaseJobDB("url", "key")
     d = tmp_path / "artifacts2"
     d.mkdir()
     (d / "a.txt").write_text("a")
@@ -85,7 +85,7 @@ def test_empty_suffix_zips_to_default(tmp_path, stub_client):
 
 
 def test_insert_helpers(monkeypatch, stub_client):
-    client = SupabaseClient("url", "key")
+    client = SupabaseJobDB("url", "key")
 
     result = client.add_sweep_config_cluster("c1", description="d")
     assert stub_client["tables"][0] == (
@@ -104,7 +104,7 @@ def test_insert_helpers(monkeypatch, stub_client):
 
 
 def test_write_finished_flag(tmp_path, stub_client):
-    client = SupabaseClient("url", "key", base_path=str(tmp_path))
+    client = SupabaseJobDB("url", "key", base_path=str(tmp_path))
     job_id = "jid3"
     client._write_finished_flag(job_id)
     flag_path = tmp_path / "job_data" / f"run_{job_id}" / "finished.flag"

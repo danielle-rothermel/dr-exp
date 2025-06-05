@@ -5,7 +5,7 @@ from pathlib import Path
 from datetime import datetime, UTC, timedelta
 
 from scripts.manager_cli import main
-from dr_exp.job_db.local_job_db import LocalDBClient
+from dr_exp.job_db.local_job_db import LocalJobDB
 
 
 def make_config() -> dict:
@@ -20,7 +20,7 @@ def test_discover_gpus(monkeypatch, capsys):
 
 
 def test_run_worker_subcommand(tmp_path, monkeypatch):
-    client = LocalDBClient(
+    client = LocalJobDB(
         base_path=str(tmp_path), storage_path=str(tmp_path / "storage")
     )
     client.add_job(make_config(), "s1", status="queued")
@@ -41,7 +41,7 @@ def test_run_subcommand_invokes_manager(tmp_path, monkeypatch):
         called["run"] = True
 
     monkeypatch.setattr("dr_exp.manage.manager_logic.Manager.run", fake_run)
-    client = LocalDBClient(
+    client = LocalJobDB(
         base_path=str(tmp_path), storage_path=str(tmp_path / "storage")
     )
 
@@ -69,7 +69,7 @@ def test_run_subcommand_invokes_manager(tmp_path, monkeypatch):
 
 
 def test_reap_stale_jobs_subcommand(tmp_path, monkeypatch, capsys):
-    client = LocalDBClient(
+    client = LocalJobDB(
         base_path=str(tmp_path), storage_path=str(tmp_path / "storage")
     )
     job = client.add_job(make_config(), "s1", status="running")
@@ -100,11 +100,11 @@ def test_upload_configs_subcommand(tmp_path, monkeypatch, capsys):
         / "train_examples"
         / "configs"
     )
-    client = LocalDBClient(
+    client = LocalJobDB(
         base_path=str(tmp_path), storage_path=str(tmp_path / "storage")
     )
 
-    monkeypatch.setattr("scripts.upload_configs.LocalDBClient", lambda: client)
+    monkeypatch.setattr("scripts.upload_configs.LocalJobDB", lambda: client)
 
     main(
         [
@@ -122,7 +122,7 @@ def test_upload_configs_subcommand(tmp_path, monkeypatch, capsys):
 
 
 def test_cleanup_run_data_subcommand(tmp_path, monkeypatch, capsys):
-    client = LocalDBClient(
+    client = LocalJobDB(
         base_path=str(tmp_path), storage_path=str(tmp_path / "storage")
     )
     run_dir = Path(client.jobs_dir) / "run_x"

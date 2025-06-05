@@ -12,8 +12,7 @@ import hydra
 from hydra.core.global_hydra import GlobalHydra
 from omegaconf import OmegaConf
 
-from dr_exp.job_db.supabase_job_db import SupabaseClient
-from dr_exp.job_db.local_job_db import LocalDBClient
+from dr_exp.job_db.base_job_db import BaseJobDB
 
 
 # --------------------- Config Generation ---------------------
@@ -68,7 +67,7 @@ def upload_configs(
     base_config_path: str,
     config_name: str,
     sweep: str,
-    client: SupabaseClient | LocalDBClient,
+    client: BaseJobDB,
     cluster_name: str | None = None,
     description: str | None = None,
     interface_version: str | None = None,

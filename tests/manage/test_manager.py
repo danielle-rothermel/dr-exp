@@ -3,7 +3,7 @@ from multiprocessing import Process
 from pathlib import Path
 
 
-from dr_exp.job_db.local_job_db import LocalDBClient
+from dr_exp.job_db.local_job_db import LocalJobDB
 import dr_exp.manage.manager_logic as manager
 
 
@@ -21,7 +21,7 @@ def test_discover_gpus_env(monkeypatch):
 
 def test_worker_spawning(tmp_path, monkeypatch):
     monkeypatch.setattr(manager, "run_worker_main", dummy_worker)
-    client = LocalDBClient(
+    client = LocalJobDB(
         base_path=str(tmp_path), storage_path=str(tmp_path / "storage")
     )
     gpus = ["0", "1"]
@@ -44,7 +44,7 @@ def test_worker_spawning(tmp_path, monkeypatch):
 
 
 def test_heartbeat_detection(tmp_path, monkeypatch):
-    client = LocalDBClient(
+    client = LocalJobDB(
         base_path=str(tmp_path), storage_path=str(tmp_path / "storage")
     )
     job = client.add_job({"cfg": 1}, "sweep1", status="running")
@@ -75,7 +75,7 @@ def test_heartbeat_detection(tmp_path, monkeypatch):
 
 
 def test_idle_timeout(tmp_path):
-    client = LocalDBClient(
+    client = LocalJobDB(
         base_path=str(tmp_path), storage_path=str(tmp_path / "storage")
     )
     mgr = manager.Manager(
@@ -166,7 +166,7 @@ def test_restart_worker(monkeypatch, tmp_path):
     def fake_launch(self, worker_id, gpu_id):
         launched["worker"] = worker_id
 
-    client = LocalDBClient(
+    client = LocalJobDB(
         base_path=str(tmp_path), storage_path=str(tmp_path / "storage")
     )
     mgr = manager.Manager(

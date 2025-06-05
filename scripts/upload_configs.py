@@ -9,7 +9,7 @@ from typing import Any, Dict, List, Sequence
 
 from dr_exp.utils import config_upload
 from dr_exp.utils.jobdb_factory import get_supabase_client
-from dr_exp.job_db.local_job_db import LocalDBClient
+from dr_exp.job_db.local_job_db import LocalJobDB
 
 
 def add_arguments(parser: argparse.ArgumentParser) -> None:
@@ -41,7 +41,7 @@ def run(args: argparse.Namespace) -> List[Dict[str, Any]]:
     if os.environ.get("EXPMGR_MODE", "mock").lower() == "real":
         client = get_supabase_client()
     else:
-        client = LocalDBClient()
+        client = LocalJobDB()
     return config_upload.upload_configs(
         base_config_path=args.base_config_path,
         config_name=args.config_name,

@@ -7,9 +7,16 @@ from supabase import create_client, Client
 from typing import Optional, Dict, Any
 from datetime import datetime, timezone
 
+from .base_job_db import BaseJobDB
 
-class SupabaseClient:
-    """Wrapper around :mod:`supabase` providing convenience helpers."""
+
+class SupabaseJobDB(BaseJobDB):
+    """Supabase-backed job database implementation.
+    
+    This class provides a production-ready job database implementation using
+    Supabase as the backend for job storage, configuration management, and
+    artifact storage.
+    """
 
     def __init__(
         self, supabase_url: str, supabase_key: str, base_path: str = "."
@@ -482,3 +489,6 @@ class SupabaseClient:
         except Exception as e:
             print(f"Error adding job entry: {e}")
             return None
+
+
+__all__ = ["SupabaseJobDB"]

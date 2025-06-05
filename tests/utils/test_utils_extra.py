@@ -6,7 +6,7 @@ import pytest
 from dr_exp.utils import config_upload
 from dr_exp.api.main import MetricsLoader
 from dr_exp.utils import jobdb_factory as client_provider
-from dr_exp.job_db.local_job_db import LocalDBClient
+from dr_exp.job_db.local_job_db import LocalJobDB
 
 
 def test_parse_sweep_and_generate_combos():
@@ -53,7 +53,7 @@ def test_config_hash_deterministic():
 def test_get_supabase_client_modes(monkeypatch, tmp_path):
     monkeypatch.delenv("EXPMGR_MODE", raising=False)
     client = client_provider.get_supabase_client(base_path=str(tmp_path))
-    assert isinstance(client, LocalDBClient)
+    assert isinstance(client, LocalJobDB)
 
     class Dummy:
         def __init__(self, url, key, base_path="."):
@@ -64,7 +64,7 @@ def test_get_supabase_client_modes(monkeypatch, tmp_path):
     monkeypatch.setenv("EXPMGR_MODE", "real")
     monkeypatch.setenv("SUPABASE_URL", "http://x")
     monkeypatch.setenv("SUPABASE_SERVICE_ROLE_KEY", "k")
-    monkeypatch.setattr("dr_exp.utils.jobdb_factory.SupabaseClient", Dummy)
+    monkeypatch.setattr("dr_exp.utils.jobdb_factory.SupabaseJobDB", Dummy)
     client = client_provider.get_supabase_client()
     assert isinstance(client, Dummy)
     assert client.url == "http://x"
@@ -78,7 +78,7 @@ def test_get_supabase_client_modes(monkeypatch, tmp_path):
 
 
 def test_metrics_loader(tmp_path):
-    client = LocalDBClient(
+    client = LocalJobDB(
         base_path=str(tmp_path), storage_path=str(tmp_path / "storage")
     )
     loader = MetricsLoader(client, maxsize=2)

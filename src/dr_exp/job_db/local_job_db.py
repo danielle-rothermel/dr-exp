@@ -8,17 +8,29 @@ from typing import Optional, List, Dict, Any
 
 import portalocker
 
+from .base_job_db import BaseJobDB
 
-class LocalDBClient:
-    """Filesystem-backed client used for local runs."""
+
+class LocalJobDB(BaseJobDB):
+    """Local filesystem-backed job database implementation.
+    
+    This class provides a development and testing job database implementation
+    using local JSON files for job storage and the local filesystem for
+    artifact storage. Ideal for local development, testing, and offline work.
+    """
 
     def __init__(self, base_path: str = ".", storage_path: str = "./storage") -> None:
-        """Create the directories used for the mock database.
+        """Initialize the local job database.
 
+        Creates the necessary directories for job storage, metrics, and artifacts.
+        
         Parameters
         ----------
         base_path : str, optional
-            Directory under which data is stored.
+            Base directory under which job data is stored, by default ".".
+            The jobs_dir will be created as base_path/job_data.
+        storage_path : str, optional
+            Directory for artifact and run output storage, by default "./storage".
         """
         # Location for finalized outputs
         self.storage_dir = storage_path
@@ -36,7 +48,15 @@ class LocalDBClient:
                 pass  # Create empty file
 
     def _atomic_write(self, target_file_path: str, data: str) -> None:
-        """Write ``data`` to ``target_file_path`` atomically."""
+        """Write data to a file atomically using a temporary file.
+        
+        Parameters
+        ----------
+        target_file_path : str
+            Path where the final file should be written.
+        data : str
+            Content to write to the file.
+        """
         target_dir = os.path.dirname(target_file_path)
         fd, temp_file_path = tempfile.mkstemp(
             dir=target_dir, prefix=os.path.basename(target_file_path) + "~"
@@ -52,7 +72,13 @@ class LocalDBClient:
                 os.remove(temp_file_path)
 
     def list_jobs(self) -> List[Dict[str, Any]]:
-        """Return a list of all job records in the mock database."""
+        """Return a list of all job records in the database.
+        
+        Returns
+        -------
+        list[dict[str, Any]]
+            List of all job records stored as JSON files.
+        """
         jobs: List[Dict[str, Any]] = []
         for job_file in os.listdir(self.jobs_dir):
             if not job_file.endswith(".json"):
@@ -68,10 +94,21 @@ class LocalDBClient:
     # --- Interface methods based on docs/supabase_mock.md ---
 
     def claim_job(self, worker_id: Optional[str] = None) -> Optional[Dict[str, Any]]:
-        """
-        Atomically claims a job from Supabase (simulated).
-        Looks for a job with status='queued', updates it to 'running'.
-        Uses file-level locking if possible for atomicity.
+        """Atomically claim the next available queued job.
+        
+        Looks for a job with status='queued' and updates it to 'running'.
+        Uses file-level locking for atomicity across processes.
+        
+        Parameters
+        ----------
+        worker_id : str, optional
+            Identifier of the worker claiming the job. If not provided,
+            a random worker ID will be generated.
+            
+        Returns
+        -------
+        dict[str, Any] | None
+            The claimed job record or None if no job is available.
         """
         for job_file_name in os.listdir(self.jobs_dir):
             if not job_file_name.endswith(".json"):
@@ -103,8 +140,21 @@ class LocalDBClient:
                 continue
         return None
 
-    def update_job(self, job_id: str, data: Dict[str, Any]):
-        """Update a job record with ``data``."""
+    def update_job(self, job_id: str, data: Dict[str, Any]) -> Dict[str, Any]:
+        """Update a job record with new data.
+        
+        Parameters
+        ----------
+        job_id : str
+            Identifier of the job to update.
+        data : dict[str, Any]
+            Fields to update on the job record.
+            
+        Returns
+        -------
+        dict[str, Any]
+            A dictionary describing the outcome of the update operation.
+        """
         job_file_path = os.path.join(self.jobs_dir, f"{job_id}.json")
         if not os.path.exists(job_file_path):
             # print(f"Job file not found for update: {job_file_path}") # Debug
@@ -129,8 +179,17 @@ class LocalDBClient:
             print(f"Error updating job {job_id}: {e}")
             return {"success": False, "message": str(e)}
 
-    def log_metrics(self, job_id: str, metrics_list: List[Dict[str, Any]]):
-        """Append metrics to the job's metrics file."""
+    def log_metrics(self, job_id: str, metrics_list: List[Dict[str, Any]]) -> None:
+        """Log metrics for a job by appending to its metrics file.
+        
+        Parameters
+        ----------
+        job_id : str
+            Job identifier.
+        metrics_list : list[dict[str, Any]]
+            List of metrics dictionaries to log. Each metric will be
+            written as a JSON line in the job's metrics file.
+        """
         metric_file_path = os.path.join(self.metrics_dir, f"{job_id}.jsonl")
         try:
             with portalocker.Lock(
@@ -154,8 +213,25 @@ class LocalDBClient:
         error_type: str,
         message: str,
         stacktrace: Optional[str] = None,
-    ):
-        """Record a failure event in ``errors.jsonl``."""
+    ) -> Dict[str, Any]:
+        """Record a failure event and mark the job as failed.
+        
+        Parameters
+        ----------
+        job_id : str
+            Identifier of the job that failed.
+        error_type : str
+            Short error class or type description.
+        message : str
+            Human-readable error message.
+        stacktrace : str, optional
+            Stack trace to store for debugging.
+            
+        Returns
+        -------
+        dict[str, Any]
+            Result of the failure recording operation.
+        """
         error_entry = {
             "job_id": job_id,
             "error_type": error_type,
@@ -170,11 +246,28 @@ class LocalDBClient:
                 f.write(json.dumps(error_entry) + "\n")
                 f.flush()
                 os.fsync(f.fileno())
+            return {"success": True}
         except Exception as e:
             print(f"Error recording failure for job {job_id}: {e}")
+            return {"success": False, "message": str(e)}
 
-    def finalize_job(self, job_id: str, final_status: str, metadata: Dict[str, Any]):
-        """Finalize a job and update its status."""
+    def finalize_job(self, job_id: str, final_status: str, metadata: Dict[str, Any]) -> Dict[str, Any]:
+        """Finalize a job with the given status and metadata.
+        
+        Parameters
+        ----------
+        job_id : str
+            Identifier of the job.
+        final_status : str
+            Final status string to record.
+        metadata : dict[str, Any]
+            Additional fields to store on the job record.
+            
+        Returns
+        -------
+        dict[str, Any]
+            Result of the finalization operation.
+        """
         update_data = {
             "status": final_status,
             "end_time": datetime.now(UTC).isoformat() + "Z",
@@ -186,7 +279,13 @@ class LocalDBClient:
         return result
 
     def _write_finished_flag(self, job_id: str) -> None:
-        """Create an empty ``finished.flag`` file for ``job_id``."""
+        """Create an empty finished.flag file for a completed job.
+        
+        Parameters
+        ----------
+        job_id : str
+            Job identifier for which to create the finished flag.
+        """
         run_dir = os.path.join(self.storage_dir, f"run_{job_id}")
         os.makedirs(run_dir, exist_ok=True)
         flag_path = os.path.join(run_dir, "finished.flag")
@@ -196,12 +295,27 @@ class LocalDBClient:
         except Exception as e:
             print(f"Error writing finished flag for job {job_id}: {e}")
 
-    def upload_artifact(self, job_id: str, local_path: str, remote_path_suffix: str):
-        """
-        Simulates uploading an artifact by copying it to the mock storage.
-        remote_path_suffix is the path relative to the run's artifact directory.
-        E.g., if remote_path_suffix = "plots/loss.png", it goes to mock_storage/run_<job_id>/artifacts/plots/loss.png
-        If remote_path_suffix = "metrics.jsonl", it goes to mock_storage/run_<job_id>/metrics.jsonl
+    def upload_artifact(self, job_id: str, local_path: str, remote_path_suffix: str) -> Dict[str, Any]:
+        """Upload an artifact file or directory to local storage.
+        
+        Simulates cloud storage by copying artifacts to the local storage directory.
+        Files are organized under run-specific directories.
+        
+        Parameters
+        ----------
+        job_id : str
+            Job identifier.
+        local_path : str
+            Path to the local file or directory to upload.
+        remote_path_suffix : str
+            Relative path where the artifact should be stored.
+            If it contains '/' or no '.', it goes under artifacts/ subdirectory.
+            Simple files like 'metrics.jsonl' go in the run root.
+            
+        Returns
+        -------
+        dict[str, Any]
+            Result of the upload operation including the storage path.
         """
         if not os.path.exists(local_path):
             print(f"Local artifact not found: {local_path}")
@@ -236,7 +350,18 @@ class LocalDBClient:
 
     # --- Helper/Additional methods that would be needed ---
     def get_job_details(self, job_id: str) -> Optional[Dict[str, Any]]:
-        """Return the stored record for ``job_id`` if it exists."""
+        """Retrieve full details for a specific job.
+        
+        Parameters
+        ----------
+        job_id : str
+            Identifier of the job to fetch.
+            
+        Returns
+        -------
+        dict[str, Any] | None
+            The job record if found, otherwise None.
+        """
         job_file_path = os.path.join(self.jobs_dir, f"{job_id}.json")
         if os.path.exists(job_file_path):
             with open(job_file_path, "r") as f:
@@ -244,7 +369,18 @@ class LocalDBClient:
         return None
 
     def get_config_for_job(self, job_id: str) -> Optional[Dict[str, Any]]:
-        """Return the ``config_json`` stored with ``job_id`` if present."""
+        """Return the configuration associated with a job.
+        
+        Parameters
+        ----------
+        job_id : str
+            Job identifier whose config should be fetched.
+            
+        Returns
+        -------
+        dict[str, Any] | None
+            The configuration dictionary or None if unavailable.
+        """
         job_data = self.get_job_details(job_id)
         if job_data and "config_json" in job_data:
             return job_data["config_json"]
@@ -254,7 +390,22 @@ class LocalDBClient:
     def add_job(
         self, job_config: Dict[str, Any], sweep_config_id: str, status: str = "queued"
     ) -> Dict[str, Any]:
-        """Add a new job entry to the mock database."""
+        """Add a new job entry to the database.
+        
+        Parameters
+        ----------
+        job_config : dict[str, Any]
+            The job configuration.
+        sweep_config_id : str
+            Identifier for the sweep configuration.
+        status : str, optional
+            Initial job status, by default "queued".
+            
+        Returns
+        -------
+        dict[str, Any]
+            The created job record with generated job ID.
+        """
         job_id = str(uuid.uuid4())
         job_data = {
             "id": job_id,
@@ -276,4 +427,4 @@ class LocalDBClient:
         return job_data
 
 
-__all__ = ["LocalDBClient"]
+__all__ = ["LocalJobDB"]

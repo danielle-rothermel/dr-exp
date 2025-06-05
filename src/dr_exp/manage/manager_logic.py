@@ -11,8 +11,7 @@ from dotenv import load_dotenv
 from typing import Dict, List
 
 from dr_exp.utils.jobdb_factory import get_supabase_client
-from dr_exp.job_db.supabase_job_db import SupabaseClient
-from dr_exp.job_db.local_job_db import LocalDBClient
+from dr_exp.job_db.base_job_db import BaseJobDB
 
 # Import the worker implementation from this package
 from . import worker_logic as _run_worker
@@ -54,7 +53,7 @@ class Manager:
         heartbeat_interval: int,
         idle_timeout_mins: int,
         base_dir: str,
-        client: SupabaseClient | LocalDBClient | None = None,
+        client: BaseJobDB | None = None,
         start_method: str | None = "fork",
     ) -> None:
         """Create a new :class:`Manager`."""

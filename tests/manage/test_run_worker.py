@@ -2,7 +2,7 @@ import os
 
 import zipfile
 
-from dr_exp.job_db.local_job_db import LocalDBClient
+from dr_exp.job_db.local_job_db import LocalJobDB
 import dr_exp.manage.worker_logic as run_worker
 
 
@@ -11,7 +11,7 @@ def make_config():
 
 
 def test_worker_success(tmp_path):
-    client = LocalDBClient(
+    client = LocalJobDB(
         base_path=str(tmp_path), storage_path=str(tmp_path / "storage")
     )
     job = client.add_job(make_config(), "sweep1", status="queued")
@@ -45,7 +45,7 @@ def test_worker_success(tmp_path):
 
 
 def test_worker_no_job(tmp_path):
-    client = LocalDBClient(
+    client = LocalJobDB(
         base_path=str(tmp_path), storage_path=str(tmp_path / "storage")
     )
     work_dir = tmp_path / "work"
@@ -62,7 +62,7 @@ def test_worker_no_job(tmp_path):
 
 
 def test_worker_training_failure(tmp_path):
-    client = LocalDBClient(
+    client = LocalJobDB(
         base_path=str(tmp_path), storage_path=str(tmp_path / "storage")
     )
     job = client.add_job(make_config(), "sweep1", status="queued")
