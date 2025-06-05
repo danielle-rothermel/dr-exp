@@ -125,7 +125,7 @@ def test_cleanup_run_data_subcommand(tmp_path, monkeypatch, capsys):
     client = LocalDBClient(
         base_path=str(tmp_path), storage_path=str(tmp_path / "storage")
     )
-    run_dir = Path(client.storage_dir) / "run_x"
+    run_dir = Path(client.jobs_dir) / "run_x"
     run_dir.mkdir(parents=True)
     (run_dir / "finished.flag").touch()
 
