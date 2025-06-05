@@ -17,13 +17,20 @@ class BaseJobDB(ABC):
     storage_dir: str
     
     @abstractmethod
-    def claim_job(self, worker_id: Optional[str] = None) -> Optional[Dict[str, Any]]:
+    def claim_job(
+        self, 
+        worker_id: Optional[str] = None,
+        respect_reservations: bool = True
+    ) -> Optional[Dict[str, Any]]:
         """Claim the next available queued job.
         
         Parameters
         ----------
         worker_id : str, optional
             Identifier of the worker claiming the job.
+        respect_reservations : bool, optional
+            Whether to respect job reservations, by default True.
+            If True, reserved jobs can only be claimed by their designated worker.
             
         Returns
         -------
@@ -292,6 +299,43 @@ class BaseJobDB(ABC):
         list[dict[str, Any]]
             List of job records ordered by priority (highest first),
             then by submission time (oldest first) for equal priorities.
+        """
+        pass
+    
+    # Job reservation methods
+    
+    @abstractmethod
+    def add_reserved_job(
+        self,
+        job_config: Dict[str, Any],
+        sweep_config_id: str,
+        reserved_for_worker: str,
+        reservation_timeout: Optional[int] = 300,
+        priority: int = 100,
+        status: str = "queued",
+    ) -> Dict[str, Any]:
+        """Add a new job entry reserved for a specific worker.
+        
+        Parameters
+        ----------
+        job_config : dict[str, Any]
+            The job configuration.
+        sweep_config_id : str
+            Identifier for the sweep configuration.
+        reserved_for_worker : str
+            Worker ID that can claim this job.
+        reservation_timeout : int, optional
+            Reservation timeout in seconds, by default 300 (5 minutes).
+            If None, reservation never expires.
+        priority : int, optional
+            Job priority for queue ordering (0-1000), by default 100.
+        status : str, optional
+            Initial job status, by default "queued".
+            
+        Returns
+        -------
+        dict[str, Any]
+            The created job record with reservation information.
         """
         pass
 
