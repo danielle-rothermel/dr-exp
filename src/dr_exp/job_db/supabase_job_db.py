@@ -4,7 +4,7 @@ import os
 import shutil
 import tempfile
 from supabase import create_client, Client
-from typing import Optional, Dict, Any
+from typing import Optional, Dict, Any, List
 from datetime import datetime, timezone
 
 from .base_job_db import BaseJobDB
@@ -452,6 +452,7 @@ class SupabaseJobDB(BaseJobDB):
         config_id: str,
         status: str = "queued",
         retry_index: int = 0,
+        priority: int = 100,
         interface_version: Optional[str] = None,
         code_version: Optional[str] = None,
     ) -> Optional[Dict[str, Any]]:
@@ -465,6 +466,9 @@ class SupabaseJobDB(BaseJobDB):
             Initial status value, by default ``"queued"``.
         retry_index : int, optional
             Retry count, by default ``0``.
+        priority : int, optional
+            Job priority for queue ordering (0-1000), by default 100.
+            Higher values indicate higher priority.
         interface_version : str, optional
             Version of the training interface.
         code_version : str, optional
@@ -476,10 +480,14 @@ class SupabaseJobDB(BaseJobDB):
             Newly created job row or ``None`` on failure.
         """
         try:
+            # Clamp priority to valid range
+            priority = max(0, min(1000, priority))
+            
             data = {
                 "config_id": config_id,
                 "status": status,
                 "retry_index": retry_index,
+                "priority": priority,
                 "interface_version": interface_version,
                 "code_version": code_version,
                 # created_at is handled by DB default
@@ -489,6 +497,157 @@ class SupabaseJobDB(BaseJobDB):
         except Exception as e:
             print(f"Error adding job entry: {e}")
             return None
+
+    # Priority management methods
+
+    def update_job_priority(
+        self,
+        job_id: str,
+        new_priority: int,
+        reason: Optional[str] = None,
+    ) -> Dict[str, Any]:
+        """Update the priority of a job.
+        
+        Parameters
+        ----------
+        job_id : str
+            Identifier of the job to update.
+        new_priority : int
+            New priority value (0-1000). Higher values indicate higher priority.
+        reason : str, optional
+            Optional reason for the priority change, for audit purposes.
+            
+        Returns
+        -------
+        dict[str, Any]
+            Result of the priority update operation.
+        """
+        # Clamp priority to valid range
+        new_priority = max(0, min(1000, new_priority))
+        
+        try:
+            # Update job priority
+            update_data = {"priority": new_priority}
+            response = (
+                self.supabase.table("jobs")
+                .update(update_data)
+                .eq("id", job_id)
+                .execute()
+            )
+            
+            if response.data:
+                return {
+                    "success": True,
+                    "new_priority": new_priority,
+                    "message": f"Priority updated to {new_priority}"
+                }
+            else:
+                return {"success": False, "message": "Job not found or update failed"}
+                
+        except Exception as e:
+            print(f"Error updating job priority for {job_id}: {e}")
+            return {"success": False, "message": str(e)}
+
+    def boost_job_priority(
+        self,
+        job_id: str,
+        boost_amount: int = 100,
+    ) -> Dict[str, Any]:
+        """Boost the priority of a job by a specified amount.
+        
+        Parameters
+        ----------
+        job_id : str
+            Identifier of the job to boost.
+        boost_amount : int, optional
+            Amount to add to the current priority, by default 100.
+            Final priority will be clamped to valid range (0-1000).
+            
+        Returns
+        -------
+        dict[str, Any]
+            Result of the priority boost operation including new priority.
+        """
+        try:
+            # Get current priority
+            response = (
+                self.supabase.table("jobs")
+                .select("priority")
+                .eq("id", job_id)
+                .single()
+                .execute()
+            )
+            
+            if not response.data:
+                return {"success": False, "message": "Job not found"}
+                
+            old_priority = response.data.get("priority", 100)
+            new_priority = max(0, min(1000, old_priority + boost_amount))
+            
+            # Update priority
+            update_response = (
+                self.supabase.table("jobs")
+                .update({"priority": new_priority})
+                .eq("id", job_id)
+                .execute()
+            )
+            
+            if update_response.data:
+                return {
+                    "success": True,
+                    "old_priority": old_priority,
+                    "new_priority": new_priority,
+                    "boost_amount": boost_amount,
+                    "message": f"Priority boosted from {old_priority} to {new_priority}"
+                }
+            else:
+                return {"success": False, "message": "Priority boost failed"}
+                
+        except Exception as e:
+            print(f"Error boosting job priority for {job_id}: {e}")
+            return {"success": False, "message": str(e)}
+
+    def list_jobs_by_priority(
+        self,
+        status_filter: Optional[List[str]] = None,
+        limit: Optional[int] = None,
+    ) -> List[Dict[str, Any]]:
+        """List jobs ordered by priority (highest first).
+        
+        Parameters
+        ----------
+        status_filter : list[str], optional
+            Filter jobs by status (e.g., ["queued", "running"]).
+            If None, all jobs are returned.
+        limit : int, optional
+            Maximum number of jobs to return. If None, all matching jobs.
+            
+        Returns
+        -------
+        list[dict[str, Any]]
+            List of job records ordered by priority (highest first),
+            then by submission time (oldest first) for equal priorities.
+        """
+        try:
+            query = self.supabase.table("jobs").select("*")
+            
+            # Apply status filter
+            if status_filter:
+                query = query.in_("status", status_filter)
+            
+            # Order by priority (descending), then by created_at (ascending)
+            query = query.order("priority", desc=True).order("created_at", desc=False)
+            
+            # Apply limit
+            if limit is not None:
+                query = query.limit(limit)
+                
+            response = query.execute()
+            return response.data if response.data else []
+            
+        except Exception as e:
+            print(f"Error listing jobs by priority: {e}")
+            return []
 
 
 __all__ = ["SupabaseJobDB"]
