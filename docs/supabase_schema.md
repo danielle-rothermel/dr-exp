@@ -58,6 +58,11 @@ Tracks training jobs with config references, current status, progress metrics, l
 | final\_train\_loss       | float     | Final reported train loss                                      |
 | upload\_complete\_at     | timestamp | When logger finalized upload                                   |
 | finalize\_success        | bool      | Whether logger reported success                                |
+| kill_requested | bool | Set when an admin issues a kill request |
+| status_reason | text | Populated by the manager on failure (e.g. `worker_lost`) |
+| train_status | text | Result reported by the trainer (`success` or `failed`) |
+| metrics_storage_path | text | Path to the uploaded metrics file |
+| bundle_storage_path | text | Path to the archived artifacts bundle |
 | resumable\_from\_run\_id | UUID      | If resumed from a prior run                                    |
 | checkpoint\_url          | text      | Path to resume checkpoint in blob storage; default = `""`      |
 | interface\_version       | text      | Interface compatibility version tag                            |

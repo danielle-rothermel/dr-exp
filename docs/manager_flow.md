@@ -19,7 +19,7 @@ The Launcher initializes the execution environment (e.g., CUDA MPS) and delegate
 
 ## Manager <> Worker Interaction
 
-`scripts/run_manager.py` is launched once per SLURM job. It discovers the GPUs available to that job and spawns one or more worker processes on each GPU. Each worker process runs the `run_worker.py` wrapper (which calls `dr_exp.worker.run_worker`) in its own subprocess. Workers claim jobs from Supabase (or the mock client), execute training and periodically update a heartbeat. The manager monitors these heartbeats to detect stalled or crashed workers and restarts them when needed.
+`scripts/run_manager.py` is launched once per SLURM job. It discovers the GPUs available to that job and spawns one or more worker processes on each GPU. Each worker process runs the `run_worker.py` wrapper (which calls `dr_exp.manage.worker_logic.run_worker`) in its own subprocess. Workers claim jobs from Supabase (or the mock client), execute training and periodically update a heartbeat. The manager monitors these heartbeats to detect stalled or crashed workers and restarts them when needed.
 
 ### Launch Sequence
 
@@ -27,7 +27,7 @@ The Launcher initializes the execution environment (e.g., CUDA MPS) and delegate
 2. **GPU discovery**: The manager uses `discover_gpus()` to build a list of GPU IDs. If `CUDA_VISIBLE_DEVICES` is set, only those IDs are used.
 3. **Worker spawning**: For each GPU and configured worker count, the manager calls `launch_worker()` which in turn starts a new `multiprocessing.Process` with `_worker_target`.
 4. **Environment setup for worker**: `_worker_target` sets `CUDA_VISIBLE_DEVICES` to the assigned GPU ID and exports `DR_EXP_BASE_PATH` (used by the mock Supabase client). It then ensures the worker's directory exists and calls `run_worker_main()`.
-5. **Worker entrypoint**: `run_worker_main()` (defined in `dr_exp.manager`) simply loads `dr_exp.worker.run_worker()` and passes the base path and working directory. The script `scripts/run_worker.py` merely exposes a CLI for this function.
+5. **Worker entrypoint**: `run_worker_main()` (defined in `dr_exp.manage.manager_logic`) simply loads `dr_exp.manage.worker_logic.run_worker()` and passes the base path and working directory. The script `scripts/run_worker.py` merely exposes a CLI for this function.
 
 ### Worker Responsibilities
 
@@ -66,7 +66,7 @@ The manager and FastAPI backend do not talk to each other directly; instead they
 1. The manager and its workers communicate only with Supabase. They never call the FastAPI server directly.
 2. When the manager spawns a worker, the worker claims a job from the Supabase `jobs` table and updates `status` and `heartbeat` fields as training progresses.
 3. The FastAPI backend reads these job records to answer `GET /job/{job_id}` and `GET /metrics/{run_id}` requests. Metrics are loaded from the same paths the worker uploaded to Supabase Storage.
-4. When an administrator issues `POST /job/kill` or `POST /job/requeue`, the FastAPI backend updates the corresponding fields in Supabase. Workers or the manager observe these changes (e.g. the `kill_requested` flag) and act accordingly.
-5. Secrets such as Supabase credentials for the manager and the FastAPI admin API key are provided via environment variables as described in the requirements document【F:docs/product_requirement_doc.md†L196-L201】.
+4. When an administrator issues `POST /job/kill` or `POST /job/requeue`, the FastAPI backend sets fields such as `kill_requested` in Supabase. The current implementation does not terminate running jobs, but the flags are recorded for future handling.
+5. Secrets such as Supabase credentials for the manager and the FastAPI admin API key are provided via environment variables as described in the environment documentation.
 
 ## 

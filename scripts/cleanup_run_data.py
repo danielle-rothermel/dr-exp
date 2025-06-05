@@ -1,7 +1,7 @@
 import argparse
 from typing import Optional
 
-from dr_exp.core.client_provider import get_supabase_client
+from dr_exp.utils.jobdb_factory import get_supabase_client
 from dr_exp.utils.storage_cleanup import cleanup_uploaded_runs
 
 

@@ -1,7 +1,7 @@
 import argparse
 from typing import Optional
 
-from dr_exp.worker import default_train, run_worker
+from dr_exp.manage.worker_logic import default_train, run_worker
 
 
 def build_arg_parser() -> argparse.ArgumentParser:
