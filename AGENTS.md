@@ -1,7 +1,7 @@
 # AGENTS.md: Quick Guide for Agentic Development (dr_exp)
 
 ## 1. Purpose
-This guide directs agentic coders in developing the Experiment Manager (`dr_exp`). For full details, always refer to `docs/product_requirement_doc.md` and component-specific spec files in `docs/`.
+This guide directs agentic coders in developing the Experiment Manager (`dr_exp`).
 
 ## 2. Core Principles for Agent Collaboration
 * **Clarity is Key:** Use precise instructions. Reference spec documents.
@@ -37,9 +37,3 @@ npm install
 npm run dev
 ```
 The Vite dev server should start without missing-module errors.
-
-## 4. Simplified Agent Workflow (for Phase 1 Tasks)
-2.  **Understand Specs:** Thoroughly read the primary spec document for the component (e.g., `docs/supabase_mock.md`) and relevant sections of `docs/product_requirement_doc.md`.
-3.  **Code & Test:** Implement the component in Python. Write `pytest` unit tests covering its specified behavior.
-4.  **Review & Iterate:** Submit code and tests for human review. Revise based on feedback.
-5.  **Integrate (Locally):** Human developer ensures the component can be (or will be) integrated with other Phase 1 mock components.
