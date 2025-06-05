@@ -115,7 +115,7 @@ class Manager:
     def _list_running_jobs(self) -> List[Dict[str, object]]:
         """Return job records currently marked as running."""
         jobs: List[Dict[str, object]] = []
-        if hasattr(self.client, "jobs_dir"):
+        if hasattr(self.client, "jobs_dir") and not hasattr(self.client, "supabase"):
             for name in os.listdir(self.client.jobs_dir):
                 if not name.endswith(".json"):
                     continue

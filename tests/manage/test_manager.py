@@ -117,6 +117,7 @@ class DummyRealClient:
     def __init__(self, data, base_path="."):
         self.supabase = DummySupabase(data)
         self.base_path = base_path
+        self.jobs_dir = f"{base_path}/job_data"
 
 
 def test_list_running_jobs_real_client(tmp_path):
