@@ -61,6 +61,15 @@ def test_base_job_db_optional_methods_raise_not_implemented():
             
         def upload_artifact(self, job_id, local_path, remote_path_suffix):
             return {"success": True}
+            
+        def update_job_priority(self, job_id, new_priority, reason=None):
+            return {"success": True}
+            
+        def boost_job_priority(self, job_id, boost_amount=100):
+            return {"success": True}
+            
+        def list_jobs_by_priority(self, status_filter=None, limit=None):
+            return []
     
     db = MinimalJobDB()
     
