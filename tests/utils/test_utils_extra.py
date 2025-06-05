@@ -50,9 +50,9 @@ def test_config_hash_deterministic():
     assert h1 == h2
 
 
-def test_get_supabase_client_modes(monkeypatch):
+def test_get_supabase_client_modes(monkeypatch, tmp_path):
     monkeypatch.delenv("EXPMGR_MODE", raising=False)
-    client = client_provider.get_supabase_client(base_path=".")
+    client = client_provider.get_supabase_client(base_path=str(tmp_path))
     assert isinstance(client, LocalDBClient)
 
     class Dummy:

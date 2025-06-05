@@ -21,6 +21,9 @@ def test_discover_gpus_env(monkeypatch):
 
 def test_worker_spawning(tmp_path, monkeypatch):
     monkeypatch.setattr(manager, "run_worker_main", dummy_worker)
+    client = LocalDBClient(
+        base_path=str(tmp_path), storage_path=str(tmp_path / "storage")
+    )
     gpus = ["0", "1"]
     mgr = manager.Manager(
         gpus=gpus,
@@ -28,6 +31,7 @@ def test_worker_spawning(tmp_path, monkeypatch):
         heartbeat_interval=1,
         idle_timeout_mins=1,
         base_dir=str(tmp_path),
+        client=client,
     )
     mgr.start_workers()
     for info in mgr.workers.values():
@@ -71,12 +75,16 @@ def test_heartbeat_detection(tmp_path, monkeypatch):
 
 
 def test_idle_timeout(tmp_path):
+    client = LocalDBClient(
+        base_path=str(tmp_path), storage_path=str(tmp_path / "storage")
+    )
     mgr = manager.Manager(
         gpus=[],
         workers_per_gpu=0,
         heartbeat_interval=1,
         idle_timeout_mins=0,
         base_dir=str(tmp_path),
+        client=client,
     )
     mgr.last_activity = datetime.now(UTC) - timedelta(minutes=1)
     mgr.check_idle_timeout()
@@ -138,7 +146,7 @@ def test_list_running_jobs_real_client(tmp_path):
     assert running == [jobs[0]]
 
 
-def test_restart_worker(monkeypatch):
+def test_restart_worker(monkeypatch, tmp_path):
     class DummyProc:
         def __init__(self):
             self.terminated = False
@@ -158,12 +166,16 @@ def test_restart_worker(monkeypatch):
     def fake_launch(self, worker_id, gpu_id):
         launched["worker"] = worker_id
 
+    client = LocalDBClient(
+        base_path=str(tmp_path), storage_path=str(tmp_path / "storage")
+    )
     mgr = manager.Manager(
         gpus=["0"],
         workers_per_gpu=1,
         heartbeat_interval=1,
         idle_timeout_mins=1,
-        base_dir="/tmp",
+        base_dir=str(tmp_path),
+        client=client,
     )
     mgr.workers["wid"] = {"process": DummyProc(), "gpu": "0"}
     monkeypatch.setattr(manager.Manager, "launch_worker", fake_launch)
