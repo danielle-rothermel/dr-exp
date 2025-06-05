@@ -3,18 +3,14 @@ import os
 import gzip
 import uuid
 from datetime import datetime, UTC
-from typing import Any, Dict, List, Optional
+from typing import Any, Dict, List, Optional, Union
 
 import fcntl
 
 from .base_logger import BaseLogger
+from .logger_paths import LoggerPathConfig, LoggerPathManager
 
 
-def _get_attr(obj: Any, key: str, default: Optional[Any] = None) -> Any:
-    """Return ``getattr(obj, key)`` or ``obj[key]`` with a default."""
-    if isinstance(obj, dict):
-        return obj.get(key, default)
-    return getattr(obj, key, default)
 
 
 class StructuredLogger(BaseLogger):
@@ -25,7 +21,11 @@ class StructuredLogger(BaseLogger):
     tracking. Ideal for development, testing, and local training runs."""
 
     def __init__(
-        self, cfg: Any, compress_checkpoints: bool = False, debug: bool = False
+        self,
+        log_dir: Union[str, LoggerPathConfig],
+        run_id: Optional[str] = None,
+        compress_checkpoints: bool = False,
+        debug: bool = False
     ) -> None:
         """Initialize the structured logger.
 
@@ -33,54 +33,35 @@ class StructuredLogger(BaseLogger):
         
         Parameters
         ----------
-        cfg : Any
-            Configuration object containing a ``logging`` section with:
-            - out_path: path for metrics JSONL file
-            - artifact_dir: directory for artifact files
-            - checkpoint_dir: directory for checkpoint files
-            - log_file: optional error log file path
+        log_dir : str or LoggerPathConfig
+            Base directory for all logging outputs, or a full path configuration.
+        run_id : str, optional
+            Unique identifier for this run. If not provided, a UUID will be generated.
         compress_checkpoints : bool, optional
             Whether to gzip checkpoint files for space efficiency, by default False.
         debug : bool, optional
             If True, errors are raised immediately instead of being logged
             to an error file. Useful for development, by default False.
-            
-        Raises
-        ------
-        ValueError
-            If required logging configuration parameters are missing.
         """
-        logging_cfg = cfg["logging"] if isinstance(cfg, dict) else cfg.logging
-        self.out_path = _get_attr(logging_cfg, "out_path")
-        self.artifact_dir = _get_attr(logging_cfg, "artifact_dir")
-        self.checkpoint_dir = _get_attr(logging_cfg, "checkpoint_dir")
-        self.log_file = _get_attr(logging_cfg, "log_file", None)
-
-        if not self.out_path or not self.artifact_dir or not self.checkpoint_dir:
-            raise ValueError(
-                "cfg.logging must define out_path, artifact_dir, and checkpoint_dir"
-            )
-
+        self._paths = LoggerPathManager(log_dir)
         self.compress_checkpoints = compress_checkpoints
         self.debug = debug
-        self.run_id = _get_attr(cfg, "run_id", uuid.uuid4().hex)
+        self.run_id = run_id or uuid.uuid4().hex
 
-        os.makedirs(os.path.dirname(self.out_path), exist_ok=True)
-        os.makedirs(self.artifact_dir, exist_ok=True)
-        os.makedirs(self.checkpoint_dir, exist_ok=True)
-
-        self.error_log_path = os.path.join(
-            os.path.dirname(self.out_path), "logger_error.log"
-        )
-        self.metrics_file = open(self.out_path, "a", encoding="utf-8")
+        self.metrics_file = open(self._paths.metrics_path, "a", encoding="utf-8")
         self.metrics_count = 0
         self.checkpoint_count = 0
         self.artifact_paths: List[str] = []
         self._finalized = False
 
+    @property
+    def paths(self) -> LoggerPathManager:
+        """Get the path manager for this logger."""
+        return self._paths
+
     def _write_error(self, msg: str) -> None:
         """Append an error message to the logger error file."""
-        with open(self.error_log_path, "a", encoding="utf-8") as ef:
+        with open(self._paths.error_log_path, "a", encoding="utf-8") as ef:
             ef.write(f"{datetime.now(UTC).isoformat()}Z {msg}\n")
 
     def log(self, metrics: Dict[str, Any]) -> None:
@@ -132,10 +113,7 @@ class StructuredLogger(BaseLogger):
         str
             Path to the saved checkpoint file.
         """
-        filename = f"checkpoint_{tag}.pt"
-        if self.compress_checkpoints:
-            filename += ".gz"
-        path = os.path.join(self.checkpoint_dir, filename)
+        path = self._paths.checkpoint_path(tag, compressed=self.compress_checkpoints)
         try:
             if self.compress_checkpoints:
                 with gzip.open(path, "wb") as f:
@@ -171,7 +149,7 @@ class StructuredLogger(BaseLogger):
     def _summary(self, success: bool) -> Dict[str, Any]:
         """Return a final summary dictionary."""
         return {
-            "metrics_path": self.out_path,
+            "metrics_path": self._paths.metrics_path,
             "num_metrics": self.metrics_count,
             "artifact_paths": self.artifact_paths,
             "num_checkpoints": self.checkpoint_count,

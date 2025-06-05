@@ -3,6 +3,8 @@
 from abc import ABC, abstractmethod
 from typing import Any, Dict
 
+from .logger_paths import LoggerPathManager
+
 
 class BaseLogger(ABC):
     """Abstract base class for structured logging implementations.
@@ -14,6 +16,18 @@ class BaseLogger(ABC):
     
     # Required attributes that subclasses must provide
     run_id: str
+    
+    @property
+    @abstractmethod
+    def paths(self) -> LoggerPathManager:
+        """Get the path manager for this logger.
+        
+        Returns
+        -------
+        LoggerPathManager
+            The path manager instance handling all file paths.
+        """
+        pass
     
     @abstractmethod
     def log(self, metrics: Dict[str, Any]) -> None:
