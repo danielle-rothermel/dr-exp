@@ -15,44 +15,44 @@ This document outlines the implementation plan for adding a priority-based job q
 ## Phase 1: Database Layer - Priority Foundation
 
 ### 1. Update BaseJobDB Interface
-- [ ] Add `priority` parameter to existing `add_job` method
-- [ ] Add `update_job_priority()` abstract method
-- [ ] Add `boost_job_priority()` abstract method  
-- [ ] Add `list_jobs_by_priority()` abstract method
-- [ ] Update docstrings with priority information
+- [x] Add `priority` parameter to existing `add_job` method
+- [x] Add `update_job_priority()` abstract method
+- [x] Add `boost_job_priority()` abstract method  
+- [x] Add `list_jobs_by_priority()` abstract method
+- [x] Update docstrings with priority information
 
 ### 2. Update LocalJobDB Implementation
-- [ ] Add priority field to job creation (default=100)
-- [ ] Implement priority-aware `claim_job()` with sorting
-- [ ] Implement `update_job_priority()` with audit trail
-- [ ] Implement `boost_job_priority()` with bounds checking
-- [ ] Implement `list_jobs_by_priority()` with filtering
-- [ ] Add age-based priority boost logic
-- [ ] Update existing tests to handle priority
+- [x] Add priority field to job creation (default=100)
+- [x] Implement priority-aware `claim_job()` with sorting
+- [x] Implement `update_job_priority()` with audit trail
+- [x] Implement `boost_job_priority()` with bounds checking
+- [x] Implement `list_jobs_by_priority()` with filtering
+- [x] Add age-based priority boost logic
+- [x] Update existing tests to handle priority
 
 ### 3. Update SupabaseJobDB Implementation  
-- [ ] Add priority support to `add_job_entry()`
-- [ ] Implement priority-aware job claiming
-- [ ] Implement priority update methods
-- [ ] Add priority to database queries
+- [x] Add priority support to `add_job_entry()`
+- [x] Implement priority-aware job claiming
+- [x] Implement priority update methods
+- [x] Add priority to database queries
 
 ## Phase 2: Priority Classes and Constants
 
 ### 4. Create Priority System Module
-- [ ] Create `src/dr_exp/utils/priority.py`
-- [ ] Define `PriorityClass` enum with ranges
-- [ ] Define priority constants (MIN=0, MAX=1000, DEFAULT=100)
-- [ ] Add helper functions for priority validation
-- [ ] Add priority boost calculation strategies
+- [x] Create `src/dr_exp/utils/priority.py`
+- [x] Define `PriorityClass` enum with ranges
+- [x] Define priority constants (MIN=0, MAX=1000, DEFAULT=100)
+- [x] Add helper functions for priority validation
+- [x] Add priority boost calculation strategies
 
 ## Phase 3: Reserved Job Support (Hybrid Approach)
 
 ### 5. Add Reservation Support to Databases
-- [ ] Add `reserved_for_worker` and `reservation_expires_at` to job schema
-- [ ] Update `claim_job()` to respect reservations
-- [ ] Add reservation timeout checking logic
-- [ ] Add `add_reserved_job()` method to BaseJobDB
-- [ ] Implement reservation methods in both databases
+- [x] Add `reserved_for_worker` and `reservation_expires_at` to job schema
+- [x] Update `claim_job()` to respect reservations
+- [x] Add reservation timeout checking logic
+- [x] Add `add_reserved_job()` method to BaseJobDB
+- [x] Implement reservation methods in both databases
 
 ## Phase 4: Worker and Manager Updates
 
