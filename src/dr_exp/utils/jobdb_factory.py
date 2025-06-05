@@ -1,29 +1,29 @@
 import os
-from typing import Union
 
 from dotenv import load_dotenv
 
-from dr_exp.job_db.supabase_job_db import SupabaseClient
-from dr_exp.job_db.local_job_db import LocalDBClient
+from dr_exp.job_db.base_job_db import BaseJobDB
+from dr_exp.job_db.supabase_job_db import SupabaseJobDB
+from dr_exp.job_db.local_job_db import LocalJobDB
 
 load_dotenv()
 
 
 def get_supabase_client(
     base_path: str = ".",
-) -> Union[SupabaseClient, LocalDBClient]:
-    """Instantiate either a real or mock Supabase client.
+) -> BaseJobDB:
+    """Instantiate either a Supabase or local job database client.
 
     Parameters
     ----------
     base_path : str, optional
-        Base directory used when creating :class:`LocalDBClient` and as the
+        Base directory used when creating :class:`LocalJobDB` and as the
         local storage path when running in real mode.
 
     Returns
     -------
-    SupabaseClient | LocalDBClient
-        A client instance depending on the ``EXPMGR_MODE`` environment
+    BaseJobDB
+        A job database instance depending on the ``EXPMGR_MODE`` environment
         variable.
 
     Raises
@@ -39,7 +39,7 @@ def get_supabase_client(
         )
         if not url or not key:
             raise ValueError("SUPABASE_URL and key required for real mode")
-        return SupabaseClient(url, key, base_path=base_path)
-    return LocalDBClient(
+        return SupabaseJobDB(url, key, base_path=base_path)
+    return LocalJobDB(
         base_path=base_path, storage_path=os.path.join(base_path, "storage")
     )

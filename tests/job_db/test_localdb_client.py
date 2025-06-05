@@ -3,7 +3,7 @@ import pytest
 import os
 import json
 from datetime import datetime, timezone
-from dr_exp.job_db.local_job_db import LocalDBClient
+from dr_exp.job_db.local_job_db import LocalJobDB
 
 # --- Test Fixtures ---
 
@@ -11,12 +11,12 @@ from dr_exp.job_db.local_job_db import LocalDBClient
 @pytest.fixture
 def mock_client(tmp_path):
     """
-    Provides a LocalDBClient instance initialized in a temporary directory.
+    Provides a LocalJobDB instance initialized in a temporary directory.
     This ensures each test runs with a clean mock environment.
     The tmp_path fixture is provided by pytest for creating temporary files/directories.
     """
-    # The LocalDBClient will create mock_db and mock_storage inside tmp_path
-    client = LocalDBClient(
+    # The LocalJobDB will create mock_db and mock_storage inside tmp_path
+    client = LocalJobDB(
         base_path=str(tmp_path), storage_path=str(tmp_path / "storage")
     )
     return client
@@ -39,7 +39,7 @@ def sample_sweep_config_id():
 
 def test_client_initialization(tmp_path):
     """Tests if the client initializes its directories correctly."""
-    client = LocalDBClient(
+    client = LocalJobDB(
         base_path=str(tmp_path), storage_path=str(tmp_path / "storage")
     )
     assert os.path.exists(client.storage_dir)
@@ -354,7 +354,7 @@ def test_finalize_job(mock_client, sample_job_config, sample_sweep_config_id):
 # --- Test for Reset Utility (Implicitly via fixture, but can add explicit if needed) ---
 # The mock_client fixture using tmp_path ensures a clean state for each test.
 # If you had a separate reset_mock_db function, you could test it directly.
-# For now, the LocalDBClient's own re-initialization on a clean tmp_path serves this.
+# For now, the LocalJobDB's own re-initialization on a clean tmp_path serves this.
 
 
 def test_multiple_operations_on_same_job(

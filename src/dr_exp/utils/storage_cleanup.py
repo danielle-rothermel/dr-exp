@@ -11,7 +11,7 @@ def cleanup_uploaded_runs(client: Any) -> int:
     Parameters
     ----------
     client : object
-        Instance of :class:`SupabaseClient` or :class:`SupabaseMockClient`.
+        Instance of :class:`BaseJobDB`.
 
     Returns
     -------

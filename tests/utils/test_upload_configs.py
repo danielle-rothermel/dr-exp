@@ -1,7 +1,7 @@
 import json
 from pathlib import Path
 
-from dr_exp.job_db.local_job_db import LocalDBClient
+from dr_exp.job_db.local_job_db import LocalJobDB
 from dr_exp.utils import config_upload
 from scripts import upload_configs
 
@@ -17,7 +17,7 @@ CONFIG_DIR = (
 
 def test_generate_and_upload(tmp_path):
     cfg_dir = CONFIG_DIR
-    client = LocalDBClient(base_path=str(tmp_path / "env"), storage_path=str(tmp_path / "env" / "storage"))
+    client = LocalJobDB(base_path=str(tmp_path / "env"), storage_path=str(tmp_path / "env" / "storage"))
     sweep = "model=resnet,vit optim.lr=0.01,0.02"
 
     jobs = config_upload.upload_configs(
@@ -44,13 +44,13 @@ def test_generate_and_upload(tmp_path):
 def test_cli_main(tmp_path, monkeypatch, capsys):
     cfg_dir = CONFIG_DIR
     client_path = tmp_path / "env"
-    client = LocalDBClient(base_path=str(client_path), storage_path=str(client_path / "storage"))
+    client = LocalJobDB(base_path=str(client_path), storage_path=str(client_path / "storage"))
 
     # monkeypatch client inside module
     def mock_client():
         return client
 
-    monkeypatch.setattr("scripts.upload_configs.LocalDBClient", mock_client)
+    monkeypatch.setattr("scripts.upload_configs.LocalJobDB", mock_client)
 
     upload_configs.main(
         [
