@@ -64,7 +64,11 @@ class Manager:
         self.idle_timeout = timedelta(minutes=idle_timeout_mins)
         self.base_dir = base_dir
         self.client = client or get_supabase_client()
-        self.base_path = self.client.jobs_dir
+        # Extract base_path from client's jobs_dir (remove "/job_data" suffix)
+        if self.client.jobs_dir.endswith("/job_data"):
+            self.base_path = self.client.jobs_dir[:-9]  # Remove "/job_data"
+        else:
+            self.base_path = os.path.dirname(self.client.jobs_dir)
         self.workers: Dict[str, Dict[str, object]] = {}
         self.last_activity = datetime.now(UTC)
         self.shutdown = False

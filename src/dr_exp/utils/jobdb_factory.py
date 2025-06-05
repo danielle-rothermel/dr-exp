@@ -40,4 +40,4 @@ def get_supabase_client(
         if not url or not key:
             raise ValueError("SUPABASE_URL and key required for real mode")
         return SupabaseClient(url, key, base_path=base_path)
-    return LocalDBClient(base_path=base_path)
+    return LocalDBClient(base_path=base_path, storage_path=os.path.join(base_path, "storage"))
