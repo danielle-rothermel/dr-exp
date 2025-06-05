@@ -17,15 +17,8 @@ def test_base_logger_inheritance():
     """Test that BaseLogger is properly inherited by concrete implementations."""
     assert issubclass(StructuredLogger, BaseLogger)
     
-    # Test with a simple config
-    cfg = {
-        "logging": {
-            "out_path": "/tmp/test_metrics.jsonl",
-            "artifact_dir": "/tmp/test_artifacts",
-            "checkpoint_dir": "/tmp/test_checkpoints",
-        }
-    }
-    logger = StructuredLogger(cfg)
+    # Test with a simple log directory
+    logger = StructuredLogger("/tmp/test_logs")
     assert isinstance(logger, BaseLogger)
 
 
@@ -43,8 +36,17 @@ def test_base_logger_enforces_abstract_methods():
 
 def test_minimal_logger_implementation():
     """Test a minimal implementation that satisfies all abstract methods."""
+    from dr_exp.logging.logger_paths import LoggerPathManager
+    
     class MinimalLogger(BaseLogger):
         run_id = "test_run"
+        
+        def __init__(self):
+            self._paths = LoggerPathManager("/tmp/minimal_logs")
+        
+        @property
+        def paths(self):
+            return self._paths
         
         def log(self, metrics):
             pass
@@ -73,14 +75,7 @@ def test_minimal_logger_implementation():
 
 def test_structured_logger_implements_interface():
     """Test that StructuredLogger properly implements the BaseLogger interface."""
-    cfg = {
-        "logging": {
-            "out_path": "/tmp/test_metrics.jsonl",
-            "artifact_dir": "/tmp/test_artifacts", 
-            "checkpoint_dir": "/tmp/test_checkpoints",
-        }
-    }
-    logger = StructuredLogger(cfg)
+    logger = StructuredLogger("/tmp/test_logs")
     
     # Should be instance of BaseLogger
     assert isinstance(logger, BaseLogger)
@@ -88,23 +83,20 @@ def test_structured_logger_implements_interface():
     # Should have required attribute
     assert hasattr(logger, 'run_id')
     
-    # Should have all abstract methods
+    # Should have all abstract methods and properties
     abstract_methods = ['log', 'save_checkpoint', 'log_artifact', 'finalize']
+    abstract_properties = ['paths']
     
     for method in abstract_methods:
         assert hasattr(logger, method) and callable(getattr(logger, method))
+    
+    for prop in abstract_properties:
+        assert hasattr(logger, prop)
 
 
 def test_interface_consistency():
     """Test that the interface is consistent across implementations."""
-    cfg = {
-        "logging": {
-            "out_path": "/tmp/test_metrics.jsonl",
-            "artifact_dir": "/tmp/test_artifacts",
-            "checkpoint_dir": "/tmp/test_checkpoints",
-        }
-    }
-    logger = StructuredLogger(cfg)
+    logger = StructuredLogger("/tmp/test_logs")
     
     # Test method signatures match base class
     import inspect
@@ -168,23 +160,16 @@ def test_abc_inheritance():
     assert hasattr(BaseLogger.save_checkpoint, '__isabstractmethod__')
     assert hasattr(BaseLogger.log_artifact, '__isabstractmethod__')
     assert hasattr(BaseLogger.finalize, '__isabstractmethod__')
+    assert hasattr(BaseLogger.paths, '__isabstractmethod__')
 
 
 def test_logger_factory_compatibility():
     """Test that logger instances work with factory patterns."""
-    def create_logger(logger_cls, cfg):
+    def create_logger(logger_cls, log_dir):
         """Simple factory function."""
-        return logger_cls(cfg)
-    
-    cfg = {
-        "logging": {
-            "out_path": "/tmp/test_metrics.jsonl",
-            "artifact_dir": "/tmp/test_artifacts",
-            "checkpoint_dir": "/tmp/test_checkpoints",
-        }
-    }
+        return logger_cls(log_dir)
     
     # Should be able to use BaseLogger as type hint in factory
-    logger = create_logger(StructuredLogger, cfg)
+    logger = create_logger(StructuredLogger, "/tmp/test_logs")
     assert isinstance(logger, BaseLogger)
     assert isinstance(logger, StructuredLogger)
