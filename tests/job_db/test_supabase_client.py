@@ -107,5 +107,5 @@ def test_write_finished_flag(tmp_path, stub_client):
     client = SupabaseClient("url", "key", base_path=str(tmp_path))
     job_id = "jid3"
     client._write_finished_flag(job_id)
-    flag_path = tmp_path / "storage" / f"run_{job_id}" / "finished.flag"
+    flag_path = tmp_path / "job_data" / f"run_{job_id}" / "finished.flag"
     assert flag_path.exists()

@@ -18,7 +18,7 @@ def cleanup_uploaded_runs(client: Any) -> int:
     int
         Number of run directories deleted.
     """
-    jobs_dir = client.job_dir
+    jobs_dir = client.jobs_dir
     if not os.path.exists(jobs_dir):
         return 0
 
@@ -26,7 +26,7 @@ def cleanup_uploaded_runs(client: Any) -> int:
     for name in os.listdir(jobs_dir):
         if not name.startswith("run_"):
             continue
-        run_dir = os.path.join(storage_path, name)
+        run_dir = os.path.join(jobs_dir, name)
         if not os.path.isdir(run_dir):
             continue
         flag_path = os.path.join(run_dir, "finished.flag")
