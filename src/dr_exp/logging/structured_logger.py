@@ -7,6 +7,8 @@ from typing import Any, Dict, List, Optional
 
 import fcntl
 
+from .base_logger import BaseLogger
+
 
 def _get_attr(obj: Any, key: str, default: Optional[Any] = None) -> Any:
     """Return ``getattr(obj, key)`` or ``obj[key]`` with a default."""
@@ -15,23 +17,38 @@ def _get_attr(obj: Any, key: str, default: Optional[Any] = None) -> Any:
     return getattr(obj, key, default)
 
 
-class StructuredLogger:
-    """Local logger for metrics, checkpoints and artifacts."""
+class StructuredLogger(BaseLogger):
+    """Local filesystem-based structured logger implementation.
+    
+    This class provides a concrete implementation of the BaseLogger interface
+    using local files for metrics storage, checkpoint saving, and artifact
+    tracking. Ideal for development, testing, and local training runs."""
 
     def __init__(
         self, cfg: Any, compress_checkpoints: bool = False, debug: bool = False
     ) -> None:
-        """Create a logger instance.
+        """Initialize the structured logger.
 
+        Creates necessary directories and opens the metrics file for writing.
+        
         Parameters
         ----------
         cfg : Any
-            Configuration object containing a ``logging`` section.
+            Configuration object containing a ``logging`` section with:
+            - out_path: path for metrics JSONL file
+            - artifact_dir: directory for artifact files
+            - checkpoint_dir: directory for checkpoint files
+            - log_file: optional error log file path
         compress_checkpoints : bool, optional
-            Whether to gzip checkpoint files, by default ``False``.
+            Whether to gzip checkpoint files for space efficiency, by default False.
         debug : bool, optional
-            If ``True`` errors are raised instead of being logged, by default
-            ``False``.
+            If True, errors are raised immediately instead of being logged
+            to an error file. Useful for development, by default False.
+            
+        Raises
+        ------
+        ValueError
+            If required logging configuration parameters are missing.
         """
         logging_cfg = cfg["logging"] if isinstance(cfg, dict) else cfg.logging
         self.out_path = _get_attr(logging_cfg, "out_path")
@@ -67,7 +84,18 @@ class StructuredLogger:
             ef.write(f"{datetime.now(UTC).isoformat()}Z {msg}\n")
 
     def log(self, metrics: Dict[str, Any]) -> None:
-        """Write a metrics record to disk."""
+        """Log metrics data to the metrics file.
+        
+        Writes metrics as a JSON line to the configured output file with
+        file locking for thread safety. Automatically adds run_id and
+        timestamp if not present.
+        
+        Parameters
+        ----------
+        metrics : dict[str, Any]
+            Dictionary containing metrics to log. Common keys include
+            'epoch', 'train_loss', 'val_acc', etc.
+        """
         record = dict(metrics)
         record.setdefault("run_id", self.run_id)
         record.setdefault("timestamp", datetime.now(UTC).isoformat() + "Z")
@@ -87,19 +115,22 @@ class StructuredLogger:
                 pass
 
     def save_checkpoint(self, state_dict: Dict[str, Any], tag: str) -> str:
-        """Persist a model checkpoint.
+        """Save a model checkpoint to the checkpoint directory.
+
+        Saves checkpoint data as JSON, optionally compressed with gzip.
+        Filenames follow the pattern 'checkpoint_{tag}.pt[.gz]'.
 
         Parameters
         ----------
         state_dict : dict[str, Any]
-            Serializable checkpoint data.
+            Serializable checkpoint data containing model state.
         tag : str
-            Identifier for the checkpoint.
+            Identifier for the checkpoint (e.g., 'epoch_10', 'best').
 
         Returns
         -------
         str
-            Path to the written checkpoint file.
+            Path to the saved checkpoint file.
         """
         filename = f"checkpoint_{tag}.pt"
         if self.compress_checkpoints:
@@ -120,7 +151,16 @@ class StructuredLogger:
         return path
 
     def log_artifact(self, path: str) -> None:
-        """Register an artifact for later upload."""
+        """Register an artifact file for tracking and potential upload.
+        
+        Adds the absolute path to the internal artifact list if the file exists.
+        Artifact paths are included in the finalization summary.
+        
+        Parameters
+        ----------
+        path : str
+            Path to the artifact file or directory to register.
+        """
         if os.path.exists(path):
             self.artifact_paths.append(os.path.abspath(path))
         else:  # pragma: no cover - debug path
@@ -139,7 +179,22 @@ class StructuredLogger:
         }
 
     def finalize(self) -> Dict[str, Any]:
-        """Close open files and return logging metadata."""
+        """Finalize logging and return summary metadata.
+        
+        Closes the metrics file and returns comprehensive metadata about
+        the logging session. This method is idempotent and can be called
+        multiple times safely.
+        
+        Returns
+        -------
+        dict[str, Any]
+            Summary metadata containing:
+            - metrics_path: path to the metrics file
+            - num_metrics: number of metrics logged
+            - artifact_paths: list of registered artifact paths
+            - num_checkpoints: number of checkpoints saved
+            - finalize_success: whether finalization succeeded
+        """
         if self._finalized:
             return self._summary(True)
         finalize_success = True

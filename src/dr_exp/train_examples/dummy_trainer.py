@@ -2,17 +2,18 @@ import os
 import time
 from typing import Any, Dict, Optional
 
+from dr_exp.logging.base_logger import BaseLogger
 from dr_exp.logging.structured_logger import StructuredLogger
 
 
-def train(cfg: Any, logger: Optional[StructuredLogger] = None) -> Dict[str, Any]:
+def train(cfg: Any, logger: Optional[BaseLogger] = None) -> Dict[str, Any]:
     """Simulate a training run and log metrics.
 
     Parameters
     ----------
     cfg : Any
         Configuration object for the run.
-    logger : StructuredLogger, optional
+    logger : BaseLogger, optional
         Logger instance used to record metrics. If ``None`` a new logger is
         created.
 

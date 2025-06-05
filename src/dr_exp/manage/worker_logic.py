@@ -11,6 +11,7 @@ import traceback
 from datetime import datetime, UTC
 from typing import Any, Callable, Optional
 
+from dr_exp.logging.base_logger import BaseLogger
 from dr_exp.logging.structured_logger import StructuredLogger
 from dr_exp.utils.jobdb_factory import get_supabase_client
 from dr_exp.job_db.base_job_db import BaseJobDB
@@ -35,8 +36,8 @@ def run_worker(
     work_dir: Optional[str] = None,
     max_claim_attempts: int = 5,
     heartbeat_interval: float = 5.0,
-    trainer_fn: Callable[[Any, StructuredLogger], dict] = default_train,
-    logger_cls: type[StructuredLogger] = StructuredLogger,
+    trainer_fn: Callable[[Any, BaseLogger], dict] = default_train,
+    logger_cls: type[BaseLogger] = StructuredLogger,
     client: Optional[BaseJobDB] = None,
     worker_id: str = "unassigned_worker",
 ) -> str:
@@ -52,9 +53,9 @@ def run_worker(
         How many times to poll for a job before giving up.
     heartbeat_interval : float, optional
         Seconds between heartbeat updates.
-    trainer_fn : Callable[[Any, StructuredLogger], dict], optional
+    trainer_fn : Callable[[Any, BaseLogger], dict], optional
         Function implementing the training loop.
-    logger_cls : type[StructuredLogger], optional
+    logger_cls : type[BaseLogger], optional
         Logger class to instantiate.
     client : BaseJobDB, optional
         Client to use for job operations.
