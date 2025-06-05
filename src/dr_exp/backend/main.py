@@ -5,6 +5,8 @@ import logging
 import os
 from typing import Any, Dict, List
 
+from dotenv import load_dotenv
+
 from cachetools import LRUCache
 from fastapi import Depends, FastAPI, Header, HTTPException, status
 from fastapi.middleware.cors import CORSMiddleware
@@ -20,6 +22,7 @@ from dr_exp.core.client_provider import get_supabase_client
 from dr_exp.core.supabase_client import SupabaseClient
 from dr_exp.core.localdb_client import LocalDBClient
 
+load_dotenv()
 logger = logging.getLogger(__name__)
 
 

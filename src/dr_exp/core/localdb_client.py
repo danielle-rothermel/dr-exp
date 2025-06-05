@@ -12,24 +12,26 @@ import portalocker
 class LocalDBClient:
     """Filesystem-backed client used for local runs."""
 
-    def __init__(self, base_path: str = ".") -> None:
+    def __init__(self, base_path: str = "./job_data", storage_path: str = "./storage") -> None:
         """Create the directories used for the mock database.
 
         Parameters
         ----------
         base_path : str, optional
-            Directory under which ``mock_db`` and ``mock_storage`` are located.
+            Directory under which data is stored.
         """
-        self.mock_db_path = os.path.join(base_path, "mock_db")
-        self.mock_storage_path = os.path.join(base_path, "mock_storage")
-        self.jobs_dir = os.path.join(self.mock_db_path, "jobs")
-        self.metrics_dir = os.path.join(self.mock_db_path, "metrics")
-        self.errors_file = os.path.join(self.mock_db_path, "errors.jsonl")
+        # Location for finalized outputs
+        self.storage_path = storage_path
+        # Location to write in-progress logs
+        self.base_path = base_path
+        self.jobs_dir = os.path.join(self.base_path, "jobs")
+        self.metrics_dir = os.path.join(self.base_path, "metrics")
+        self.errors_file = os.path.join(self.base_path, "errors.jsonl")
 
         # Ensure directories exist (idempotent)
         os.makedirs(self.jobs_dir, exist_ok=True)
         os.makedirs(self.metrics_dir, exist_ok=True)
-        os.makedirs(self.mock_storage_path, exist_ok=True)
+        os.makedirs(self.storage_path, exist_ok=True)
         if not os.path.exists(self.errors_file):
             with open(self.errors_file, "w"):
                 pass  # Create empty file
@@ -186,7 +188,7 @@ class LocalDBClient:
 
     def _write_finished_flag(self, job_id: str) -> None:
         """Create an empty ``finished.flag`` file for ``job_id``."""
-        run_dir = os.path.join(self.mock_storage_path, f"run_{job_id}")
+        run_dir = os.path.join(self.storage_path, f"run_{job_id}")
         os.makedirs(run_dir, exist_ok=True)
         flag_path = os.path.join(run_dir, "finished.flag")
         try:
@@ -211,11 +213,11 @@ class LocalDBClient:
             "/" not in remote_path_suffix and "." in remote_path_suffix
         ):  # Simple check for root files
             destination_path = os.path.join(
-                self.mock_storage_path, f"run_{job_id}", remote_path_suffix
+                self.storage_path, f"run_{job_id}", remote_path_suffix
             )
         else:
             destination_path = os.path.join(
-                self.mock_storage_path, f"run_{job_id}", "artifacts", remote_path_suffix
+                self.storage_path, f"run_{job_id}", "artifacts", remote_path_suffix
             )
 
         destination_dir = os.path.dirname(destination_path)

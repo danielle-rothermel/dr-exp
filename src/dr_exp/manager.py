@@ -7,19 +7,23 @@ import signal
 import time
 from datetime import datetime, timedelta, UTC
 import multiprocessing as mp
+from dotenv import load_dotenv
 from typing import Dict, List
 
 from dr_exp.core.client_provider import get_supabase_client
 from dr_exp.core.supabase_client import SupabaseClient
 from dr_exp.core.localdb_client import LocalDBClient
+from dr_exp.mock.supabase_mock_client import SupabaseMockClient
 
 # Import the worker implementation
 import dr_exp.worker as _run_worker
 
+load_dotenv()
+
 
 def run_worker_main(worker_id: str, work_dir: str) -> None:
     """Wrapper to execute the worker with base path from env."""
-    base_path = os.environ.get("DR_EXP_BASE_PATH", ".")
+    base_path = os.environ.get("DR_EXP_BASE_PATH", "./job_data")
     _run_worker.run_worker(base_path=base_path, work_dir=work_dir, worker_id=worker_id)
 
 
@@ -61,11 +65,7 @@ class Manager:
         self.idle_timeout = timedelta(minutes=idle_timeout_mins)
         self.base_dir = base_dir
         self.client = client or get_supabase_client()
-        # Base path for LocalDBClient used by workers
-        if hasattr(self.client, "mock_db_path"):
-            self.base_path = os.path.dirname(self.client.mock_db_path)
-        else:
-            self.base_path = "."
+        self.base_path = os.path.dirname(self.client.base_path)
         self.workers: Dict[str, Dict[str, object]] = {}
         self.last_activity = datetime.now(UTC)
         self.shutdown = False

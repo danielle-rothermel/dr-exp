@@ -12,7 +12,7 @@ class SupabaseClient:
     """Wrapper around :mod:`supabase` providing convenience helpers."""
 
     def __init__(
-        self, supabase_url: str, supabase_key: str, base_path: str = "."
+        self, supabase_url: str, supabase_key: str, base_path: str = "./job_data"
     ) -> None:
         """Initialise the client and connect to Supabase.
 
@@ -37,8 +37,9 @@ class SupabaseClient:
             print(f"Failed to connect to Supabase: {e}")
             raise
 
-        self.local_storage_path = os.path.join(base_path, "mock_storage")
-        os.makedirs(self.local_storage_path, exist_ok=True)
+        # Where to write any local data
+        self.base_path = base_path
+        os.makedirs(self.base_path, exist_ok=True)
 
     def claim_job(
         self, worker_id: str = "unassigned_worker"
@@ -280,7 +281,7 @@ class SupabaseClient:
 
     def _write_finished_flag(self, job_id: str) -> None:
         """Create an empty ``finished.flag`` file for ``job_id`` in local storage."""
-        run_dir = os.path.join(self.local_storage_path, f"run_{job_id}")
+        run_dir = os.path.join(self.base_path, f"run_{job_id}")
         os.makedirs(run_dir, exist_ok=True)
         flag_path = os.path.join(run_dir, "finished.flag")
         try:
