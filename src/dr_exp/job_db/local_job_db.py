@@ -3,7 +3,7 @@ import os
 import shutil
 import tempfile
 import uuid
-from datetime import datetime, UTC
+from datetime import datetime, UTC, timedelta
 from typing import Optional, List, Dict, Any
 
 import portalocker
@@ -93,7 +93,7 @@ class LocalJobDB(BaseJobDB):
 
     # --- Interface methods based on docs/supabase_mock.md ---
 
-    def claim_job(self, worker_id: Optional[str] = None) -> Optional[Dict[str, Any]]:
+    def claim_job(self, worker_id: Optional[str] = None, respect_reservations: bool = True) -> Optional[Dict[str, Any]]:
         """Atomically claim the highest priority available queued job.
         
         Looks for jobs with status='queued', sorts by priority (highest first),
@@ -123,6 +123,23 @@ class LocalJobDB(BaseJobDB):
                     with open(job_file_path, "r") as f:
                         job_data = json.load(f)
                     if job_data.get("status") == "queued":
+                        # Check reservations if respect_reservations is True
+                        if respect_reservations and job_data.get("reserved_for_worker"):
+                            # Check if reservation has expired
+                            if self._is_reservation_expired(job_data):
+                                # Clear expired reservation
+                                job_data.pop("reserved_for_worker", None)
+                                job_data.pop("reservation_expires_at", None)
+                                # Update the job file to clear reservation
+                                try:
+                                    with portalocker.Lock(job_file_path, mode="r+b", flags=portalocker.LOCK_EX):
+                                        self._atomic_write(job_file_path, json.dumps(job_data, indent=4))
+                                except:
+                                    pass  # Continue even if cleanup fails
+                            elif job_data["reserved_for_worker"] != worker_id:
+                                # Skip jobs reserved for other workers
+                                continue
+                        
                         queued_jobs.append((job_file_path, job_data))
             except Exception as e:
                 print(f"Error reading job file {job_file_path}: {e}")
@@ -618,6 +635,93 @@ class LocalJobDB(BaseJobDB):
             jobs = jobs[:limit]
             
         return jobs
+
+    # Job reservation methods
+
+    def _is_reservation_expired(self, job_data: Dict[str, Any]) -> bool:
+        """Check if a job reservation has expired.
+        
+        Parameters
+        ----------
+        job_data : dict[str, Any]
+            Job record to check.
+            
+        Returns
+        -------
+        bool
+            True if the reservation has expired or no expiration is set.
+        """
+        expires_at_str = job_data.get("reservation_expires_at")
+        if not expires_at_str:
+            return False  # No expiration set, never expires
+        
+        try:
+            expires_at_str = expires_at_str.rstrip('Z')
+            expires_at = datetime.fromisoformat(expires_at_str.replace('Z', '+00:00'))
+            return datetime.now(UTC) >= expires_at
+        except (ValueError, TypeError):
+            return True  # Invalid timestamp, consider expired
+
+    def add_reserved_job(
+        self,
+        job_config: Dict[str, Any],
+        sweep_config_id: str,
+        reserved_for_worker: str,
+        reservation_timeout: Optional[int] = 300,
+        priority: int = 100,
+        status: str = "queued",
+    ) -> Dict[str, Any]:
+        """Add a new job entry reserved for a specific worker.
+        
+        Parameters
+        ----------
+        job_config : dict[str, Any]
+            The job configuration.
+        sweep_config_id : str
+            Identifier for the sweep configuration.
+        reserved_for_worker : str
+            Worker ID that can claim this job.
+        reservation_timeout : int, optional
+            Reservation timeout in seconds, by default 300 (5 minutes).
+            If None, reservation never expires.
+        priority : int, optional
+            Job priority for queue ordering (0-1000), by default 100.
+        status : str, optional
+            Initial job status, by default "queued".
+            
+        Returns
+        -------
+        dict[str, Any]
+            The created job record with reservation information.
+        """
+        job_id = str(uuid.uuid4())
+        # Clamp priority to valid range
+        priority = max(0, min(1000, priority))
+        
+        job_data = {
+            "id": job_id,
+            "config_id": sweep_config_id,
+            "status": status,
+            "retry_index": 0,
+            "priority": priority,
+            "priority_boost_count": 0,
+            "assigned_worker": "unassigned",
+            "config_json": job_config,
+            "created_at": datetime.now(UTC).isoformat() + "Z",
+            "reserved_for_worker": reserved_for_worker,
+        }
+        
+        # Add expiration time if timeout is specified
+        if reservation_timeout is not None:
+            expires_at = datetime.now(UTC) + timedelta(seconds=reservation_timeout)
+            job_data["reservation_expires_at"] = expires_at.isoformat() + "Z"
+        
+        job_file_path = os.path.join(self.jobs_dir, f"{job_id}.json")
+        with portalocker.Lock(job_file_path, mode="wb", flags=portalocker.LOCK_EX):
+            self._atomic_write(job_file_path, json.dumps(job_data, indent=4))
+        
+        print(f"Added reserved job {job_id} for worker {reserved_for_worker}")
+        return job_data
 
 
 __all__ = ["LocalJobDB"]

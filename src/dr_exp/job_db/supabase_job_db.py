@@ -5,7 +5,7 @@ import shutil
 import tempfile
 from supabase import create_client, Client
 from typing import Optional, Dict, Any, List
-from datetime import datetime, timezone
+from datetime import datetime, timezone, timedelta
 
 from .base_job_db import BaseJobDB
 
@@ -51,7 +51,7 @@ class SupabaseJobDB(BaseJobDB):
         os.makedirs(self.storage_dir, exist_ok=True)
 
     def claim_job(
-        self, worker_id: str = "unassigned_worker"
+        self, worker_id: str = "unassigned_worker", respect_reservations: bool = True
     ) -> Optional[Dict[str, Any]]:
         """Claim the next available queued job.
 
@@ -648,6 +648,71 @@ class SupabaseJobDB(BaseJobDB):
         except Exception as e:
             print(f"Error listing jobs by priority: {e}")
             return []
+
+    # Job reservation methods
+
+    def add_reserved_job(
+        self,
+        job_config: Dict[str, Any],
+        sweep_config_id: str,
+        reserved_for_worker: str,
+        reservation_timeout: Optional[int] = 300,
+        priority: int = 100,
+        status: str = "queued",
+    ) -> Dict[str, Any]:
+        """Add a new job entry reserved for a specific worker.
+        
+        Parameters
+        ----------
+        job_config : dict[str, Any]
+            The job configuration.
+        sweep_config_id : str
+            Identifier for the sweep configuration.
+        reserved_for_worker : str
+            Worker ID that can claim this job.
+        reservation_timeout : int, optional
+            Reservation timeout in seconds, by default 300 (5 minutes).
+            If None, reservation never expires.
+        priority : int, optional
+            Job priority for queue ordering (0-1000), by default 100.
+        status : str, optional
+            Initial job status, by default "queued".
+            
+        Returns
+        -------
+        dict[str, Any]
+            The created job record with reservation information.
+        """
+        # Clamp priority to valid range
+        priority = max(0, min(1000, priority))
+        
+        data = {
+            "config_id": sweep_config_id,
+            "status": status,
+            "retry_index": 0,
+            "priority": priority,
+            "reserved_for_worker": reserved_for_worker,
+            # created_at is handled by DB default
+        }
+        
+        # Add expiration time if timeout is specified
+        if reservation_timeout is not None:
+            expires_at = datetime.now(timezone.utc) + timedelta(seconds=reservation_timeout)
+            data["reservation_expires_at"] = expires_at.isoformat()
+        
+        try:
+            response = self.supabase.table("jobs").insert(data).execute()
+            if response.data:
+                job_record = response.data[0]
+                # Add the config_json to the response for consistency with LocalJobDB
+                job_record["config_json"] = job_config
+                print(f"Added reserved job {job_record['id']} for worker {reserved_for_worker}")
+                return job_record
+            else:
+                raise Exception("No data returned from insert")
+        except Exception as e:
+            print(f"Error adding reserved job: {e}")
+            return {"success": False, "message": str(e)}
 
 
 __all__ = ["SupabaseJobDB"]
