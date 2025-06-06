@@ -11,6 +11,7 @@ import traceback
 from datetime import datetime, UTC
 from typing import Any, Callable, Optional
 
+from dr_exp.logging.base_logger import BaseLogger
 from dr_exp.logging.structured_logger import StructuredLogger
 from dr_exp.utils.jobdb_factory import get_supabase_client
 from dr_exp.job_db.base_job_db import BaseJobDB
@@ -35,8 +36,8 @@ def run_worker(
     work_dir: Optional[str] = None,
     max_claim_attempts: int = 5,
     heartbeat_interval: float = 5.0,
-    trainer_fn: Callable[[Any, StructuredLogger], dict] = default_train,
-    logger_cls: type[StructuredLogger] = StructuredLogger,
+    trainer_fn: Callable[[Any, BaseLogger], dict] = default_train,
+    logger_cls: type[BaseLogger] = StructuredLogger,
     client: Optional[BaseJobDB] = None,
     worker_id: str = "unassigned_worker",
 ) -> str:
@@ -52,9 +53,9 @@ def run_worker(
         How many times to poll for a job before giving up.
     heartbeat_interval : float, optional
         Seconds between heartbeat updates.
-    trainer_fn : Callable[[Any, StructuredLogger], dict], optional
+    trainer_fn : Callable[[Any, BaseLogger], dict], optional
         Function implementing the training loop.
-    logger_cls : type[StructuredLogger], optional
+    logger_cls : type[BaseLogger], optional
         Logger class to instantiate.
     client : BaseJobDB, optional
         Client to use for job operations.
@@ -94,19 +95,8 @@ def run_worker(
     os.makedirs(work_dir, exist_ok=True)
     worker_log_path = os.path.join(work_dir, "worker.log")
 
-    cfg.setdefault("logging", {})
-    cfg["logging"].update(
-        {
-            "out_path": os.path.join(work_dir, "metrics.jsonl"),
-            "checkpoint_dir": os.path.join(work_dir, "checkpoints"),
-            "artifact_dir": os.path.join(work_dir, "artifacts"),
-        }
-    )
-
-    os.makedirs(cfg["logging"]["checkpoint_dir"], exist_ok=True)
-    os.makedirs(cfg["logging"]["artifact_dir"], exist_ok=True)
-
-    logger = logger_cls(cfg)
+    # Create logger with the work directory
+    logger = logger_cls(work_dir, run_id=cfg.get("run_id"))
 
     stop_event = threading.Event()
     hb_thread = threading.Thread(
@@ -145,11 +135,11 @@ def run_worker(
     bundle_dir = os.path.join(work_dir, "bundle")
     os.makedirs(bundle_dir, exist_ok=True)
     shutil.copytree(
-        cfg["logging"]["checkpoint_dir"],
+        logger.paths.checkpoint_dir,
         os.path.join(bundle_dir, "checkpoints"),
     )
     shutil.copytree(
-        cfg["logging"]["artifact_dir"],
+        logger.paths.artifact_dir,
         os.path.join(bundle_dir, "artifacts"),
     )
     shutil.copy2(worker_log_path, os.path.join(bundle_dir, "worker.log"))

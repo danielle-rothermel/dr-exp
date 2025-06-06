@@ -3,71 +3,80 @@ import os
 import gzip
 import uuid
 from datetime import datetime, UTC
-from typing import Any, Dict, List, Optional
+from typing import Any, Dict, List, Optional, Union
 
 import fcntl
 
-
-def _get_attr(obj: Any, key: str, default: Optional[Any] = None) -> Any:
-    """Return ``getattr(obj, key)`` or ``obj[key]`` with a default."""
-    if isinstance(obj, dict):
-        return obj.get(key, default)
-    return getattr(obj, key, default)
+from .base_logger import BaseLogger
+from .logger_paths import LoggerPathConfig, LoggerPathManager
 
 
-class StructuredLogger:
-    """Local logger for metrics, checkpoints and artifacts."""
+
+
+class StructuredLogger(BaseLogger):
+    """Local filesystem-based structured logger implementation.
+    
+    This class provides a concrete implementation of the BaseLogger interface
+    using local files for metrics storage, checkpoint saving, and artifact
+    tracking. Ideal for development, testing, and local training runs."""
 
     def __init__(
-        self, cfg: Any, compress_checkpoints: bool = False, debug: bool = False
+        self,
+        log_dir: Union[str, LoggerPathConfig],
+        run_id: Optional[str] = None,
+        compress_checkpoints: bool = False,
+        debug: bool = False
     ) -> None:
-        """Create a logger instance.
+        """Initialize the structured logger.
 
+        Creates necessary directories and opens the metrics file for writing.
+        
         Parameters
         ----------
-        cfg : Any
-            Configuration object containing a ``logging`` section.
+        log_dir : str or LoggerPathConfig
+            Base directory for all logging outputs, or a full path configuration.
+        run_id : str, optional
+            Unique identifier for this run. If not provided, a UUID will be generated.
         compress_checkpoints : bool, optional
-            Whether to gzip checkpoint files, by default ``False``.
+            Whether to gzip checkpoint files for space efficiency, by default False.
         debug : bool, optional
-            If ``True`` errors are raised instead of being logged, by default
-            ``False``.
+            If True, errors are raised immediately instead of being logged
+            to an error file. Useful for development, by default False.
         """
-        logging_cfg = cfg["logging"] if isinstance(cfg, dict) else cfg.logging
-        self.out_path = _get_attr(logging_cfg, "out_path")
-        self.artifact_dir = _get_attr(logging_cfg, "artifact_dir")
-        self.checkpoint_dir = _get_attr(logging_cfg, "checkpoint_dir")
-        self.log_file = _get_attr(logging_cfg, "log_file", None)
-
-        if not self.out_path or not self.artifact_dir or not self.checkpoint_dir:
-            raise ValueError(
-                "cfg.logging must define out_path, artifact_dir, and checkpoint_dir"
-            )
-
+        self._paths = LoggerPathManager(log_dir)
         self.compress_checkpoints = compress_checkpoints
         self.debug = debug
-        self.run_id = _get_attr(cfg, "run_id", uuid.uuid4().hex)
+        self.run_id = run_id or uuid.uuid4().hex
 
-        os.makedirs(os.path.dirname(self.out_path), exist_ok=True)
-        os.makedirs(self.artifact_dir, exist_ok=True)
-        os.makedirs(self.checkpoint_dir, exist_ok=True)
-
-        self.error_log_path = os.path.join(
-            os.path.dirname(self.out_path), "logger_error.log"
-        )
-        self.metrics_file = open(self.out_path, "a", encoding="utf-8")
+        self.metrics_file = open(self._paths.metrics_path, "a", encoding="utf-8")
         self.metrics_count = 0
         self.checkpoint_count = 0
         self.artifact_paths: List[str] = []
         self._finalized = False
 
+    @property
+    def paths(self) -> LoggerPathManager:
+        """Get the path manager for this logger."""
+        return self._paths
+
     def _write_error(self, msg: str) -> None:
         """Append an error message to the logger error file."""
-        with open(self.error_log_path, "a", encoding="utf-8") as ef:
+        with open(self._paths.error_log_path, "a", encoding="utf-8") as ef:
             ef.write(f"{datetime.now(UTC).isoformat()}Z {msg}\n")
 
     def log(self, metrics: Dict[str, Any]) -> None:
-        """Write a metrics record to disk."""
+        """Log metrics data to the metrics file.
+        
+        Writes metrics as a JSON line to the configured output file with
+        file locking for thread safety. Automatically adds run_id and
+        timestamp if not present.
+        
+        Parameters
+        ----------
+        metrics : dict[str, Any]
+            Dictionary containing metrics to log. Common keys include
+            'epoch', 'train_loss', 'val_acc', etc.
+        """
         record = dict(metrics)
         record.setdefault("run_id", self.run_id)
         record.setdefault("timestamp", datetime.now(UTC).isoformat() + "Z")
@@ -87,24 +96,24 @@ class StructuredLogger:
                 pass
 
     def save_checkpoint(self, state_dict: Dict[str, Any], tag: str) -> str:
-        """Persist a model checkpoint.
+        """Save a model checkpoint to the checkpoint directory.
+
+        Saves checkpoint data as JSON, optionally compressed with gzip.
+        Filenames follow the pattern 'checkpoint_{tag}.pt[.gz]'.
 
         Parameters
         ----------
         state_dict : dict[str, Any]
-            Serializable checkpoint data.
+            Serializable checkpoint data containing model state.
         tag : str
-            Identifier for the checkpoint.
+            Identifier for the checkpoint (e.g., 'epoch_10', 'best').
 
         Returns
         -------
         str
-            Path to the written checkpoint file.
+            Path to the saved checkpoint file.
         """
-        filename = f"checkpoint_{tag}.pt"
-        if self.compress_checkpoints:
-            filename += ".gz"
-        path = os.path.join(self.checkpoint_dir, filename)
+        path = self._paths.checkpoint_path(tag, compressed=self.compress_checkpoints)
         try:
             if self.compress_checkpoints:
                 with gzip.open(path, "wb") as f:
@@ -120,7 +129,16 @@ class StructuredLogger:
         return path
 
     def log_artifact(self, path: str) -> None:
-        """Register an artifact for later upload."""
+        """Register an artifact file for tracking and potential upload.
+        
+        Adds the absolute path to the internal artifact list if the file exists.
+        Artifact paths are included in the finalization summary.
+        
+        Parameters
+        ----------
+        path : str
+            Path to the artifact file or directory to register.
+        """
         if os.path.exists(path):
             self.artifact_paths.append(os.path.abspath(path))
         else:  # pragma: no cover - debug path
@@ -131,7 +149,7 @@ class StructuredLogger:
     def _summary(self, success: bool) -> Dict[str, Any]:
         """Return a final summary dictionary."""
         return {
-            "metrics_path": self.out_path,
+            "metrics_path": self._paths.metrics_path,
             "num_metrics": self.metrics_count,
             "artifact_paths": self.artifact_paths,
             "num_checkpoints": self.checkpoint_count,
@@ -139,7 +157,22 @@ class StructuredLogger:
         }
 
     def finalize(self) -> Dict[str, Any]:
-        """Close open files and return logging metadata."""
+        """Finalize logging and return summary metadata.
+        
+        Closes the metrics file and returns comprehensive metadata about
+        the logging session. This method is idempotent and can be called
+        multiple times safely.
+        
+        Returns
+        -------
+        dict[str, Any]
+            Summary metadata containing:
+            - metrics_path: path to the metrics file
+            - num_metrics: number of metrics logged
+            - artifact_paths: list of registered artifact paths
+            - num_checkpoints: number of checkpoints saved
+            - finalize_success: whether finalization succeeded
+        """
         if self._finalized:
             return self._summary(True)
         finalize_success = True
