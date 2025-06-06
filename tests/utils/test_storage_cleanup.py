@@ -1,12 +1,11 @@
 from pathlib import Path
 
-from dr_exp.job_db.local_job_db import LocalJobDB
+from dr_exp.job_db import LocalJobDB, JobDBConfig, JobDBConfig
 from dr_exp.utils.storage_cleanup import cleanup_uploaded_runs
 
 
 def test_cleanup_uploaded_runs(tmp_path):
-    client = LocalJobDB(
-        base_path=str(tmp_path), storage_path=str(tmp_path / "storage")
+    client = LocalJobDB(JobDBConfig(base_path=str(tmp_path, storage_path=str(tmp_path + "/storage", mode="mock")), storage_path=str(tmp_path / "storage")
     )
     run1 = Path(client.jobs_dir) / "run_a"
     run1.mkdir(parents=True)

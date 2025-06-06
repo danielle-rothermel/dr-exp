@@ -3,7 +3,7 @@ import pytest
 import os
 import json
 from datetime import datetime, timezone
-from dr_exp.job_db.local_job_db import LocalJobDB
+from dr_exp.job_db import LocalJobDB, JobDBConfig
 
 # --- Test Fixtures ---
 
@@ -15,10 +15,12 @@ def mock_client(tmp_path):
     This ensures each test runs with a clean mock environment.
     The tmp_path fixture is provided by pytest for creating temporary files/directories.
     """
-    # The LocalJobDB will create mock_db and mock_storage inside tmp_path
-    client = LocalJobDB(
-        base_path=str(tmp_path), storage_path=str(tmp_path / "storage")
+    config = JobDBConfig(
+        base_path=str(tmp_path),
+        storage_path=str(tmp_path / "storage"),
+        mode="mock"
     )
+    client = LocalJobDB(config)
     return client
 
 
@@ -39,9 +41,12 @@ def sample_sweep_config_id():
 
 def test_client_initialization(tmp_path):
     """Tests if the client initializes its directories correctly."""
-    client = LocalJobDB(
-        base_path=str(tmp_path), storage_path=str(tmp_path / "storage")
+    config = JobDBConfig(
+        base_path=str(tmp_path),
+        storage_path=str(tmp_path / "storage"),
+        mode="mock"
     )
+    client = LocalJobDB(config)
     assert os.path.exists(client.storage_dir)
     assert os.path.exists(client.jobs_dir)
     assert os.path.exists(client.metrics_dir)

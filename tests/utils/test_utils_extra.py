@@ -6,7 +6,7 @@ import pytest
 from dr_exp.utils import config_upload
 from dr_exp.api.main import MetricsLoader
 from dr_exp.utils import jobdb_factory as client_provider
-from dr_exp.job_db.local_job_db import LocalJobDB
+from dr_exp.job_db import LocalJobDB, JobDBConfig
 
 
 def test_parse_sweep_and_generate_combos():
@@ -52,20 +52,21 @@ def test_config_hash_deterministic():
 
 def test_get_supabase_client_modes(monkeypatch, tmp_path):
     monkeypatch.delenv("EXPMGR_MODE", raising=False)
-    client = client_provider.get_supabase_client(base_path=str(tmp_path))
+    client = client_provider.get_job_db_client()
     assert isinstance(client, LocalJobDB)
 
     class Dummy:
-        def __init__(self, url, key, base_path="."):
-            self.url = url
-            self.key = key
-            self.base_path = base_path
+        def __init__(self, config):
+            self.config = config
+            self.url = config.supabase_url
+            self.key = config.supabase_key
+            self.base_path = config.base_path
 
     monkeypatch.setenv("EXPMGR_MODE", "real")
     monkeypatch.setenv("SUPABASE_URL", "http://x")
     monkeypatch.setenv("SUPABASE_SERVICE_ROLE_KEY", "k")
     monkeypatch.setattr("dr_exp.utils.jobdb_factory.SupabaseJobDB", Dummy)
-    client = client_provider.get_supabase_client()
+    client = client_provider.get_job_db_client()
     assert isinstance(client, Dummy)
     assert client.url == "http://x"
     assert client.key == "k"
@@ -74,13 +75,12 @@ def test_get_supabase_client_modes(monkeypatch, tmp_path):
     monkeypatch.delenv("SUPABASE_URL")
     monkeypatch.delenv("SUPABASE_SERVICE_ROLE_KEY")
     with pytest.raises(ValueError):
-        client_provider.get_supabase_client()
+        client_provider.get_job_db_client()
 
 
 def test_metrics_loader(tmp_path):
-    client = LocalJobDB(
-        base_path=str(tmp_path), storage_path=str(tmp_path / "storage")
-    )
+    config = JobDBConfig(base_path=str(tmp_path), storage_path=str(tmp_path / "storage"), mode="mock")
+    client = LocalJobDB(config)
     loader = MetricsLoader(client, maxsize=2)
     run_id = "r1"
     run_dir = Path(client.storage_dir) / f"run_{run_id}"

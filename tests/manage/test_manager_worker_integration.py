@@ -2,7 +2,7 @@ from multiprocessing import Process
 import zipfile
 from pathlib import Path
 
-from dr_exp.job_db.local_job_db import LocalJobDB
+from dr_exp.job_db import LocalJobDB, JobDBConfig, JobDBConfig
 import dr_exp.manage.manager_logic as manager
 
 
@@ -12,8 +12,7 @@ def make_config():
 
 def test_manager_worker_flow(tmp_path, monkeypatch):
     base_path = tmp_path
-    client = LocalJobDB(
-        base_path=str(base_path), storage_path=str(base_path / "storage")
+    client = LocalJobDB(JobDBConfig(base_path=str(base_path, storage_path=str(base_path + "/storage", mode="mock")), storage_path=str(base_path / "storage")
     )
     job = client.add_job(make_config(), "sweep1", status="queued")
 
