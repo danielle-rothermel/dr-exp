@@ -72,6 +72,7 @@ def upload_configs(
     description: str | None = None,
     interface_version: str | None = None,
     code_version: str | None = None,
+    priority: int = 100,
 ) -> List[Dict[str, Any]]:
     sweep_params = parse_sweep(sweep)
 
@@ -85,7 +86,7 @@ def upload_configs(
             "code_version": code_version,
         }
         cfg_with_meta = {"config": cfg, "metadata": metadata}
-        job = client.add_job(cfg_with_meta, sweep_id, status="queued")
+        job = client.add_job(cfg_with_meta, sweep_id, status="queued", priority=priority)
         created_jobs.append(job)
     return created_jobs
 
