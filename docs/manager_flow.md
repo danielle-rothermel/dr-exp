@@ -33,7 +33,7 @@ The Launcher initializes the execution environment (e.g., CUDA MPS) and delegate
 
 Inside `run_worker.run_worker()` the following actions occur:
 
-1. **Job claim**: The worker obtains a client instance via `get_supabase_client()` and attempts to atomically claim a job (`status='queued' → 'running'`). It uses exponential backoff if no job is immediately available.
+1. **Job claim**: The worker obtains a client instance via `get_supabase_client()` and attempts to atomically claim a job (`status='queued' → 'running'`). Jobs are claimed in priority order (highest priority first), with tie-breaking by submission time. The worker respects job reservations and uses exponential backoff if no job is immediately available.
 2. **Configuration setup**: Once a job is claimed, the worker fetches its configuration and creates a local working directory. Paths for metrics, checkpoints and artifacts are injected into the config.
 3. **Heartbeat loop**: A background thread updates the job's `heartbeat` field every `heartbeat_interval` seconds using `client.update_job()`.
 4. **Training**: The provided `trainer_fn` is called. Any exception is captured and recorded via `client.record_failure()`.
@@ -45,7 +45,7 @@ Inside `run_worker.run_worker()` the following actions occur:
 While workers run, the manager periodically executes two checks:
 
 1. **Heartbeat check** (`check_heartbeats`): The manager lists all running jobs via the Supabase client. If a job's heartbeat is older than twice the heartbeat interval, the manager assumes the worker was lost. It marks the job as failed (`status_reason='worker_lost'`) and restarts that worker process.
-2. **Idle timeout** (`check_idle_timeout`): If no running jobs remain for the configured idle timeout window, the manager initiates shutdown of all workers.
+2. **Idle timeout** (`check_idle_timeout`): If no running jobs remain for the configured idle timeout window, the manager logs the top queued jobs by priority and initiates shutdown of all workers.
 
 Workers write heartbeats and logs directly to Supabase, so the manager relies solely on the job records to monitor health. Workers do not communicate back to the manager process except through those updates.
 
