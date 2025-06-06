@@ -115,6 +115,15 @@ class Manager:
         self.workers.clear()
 
     # ---------------- Job & Heartbeat ------------------
+    def list_jobs_by_priority(self, status_filter: List[str] = None, limit: int = 10) -> List[Dict[str, object]]:
+        """List jobs ordered by priority for monitoring purposes."""
+        try:
+            return self.client.list_jobs_by_priority(status_filter=status_filter, limit=limit)
+        except AttributeError:
+            # Fallback for clients without priority support
+            logging.warning("Client does not support priority listing")
+            return []
+
     def _list_running_jobs(self) -> List[Dict[str, object]]:
         """Return job records currently marked as running."""
         jobs: List[Dict[str, object]] = []
@@ -182,6 +191,13 @@ class Manager:
         if running:
             self.last_activity = datetime.now(UTC)
             return
+        
+        # Log queue status before potential shutdown
+        queued_jobs = self.list_jobs_by_priority(status_filter=["queued"], limit=5)
+        if queued_jobs:
+            logging.info("Queued jobs (top 5 by priority): %s", 
+                        [{"id": j.get("id"), "priority": j.get("priority", 100)} for j in queued_jobs])
+        
         if datetime.now(UTC) - self.last_activity > self.idle_timeout:
             logging.info("Idle timeout reached, shutting down")
             self.shutdown = True

@@ -29,6 +29,12 @@ def add_arguments(parser: argparse.ArgumentParser) -> None:
     parser.add_argument("--description")
     parser.add_argument("--interface-version")
     parser.add_argument("--code-version")
+    parser.add_argument(
+        "--priority",
+        type=int,
+        default=100,
+        help="Job priority (0-1000, higher = more urgent). Default: 100",
+    )
 
 
 def build_arg_parser() -> argparse.ArgumentParser:
@@ -51,6 +57,7 @@ def run(args: argparse.Namespace) -> List[Dict[str, Any]]:
         description=args.description,
         interface_version=args.interface_version,
         code_version=args.code_version,
+        priority=args.priority,
     )
 
 

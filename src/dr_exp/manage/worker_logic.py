@@ -40,6 +40,8 @@ def run_worker(
     logger_cls: type[BaseLogger] = StructuredLogger,
     client: Optional[BaseJobDB] = None,
     worker_id: str = "unassigned_worker",
+    target_job_id: Optional[str] = None,
+    respect_reservations: bool = True,
 ) -> str:
     """Run a single worker iteration.
 
@@ -61,6 +63,11 @@ def run_worker(
         Client to use for job operations.
     worker_id : str, optional
         Identifier used when claiming jobs.
+    target_job_id : str, optional
+        If specified, worker will only attempt to claim this specific job.
+        Useful for "run one" functionality with reserved jobs.
+    respect_reservations : bool, optional
+        Whether to respect job reservations when claiming jobs, by default True.
 
     Returns
     -------
@@ -69,19 +76,34 @@ def run_worker(
     """
     client = client or get_supabase_client(base_path=base_path)
 
-    attempt = 0
-    backoff = 1.0
-    job = None
-    while attempt < max_claim_attempts:
-        job = client.claim_job(worker_id)
-        if job:
-            break
-        time.sleep(backoff)
-        backoff *= 2
-        attempt += 1
+    # Handle target job ID for "run one" functionality
+    if target_job_id:
+        job = client.get_job_details(target_job_id)
+        if job is None:
+            return "job_not_found"
+        if job.get("status") != "queued":
+            return "job_not_available"
+        
+        # Try to claim the specific job
+        claimed_job = client.claim_job(worker_id, respect_reservations=respect_reservations)
+        if claimed_job is None or claimed_job.get("id") != target_job_id:
+            return "target_job_claim_failed"
+        job = claimed_job
+    else:
+        # Normal job claiming behavior
+        attempt = 0
+        backoff = 1.0
+        job = None
+        while attempt < max_claim_attempts:
+            job = client.claim_job(worker_id, respect_reservations=respect_reservations)
+            if job:
+                break
+            time.sleep(backoff)
+            backoff *= 2
+            attempt += 1
 
-    if job is None:
-        return "no_job"
+        if job is None:
+            return "no_job"
 
     job_id = job["id"]
     cfg = client.get_config_for_job(job_id)
