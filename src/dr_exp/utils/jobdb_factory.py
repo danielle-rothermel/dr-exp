@@ -1,45 +1,58 @@
 import os
+from typing import Optional
 
 from dotenv import load_dotenv
 
-from dr_exp.job_db.base_job_db import BaseJobDB
-from dr_exp.job_db.supabase_job_db import SupabaseJobDB
-from dr_exp.job_db.local_job_db import LocalJobDB
+from dr_exp.job_db import BaseJobDB, LocalJobDB, SupabaseJobDB, JobDBConfig
 
 load_dotenv()
 
 
-def get_supabase_client(
-    base_path: str = ".",
-) -> BaseJobDB:
-    """Instantiate either a Supabase or local job database client.
-
+def get_job_db_client(config: Optional[JobDBConfig] = None) -> BaseJobDB:
+    """Create JobDB client from config or environment.
+    
     Parameters
     ----------
-    base_path : str, optional
-        Base directory used when creating :class:`LocalJobDB` and as the
-        local storage path when running in real mode.
-
+    config : JobDBConfig, optional
+        Configuration object. If None, creates config from environment variables.
+        
     Returns
     -------
     BaseJobDB
-        A job database instance depending on the ``EXPMGR_MODE`` environment
-        variable.
-
+        A job database instance (LocalJobDB or SupabaseJobDB).
+        
     Raises
     ------
     ValueError
-        If real mode is requested but no URL or key is provided.
+        If configuration is invalid.
     """
-    mode = os.environ.get("EXPMGR_MODE", "mock").lower()
-    if mode == "real":
-        url = os.environ.get("SUPABASE_URL")
-        key = os.environ.get("SUPABASE_SERVICE_ROLE_KEY") or os.environ.get(
-            "SUPABASE_KEY"
-        )
-        if not url or not key:
-            raise ValueError("SUPABASE_URL and key required for real mode")
-        return SupabaseJobDB(url, key, base_path=base_path)
-    return LocalJobDB(
-        base_path=base_path, storage_path=os.path.join(base_path, "storage")
-    )
+    if config is None:
+        config = JobDBConfig.from_env()
+    
+    config.validate()
+    
+    if config.mode == "real":
+        return SupabaseJobDB(config)
+    else:
+        return LocalJobDB(config)
+
+
+def get_supabase_client(base_path: str = ".") -> BaseJobDB:
+    """Legacy factory function for backward compatibility.
+    
+    This function is deprecated. Use get_job_db_client() instead.
+    
+    Parameters
+    ----------
+    base_path : str, optional
+        Base directory for job data storage.
+        
+    Returns
+    -------
+    BaseJobDB
+        A job database instance.
+    """
+    config = JobDBConfig.from_env()
+    config.base_path = base_path
+    config.storage_path = os.path.join(base_path, "storage")
+    return get_job_db_client(config)

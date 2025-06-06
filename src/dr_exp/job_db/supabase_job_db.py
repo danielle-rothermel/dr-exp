@@ -8,6 +8,7 @@ from typing import Optional, Dict, Any, List
 from datetime import datetime, timezone, timedelta
 
 from .base_job_db import BaseJobDB
+from .config import JobDBConfig
 
 
 class SupabaseJobDB(BaseJobDB):
@@ -18,32 +19,28 @@ class SupabaseJobDB(BaseJobDB):
     artifact storage.
     """
 
-    def __init__(
-        self, supabase_url: str, supabase_key: str, base_path: str = "."
-    ) -> None:
-        """Initialise the client and connect to Supabase.
+    def __init__(self, config: JobDBConfig) -> None:
+        """Initialize the client and connect to Supabase.
 
         Parameters
         ----------
-        supabase_url : str
-            URL of the Supabase project.
-        supabase_key : str
-            API key with permissions for backend operations.
-        base_path : str, optional
-            Base directory for local data storage, by default ".".
+        config : JobDBConfig
+            Configuration object with Supabase credentials and paths.
 
         Raises
         ------
         ValueError
-            If ``supabase_url`` or ``supabase_key`` is missing.
+            If Supabase URL or key is missing from config.
         """
+        config.validate()
         # Initialize base class first
-        super().__init__(base_path, base_path + "/storage")
+        super().__init__(config.base_path, config.storage_path)
+        self.config = config
         
-        if not supabase_url or not supabase_key:
-            raise ValueError("Supabase URL and Key must be provided.")
+        if not config.supabase_url or not config.supabase_key:
+            raise ValueError("Supabase URL and Key must be provided in config.")
         try:
-            self.supabase: Client = create_client(supabase_url, supabase_key)
+            self.supabase: Client = create_client(config.supabase_url, config.supabase_key)
             print("Successfully connected to Supabase.")
         except Exception as e:
             print(f"Failed to connect to Supabase: {e}")

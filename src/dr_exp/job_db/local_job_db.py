@@ -4,11 +4,13 @@ import shutil
 import tempfile
 import uuid
 from datetime import datetime, UTC, timedelta
+from pathlib import Path
 from typing import Optional, List, Dict, Any
 
 import portalocker
 
 from .base_job_db import BaseJobDB
+from .config import JobDBConfig
 
 
 class LocalJobDB(BaseJobDB):
@@ -19,21 +21,19 @@ class LocalJobDB(BaseJobDB):
     artifact storage. Ideal for local development, testing, and offline work.
     """
 
-    def __init__(self, base_path: str = ".", storage_path: str = "./storage") -> None:
-        """Initialize the local job database.
+    def __init__(self, config: JobDBConfig) -> None:
+        """Initialize the local job database from configuration.
 
         Creates the necessary directories for job storage, metrics, and artifacts.
         
         Parameters
         ----------
-        base_path : str, optional
-            Base directory under which job data is stored, by default ".".
-            The jobs_dir will be created as base_path/job_data.
-        storage_path : str, optional
-            Directory for artifact and run output storage, by default "./storage".
+        config : JobDBConfig
+            Configuration object with paths and settings.
         """
-        # Initialize base class
-        super().__init__(base_path, storage_path)
+        config.validate()
+        super().__init__(config.base_path, config.storage_path)
+        self.config = config
         
         # Local-specific directories and files
         self.metrics_dir = os.path.join(self.jobs_dir, "metrics")
@@ -41,9 +41,7 @@ class LocalJobDB(BaseJobDB):
 
         # Ensure local-specific directories exist
         os.makedirs(self.metrics_dir, exist_ok=True)
-        if not os.path.exists(self.errors_file):
-            with open(self.errors_file, "w"):
-                pass  # Create empty file
+        Path(self.errors_file).touch(exist_ok=True)
 
     def _atomic_write(self, target_file_path: str, data: str) -> None:
         """Write data to a file atomically using a temporary file.
