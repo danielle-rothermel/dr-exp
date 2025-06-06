@@ -95,19 +95,8 @@ def run_worker(
     os.makedirs(work_dir, exist_ok=True)
     worker_log_path = os.path.join(work_dir, "worker.log")
 
-    cfg.setdefault("logging", {})
-    cfg["logging"].update(
-        {
-            "out_path": os.path.join(work_dir, "metrics.jsonl"),
-            "checkpoint_dir": os.path.join(work_dir, "checkpoints"),
-            "artifact_dir": os.path.join(work_dir, "artifacts"),
-        }
-    )
-
-    os.makedirs(cfg["logging"]["checkpoint_dir"], exist_ok=True)
-    os.makedirs(cfg["logging"]["artifact_dir"], exist_ok=True)
-
-    logger = logger_cls(cfg)
+    # Create logger with the work directory
+    logger = logger_cls(work_dir, run_id=cfg.get("run_id"))
 
     stop_event = threading.Event()
     hb_thread = threading.Thread(
@@ -146,11 +135,11 @@ def run_worker(
     bundle_dir = os.path.join(work_dir, "bundle")
     os.makedirs(bundle_dir, exist_ok=True)
     shutil.copytree(
-        cfg["logging"]["checkpoint_dir"],
+        logger.paths.checkpoint_dir,
         os.path.join(bundle_dir, "checkpoints"),
     )
     shutil.copytree(
-        cfg["logging"]["artifact_dir"],
+        logger.paths.artifact_dir,
         os.path.join(bundle_dir, "artifacts"),
     )
     shutil.copy2(worker_log_path, os.path.join(bundle_dir, "worker.log"))
