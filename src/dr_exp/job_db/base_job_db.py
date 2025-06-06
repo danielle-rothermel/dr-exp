@@ -9,6 +9,7 @@ class BaseJobDB(ABC):
     
     This class defines the interface that all job database implementations
     must provide for interacting with jobs, configurations, and artifacts.
+    Includes support for priority-based job scheduling and queue management.
     """
     
     # Required attributes that subclasses must provide
@@ -16,13 +17,20 @@ class BaseJobDB(ABC):
     storage_dir: str
     
     @abstractmethod
-    def claim_job(self, worker_id: Optional[str] = None) -> Optional[Dict[str, Any]]:
+    def claim_job(
+        self, 
+        worker_id: Optional[str] = None,
+        respect_reservations: bool = True
+    ) -> Optional[Dict[str, Any]]:
         """Claim the next available queued job.
         
         Parameters
         ----------
         worker_id : str, optional
             Identifier of the worker claiming the job.
+        respect_reservations : bool, optional
+            Whether to respect job reservations, by default True.
+            If True, reserved jobs can only be claimed by their designated worker.
             
         Returns
         -------
@@ -175,6 +183,7 @@ class BaseJobDB(ABC):
         job_config: Dict[str, Any],
         sweep_config_id: str,
         status: str = "queued",
+        priority: int = 100,
     ) -> Dict[str, Any]:
         """Add a new job entry.
         
@@ -186,6 +195,9 @@ class BaseJobDB(ABC):
             Identifier for the sweep configuration.
         status : str, optional
             Initial job status, by default "queued".
+        priority : int, optional
+            Job priority for queue ordering (0-1000), by default 100.
+            Higher values indicate higher priority.
             
         Returns
         -------
@@ -215,6 +227,117 @@ class BaseJobDB(ABC):
             If this method is not implemented by the subclass.
         """
         raise NotImplementedError("log_metrics not implemented for this client type")
+    
+    # Priority management methods
+    
+    @abstractmethod
+    def update_job_priority(
+        self,
+        job_id: str,
+        new_priority: int,
+        reason: Optional[str] = None,
+    ) -> Dict[str, Any]:
+        """Update the priority of a job.
+        
+        Parameters
+        ----------
+        job_id : str
+            Identifier of the job to update.
+        new_priority : int
+            New priority value (0-1000). Higher values indicate higher priority.
+        reason : str, optional
+            Optional reason for the priority change, for audit purposes.
+            
+        Returns
+        -------
+        dict[str, Any]
+            Result of the priority update operation.
+        """
+        pass
+    
+    @abstractmethod
+    def boost_job_priority(
+        self,
+        job_id: str,
+        boost_amount: int = 100,
+    ) -> Dict[str, Any]:
+        """Boost the priority of a job by a specified amount.
+        
+        Parameters
+        ----------
+        job_id : str
+            Identifier of the job to boost.
+        boost_amount : int, optional
+            Amount to add to the current priority, by default 100.
+            Final priority will be clamped to valid range (0-1000).
+            
+        Returns
+        -------
+        dict[str, Any]
+            Result of the priority boost operation including new priority.
+        """
+        pass
+    
+    @abstractmethod
+    def list_jobs_by_priority(
+        self,
+        status_filter: Optional[List[str]] = None,
+        limit: Optional[int] = None,
+    ) -> List[Dict[str, Any]]:
+        """List jobs ordered by priority (highest first).
+        
+        Parameters
+        ----------
+        status_filter : list[str], optional
+            Filter jobs by status (e.g., ["queued", "running"]).
+            If None, all jobs are returned.
+        limit : int, optional
+            Maximum number of jobs to return. If None, all matching jobs.
+            
+        Returns
+        -------
+        list[dict[str, Any]]
+            List of job records ordered by priority (highest first),
+            then by submission time (oldest first) for equal priorities.
+        """
+        pass
+    
+    # Job reservation methods
+    
+    @abstractmethod
+    def add_reserved_job(
+        self,
+        job_config: Dict[str, Any],
+        sweep_config_id: str,
+        reserved_for_worker: str,
+        reservation_timeout: Optional[int] = 300,
+        priority: int = 100,
+        status: str = "queued",
+    ) -> Dict[str, Any]:
+        """Add a new job entry reserved for a specific worker.
+        
+        Parameters
+        ----------
+        job_config : dict[str, Any]
+            The job configuration.
+        sweep_config_id : str
+            Identifier for the sweep configuration.
+        reserved_for_worker : str
+            Worker ID that can claim this job.
+        reservation_timeout : int, optional
+            Reservation timeout in seconds, by default 300 (5 minutes).
+            If None, reservation never expires.
+        priority : int, optional
+            Job priority for queue ordering (0-1000), by default 100.
+        status : str, optional
+            Initial job status, by default "queued".
+            
+        Returns
+        -------
+        dict[str, Any]
+            The created job record with reservation information.
+        """
+        pass
 
 
 __all__ = ["BaseJobDB"]

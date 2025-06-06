@@ -3,7 +3,7 @@ import os
 import shutil
 import tempfile
 import uuid
-from datetime import datetime, UTC
+from datetime import datetime, UTC, timedelta
 from typing import Optional, List, Dict, Any
 
 import portalocker
@@ -93,10 +93,11 @@ class LocalJobDB(BaseJobDB):
 
     # --- Interface methods based on docs/supabase_mock.md ---
 
-    def claim_job(self, worker_id: Optional[str] = None) -> Optional[Dict[str, Any]]:
-        """Atomically claim the next available queued job.
+    def claim_job(self, worker_id: Optional[str] = None, respect_reservations: bool = True) -> Optional[Dict[str, Any]]:
+        """Atomically claim the highest priority available queued job.
         
-        Looks for a job with status='queued' and updates it to 'running'.
+        Looks for jobs with status='queued', sorts by priority (highest first),
+        then by age (oldest first), and claims the first available job.
         Uses file-level locking for atomicity across processes.
         
         Parameters
@@ -110,34 +111,76 @@ class LocalJobDB(BaseJobDB):
         dict[str, Any] | None
             The claimed job record or None if no job is available.
         """
+        # Collect all queued jobs with shared locks
+        queued_jobs = []
         for job_file_name in os.listdir(self.jobs_dir):
             if not job_file_name.endswith(".json"):
                 continue
 
             job_file_path = os.path.join(self.jobs_dir, job_file_name)
             try:
-                with portalocker.Lock(
-                    job_file_path, mode="r+b", flags=portalocker.LOCK_EX
-                ):
+                with portalocker.Lock(job_file_path, mode="r", flags=portalocker.LOCK_SH):
                     with open(job_file_path, "r") as f:
                         job_data = json.load(f)
-
                     if job_data.get("status") == "queued":
-                        job_data["status"] = "running"
-                        job_data["assigned_worker"] = worker_id or (
+                        # Check reservations if respect_reservations is True
+                        if respect_reservations and job_data.get("reserved_for_worker"):
+                            # Check if reservation has expired
+                            if self._is_reservation_expired(job_data):
+                                # Clear expired reservation
+                                job_data.pop("reserved_for_worker", None)
+                                job_data.pop("reservation_expires_at", None)
+                                # Update the job file to clear reservation
+                                try:
+                                    with portalocker.Lock(job_file_path, mode="r+b", flags=portalocker.LOCK_EX):
+                                        self._atomic_write(job_file_path, json.dumps(job_data, indent=4))
+                                except:
+                                    pass  # Continue even if cleanup fails
+                            elif job_data["reserved_for_worker"] != worker_id:
+                                # Skip jobs reserved for other workers
+                                continue
+                        
+                        queued_jobs.append((job_file_path, job_data))
+            except Exception as e:
+                print(f"Error reading job file {job_file_path}: {e}")
+                continue
+
+        if not queued_jobs:
+            return None
+
+        # Sort by priority (higher first), then by age (older first)
+        queued_jobs.sort(
+            key=lambda item: (
+                -item[1].get("priority", 100),  # Negative for descending priority
+                item[1].get("created_at", "")   # Older jobs first at same priority
+            )
+        )
+
+        # Try to claim jobs in priority order
+        for job_file_path, job_data in queued_jobs:
+            try:
+                with portalocker.Lock(job_file_path, mode="r+b", flags=portalocker.LOCK_EX):
+                    # Re-read under exclusive lock to ensure status hasn't changed
+                    with open(job_file_path, "r") as f:
+                        current_job_data = json.load(f)
+                    
+                    if current_job_data.get("status") == "queued":
+                        # Claim the job
+                        current_job_data["status"] = "running"
+                        current_job_data["assigned_worker"] = worker_id or (
                             f"mock_worker_{uuid.uuid4().hex[:6]}"
                         )
-                        job_data["heartbeat"] = datetime.now(UTC).isoformat() + "Z"
+                        current_job_data["heartbeat"] = datetime.now(UTC).isoformat() + "Z"
+                        current_job_data["started_at"] = datetime.now(UTC).isoformat() + "Z"
 
                         self._atomic_write(
-                            job_file_path, json.dumps(job_data, indent=4)
+                            job_file_path, json.dumps(current_job_data, indent=4)
                         )
-                        return job_data
+                        return current_job_data
             except Exception as e:
-                print(
-                    f"Error processing job file {job_file_path}: {e}"
-                )  # Should go to a logger
+                print(f"Error claiming job file {job_file_path}: {e}")
                 continue
+
         return None
 
     def update_job(self, job_id: str, data: Dict[str, Any]) -> Dict[str, Any]:
@@ -388,7 +431,7 @@ class LocalJobDB(BaseJobDB):
         return None
 
     def add_job(
-        self, job_config: Dict[str, Any], sweep_config_id: str, status: str = "queued"
+        self, job_config: Dict[str, Any], sweep_config_id: str, status: str = "queued", priority: int = 100
     ) -> Dict[str, Any]:
         """Add a new job entry to the database.
         
@@ -400,6 +443,9 @@ class LocalJobDB(BaseJobDB):
             Identifier for the sweep configuration.
         status : str, optional
             Initial job status, by default "queued".
+        priority : int, optional
+            Job priority for queue ordering (0-1000), by default 100.
+            Higher values indicate higher priority.
             
         Returns
         -------
@@ -407,11 +453,16 @@ class LocalJobDB(BaseJobDB):
             The created job record with generated job ID.
         """
         job_id = str(uuid.uuid4())
+        # Clamp priority to valid range
+        priority = max(0, min(1000, priority))
+        
         job_data = {
             "id": job_id,
             "config_id": sweep_config_id,  # This would be the ID of the entry in a sweep_configs table
             "status": status,
             "retry_index": 0,
+            "priority": priority,
+            "priority_boost_count": 0,
             "assigned_worker": "unassigned",
             "config_json": job_config,  # Storing the full config here for mock simplicity
             "created_at": datetime.now(UTC).isoformat() + "Z",
@@ -424,6 +475,252 @@ class LocalJobDB(BaseJobDB):
         print("Job Data:")
         for k, v in job_data.items():
             print(f" - {k + ':':20} {v}")
+        return job_data
+
+    # Priority management methods
+
+    def update_job_priority(
+        self,
+        job_id: str,
+        new_priority: int,
+        reason: Optional[str] = None,
+    ) -> Dict[str, Any]:
+        """Update the priority of a job.
+        
+        Parameters
+        ----------
+        job_id : str
+            Identifier of the job to update.
+        new_priority : int
+            New priority value (0-1000). Higher values indicate higher priority.
+        reason : str, optional
+            Optional reason for the priority change, for audit purposes.
+            
+        Returns
+        -------
+        dict[str, Any]
+            Result of the priority update operation.
+        """
+        # Clamp priority to valid range
+        new_priority = max(0, min(1000, new_priority))
+        
+        job_file_path = os.path.join(self.jobs_dir, f"{job_id}.json")
+        if not os.path.exists(job_file_path):
+            return {"success": False, "message": "Job not found"}
+
+        try:
+            with portalocker.Lock(job_file_path, mode="r+b", flags=portalocker.LOCK_EX):
+                with open(job_file_path, "r") as f:
+                    job_data = json.load(f)
+
+                old_priority = job_data.get("priority", 100)
+                job_data["priority"] = new_priority
+                
+                # Add audit trail
+                if "priority_changes" not in job_data:
+                    job_data["priority_changes"] = []
+                
+                job_data["priority_changes"].append({
+                    "timestamp": datetime.now(UTC).isoformat() + "Z",
+                    "old_priority": old_priority,
+                    "new_priority": new_priority,
+                    "reason": reason
+                })
+
+                self._atomic_write(job_file_path, json.dumps(job_data, indent=4))
+            
+            return {
+                "success": True,
+                "old_priority": old_priority,
+                "new_priority": new_priority,
+                "message": f"Priority updated from {old_priority} to {new_priority}"
+            }
+        except Exception as e:
+            return {"success": False, "message": str(e)}
+
+    def boost_job_priority(
+        self,
+        job_id: str,
+        boost_amount: int = 100,
+    ) -> Dict[str, Any]:
+        """Boost the priority of a job by a specified amount.
+        
+        Parameters
+        ----------
+        job_id : str
+            Identifier of the job to boost.
+        boost_amount : int, optional
+            Amount to add to the current priority, by default 100.
+            Final priority will be clamped to valid range (0-1000).
+            
+        Returns
+        -------
+        dict[str, Any]
+            Result of the priority boost operation including new priority.
+        """
+        job_file_path = os.path.join(self.jobs_dir, f"{job_id}.json")
+        if not os.path.exists(job_file_path):
+            return {"success": False, "message": "Job not found"}
+
+        try:
+            with portalocker.Lock(job_file_path, mode="r+b", flags=portalocker.LOCK_EX):
+                with open(job_file_path, "r") as f:
+                    job_data = json.load(f)
+
+                old_priority = job_data.get("priority", 100)
+                new_priority = max(0, min(1000, old_priority + boost_amount))
+                job_data["priority"] = new_priority
+                job_data["priority_boost_count"] = job_data.get("priority_boost_count", 0) + 1
+                
+                # Add audit trail
+                if "priority_changes" not in job_data:
+                    job_data["priority_changes"] = []
+                
+                job_data["priority_changes"].append({
+                    "timestamp": datetime.now(UTC).isoformat() + "Z",
+                    "old_priority": old_priority,
+                    "new_priority": new_priority,
+                    "reason": f"Priority boost of +{boost_amount}"
+                })
+
+                self._atomic_write(job_file_path, json.dumps(job_data, indent=4))
+            
+            return {
+                "success": True,
+                "old_priority": old_priority,
+                "new_priority": new_priority,
+                "boost_amount": boost_amount,
+                "message": f"Priority boosted from {old_priority} to {new_priority}"
+            }
+        except Exception as e:
+            return {"success": False, "message": str(e)}
+
+    def list_jobs_by_priority(
+        self,
+        status_filter: Optional[List[str]] = None,
+        limit: Optional[int] = None,
+    ) -> List[Dict[str, Any]]:
+        """List jobs ordered by priority (highest first).
+        
+        Parameters
+        ----------
+        status_filter : list[str], optional
+            Filter jobs by status (e.g., ["queued", "running"]).
+            If None, all jobs are returned.
+        limit : int, optional
+            Maximum number of jobs to return. If None, all matching jobs.
+            
+        Returns
+        -------
+        list[dict[str, Any]]
+            List of job records ordered by priority (highest first),
+            then by submission time (oldest first) for equal priorities.
+        """
+        jobs = self.list_jobs()
+        
+        # Apply status filter
+        if status_filter:
+            jobs = [job for job in jobs if job.get("status") in status_filter]
+        
+        # Sort by priority (highest first), then by age (oldest first)
+        jobs.sort(
+            key=lambda job: (
+                -job.get("priority", 100),  # Negative for descending priority
+                job.get("created_at", "")   # Older jobs first at same priority
+            )
+        )
+        
+        # Apply limit
+        if limit is not None:
+            jobs = jobs[:limit]
+            
+        return jobs
+
+    # Job reservation methods
+
+    def _is_reservation_expired(self, job_data: Dict[str, Any]) -> bool:
+        """Check if a job reservation has expired.
+        
+        Parameters
+        ----------
+        job_data : dict[str, Any]
+            Job record to check.
+            
+        Returns
+        -------
+        bool
+            True if the reservation has expired or no expiration is set.
+        """
+        expires_at_str = job_data.get("reservation_expires_at")
+        if not expires_at_str:
+            return False  # No expiration set, never expires
+        
+        try:
+            expires_at_str = expires_at_str.rstrip('Z')
+            expires_at = datetime.fromisoformat(expires_at_str.replace('Z', '+00:00'))
+            return datetime.now(UTC) >= expires_at
+        except (ValueError, TypeError):
+            return True  # Invalid timestamp, consider expired
+
+    def add_reserved_job(
+        self,
+        job_config: Dict[str, Any],
+        sweep_config_id: str,
+        reserved_for_worker: str,
+        reservation_timeout: Optional[int] = 300,
+        priority: int = 100,
+        status: str = "queued",
+    ) -> Dict[str, Any]:
+        """Add a new job entry reserved for a specific worker.
+        
+        Parameters
+        ----------
+        job_config : dict[str, Any]
+            The job configuration.
+        sweep_config_id : str
+            Identifier for the sweep configuration.
+        reserved_for_worker : str
+            Worker ID that can claim this job.
+        reservation_timeout : int, optional
+            Reservation timeout in seconds, by default 300 (5 minutes).
+            If None, reservation never expires.
+        priority : int, optional
+            Job priority for queue ordering (0-1000), by default 100.
+        status : str, optional
+            Initial job status, by default "queued".
+            
+        Returns
+        -------
+        dict[str, Any]
+            The created job record with reservation information.
+        """
+        job_id = str(uuid.uuid4())
+        # Clamp priority to valid range
+        priority = max(0, min(1000, priority))
+        
+        job_data = {
+            "id": job_id,
+            "config_id": sweep_config_id,
+            "status": status,
+            "retry_index": 0,
+            "priority": priority,
+            "priority_boost_count": 0,
+            "assigned_worker": "unassigned",
+            "config_json": job_config,
+            "created_at": datetime.now(UTC).isoformat() + "Z",
+            "reserved_for_worker": reserved_for_worker,
+        }
+        
+        # Add expiration time if timeout is specified
+        if reservation_timeout is not None:
+            expires_at = datetime.now(UTC) + timedelta(seconds=reservation_timeout)
+            job_data["reservation_expires_at"] = expires_at.isoformat() + "Z"
+        
+        job_file_path = os.path.join(self.jobs_dir, f"{job_id}.json")
+        with portalocker.Lock(job_file_path, mode="wb", flags=portalocker.LOCK_EX):
+            self._atomic_write(job_file_path, json.dumps(job_data, indent=4))
+        
+        print(f"Added reserved job {job_id} for worker {reserved_for_worker}")
         return job_data
 
 

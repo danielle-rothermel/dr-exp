@@ -41,7 +41,7 @@ def test_base_job_db_optional_methods_raise_not_implemented():
         jobs_dir = "/tmp"
         storage_dir = "/tmp/storage"
         
-        def claim_job(self, worker_id=None):
+        def claim_job(self, worker_id=None, respect_reservations=True):
             return None
             
         def update_job(self, job_id, data):
@@ -61,6 +61,19 @@ def test_base_job_db_optional_methods_raise_not_implemented():
             
         def upload_artifact(self, job_id, local_path, remote_path_suffix):
             return {"success": True}
+            
+        def update_job_priority(self, job_id, new_priority, reason=None):
+            return {"success": True}
+            
+        def boost_job_priority(self, job_id, boost_amount=100):
+            return {"success": True}
+            
+        def list_jobs_by_priority(self, status_filter=None, limit=None):
+            return []
+            
+        def add_reserved_job(self, job_config, sweep_config_id, reserved_for_worker, 
+                           reservation_timeout=300, priority=100, status="queued"):
+            return {"id": "test_job", "reserved_for_worker": reserved_for_worker}
     
     db = MinimalJobDB()
     
