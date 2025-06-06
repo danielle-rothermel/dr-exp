@@ -17,7 +17,7 @@ CONFIG_DIR = (
 
 def test_generate_and_upload(tmp_path):
     cfg_dir = CONFIG_DIR
-    client = LocalJobDB(JobDBConfig(base_path=str(tmp_path / "env", storage_path=str(tmp_path / "env" + "/storage", mode="mock")), storage_path=str(tmp_path / "env" / "storage"))
+    client = LocalJobDB(JobDBConfig(base_path=str(tmp_path / "env", storage_path=str(tmp_path / "env" + "/storage", mode="files_local")), storage_path=str(tmp_path / "env" / "storage"))
     sweep = "model=resnet,vit optim.lr=0.01,0.02"
 
     jobs = config_upload.upload_configs(
@@ -44,7 +44,7 @@ def test_generate_and_upload(tmp_path):
 def test_cli_main(tmp_path, monkeypatch, capsys):
     cfg_dir = CONFIG_DIR
     client_path = tmp_path / "env"
-    client = LocalJobDB(JobDBConfig(base_path=str(client_path, storage_path=str(client_path + "/storage", mode="mock")), storage_path=str(client_path / "storage"))
+    client = LocalJobDB(JobDBConfig(base_path=str(client_path, storage_path=str(client_path + "/storage", mode="files_local")), storage_path=str(client_path / "storage"))
 
     # monkeypatch client inside module
     def mock_client():

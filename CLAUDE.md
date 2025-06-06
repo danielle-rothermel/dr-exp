@@ -20,14 +20,14 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 - **Build**: `npm run build`
 - **Lint**: `npm run lint`
 
-### Supabase (for real database mode)
+### Supabase (for supabase_remote database mode)
 - **Install Supabase CLI**: `npm install -g supabase` or via Homebrew
 - **Start local Supabase**: `supabase start` (requires Docker)
 - **Stop local Supabase**: `supabase stop`
 
 ## Architecture Overview
 
-This is an experiment management system for coordinating deep learning experiments on SLURM GPU clusters. The system supports both local development (mock mode) and production deployment (real mode).
+This is an experiment management system for coordinating deep learning experiments on SLURM GPU clusters. The system supports both local development (files_local mode) and production deployment (supabase_remote mode).
 
 ### Components
 
@@ -64,7 +64,7 @@ This is an experiment management system for coordinating deep learning experimen
 
 6. **Logging System** (`src/dr_exp/logging/`):
    - `StructuredLogger`: Comprehensive metrics and artifact logging
-   - Local file storage in mock mode
+   - Local file storage in files_local mode
    - Supabase object storage in production mode
    - Configurable logging paths and formats
 
@@ -75,7 +75,7 @@ This is an experiment management system for coordinating deep learning experimen
 
 ### Environment Configuration
 
-- `EXPMGR_MODE`: Set to "mock" for local development, "real" for production
+- `EXPMGR_MODE`: Set to "files_local" for local development, "supabase_remote" for production
 - `DR_EXP_BASE_PATH`: Base directory for job data storage
 - `ADMIN_API_KEY`: API key for admin endpoints (defaults to "testkey")
 - Supabase connection vars: `SUPABASE_URL`, `SUPABASE_KEY`, `SUPABASE_SERVICE_ROLE_KEY`
@@ -106,7 +106,7 @@ The manager CLI (`scripts/manager_cli.py`) provides comprehensive job management
 **Maintenance:**
 - `reap-stale`: Clean up stale jobs (jobs without recent heartbeats)
 - `cleanup-storage`: Remove old job data and logs
-- `reset-db`: Reset the local job database (mock mode only)
+- `reset-db`: Reset the local job database (files_local mode only)
 
 ### Key Design Patterns
 
@@ -122,8 +122,8 @@ The manager CLI (`scripts/manager_cli.py`) provides comprehensive job management
 
 1. **Local Development Setup**:
    ```bash
-   # Create .env file with mock mode
-   echo "EXPMGR_MODE=mock" > .env
+   # Create .env file with files_local mode
+   echo "EXPMGR_MODE=files_local" > .env
    
    # Install dependencies
    uv sync
@@ -159,7 +159,7 @@ The manager CLI (`scripts/manager_cli.py`) provides comprehensive job management
    ```
 
 4. **Production Deployment**:
-   - Set `EXPMGR_MODE=real` with Supabase credentials
+   - Set `EXPMGR_MODE=supabase_remote` with Supabase credentials
    - Deploy on SLURM cluster
    - Submit jobs via `sbatch scripts/slurm_job.sbatch`
    - Monitor via web UI or CLI
@@ -168,7 +168,7 @@ The manager CLI (`scripts/manager_cli.py`) provides comprehensive job management
 
 - **Unit Tests**: Each component has dedicated unit tests
 - **Integration Tests**: Manager/worker interaction, API endpoints
-- **Mock Mode Testing**: Most tests run in mock mode for speed
+- **Files Local Testing**: Most tests run in files_local mode for speed
 - **Fixtures**: Shared test utilities in `conftest.py` files
 - **Test Organization**: Tests mirror source structure in `tests/`
 

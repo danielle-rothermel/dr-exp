@@ -7,12 +7,12 @@ from dr_exp.job_db import JobDBConfig
 
 
 def reset_job_db() -> None:
-    """Remove all mock database and storage files then recreate empty dirs."""
+    """Remove all local database and storage files then recreate empty dirs."""
     # Get config to find correct paths
     config = JobDBConfig.from_env()
     
-    if config.mode != "mock":
-        raise ValueError("Can only reset database in mock mode")
+    if config.mode != "files_local":
+        raise ValueError("Can only reset database in files_local mode")
     
     # Get paths from config
     jobs_dir = os.path.join(config.base_path, "job_data")

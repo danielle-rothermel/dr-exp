@@ -62,7 +62,7 @@ def test_get_supabase_client_modes(monkeypatch, tmp_path):
             self.key = config.supabase_key
             self.base_path = config.base_path
 
-    monkeypatch.setenv("EXPMGR_MODE", "real")
+    monkeypatch.setenv("EXPMGR_MODE", "supabase_remote")
     monkeypatch.setenv("SUPABASE_URL", "http://x")
     monkeypatch.setenv("SUPABASE_SERVICE_ROLE_KEY", "k")
     monkeypatch.setattr("dr_exp.utils.jobdb_factory.SupabaseJobDB", Dummy)
@@ -71,7 +71,7 @@ def test_get_supabase_client_modes(monkeypatch, tmp_path):
     assert client.url == "http://x"
     assert client.key == "k"
 
-    monkeypatch.setenv("EXPMGR_MODE", "real")
+    monkeypatch.setenv("EXPMGR_MODE", "supabase_remote")
     monkeypatch.delenv("SUPABASE_URL")
     monkeypatch.delenv("SUPABASE_SERVICE_ROLE_KEY")
     with pytest.raises(ValueError):
@@ -79,7 +79,7 @@ def test_get_supabase_client_modes(monkeypatch, tmp_path):
 
 
 def test_metrics_loader(tmp_path):
-    config = JobDBConfig(base_path=str(tmp_path), storage_path=str(tmp_path / "storage"), mode="mock")
+    config = JobDBConfig(base_path=str(tmp_path), storage_path=str(tmp_path / "storage"), mode="files_local")
     client = LocalJobDB(config)
     loader = MetricsLoader(client, maxsize=2)
     run_id = "r1"
