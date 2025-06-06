@@ -11,4 +11,4 @@ The `src/dr_exp/train_examples` package contains a minimal training loop and a s
 
 These examples are not intended for serious training but show how a user training script can interact with the Experiment Manager.  The configs can be uploaded using `scripts/upload_configs.py` or the `manager_cli upload-configs` command.
 
-`dummy_trainer.train()` accepts a configuration object and an optional `StructuredLogger` instance.  It simulates a few epochs of training, emits checkpoint files and returns summary statistics that are stored with each job.
+`dummy_trainer.train()` accepts a configuration object and an optional `StructuredLogger` instance. When no logger is provided, it creates one using the `log_dir` from the configuration. It simulates a few epochs of training, emits checkpoint files and returns summary statistics that are stored with each job.
