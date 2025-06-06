@@ -29,12 +29,17 @@ class SupabaseJobDB(BaseJobDB):
             URL of the Supabase project.
         supabase_key : str
             API key with permissions for backend operations.
+        base_path : str, optional
+            Base directory for local data storage, by default ".".
 
         Raises
         ------
         ValueError
             If ``supabase_url`` or ``supabase_key`` is missing.
         """
+        # Initialize base class first
+        super().__init__(base_path, base_path + "/storage")
+        
         if not supabase_url or not supabase_key:
             raise ValueError("Supabase URL and Key must be provided.")
         try:
@@ -43,12 +48,6 @@ class SupabaseJobDB(BaseJobDB):
         except Exception as e:
             print(f"Failed to connect to Supabase: {e}")
             raise
-
-        # Where to write any local data
-        self.jobs_dir = f"{base_path}/job_data"
-        self.storage_dir = f"{base_path}/storage"
-        os.makedirs(self.jobs_dir, exist_ok=True)
-        os.makedirs(self.storage_dir, exist_ok=True)
 
     def claim_job(
         self, worker_id: str = "unassigned_worker", respect_reservations: bool = True
@@ -260,45 +259,6 @@ class SupabaseJobDB(BaseJobDB):
             print(f"Error recording failure for job {job_id}: {e}")
             return {"success": False, "message": str(e)}
 
-    def finalize_job(
-        self, job_id: str, final_status: str, metadata: Dict[str, Any]
-    ) -> Dict[str, Any]:
-        """Finalize a job with the given status and metadata.
-
-        Parameters
-        ----------
-        job_id : str
-            Identifier of the job.
-        final_status : str
-            Final status string to record.
-        metadata : dict[str, Any]
-            Additional fields to store on the job record.
-
-        Returns
-        -------
-        dict[str, Any]
-            Result of the update operation.
-        """
-        update_data = {"status": final_status}
-        if "end_time" not in metadata:  # Add end_time if not already provided
-            update_data["end_time"] = datetime.now(timezone.utc).isoformat()
-        update_data.update(metadata)
-        result = self.update_job(job_id, update_data)
-        if result.get("success"):
-            self._write_finished_flag(job_id)
-        return result
-
-    def _write_finished_flag(self, job_id: str) -> None:
-        """Create an empty ``finished.flag`` file for ``job_id`` in local storage."""
-        run_dir = os.path.join(self.jobs_dir, f"run_{job_id}")
-        os.makedirs(run_dir, exist_ok=True)
-        flag_path = os.path.join(run_dir, "finished.flag")
-        try:
-            with open(flag_path, "w"):
-                pass
-        except Exception as e:  # pragma: no cover - unexpected disk error
-            print(f"Error writing finished flag for job {job_id}: {e}")
-
     def upload_artifact(
         self, job_id: str, local_path: str, remote_path_suffix: str
     ) -> Dict[str, Any]:
@@ -481,7 +441,7 @@ class SupabaseJobDB(BaseJobDB):
         """
         try:
             # Clamp priority to valid range
-            priority = max(0, min(1000, priority))
+            priority = self._clamp_priority(priority)
             
             data = {
                 "config_id": config_id,
@@ -523,7 +483,7 @@ class SupabaseJobDB(BaseJobDB):
             Result of the priority update operation.
         """
         # Clamp priority to valid range
-        new_priority = max(0, min(1000, new_priority))
+        new_priority = self._clamp_priority(new_priority)
         
         try:
             # Update job priority
@@ -582,7 +542,7 @@ class SupabaseJobDB(BaseJobDB):
                 return {"success": False, "message": "Job not found"}
                 
             old_priority = response.data.get("priority", 100)
-            new_priority = max(0, min(1000, old_priority + boost_amount))
+            new_priority = self._clamp_priority(old_priority + boost_amount)
             
             # Update priority
             update_response = (
@@ -684,7 +644,7 @@ class SupabaseJobDB(BaseJobDB):
             The created job record with reservation information.
         """
         # Clamp priority to valid range
-        priority = max(0, min(1000, priority))
+        priority = self._clamp_priority(priority)
         
         data = {
             "config_id": sweep_config_id,

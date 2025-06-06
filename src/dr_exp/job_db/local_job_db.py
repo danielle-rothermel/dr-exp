@@ -32,17 +32,15 @@ class LocalJobDB(BaseJobDB):
         storage_path : str, optional
             Directory for artifact and run output storage, by default "./storage".
         """
-        # Location for finalized outputs
-        self.storage_dir = storage_path
-        # Location to write in-progress logs
-        self.jobs_dir = os.path.join(base_path, "job_data")
+        # Initialize base class
+        super().__init__(base_path, storage_path)
+        
+        # Local-specific directories and files
         self.metrics_dir = os.path.join(self.jobs_dir, "metrics")
         self.errors_file = os.path.join(self.jobs_dir, "errors.jsonl")
 
-        # Ensure directories exist (idempotent)
-        os.makedirs(self.jobs_dir, exist_ok=True)
+        # Ensure local-specific directories exist
         os.makedirs(self.metrics_dir, exist_ok=True)
-        os.makedirs(self.storage_dir, exist_ok=True)
         if not os.path.exists(self.errors_file):
             with open(self.errors_file, "w"):
                 pass  # Create empty file
@@ -294,50 +292,6 @@ class LocalJobDB(BaseJobDB):
             print(f"Error recording failure for job {job_id}: {e}")
             return {"success": False, "message": str(e)}
 
-    def finalize_job(self, job_id: str, final_status: str, metadata: Dict[str, Any]) -> Dict[str, Any]:
-        """Finalize a job with the given status and metadata.
-        
-        Parameters
-        ----------
-        job_id : str
-            Identifier of the job.
-        final_status : str
-            Final status string to record.
-        metadata : dict[str, Any]
-            Additional fields to store on the job record.
-            
-        Returns
-        -------
-        dict[str, Any]
-            Result of the finalization operation.
-        """
-        update_data = {
-            "status": final_status,
-            "end_time": datetime.now(UTC).isoformat() + "Z",
-        }
-        update_data.update(metadata)  # e.g., upload_complete_at, finalize_success
-        result = self.update_job(job_id, update_data)
-        if result.get("success"):
-            self._write_finished_flag(job_id)
-        return result
-
-    def _write_finished_flag(self, job_id: str) -> None:
-        """Create an empty finished.flag file for a completed job.
-        
-        Parameters
-        ----------
-        job_id : str
-            Job identifier for which to create the finished flag.
-        """
-        run_dir = os.path.join(self.storage_dir, f"run_{job_id}")
-        os.makedirs(run_dir, exist_ok=True)
-        flag_path = os.path.join(run_dir, "finished.flag")
-        try:
-            with open(flag_path, "w"):
-                pass
-        except Exception as e:
-            print(f"Error writing finished flag for job {job_id}: {e}")
-
     def upload_artifact(self, job_id: str, local_path: str, remote_path_suffix: str) -> Dict[str, Any]:
         """Upload an artifact file or directory to local storage.
         
@@ -454,7 +408,7 @@ class LocalJobDB(BaseJobDB):
         """
         job_id = str(uuid.uuid4())
         # Clamp priority to valid range
-        priority = max(0, min(1000, priority))
+        priority = self._clamp_priority(priority)
         
         job_data = {
             "id": job_id,
@@ -502,7 +456,7 @@ class LocalJobDB(BaseJobDB):
             Result of the priority update operation.
         """
         # Clamp priority to valid range
-        new_priority = max(0, min(1000, new_priority))
+        new_priority = self._clamp_priority(new_priority)
         
         job_file_path = os.path.join(self.jobs_dir, f"{job_id}.json")
         if not os.path.exists(job_file_path):
@@ -568,7 +522,7 @@ class LocalJobDB(BaseJobDB):
                     job_data = json.load(f)
 
                 old_priority = job_data.get("priority", 100)
-                new_priority = max(0, min(1000, old_priority + boost_amount))
+                new_priority = self._clamp_priority(old_priority + boost_amount)
                 job_data["priority"] = new_priority
                 job_data["priority_boost_count"] = job_data.get("priority_boost_count", 0) + 1
                 
@@ -696,7 +650,7 @@ class LocalJobDB(BaseJobDB):
         """
         job_id = str(uuid.uuid4())
         # Clamp priority to valid range
-        priority = max(0, min(1000, priority))
+        priority = self._clamp_priority(priority)
         
         job_data = {
             "id": job_id,
