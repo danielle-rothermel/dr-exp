@@ -2,40 +2,42 @@ import argparse
 import os
 import shutil
 
+from dr_exp.utils.jobdb_factory import get_job_db_client
+from dr_exp.job_db import JobDBConfig
 
-def reset_job_db(base_path: str = ".") -> None:
+
+def reset_job_db() -> None:
     """Remove all mock database and storage files then recreate empty dirs."""
-    jobs_dir = os.path.join(base_path, "jobs")
-    metrics_dir = os.path.join(base_path, "metrics")
-    errors_file = os.path.join(base_path, "errors.jsonl")
-
-    # Remove directories and files if they exist
-    for path in (jobs_dir, metrics_dir):
+    # Get config to find correct paths
+    config = JobDBConfig.from_env()
+    
+    if config.mode != "mock":
+        raise ValueError("Can only reset database in mock mode")
+    
+    # Get paths from config
+    jobs_dir = os.path.join(config.base_path, "job_data")
+    storage_dir = config.storage_path
+    
+    # Remove directories if they exist
+    for path in (jobs_dir, storage_dir):
         if os.path.exists(path):
+            print(f"Removing {path}")
             shutil.rmtree(path)
-
-    if os.path.exists(errors_file):
-        os.remove(errors_file)
-
-    # Recreate clean structure
-    os.makedirs(jobs_dir, exist_ok=True)
-    os.makedirs(metrics_dir, exist_ok=True)
-    with open(errors_file, "w"):
-        pass
+    
+    # Create a new client to reinitialize directories
+    client = get_job_db_client(config)
+    print(f"JobDB reset complete")
+    print(f"  Job data: {jobs_dir}")
+    print(f"  Storage: {storage_dir}")
 
 
 def main() -> None:
     """CLI wrapper for :func:`reset_job_db`."""
 
     parser = argparse.ArgumentParser(description="Reset the local jobdb environment.")
-    parser.add_argument(
-        "--base-path",
-        default=".",
-        help="Base path containing job data",
-    )
+    # No longer need base-path argument since we use config
     args = parser.parse_args()
-    reset_job_db(args.base_path)
-    print(f"JobDB reset under {os.path.abspath(args.base_path)}")
+    reset_job_db()
 
 
 if __name__ == "__main__":

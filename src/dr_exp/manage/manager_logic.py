@@ -10,7 +10,7 @@ import multiprocessing as mp
 from dotenv import load_dotenv
 from typing import Dict, List
 
-from dr_exp.utils.jobdb_factory import get_supabase_client
+from dr_exp.utils.jobdb_factory import get_job_db_client
 from dr_exp.job_db.base_job_db import BaseJobDB
 
 # Import the worker implementation from this package
@@ -62,7 +62,7 @@ class Manager:
         self.heartbeat_interval = heartbeat_interval
         self.idle_timeout = timedelta(minutes=idle_timeout_mins)
         self.base_dir = base_dir
-        self.client = client or get_supabase_client()
+        self.client = client or get_job_db_client()
         # Extract base_path from client's jobs_dir (remove "/job_data" suffix)
         if self.client.jobs_dir.endswith("/job_data"):
             self.base_path = self.client.jobs_dir[:-9]  # Remove "/job_data"

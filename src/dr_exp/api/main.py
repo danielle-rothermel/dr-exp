@@ -18,7 +18,7 @@ from dr_exp.api.models import (
     MetricsResponse,
     RequeueRequest,
 )
-from dr_exp.utils.jobdb_factory import get_supabase_client
+from dr_exp.utils.jobdb_factory import get_job_db_client
 from dr_exp.job_db.base_job_db import BaseJobDB
 
 load_dotenv()
@@ -144,7 +144,7 @@ def create_app(base_path: str = ".") -> FastAPI:
         allow_headers=["*"],
     )
 
-    client = get_supabase_client(base_path=base_path)
+    client = get_job_db_client()
     loader = MetricsLoader(client)
 
     app.state.client = client

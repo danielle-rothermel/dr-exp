@@ -15,7 +15,7 @@ from dr_exp.manage.manager_logic import (
 )
 from dr_exp.utils.job_reaper import reap_stale_jobs
 from dr_exp.utils.storage_cleanup import cleanup_uploaded_runs
-from dr_exp.utils.jobdb_factory import get_supabase_client
+from dr_exp.utils.jobdb_factory import get_job_db_client
 from . import upload_configs, run_one
 
 load_dotenv()
@@ -197,20 +197,20 @@ def _cmd_run_worker(args: argparse.Namespace) -> None:
 
 
 def _cmd_reap_stale_jobs(args: argparse.Namespace) -> None:
-    client = get_supabase_client(base_path=args.base_path)
+    client = get_job_db_client()
     count = reap_stale_jobs(client, args.max_age_mins)
     print(f"Marked {count} stale job(s) as failed")
 
 
 def _cmd_cleanup_run_data(args: argparse.Namespace) -> None:
-    client = get_supabase_client(base_path=args.base_path)
+    client = get_job_db_client()
     count = cleanup_uploaded_runs(client)
     print(f"Removed {count} run directory(s)")
 
 
 def _cmd_list_jobs(args: argparse.Namespace) -> None:
     """List jobs ordered by priority."""
-    client = get_supabase_client(base_path=args.base_path)
+    client = get_job_db_client()
     jobs = client.list_jobs_by_priority(status_filter=args.status, limit=args.limit)
     
     if not jobs:
@@ -229,7 +229,7 @@ def _cmd_list_jobs(args: argparse.Namespace) -> None:
 
 def _cmd_boost_priority(args: argparse.Namespace) -> None:
     """Boost job priority by specified amount."""
-    client = get_supabase_client(base_path=args.base_path)
+    client = get_job_db_client()
     result = client.boost_job_priority(args.job_id, boost_amount=args.amount)
     
     if result.get("success"):
@@ -240,7 +240,7 @@ def _cmd_boost_priority(args: argparse.Namespace) -> None:
 
 def _cmd_set_priority(args: argparse.Namespace) -> None:
     """Set job priority to exact value."""
-    client = get_supabase_client(base_path=args.base_path)
+    client = get_job_db_client()
     result = client.update_job_priority(args.job_id, args.priority, reason=args.reason)
     
     if result.get("success"):

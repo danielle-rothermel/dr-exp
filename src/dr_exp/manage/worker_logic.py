@@ -13,7 +13,7 @@ from typing import Any, Callable, Optional
 
 from dr_exp.logging.base_logger import BaseLogger
 from dr_exp.logging.structured_logger import StructuredLogger
-from dr_exp.utils.jobdb_factory import get_supabase_client
+from dr_exp.utils.jobdb_factory import get_job_db_client
 from dr_exp.job_db.base_job_db import BaseJobDB
 from dr_exp.train_examples.dummy_trainer import train as default_train
 
@@ -74,7 +74,7 @@ def run_worker(
     str
         Final status string.
     """
-    client = client or get_supabase_client(base_path=base_path)
+    client = client or get_job_db_client()
 
     # Handle target job ID for "run one" functionality
     if target_job_id:
