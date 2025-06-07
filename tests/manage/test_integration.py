@@ -5,8 +5,10 @@ import tempfile
 import threading
 import time
 import pytest
-from unittest.mock import Mock, patch
+from unittest.mock import Mock, patch, MagicMock, call
 from pathlib import Path
+from datetime import datetime, UTC, timedelta
+from contextlib import contextmanager
 
 from dr_exp.utils.factory import create_system, SystemConfig
 from dr_exp.job_db import JobDBConfig, LocalJobDB
@@ -31,8 +33,56 @@ def integration_config(tmp_path):
         heartbeat_timeout=10,
         idle_timeout_mins=1,
         max_claim_attempts=3,
-        worker_heartbeat_interval=1.0
+        worker_heartbeat_interval=0.1  # Fast heartbeat for testing
     )
+
+
+@pytest.fixture
+def mock_time():
+    """Fixture providing controlled time for deterministic timing tests."""
+    class MockTime:
+        def __init__(self):
+            self._current_time = datetime(2024, 1, 1, 12, 0, 0, tzinfo=UTC)
+            self._time_calls = []
+        
+        def now(self, tz=None):
+            self._time_calls.append(self._current_time)
+            return self._current_time
+        
+        def advance(self, seconds):
+            """Advance mock time by specified seconds."""
+            self._current_time += timedelta(seconds=seconds)
+        
+        def get_calls(self):
+            return self._time_calls.copy()
+        
+        def reset_calls(self):
+            self._time_calls.clear()
+    
+    return MockTime()
+
+
+@contextmanager
+def event_driven_mock_train(completion_events=None, execution_order=None, results=None):
+    """Context manager for event-driven mock training with deterministic timing."""
+    completion_events = completion_events or {}
+    execution_order = execution_order or []
+    results = results or {}
+    
+    def mock_train(config, logger, *args, **kwargs):
+        job_key = config.get("test_param") or config.get("priority_test") or config.get("job_number", "default")
+        execution_order.append(job_key)
+        
+        # Signal completion if event provided
+        event = completion_events.get(job_key)
+        if event:
+            event.set()
+        
+        # Return configured result
+        return results.get(job_key, {"final_val_acc": 0.95, "status": "success"})
+    
+    with patch('dr_exp.train_examples.dummy_trainer.train', side_effect=mock_train):
+        yield execution_order
 
 
 class TestManagerWorkerIntegration:
@@ -56,27 +106,42 @@ class TestManagerWorkerIntegration:
         # Mock the actual training function to avoid real execution
         def mock_train(config, logger, *args, **kwargs):
             """Mock training function that simulates work."""
-            time.sleep(0.1)  # Simulate some work
-            logger.log_metric("test_metric", 0.95)
-            return {"final_val_acc": 0.95, "status": "completed"}
+            logger.log({"test_metric": 0.95})
+            return {"final_val_acc": 0.95, "status": "success"}
         
         # Run worker to process jobs
-        with patch('dr_exp.manage.worker.default_train', side_effect=mock_train):
-            # Worker should claim and execute the higher priority job first
-            status1 = factory.run_worker(worker_id="test_worker_1")
-            assert status1 == "completed"
-            
-            # Check that the higher priority job was processed
-            job_details = factory.job_db.get_job_details(job2["id"])
-            assert job_details["status"] == "completed"
-            
-            # Process second job
-            status2 = factory.run_worker(worker_id="test_worker_2")
-            assert status2 == "completed"
-            
-            # Check that the lower priority job was also processed
-            job_details = factory.job_db.get_job_details(job1["id"])
-            assert job_details["status"] == "completed"
+        # Use direct trainer_fn to bypass import issues
+        from dr_exp.manage.worker import run_worker
+        
+        # Worker should claim and execute the higher priority job first
+        status1 = run_worker(
+            base_path=integration_config.job_db_config.base_path,
+            max_claim_attempts=integration_config.max_claim_attempts,
+            heartbeat_interval=integration_config.worker_heartbeat_interval,
+            trainer_fn=mock_train,
+            client=factory.job_db,
+            worker_id="test_worker_1"
+        )
+        assert status1 == "completed"
+        
+        # Check that the higher priority job was processed
+        job_details = factory.job_db.get_job_details(job2["id"])
+        assert job_details["status"] == "completed"
+        
+        # Process second job
+        status2 = run_worker(
+            base_path=integration_config.job_db_config.base_path,
+            max_claim_attempts=integration_config.max_claim_attempts,
+            heartbeat_interval=integration_config.worker_heartbeat_interval,
+            trainer_fn=mock_train,
+            client=factory.job_db,
+            worker_id="test_worker_2"
+        )
+        assert status2 == "completed"
+        
+        # Check that the lower priority job was also processed
+        job_details = factory.job_db.get_job_details(job1["id"])
+        assert job_details["status"] == "completed"
     
     def test_manager_coordinates_multiple_workers(self, integration_config):
         """Test that manager can coordinate multiple workers."""
@@ -119,8 +184,7 @@ class TestManagerWorkerIntegration:
         assert "0" in gpu_assignments
         assert "1" in gpu_assignments
     
-    @pytest.mark.skip("TODO: Fix stale job detection timing in test")
-    def test_stale_job_detection_and_recovery(self, integration_config):
+    def test_stale_job_detection_and_recovery(self, integration_config, mock_time):
         """Test that stale jobs are detected and marked as failed."""
         factory = create_system(integration_config)
         
@@ -131,33 +195,44 @@ class TestManagerWorkerIntegration:
         )
         
         # Claim the job manually to simulate worker claiming it
-        claimed_job = factory.job_db.claim_next_job("dead_worker")
+        claimed_job = factory.job_db.claim_job("dead_worker")
         assert claimed_job is not None
         assert claimed_job["id"] == job["id"]
         
-        # Wait longer than heartbeat timeout to make job stale
-        time.sleep(0.1)  # Short sleep for test speed
+        # Set the heartbeat timestamp to an old time to simulate stale job
+        old_heartbeat = mock_time.now()
+        factory.job_db.update_job(job["id"], {
+            "heartbeat": old_heartbeat.isoformat() + "Z"
+        })
         
-        # Use manager's stale job detection with very short timeout for testing
+        # Advance time to make the job stale
+        mock_time.advance(25)  # 25 seconds > heartbeat_timeout * 2 (20s)
+        
+        # Create manager with deterministic timing
         manager = Manager(
             gpus=["0"],
             workers_per_gpu=1,
-            heartbeat_timeout=0.01,  # Very short timeout for testing
+            heartbeat_timeout=10,  # 10 second timeout (threshold will be 20s)
             idle_timeout_mins=1,
             base_dir=str(Path(integration_config.job_db_config.base_path) / "manager"),
             client=factory.job_db,
             process_manager=MockProcessManager()
         )
         
-        # Check for stale jobs
-        manager.check_stale_jobs()
+        # Mock datetime in job_db for stale job detection
+        with patch('dr_exp.job_db.local_job_db.datetime') as job_db_mock_datetime:
+            job_db_mock_datetime.now.return_value = mock_time.now()
+            job_db_mock_datetime.UTC = UTC
+            job_db_mock_datetime.fromisoformat = datetime.fromisoformat
+            
+            # Check for stale jobs
+            manager.check_stale_jobs()
         
         # Verify job was marked as failed
         job_details = factory.job_db.get_job_details(job["id"])
         assert job_details["status"] == "failed"
         assert "worker_lost" in job_details.get("status_reason", "")
     
-    @pytest.mark.skip("TODO: Fix mock patching in worker execution context")
     def test_priority_based_job_scheduling(self, integration_config):
         """Test that jobs are processed in priority order."""
         factory = create_system(integration_config)
@@ -176,24 +251,33 @@ class TestManagerWorkerIntegration:
             status="queued", priority=500
         )
         
+        
         # Mock training to track execution order
         execution_order = []
         
         def mock_train(config, logger, *args, **kwargs):
-            execution_order.append(config["priority_test"])
-            time.sleep(0.05)  # Simulate work
-            return {"status": "completed"}
+            priority_level = config.get("priority_test")
+            execution_order.append(priority_level)
+            return {"final_val_acc": 0.95, "status": "success"}
         
-        with patch('dr_exp.manage.worker.default_train', side_effect=mock_train):
-            # Process all jobs
-            for i in range(3):
-                status = factory.run_worker(worker_id=f"priority_worker_{i}")
-                assert status == "completed"
+        # Use run_worker with custom trainer_fn to bypass the default_train import issue
+        from dr_exp.manage.worker import run_worker
+        
+        # Process all jobs with custom trainer function
+        for i in range(3):
+            status = run_worker(
+                base_path=integration_config.job_db_config.base_path,
+                max_claim_attempts=integration_config.max_claim_attempts,
+                heartbeat_interval=integration_config.worker_heartbeat_interval,
+                trainer_fn=mock_train,  # Pass mock directly as parameter
+                client=factory.job_db,
+                worker_id=f"priority_worker_{i}"
+            )
+            assert status == "completed"
         
         # Verify jobs were executed in priority order (high to low)
         assert execution_order == ["high", "medium", "low"]
     
-    @pytest.mark.skip("TODO: Fix heartbeat timing in test") 
     def test_worker_heartbeat_mechanism(self, integration_config):
         """Test that worker heartbeat mechanism works correctly."""
         factory = create_system(integration_config)
@@ -205,11 +289,15 @@ class TestManagerWorkerIntegration:
         )
         
         heartbeat_updates = []
+        training_started = threading.Event()
+        training_can_complete = threading.Event()
         
         def mock_train(config, logger, *args, **kwargs):
-            # Simulate longer running job
-            time.sleep(0.3)  # Should allow multiple heartbeats
-            return {"status": "completed"}
+            # Signal training started
+            training_started.set()
+            # Wait for test to verify heartbeats before completing
+            training_can_complete.wait(timeout=5)
+            return {"final_val_acc": 0.95, "status": "success"}
         
         # Monitor heartbeat updates
         original_update = factory.job_db.update_job
@@ -217,18 +305,39 @@ class TestManagerWorkerIntegration:
         def track_heartbeat_updates(job_id, updates):
             if "heartbeat" in updates:
                 heartbeat_updates.append(updates["heartbeat"])
+                # Allow training to complete after we get some heartbeats
+                if len(heartbeat_updates) >= 2:
+                    training_can_complete.set()
             return original_update(job_id, updates)
         
-        with patch('dr_exp.manage.worker.default_train', side_effect=mock_train):
-            with patch.object(factory.job_db, 'update_job', side_effect=track_heartbeat_updates):
-                status = factory.run_worker(
-                    worker_id="heartbeat_worker",
-                    heartbeat_interval=0.1  # Fast heartbeat for testing
+        with patch.object(factory.job_db, 'update_job', side_effect=track_heartbeat_updates):
+            # Run worker in thread to allow heartbeat monitoring
+            from dr_exp.manage.worker import run_worker
+            result = []
+            def run_worker_thread():
+                status = run_worker(
+                    base_path=integration_config.job_db_config.base_path,
+                    max_claim_attempts=integration_config.max_claim_attempts,
+                    heartbeat_interval=integration_config.worker_heartbeat_interval,
+                    trainer_fn=mock_train,  # Pass mock directly as parameter
+                    client=factory.job_db,
+                    worker_id="heartbeat_worker"
                 )
-                assert status == "completed"
+                result.append(status)
+            
+            worker_thread = threading.Thread(target=run_worker_thread)
+            worker_thread.start()
+            
+            # Wait for training to start
+            assert training_started.wait(timeout=5), "Training did not start"
+            
+            # Wait for worker to complete
+            worker_thread.join(timeout=10)
+            assert len(result) == 1
+            assert result[0] == "completed"
         
         # Verify that heartbeats were sent during job execution
-        assert len(heartbeat_updates) >= 2  # Should have multiple heartbeat updates
+        assert len(heartbeat_updates) >= 2, f"Expected >= 2 heartbeats, got {len(heartbeat_updates)}"
     
     def test_system_status_reporting(self, integration_config):
         """Test that system status reporting works correctly."""
@@ -300,7 +409,6 @@ class TestFactoryIntegration:
             assert factory.config.job_db_config.mode == "files_local"
             assert str(tmp_path / "env_test") in factory.config.job_db_config.base_path
     
-    @pytest.mark.skip("TODO: Fix mock patching in worker execution context")
     def test_factory_worker_execution_with_parameters(self, integration_config):
         """Test factory worker execution with various parameters."""
         factory = create_system(integration_config)
@@ -318,16 +426,23 @@ class TestFactoryIntegration:
         )
         
         def mock_train(config, logger, *args, **kwargs):
-            return {"status": "completed", "config": config}
+            return {"final_val_acc": 0.95, "status": "success", "config": config}
         
-        with patch('dr_exp.manage.worker.default_train', side_effect=mock_train):
-            # Run worker targeting specific job
-            status = factory.run_worker(
-                worker_id="targeted_worker",
-                target_job_id=target_job["id"],
-                respect_reservations=False
-            )
-            assert status == "completed"
+        # Use direct trainer_fn to bypass import issues
+        from dr_exp.manage.worker import run_worker
+        
+        # Run worker targeting specific job
+        status = run_worker(
+            base_path=integration_config.job_db_config.base_path,
+            max_claim_attempts=integration_config.max_claim_attempts,
+            heartbeat_interval=integration_config.worker_heartbeat_interval,
+            trainer_fn=mock_train,
+            client=factory.job_db,
+            worker_id="targeted_worker",
+            target_job_id=target_job["id"],
+            respect_reservations=False
+        )
+        assert status == "completed"
         
         # Verify target job was processed
         target_details = factory.job_db.get_job_details(target_job["id"])
@@ -339,7 +454,6 @@ class TestFactoryIntegration:
 
 
 @pytest.mark.integration
-@pytest.mark.skip("TODO: Fix mock patching for full system tests")
 class TestFullSystemIntegration:
     """Full system integration tests that simulate real usage patterns."""
     
@@ -371,8 +485,8 @@ class TestFullSystemIntegration:
             else:
                 final_accuracy = 0.90
             
-            logger.log_metric("accuracy", final_accuracy)
-            logger.log_metric("loss", 0.1)
+            logger.log({"accuracy": final_accuracy})
+            logger.log({"loss": 0.1})
             
             results.append({
                 "model": config["model"],
@@ -380,13 +494,22 @@ class TestFullSystemIntegration:
                 "accuracy": final_accuracy
             })
             
-            return {"final_val_acc": final_accuracy, "status": "completed"}
+            return {"final_val_acc": final_accuracy, "status": "success"}
         
-        with patch('dr_exp.manage.worker.default_train', side_effect=mock_train):
-            # Process all jobs
-            for i in range(len(experiment_jobs)):
-                status = factory.run_worker(worker_id=f"exp_worker_{i}")
-                assert status == "completed"
+        # Use direct trainer_fn to bypass import issues
+        from dr_exp.manage.worker import run_worker
+        
+        # Process all jobs
+        for i in range(len(experiment_jobs)):
+            status = run_worker(
+                base_path=integration_config.job_db_config.base_path,
+                max_claim_attempts=integration_config.max_claim_attempts,
+                heartbeat_interval=integration_config.worker_heartbeat_interval,
+                trainer_fn=mock_train,
+                client=factory.job_db,
+                worker_id=f"exp_worker_{i}"
+            )
+            assert status == "completed"
         
         # Phase 3: Verify results
         assert len(results) == 4
@@ -428,29 +551,45 @@ class TestFullSystemIntegration:
             if call_count == 1:
                 raise RuntimeError("Simulated training failure")
             else:
-                logger.log_metric("recovery_metric", 0.85)
-                return {"final_val_acc": 0.85, "status": "completed"}
+                logger.log({"recovery_metric": 0.85})
+                return {"final_val_acc": 0.85, "status": "success"}
         
-        with patch('dr_exp.manage.worker.default_train', side_effect=mock_train_with_failure):
-            # First attempt should complete (worker completes), but job should fail
-            status1 = factory.run_worker(worker_id="failure_worker_1")
-            assert status1 == "completed"  # Worker completed successfully
-            
-            # Verify job marked as failed (training failed)
-            job_details = factory.job_db.get_job_details(failing_job["id"])
-            assert job_details["status"] == "failed"
-            
-            # Manually requeue the job (simulating retry logic)
-            factory.job_db.update_job(failing_job["id"], {
-                "status": "queued",
-                "retry_index": job_details["retry_index"] + 1
-            })
-            
-            # Second attempt should succeed
-            status2 = factory.run_worker(worker_id="failure_worker_2")
-            assert status2 == "completed"
-            
-            # Verify job completed successfully on retry
-            final_details = factory.job_db.get_job_details(failing_job["id"])
-            assert final_details["status"] == "completed"
-            assert final_details["retry_index"] == 1
+        # Use direct trainer_fn to bypass import issues
+        from dr_exp.manage.worker import run_worker
+        
+        # First attempt should fail due to training exception
+        status1 = run_worker(
+            base_path=integration_config.job_db_config.base_path,
+            max_claim_attempts=integration_config.max_claim_attempts,
+            heartbeat_interval=integration_config.worker_heartbeat_interval,
+            trainer_fn=mock_train_with_failure,
+            client=factory.job_db,
+            worker_id="failure_worker_1"
+        )
+        assert status1 == "failed"  # Worker reports failure due to training exception
+        
+        # Verify job marked as failed (training failed)
+        job_details = factory.job_db.get_job_details(failing_job["id"])
+        assert job_details["status"] == "failed"
+        
+        # Manually requeue the job (simulating retry logic)
+        factory.job_db.update_job(failing_job["id"], {
+            "status": "queued",
+            "retry_index": job_details["retry_index"] + 1
+        })
+        
+        # Second attempt should succeed
+        status2 = run_worker(
+            base_path=integration_config.job_db_config.base_path,
+            max_claim_attempts=integration_config.max_claim_attempts,
+            heartbeat_interval=integration_config.worker_heartbeat_interval,
+            trainer_fn=mock_train_with_failure,
+            client=factory.job_db,
+            worker_id="failure_worker_2"
+        )
+        assert status2 == "completed"
+        
+        # Verify job completed successfully on retry
+        final_details = factory.job_db.get_job_details(failing_job["id"])
+        assert final_details["status"] == "completed"
+        assert final_details["retry_index"] == 1

@@ -12,7 +12,7 @@
 - **Advanced Job Management:** Boost job priorities, set reservations, and list jobs by priority with comprehensive CLI tools.
 - **Reproducibility:** Captures code versions, configurations, and (planned) environment details.
 - **Modular & Agent-Ready Design:** Components are designed with clear interfaces for independent development and testing, suitable for agentic coders.
-- **Streamlined Architecture:** Recently refactored to eliminate mixed responsibilities and improve maintainability through abstract interface methods.
+- **Streamlined Architecture:** Eliminates mixed responsibilities and improves maintainability through abstract interface methods.
 ## 3. System Architecture
 - The system comprises several key components that interact to manage the experiment lifecycle:
 - ```plain text

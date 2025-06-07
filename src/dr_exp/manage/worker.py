@@ -314,11 +314,17 @@ def _claim_job(
         if job.get("status") != "queued":
             return "job_not_available"
         
-        # Try to claim the specific job
-        claimed_job = client.claim_job(worker_id, respect_reservations=respect_reservations)
-        if claimed_job is None or claimed_job.get("id") != target_job_id:
+        # Directly claim the specific job by updating its status
+        try:
+            client.update_job(target_job_id, {
+                "status": "running",
+                "worker_id": worker_id,
+                "claimed_at": datetime.now(UTC).isoformat() + "Z"
+            })
+            # Return the updated job details
+            return client.get_job_details(target_job_id)
+        except Exception:
             return "target_job_claim_failed"
-        return claimed_job
     
     # Normal job claiming with exponential backoff
     attempt = 0
