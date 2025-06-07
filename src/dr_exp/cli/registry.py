@@ -13,6 +13,7 @@ from dr_exp.cli.commands.run_one import RunOneCommand
 from dr_exp.cli.commands.reap_stale_jobs import ReapStaleJobsCommand
 from dr_exp.cli.commands.cleanup_run_data import CleanupRunDataCommand
 from dr_exp.cli.commands.upload_configs import UploadConfigsCommand
+from dr_exp.cli.commands.status import StatusCommand
 
 
 class CommandRegistry:
@@ -35,6 +36,7 @@ class CommandRegistry:
             ReapStaleJobsCommand,
             CleanupRunDataCommand,
             UploadConfigsCommand,
+            StatusCommand,
         ]
         
         for command_class in commands:

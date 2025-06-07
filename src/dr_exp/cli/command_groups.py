@@ -67,7 +67,8 @@ COMMAND_GROUP_MAPPING = {
     "system": [
         "run",
         "discover-gpus", 
-        "run-worker"
+        "run-worker",
+        "status"
     ],
     
     # Job commands  
