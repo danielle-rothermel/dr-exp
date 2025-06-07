@@ -152,3 +152,13 @@ def test_priority_endpoints(client, sb_client):
         headers={"Authorization": "Bearer bad"}
     )
     assert bad_resp.status_code == 401
+
+
+def test_websocket_connection(client):
+    """Test WebSocket connection can be established."""
+    with client.websocket_connect("/ws") as websocket:
+        # Send a test message
+        websocket.send_text("test message")
+        # Receive the echo
+        data = websocket.receive_text()
+        assert "Echo: test message" in data
