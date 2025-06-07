@@ -4,6 +4,16 @@ import os
 from abc import ABC, abstractmethod
 from datetime import datetime, UTC
 from typing import Any, Dict, List, Optional
+from dataclasses import dataclass
+
+
+@dataclass
+class StaleJobInfo:
+    """Information about a job with stale heartbeat."""
+    job_id: str
+    assigned_worker: str
+    last_heartbeat: datetime
+    age_seconds: int
 
 
 class BaseJobDB(ABC):
@@ -176,6 +186,105 @@ class BaseJobDB(ABC):
             Result of the upload operation including the storage path.
         """
         pass
+    
+    # =========================================================================
+    # NEW STREAMLINED INTERFACE METHODS
+    # =========================================================================
+    
+    @abstractmethod
+    def list_running_jobs(self) -> List[Dict[str, Any]]:
+        """Get all jobs currently in 'running' status.
+        
+        Eliminates the need for manager to implement database-specific 
+        queries with file system traversal or SQL logic.
+        
+        Returns
+        -------
+        List[Dict[str, Any]]
+            Jobs with status='running', including worker assignments
+        """
+        pass
+    
+    @abstractmethod
+    def get_stale_jobs(self, max_age_seconds: int) -> List[StaleJobInfo]:
+        """Find jobs with heartbeats older than max_age_seconds.
+        
+        Eliminates datetime parsing and comparison logic from manager.
+        Manager just says "find stale jobs" and gets structured results.
+        
+        Parameters
+        ----------
+        max_age_seconds : int
+            Maximum age of heartbeat before considering stale
+            
+        Returns
+        -------
+        List[StaleJobInfo]
+            Structured information about stale jobs
+        """
+        pass
+    
+    @abstractmethod
+    def mark_jobs_failed(
+        self, 
+        job_ids: List[str], 
+        reason: str = "worker_lost"
+    ) -> Dict[str, bool]:
+        """Mark multiple jobs as failed efficiently.
+        
+        Eliminates the need for manager to loop through individual updates.
+        Supports batch operations for better performance.
+        
+        Parameters
+        ----------
+        job_ids : List[str]
+            Job IDs to mark as failed
+        reason : str
+            Failure reason for audit trail
+            
+        Returns
+        -------
+        Dict[str, bool]
+            Mapping of job_id -> success status
+        """
+        pass
+    
+    @abstractmethod
+    def has_queued_jobs(self) -> bool:
+        """Check if there are any queued jobs available.
+        
+        Eliminates the need for manager to fetch and count job lists
+        when checking idle conditions. Simple boolean check.
+        
+        Returns
+        -------
+        bool
+            True if there are jobs in 'queued' status
+        """
+        pass
+    
+    @abstractmethod
+    def get_queue_summary(self, limit: int = 5) -> List[Dict[str, Any]]:
+        """Get summary of top queued jobs for logging.
+        
+        Eliminates manager having to know about priority ordering.
+        Just asks for "top jobs in queue" for monitoring purposes.
+        
+        Parameters
+        ----------
+        limit : int
+            Maximum number of jobs to return
+            
+        Returns
+        -------
+        List[Dict[str, Any]]
+            Top queued jobs with id, priority, created_at
+        """
+        pass
+    
+    # =========================================================================
+    # END NEW INTERFACE METHODS
+    # =========================================================================
     
     # Optional methods that subclasses may implement differently
     
@@ -419,4 +528,4 @@ class BaseJobDB(ABC):
         return max(0, min(1000, priority))
 
 
-__all__ = ["BaseJobDB"]
+__all__ = ["BaseJobDB", "StaleJobInfo"]

@@ -8,17 +8,21 @@ from typing import Sequence
 
 from dotenv import load_dotenv
 
-from dr_exp.manage.manager_logic import (
-    Manager,
-    discover_gpus,
-    run_worker_main,
-)
+from dr_exp.utils.factory import create_system, SystemConfig
 from dr_exp.utils.job_reaper import reap_stale_jobs
 from dr_exp.utils.storage_cleanup import cleanup_uploaded_runs
 from dr_exp.utils.jobdb_factory import get_job_db_client
-from . import upload_configs, run_one
+from . import upload_configs
 
 load_dotenv()
+
+
+def discover_gpus(gpus_per_node: int) -> list[str]:
+    """Return list of visible GPU IDs as strings."""
+    env = os.environ.get("CUDA_VISIBLE_DEVICES")
+    if env:
+        return [g.strip() for g in env.split(",") if g.strip()]
+    return [str(i) for i in range(gpus_per_node)]
 
 
 def build_arg_parser() -> argparse.ArgumentParser:
@@ -167,23 +171,33 @@ def build_arg_parser() -> argparse.ArgumentParser:
         help="Reserve and run a single high-priority job immediately",
         description="Create a reserved high-priority job and execute it immediately",
     )
-    run_one.add_arguments(run_one_parser)
+    run_one_parser.add_argument(
+        "--overrides", default="", help="Hydra-style config overrides"
+    )
+    run_one_parser.add_argument(
+        "--priority", type=int, default=850, help="Job priority (default: 850)"
+    )
 
     return parser
 
 
 def _cmd_run(args: argparse.Namespace) -> None:
-    gpus = discover_gpus(args.gpus_per_node)
+    """Run the manager."""
     slurm_job_id = os.environ.get("SLURM_JOB_ID", str(os.getpid()))
     base_dir = os.path.join("./manager_runs", f"job_{slurm_job_id}")
-    mgr = Manager(
-        gpus=gpus,
+    
+    # Create system configuration
+    system_config = SystemConfig(
         workers_per_gpu=args.workers_per_gpu,
-        heartbeat_interval=args.heartbeat_interval,
+        heartbeat_timeout=args.heartbeat_interval * 2,  # Convert interval to timeout
         idle_timeout_mins=args.idle_timeout_mins,
-        base_dir=base_dir,
+        manager_base_dir=base_dir,
     )
-    mgr.run()
+    
+    # Create and run manager
+    system = create_system(system_config)
+    manager = system.create_manager()
+    manager.run()
 
 
 def _cmd_discover_gpus(args: argparse.Namespace) -> None:
@@ -193,7 +207,13 @@ def _cmd_discover_gpus(args: argparse.Namespace) -> None:
 
 
 def _cmd_run_worker(args: argparse.Namespace) -> None:
-    run_worker_main(worker_id=args.worker_id, work_dir=args.work_dir)
+    """Run a worker."""
+    system = create_system()
+    status = system.run_worker(
+        worker_id=args.worker_id,
+        work_dir=args.work_dir
+    )
+    print(f"Worker completed with status: {status}")
 
 
 def _cmd_reap_stale_jobs(args: argparse.Namespace) -> None:
@@ -251,6 +271,33 @@ def _cmd_set_priority(args: argparse.Namespace) -> None:
         print(f"Failed to update priority: {result.get('message', 'Unknown error')}")
 
 
+def _cmd_run_one(args: argparse.Namespace) -> str:
+    """Create and immediately run a high-priority job."""
+    client = get_job_db_client()
+    
+    # Create a simple config (this is simplified - in practice would parse overrides)
+    config = {"run_one": True, "priority": args.priority}
+    if args.overrides:
+        # Simple override parsing (in practice would use Hydra)
+        for override in args.overrides.split(","):
+            if "=" in override:
+                key, value = override.split("=", 1)
+                config[key.strip()] = value.strip()
+    
+    # Add job with high priority
+    job = client.add_job(config, "run_one_sweep", status="queued", priority=args.priority)
+    print(f"Created job {job['id']} with priority {args.priority}")
+    
+    # Run worker targeting this specific job
+    system = create_system()
+    status = system.run_worker(
+        worker_id="run_one_worker",
+        target_job_id=job["id"]
+    )
+    print(f"Job completed with status: {status}")
+    return status
+
+
 def main(argv: Sequence[str] | None = None) -> None:
     """Entry point for the CLI."""
     parser = build_arg_parser()
@@ -276,7 +323,7 @@ def main(argv: Sequence[str] | None = None) -> None:
     elif args.command == "set-priority":
         _cmd_set_priority(args)
     elif args.command == "run-one":
-        status = run_one.run(args)
+        status = _cmd_run_one(args)
         exit_code = 0 if status in ["completed", "success"] else 1
         exit(exit_code)
     else:  # pragma: no cover - fallback

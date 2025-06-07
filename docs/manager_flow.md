@@ -1,72 +1,236 @@
-# Manager & Launcher Specification (`docs/manager.md`)
+# Manager & Worker Flow Specification
 
-### Purpose
+## Overview
 
-The Manager process is launched per SLURM job and acts as the orchestrator for all training workers running on that job’s GPU resources. It manages local resource setup, worker launching, heartbeat monitoring, job reassignment, and graceful cleanup.
+The Manager/Worker system has been refactored to achieve clean separation of concerns and eliminate mixed responsibilities. The system now uses abstract interface methods to ensure the manager focuses purely on coordination logic while delegating all database-specific operations to appropriate abstractions.
 
-The Launcher initializes the execution environment (e.g., CUDA MPS) and delegates to the Manager.
+## Key Architectural Principles
 
-### Key Parameters and Environment Variables
+### Streamlined Interface Methods
+The manager uses only abstract methods from `BaseJobDB`, eliminating database-specific code paths:
+- `list_running_jobs()`: Get currently running jobs for monitoring
+- `get_stale_jobs(max_age_seconds)`: Find jobs with stale heartbeats
+- `mark_jobs_failed(job_ids, reason)`: Batch failure marking for lost workers
+- `has_queued_jobs()`: Quick queue status check for idle timeout
+- `get_queue_summary(limit)`: Preview of highest priority queued jobs
 
-| Parameter              | Description                                |
-| ---------------------- | ------------------------------------------ |
-| `--gpus-per-node`      | Number of GPUs available on this SLURM job |
-| `--workers-per-gpu`    | Number of concurrent workers per GPU       |
-| `--heartbeat-interval` | Seconds between heartbeat checks           |
-| `--idle-timeout-mins`  | Minutes of inactivity before shutdown      |
-| `SLURM_ARRAY_TASK_ID`  | Used to identify worker group/run group ID |
-| `SLURM_JOB_ID`         | Used for traceability and job metadata     |
+### Clean Separation of Concerns
+- **Manager**: Focuses purely on high-level coordination logic
+- **Worker**: Handles job execution with improved error handling
+- **ProcessManager**: Abstracts multiprocessing lifecycle management
+- **Factory**: Creates properly integrated system components
 
-## Manager <> Worker Interaction
+## System Components
 
-`scripts/run_manager.py` is launched once per SLURM job. It discovers the GPUs available to that job and spawns one or more worker processes on each GPU. Each worker process runs the `run_worker.py` wrapper (which calls `dr_exp.manage.worker_logic.run_worker`) in its own subprocess. Workers claim jobs from Supabase (or the mock client), execute training and periodically update a heartbeat. The manager monitors these heartbeats to detect stalled or crashed workers and restarts them when needed.
+### Manager (`src/dr_exp/manage/manager.py`)
 
-### Launch Sequence
+The `Manager` class coordinates worker processes using only abstract interface methods:
 
-1. **Manager start**: `scripts/run_manager.py` is executed with parameters such as `--gpus-per-node`, `--workers-per-gpu` and `--heartbeat-interval`.
-2. **GPU discovery**: The manager uses `discover_gpus()` to build a list of GPU IDs. If `CUDA_VISIBLE_DEVICES` is set, only those IDs are used.
-3. **Worker spawning**: For each GPU and configured worker count, the manager calls `launch_worker()` which in turn starts a new `multiprocessing.Process` with `_worker_target`.
-4. **Environment setup for worker**: `_worker_target` sets `CUDA_VISIBLE_DEVICES` to the assigned GPU ID and exports `DR_EXP_BASE_PATH` (used by the mock Supabase client). It then ensures the worker's directory exists and calls `run_worker_main()`.
-5. **Worker entrypoint**: `run_worker_main()` (defined in `dr_exp.manage.manager_logic`) simply loads `dr_exp.manage.worker_logic.run_worker()` and passes the base path and working directory. The script `scripts/run_worker.py` merely exposes a CLI for this function.
+**Core Responsibilities:**
+- Launch and monitor worker processes via `ProcessManager`
+- Detect stale jobs and mark them as failed
+- Handle idle timeout and graceful shutdown
+- Log system status and queue information
 
-### Worker Responsibilities
+**Key Methods:**
+- `start_workers()`: Launch configured worker processes
+- `run()`: Main event loop with heartbeat monitoring
+- `check_stale_jobs()`: Find and recover from lost workers
+- `check_idle_timeout()`: Monitor for system inactivity
 
-Inside `run_worker.run_worker()` the following actions occur:
+### Worker (`src/dr_exp/manage/worker.py`)
 
-1. **Job claim**: The worker obtains a client instance via `get_supabase_client()` and attempts to atomically claim a job (`status='queued' → 'running'`). Jobs are claimed in priority order (highest priority first), with tie-breaking by submission time. The worker respects job reservations and uses exponential backoff if no job is immediately available.
-2. **Configuration setup**: Once a job is claimed, the worker fetches its configuration and creates a local working directory. Paths for metrics, checkpoints and artifacts are injected into the config.
-3. **Heartbeat loop**: A background thread updates the job's `heartbeat` field every `heartbeat_interval` seconds using `client.update_job()`.
-4. **Training**: The provided `trainer_fn` is called. Any exception is captured and recorded via `client.record_failure()`.
-5. **Uploading results**: After training the worker uploads metrics, checkpoints, artifacts and its log file to Supabase Storage, then finalizes the job record with success or failure status.
-6. **Cleanup**: Temporary files are removed and the function returns the final status string.
+The worker has been redesigned with better separation of concerns:
 
-### Manager Monitoring
+**Components:**
+- **HeartbeatManager**: Manages background heartbeat thread
+- **JobExecutor**: Handles job execution with structured error handling
+- **managed_work_directory**: Context manager for temporary directories
 
-While workers run, the manager periodically executes two checks:
+**Improved Error Handling:**
+- Comprehensive exception capture and logging
+- Structured failure recording with stack traces
+- Automatic cleanup on both success and failure
+- Proper artifact uploading even on training failures
 
-1. **Heartbeat check** (`check_heartbeats`): The manager lists all running jobs via the Supabase client. If a job's heartbeat is older than twice the heartbeat interval, the manager assumes the worker was lost. It marks the job as failed (`status_reason='worker_lost'`) and restarts that worker process.
-2. **Idle timeout** (`check_idle_timeout`): If no running jobs remain for the configured idle timeout window, the manager logs the top queued jobs by priority and initiates shutdown of all workers.
+### ProcessManager (`src/dr_exp/manage/process_manager.py`)
 
-Workers write heartbeats and logs directly to Supabase, so the manager relies solely on the job records to monitor health. Workers do not communicate back to the manager process except through those updates.
+Abstracts multiprocessing details from the manager:
 
-### Shutdown Behaviour
+**Interface:**
+- `launch_worker(worker_id, gpu_id, work_dir)`: Start worker process
+- `stop_all_workers()`: Terminate all worker processes
+- `restart_worker(worker_id)`: Restart failed worker
+- `get_worker_count()`: Current active worker count
+- `get_worker_status()`: Detailed worker status information
 
-On receiving SIGTERM or SIGINT, the manager sets a shutdown flag, waits for the current heartbeat check loop to finish, and then terminates all worker processes. Each worker will finish its current iteration and exit. When idle timeout is reached, the same shutdown procedure occurs.
+**Implementations:**
+- `ProcessManager`: Real multiprocessing implementation
+- `MockProcessManager`: Test-friendly mock for unit tests
 
-### Environment Variables
+### Factory System (`src/dr_exp/utils/factory.py`)
 
-- `CUDA_VISIBLE_DEVICES`: Set by the manager for each worker so it only sees its assigned GPU.
-- `DR_EXP_BASE_PATH`: Base directory used by `LocalDBClient` when workers interact with the local DB/Storage.
+Ensures consistent system configuration and shared instances:
 
-## Manager <> FastAPI Interaction
+**Components:**
+- `SystemConfig`: Unified configuration for all components
+- `Factory`: Creates properly integrated managers and workers
+- `create_system()`: Main entry point with environment awareness
 
-The manager and FastAPI backend do not talk to each other directly; instead they share state via the JobDBClient. The manager, launches workers & updates job records in Supabase based on their work.  The FastAPI backend exposes REST endpoints which read or modify these same Supabase records. Actions triggered by the UI or CLI through the FastAPI API (e.g. job kill or requeue) result in Supabase updates that the manager or workers react to.
+## Execution Flow
 
-**Details:**
-1. The manager and its workers communicate only with Supabase. They never call the FastAPI server directly.
-2. When the manager spawns a worker, the worker claims a job from the Supabase `jobs` table and updates `status` and `heartbeat` fields as training progresses.
-3. The FastAPI backend reads these job records to answer `GET /job/{job_id}` and `GET /metrics/{run_id}` requests. Metrics are loaded from the same paths the worker uploaded to Supabase Storage.
-4. When an administrator issues `POST /job/kill` or `POST /job/requeue`, the FastAPI backend sets fields such as `kill_requested` in Supabase. The current implementation does not terminate running jobs, but the flags are recorded for future handling.
-5. Secrets such as Supabase credentials for the manager and the FastAPI admin API key are provided via environment variables as described in the environment documentation.
+### 1. System Initialization
 
-## 
+```python
+# Create system with environment-aware configuration
+system = create_system()
+
+# Or with explicit configuration
+config = SystemConfig(
+    gpus=["0", "1"],
+    workers_per_gpu=2,
+    heartbeat_timeout=60,
+    idle_timeout_mins=30
+)
+system = create_system(config)
+```
+
+### 2. Manager Launch Sequence
+
+1. **Initialization**: Manager created with shared job database and process manager
+2. **Worker Spawning**: `start_workers()` launches configured workers via ProcessManager
+3. **Environment Setup**: Each worker gets assigned GPU and isolated work directory
+4. **Monitoring Loop**: Manager enters main loop monitoring job status and worker health
+
+### 3. Worker Execution Flow
+
+1. **Job Claiming**: Worker claims next available job using priority-based selection
+2. **Heartbeat Start**: Background thread begins sending regular heartbeats
+3. **Training Execution**: JobExecutor handles training with comprehensive error management
+4. **Artifact Upload**: Results uploaded to storage regardless of training outcome
+5. **Job Finalization**: Job marked as completed/failed with detailed metadata
+6. **Cleanup**: Temporary files removed and worker ready for next job
+
+### 4. Health Monitoring
+
+**Stale Job Detection:**
+```python
+# Manager checks for workers that haven't sent heartbeats
+stale_jobs = self.job_db.get_stale_jobs(self.heartbeat_timeout * 2)
+if stale_jobs:
+    job_ids = [job.job_id for job in stale_jobs]
+    self.job_db.mark_jobs_failed(job_ids, "worker_lost")
+    # Restart affected workers
+```
+
+**Idle Timeout:**
+```python
+# Manager monitors for system inactivity
+if not self.job_db.has_queued_jobs() and not running_jobs:
+    # Log queue status and prepare for shutdown
+    queue_summary = self.job_db.get_queue_summary(limit=5)
+```
+
+## Command Line Interface
+
+### Running the Manager
+
+```bash
+# Direct manager execution
+uv run python scripts/run_manager.py --gpus-per-node 2 --workers-per-gpu 2
+
+# Via manager CLI
+uv run python scripts/manager_cli.py run --gpus-per-node 2 --workers-per-gpu 2
+
+# With custom configuration
+uv run python scripts/run_manager.py \
+  --gpus-per-node 4 \
+  --workers-per-gpu 1 \
+  --heartbeat-timeout 30 \
+  --idle-timeout 60
+```
+
+### Running Individual Workers
+
+```bash
+# Single worker for development/testing
+uv run python scripts/run_worker.py --worker-id dev_worker
+
+# Continuous mode
+uv run python scripts/run_worker.py --worker-id test_worker --continuous
+
+# Target specific job
+uv run python scripts/run_worker.py --target-job-id <job_id>
+```
+
+## Environment Configuration
+
+### Required Environment Variables
+
+- `EXPMGR_MODE`: Database mode (`files_local`, `supabase_local`, `supabase_remote`)
+- `DR_EXP_BASE_PATH`: Base directory for job data storage (default: `./job_data`)
+
+### Worker Environment Setup
+
+Each worker process gets:
+- `CUDA_VISIBLE_DEVICES`: Set to assigned GPU ID
+- `DR_EXP_BASE_PATH`: Inherited from manager environment
+- Isolated working directory for temporary files
+
+## Integration with Other Components
+
+### FastAPI Backend
+
+- Manager and workers communicate only through the job database
+- FastAPI reads job status for UI display
+- Admin operations (kill, requeue) update job records that manager/workers react to
+- Real-time updates via WebSocket based on database changes
+
+### Priority System
+
+- Workers claim jobs in priority order (highest first)
+- Manager logs queue status during idle periods
+- Priority changes immediately affect job claiming order
+
+### Storage System
+
+- Workers upload artifacts to configured storage backend
+- Manager doesn't directly handle storage operations
+- Storage abstraction allows local files or cloud storage
+
+## Error Handling and Recovery
+
+### Worker Failures
+
+1. **Training Exceptions**: Captured and recorded with full stack traces
+2. **Worker Process Crashes**: Detected by stale heartbeat monitoring
+3. **Resource Issues**: Structured error logging for debugging
+4. **Automatic Recovery**: Manager restarts failed workers automatically
+
+### Manager Resilience
+
+1. **Database Connectivity**: Graceful handling of temporary connection issues
+2. **Resource Cleanup**: Proper worker termination on shutdown signals
+3. **State Recovery**: Manager can resume monitoring existing jobs after restart
+
+## Testing Strategy
+
+### Unit Tests
+- Manager components tested in isolation using mock dependencies
+- Worker components tested with temporary directories and mock training
+- ProcessManager has both real and mock implementations
+
+### Integration Tests
+- End-to-end job execution workflows
+- Manager-worker coordination scenarios
+- System status and health monitoring
+- Error recovery and cleanup behavior
+
+### Performance Considerations
+
+1. **Batch Operations**: Stale job detection processes multiple jobs efficiently
+2. **Lightweight Monitoring**: Manager uses efficient database queries
+3. **Minimal Overhead**: Worker heartbeats are lightweight database updates
+4. **Resource Isolation**: Each worker operates in isolated environment
+
+This streamlined architecture provides better maintainability, clearer responsibilities, and improved error handling while maintaining all existing functionality.

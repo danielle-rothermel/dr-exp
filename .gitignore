@@ -1,6 +1,7 @@
 *.swp
 temp.patch
 job_data/
+storage/
 
 mock_db/*.json
 mock_db/*.jsonl
