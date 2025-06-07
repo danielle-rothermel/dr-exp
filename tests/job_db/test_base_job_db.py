@@ -73,6 +73,22 @@ def test_base_job_db_optional_methods_raise_not_implemented():
         def add_reserved_job(self, job_config, sweep_config_id, reserved_for_worker, 
                            reservation_timeout=300, priority=100, status="queued"):
             return {"id": "test_job", "reserved_for_worker": reserved_for_worker}
+
+        # New abstract methods
+        def list_running_jobs(self):
+            return []
+
+        def get_stale_jobs(self, max_age_seconds):
+            return []
+
+        def mark_jobs_failed(self, job_ids, reason="worker_lost"):
+            return {}
+
+        def has_queued_jobs(self):
+            return False
+
+        def get_queue_summary(self, limit=5):
+            return []
     
     db = MinimalJobDB()
     

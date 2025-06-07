@@ -9,7 +9,7 @@ from typing import Optional, List, Dict, Any
 
 import portalocker
 
-from .base_job_db import BaseJobDB
+from .base_job_db import BaseJobDB, StaleJobInfo
 from .config import JobDBConfig
 
 
@@ -674,6 +674,173 @@ class LocalJobDB(BaseJobDB):
         
         print(f"Added reserved job {job_id} for worker {reserved_for_worker}")
         return job_data
+
+    # =========================================================================
+    # NEW STREAMLINED INTERFACE IMPLEMENTATIONS
+    # =========================================================================
+
+    def list_running_jobs(self) -> List[Dict[str, Any]]:
+        """Get all jobs currently in 'running' status."""
+        running_jobs = []
+        try:
+            for filename in os.listdir(self.jobs_dir):
+                if not filename.endswith(".json"):
+                    continue
+                
+                job_file_path = os.path.join(self.jobs_dir, filename)
+                try:
+                    with open(job_file_path, "r") as f:
+                        job_data = json.load(f)
+                    
+                    if job_data.get("status") == "running":
+                        running_jobs.append(job_data)
+                        
+                except (json.JSONDecodeError, KeyError) as e:
+                    print(f"Error reading job file {filename}: {e}")
+                    continue
+                    
+        except FileNotFoundError:
+            # Jobs directory doesn't exist yet
+            pass
+        
+        return running_jobs
+
+    def get_stale_jobs(self, max_age_seconds: int) -> List[StaleJobInfo]:
+        """Find jobs with heartbeats older than max_age_seconds."""
+        stale_jobs = []
+        now = datetime.now(UTC)
+        
+        running_jobs = self.list_running_jobs()
+        
+        for job in running_jobs:
+            heartbeat_str = job.get("heartbeat")
+            assigned_worker = job.get("assigned_worker")
+            job_id = job.get("id")
+            
+            if not heartbeat_str or not assigned_worker or not job_id:
+                continue
+            
+            try:
+                # Parse heartbeat timestamp
+                heartbeat_time = datetime.fromisoformat(heartbeat_str.replace("Z", ""))
+                if heartbeat_time.tzinfo is None:
+                    heartbeat_time = heartbeat_time.replace(tzinfo=UTC)
+                
+                # Calculate age
+                age = now - heartbeat_time
+                age_seconds = int(age.total_seconds())
+                
+                if age_seconds > max_age_seconds:
+                    stale_jobs.append(StaleJobInfo(
+                        job_id=job_id,
+                        assigned_worker=assigned_worker,
+                        last_heartbeat=heartbeat_time,
+                        age_seconds=age_seconds
+                    ))
+                    
+            except (ValueError, TypeError) as e:
+                print(f"Error parsing heartbeat for job {job_id}: {e}")
+                continue
+        
+        return stale_jobs
+
+    def mark_jobs_failed(
+        self, 
+        job_ids: List[str], 
+        reason: str = "worker_lost"
+    ) -> Dict[str, bool]:
+        """Mark multiple jobs as failed efficiently."""
+        results = {}
+        current_time = datetime.now(UTC).isoformat() + "Z"
+        
+        for job_id in job_ids:
+            try:
+                job_file_path = os.path.join(self.jobs_dir, f"{job_id}.json")
+                
+                # Read current job data
+                with portalocker.Lock(job_file_path, mode="r+b", flags=portalocker.LOCK_EX):
+                    try:
+                        with open(job_file_path, "r") as f:
+                            job_data = json.load(f)
+                    except (FileNotFoundError, json.JSONDecodeError):
+                        results[job_id] = False
+                        continue
+                    
+                    # Update job status
+                    job_data.update({
+                        "status": "failed",
+                        "status_reason": reason,
+                        "end_time": current_time
+                    })
+                    
+                    # Write updated data
+                    self._atomic_write(job_file_path, json.dumps(job_data, indent=4))
+                    results[job_id] = True
+                    
+            except Exception as e:
+                print(f"Error marking job {job_id} as failed: {e}")
+                results[job_id] = False
+        
+        return results
+
+    def has_queued_jobs(self) -> bool:
+        """Check if there are any queued jobs available."""
+        try:
+            for filename in os.listdir(self.jobs_dir):
+                if not filename.endswith(".json"):
+                    continue
+                
+                job_file_path = os.path.join(self.jobs_dir, filename)
+                try:
+                    with open(job_file_path, "r") as f:
+                        job_data = json.load(f)
+                    
+                    if job_data.get("status") == "queued":
+                        return True
+                        
+                except (json.JSONDecodeError, KeyError):
+                    continue
+                    
+        except FileNotFoundError:
+            # Jobs directory doesn't exist yet
+            pass
+        
+        return False
+
+    def get_queue_summary(self, limit: int = 5) -> List[Dict[str, Any]]:
+        """Get summary of top queued jobs for logging."""
+        try:
+            # Get all queued jobs
+            queued_jobs = []
+            for filename in os.listdir(self.jobs_dir):
+                if not filename.endswith(".json"):
+                    continue
+                
+                job_file_path = os.path.join(self.jobs_dir, filename)
+                try:
+                    with open(job_file_path, "r") as f:
+                        job_data = json.load(f)
+                    
+                    if job_data.get("status") == "queued":
+                        queued_jobs.append({
+                            "id": job_data.get("id"),
+                            "priority": job_data.get("priority", 100),
+                            "created_at": job_data.get("created_at", "")
+                        })
+                        
+                except (json.JSONDecodeError, KeyError):
+                    continue
+            
+            # Sort by priority (highest first), then by created_at (oldest first)
+            queued_jobs.sort(
+                key=lambda job: (-job["priority"], job["created_at"])
+            )
+            
+            return queued_jobs[:limit]
+            
+        except FileNotFoundError:
+            # Jobs directory doesn't exist yet
+            return []
 
 
 __all__ = ["LocalJobDB"]

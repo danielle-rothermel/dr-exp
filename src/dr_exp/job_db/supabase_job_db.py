@@ -7,7 +7,7 @@ from supabase import create_client, Client
 from typing import Optional, Dict, Any, List
 from datetime import datetime, timezone, timedelta
 
-from .base_job_db import BaseJobDB
+from .base_job_db import BaseJobDB, StaleJobInfo
 from .config import JobDBConfig
 
 
@@ -670,6 +670,158 @@ class SupabaseJobDB(BaseJobDB):
         except Exception as e:
             print(f"Error adding reserved job: {e}")
             return {"success": False, "message": str(e)}
+
+    # =========================================================================
+    # NEW STREAMLINED INTERFACE IMPLEMENTATIONS
+    # =========================================================================
+
+    def list_running_jobs(self) -> List[Dict[str, Any]]:
+        """Get all jobs currently in 'running' status."""
+        try:
+            response = (
+                self.supabase.table("jobs")
+                .select("*")
+                .eq("status", "running")
+                .execute()
+            )
+            return response.data or []
+        except Exception as e:
+            print(f"Error listing running jobs: {e}")
+            return []
+
+    def get_stale_jobs(self, max_age_seconds: int) -> List[StaleJobInfo]:
+        """Find jobs with heartbeats older than max_age_seconds."""
+        try:
+            # Calculate cutoff time
+            cutoff_time = datetime.now(timezone.utc) - timedelta(seconds=max_age_seconds)
+            
+            response = (
+                self.supabase.table("jobs")
+                .select("id, assigned_worker, heartbeat")
+                .eq("status", "running")
+                .not_.is_("heartbeat", "null")
+                .not_.is_("assigned_worker", "null")
+                .lt("heartbeat", cutoff_time.isoformat())
+                .execute()
+            )
+            
+            stale_jobs = []
+            now = datetime.now(timezone.utc)
+            
+            for job in response.data or []:
+                try:
+                    heartbeat_str = job.get("heartbeat")
+                    if heartbeat_str:
+                        heartbeat_time = datetime.fromisoformat(heartbeat_str.replace("Z", ""))
+                        if heartbeat_time.tzinfo is None:
+                            heartbeat_time = heartbeat_time.replace(tzinfo=timezone.utc)
+                        
+                        age_seconds = int((now - heartbeat_time).total_seconds())
+                        
+                        stale_jobs.append(StaleJobInfo(
+                            job_id=job["id"],
+                            assigned_worker=job["assigned_worker"],
+                            last_heartbeat=heartbeat_time,
+                            age_seconds=age_seconds
+                        ))
+                except (ValueError, TypeError) as e:
+                    print(f"Error parsing heartbeat for job {job.get('id')}: {e}")
+                    continue
+            
+            return stale_jobs
+            
+        except Exception as e:
+            print(f"Error getting stale jobs: {e}")
+            return []
+
+    def mark_jobs_failed(
+        self, 
+        job_ids: List[str], 
+        reason: str = "worker_lost"
+    ) -> Dict[str, bool]:
+        """Mark multiple jobs as failed efficiently."""
+        if not job_ids:
+            return {}
+        
+        results = {}
+        current_time = datetime.now(timezone.utc).isoformat()
+        
+        try:
+            # Batch update using Supabase
+            response = (
+                self.supabase.table("jobs")
+                .update({
+                    "status": "failed",
+                    "status_reason": reason,
+                    "end_time": current_time
+                })
+                .in_("id", job_ids)
+                .execute()
+            )
+            
+            # Mark all as successful if the batch update worked
+            updated_jobs = response.data or []
+            updated_job_ids = {job["id"] for job in updated_jobs}
+            
+            for job_id in job_ids:
+                results[job_id] = job_id in updated_job_ids
+                
+        except Exception as e:
+            print(f"Error in batch update, falling back to individual updates: {e}")
+            
+            # Fallback: individual updates
+            for job_id in job_ids:
+                try:
+                    response = (
+                        self.supabase.table("jobs")
+                        .update({
+                            "status": "failed",
+                            "status_reason": reason,
+                            "end_time": current_time
+                        })
+                        .eq("id", job_id)
+                        .execute()
+                    )
+                    results[job_id] = bool(response.data)
+                except Exception as e:
+                    print(f"Error marking job {job_id} as failed: {e}")
+                    results[job_id] = False
+        
+        return results
+
+    def has_queued_jobs(self) -> bool:
+        """Check if there are any queued jobs available."""
+        try:
+            response = (
+                self.supabase.table("jobs")
+                .select("id")
+                .eq("status", "queued")
+                .limit(1)
+                .execute()
+            )
+            return len(response.data or []) > 0
+        except Exception as e:
+            print(f"Error checking for queued jobs: {e}")
+            return False
+
+    def get_queue_summary(self, limit: int = 5) -> List[Dict[str, Any]]:
+        """Get summary of top queued jobs for logging."""
+        try:
+            response = (
+                self.supabase.table("jobs")
+                .select("id, priority, created_at")
+                .eq("status", "queued")
+                .order("priority", desc=True)
+                .order("created_at", desc=False)
+                .limit(limit)
+                .execute()
+            )
+            
+            return response.data or []
+            
+        except Exception as e:
+            print(f"Error getting queue summary: {e}")
+            return []
 
 
 __all__ = ["SupabaseJobDB"]
