@@ -289,11 +289,3 @@ class TestStreamlinedWorker:
         assert job_data["status"] == "failed"
 
 
-class TestBackwardsCompatibility:
-    """Test backwards compatibility."""
-    
-    def test_run_worker_alias(self):
-        """Test that run_worker is an alias for run_streamlined_worker."""
-        from dr_exp.manage.streamlined_worker import run_worker, run_streamlined_worker
-        
-        assert run_worker is run_streamlined_worker

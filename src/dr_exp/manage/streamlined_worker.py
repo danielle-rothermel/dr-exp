@@ -47,7 +47,7 @@ class HeartbeatManager:
             
     def _heartbeat_loop(self):
         """Send heartbeats at a fixed interval until stop_event is set."""
-        while not stop_event.is_set():
+        while not self.stop_event.is_set():
             try:
                 self.client.update_job(
                     self.job_id, 
@@ -336,13 +336,8 @@ def _claim_job(
     return "no_job"
 
 
-# Maintain backwards compatibility
-run_worker = run_streamlined_worker
-
-
 __all__ = [
     "run_streamlined_worker", 
-    "run_worker",  # Backwards compatibility alias
     "HeartbeatManager", 
     "JobExecutor",
     "managed_work_directory"

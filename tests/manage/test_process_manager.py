@@ -157,7 +157,7 @@ class TestHelperFunctions:
     """Test helper functions."""
     
     @patch.dict('os.environ', {"DR_EXP_BASE_PATH": "/custom/path"})
-    @patch('dr_exp.manage.process_manager._run_worker.run_worker')
+    @patch('dr_exp.manage.process_manager.run_streamlined_worker')
     def test_run_worker_main_custom_path(self, mock_run_worker):
         """Test run_worker_main with custom base path."""
         run_worker_main("worker1", "/work/dir")
@@ -169,7 +169,7 @@ class TestHelperFunctions:
         )
     
     @patch.dict('os.environ', {}, clear=True)
-    @patch('dr_exp.manage.process_manager._run_worker.run_worker')
+    @patch('dr_exp.manage.process_manager.run_streamlined_worker')
     def test_run_worker_main_default_path(self, mock_run_worker):
         """Test run_worker_main with default base path."""
         run_worker_main("worker1", "/work/dir")

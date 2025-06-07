@@ -1,12 +1,14 @@
-"""Public exports for the experiment manager package."""
+"""Public exports for the streamlined experiment manager package."""
 
-from .manager_logic import Manager, discover_gpus, run_worker_main
-from .worker_logic import run_worker, default_train
+from .streamlined_manager import StreamlinedManager
+from .streamlined_worker import run_streamlined_worker
+from .process_manager import ProcessManager, run_worker_main
+from ..train_examples.dummy_trainer import train as default_train
 
 __all__ = [
-    "Manager",
-    "discover_gpus",
+    "StreamlinedManager",
+    "ProcessManager", 
+    "run_streamlined_worker",
     "run_worker_main",
-    "run_worker",
     "default_train",
 ]

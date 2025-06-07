@@ -5,13 +5,13 @@ import multiprocessing as mp
 from typing import Dict, List, Optional, Any
 from abc import ABC, abstractmethod
 
-from . import worker_logic as _run_worker
+from .streamlined_worker import run_streamlined_worker
 
 
 def run_worker_main(worker_id: str, work_dir: str) -> None:
     """Wrapper to execute the worker with base path from env."""
     base_path = os.environ.get("DR_EXP_BASE_PATH", "./job_data")
-    _run_worker.run_worker(base_path=base_path, work_dir=work_dir, worker_id=worker_id)
+    run_streamlined_worker(base_path=base_path, work_dir=work_dir, worker_id=worker_id)
 
 
 def _worker_target(
