@@ -831,8 +831,8 @@ class SupabaseJobDB(BaseJobDB):
     def get_metrics(self, run_id: str, limit: Optional[int] = 500) -> List[Dict[str, Any]]:
         """Get metrics for a specific run.
         
-        For Supabase, this attempts to download metrics from storage first,
-        falling back to local storage if available.
+        For Supabase, this first checks local storage for faster access,
+        then downloads from Supabase storage bucket with retry logic.
         
         Parameters
         ----------
@@ -850,7 +850,7 @@ class SupabaseJobDB(BaseJobDB):
         Raises
         ------
         FileNotFoundError
-            If metrics for the run do not exist.
+            If metrics for the run do not exist in local or remote storage.
         """
         import json
         import os
@@ -871,9 +871,44 @@ class SupabaseJobDB(BaseJobDB):
                 
             return metrics
         
-        # TODO: Implement Supabase storage download when needed
-        # For now, raise FileNotFoundError to maintain consistent interface
-        raise FileNotFoundError(f"Metrics not found for run {run_id}")
+        # Implement Supabase storage download with retry logic
+        storage_path = f"run_{run_id}/metrics.jsonl"
+        max_retries = 3
+        
+        for attempt in range(max_retries):
+            try:
+                # Download from Supabase storage bucket
+                response = self.supabase.storage.from_("experiment-artifacts").download(storage_path)
+                
+                if response:
+                    metrics = []
+                    # Parse the downloaded content line by line
+                    content = response.decode('utf-8')
+                    for line in content.strip().split('\n'):
+                        if line.strip():
+                            try:
+                                metrics.append(json.loads(line))
+                            except json.JSONDecodeError as e:
+                                print(f"Warning: Failed to parse metrics line: {line[:100]}... Error: {e}")
+                                continue
+                    
+                    # Apply limit if specified
+                    if limit is not None and len(metrics) > limit:
+                        metrics = metrics[-limit:]
+                        
+                    print(f"Successfully downloaded {len(metrics)} metrics from Supabase storage for run {run_id}")
+                    return metrics
+                else:
+                    raise FileNotFoundError(f"Metrics file not found in Supabase storage for run {run_id}")
+                    
+            except Exception as e:
+                if attempt == max_retries - 1:
+                    # Last attempt failed
+                    print(f"Error downloading metrics from Supabase storage for run {run_id} after {max_retries} attempts: {e}")
+                    raise FileNotFoundError(f"Could not retrieve metrics from storage: {e}")
+                else:
+                    print(f"Retry {attempt + 1}/{max_retries} for downloading metrics from Supabase storage for run {run_id}: {e}")
+                    continue
 
     def finalize_job(self, job_id: str, final_status: str, metadata: Dict[str, Any]) -> Dict[str, Any]:
         """Finalize a job with the given status and metadata."""
