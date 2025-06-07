@@ -110,30 +110,60 @@ export EXPMGR_MODE=supabase_local
 
 ### CLI Commands
 
-The manager CLI (`scripts/manager_cli.py`) provides comprehensive job management:
+The manager CLI (`scripts/manager_cli.py`) provides comprehensive job management using grouped commands:
 
-**Job Operations:**
-- `upload-configs`: Generate and upload experiment configurations
-  - `--sweep`: Specify parameter sweeps (e.g., "model=resnet,vit lr=0.01,0.001")
-  - `--priority`: Set initial priority (0-1000)
-- `list-jobs`: List jobs with filtering options
+**System Commands (`manager-cli system <command>`):**
+- `run`: Start the manager process with worker supervision
+  - `--gpus-per-node`: Number of GPUs available (default: 1)
+  - `--workers-per-gpu`: Workers per GPU (default: 1)
+  - `--heartbeat-timeout`: Worker timeout in seconds (default: 60)
+  - `--idle-timeout-mins`: Manager idle timeout (default: 30)
+- `discover-gpus`: List visible GPU IDs from environment
+- `run-worker <worker_id> <work_dir>`: Run a single worker process
+- `status`: Show system status, configuration, and environment info
+
+**Job Commands (`manager-cli job <command>`):**
+- `list-jobs`: List jobs ordered by priority
   - `--status`: Filter by status (queued, running, completed, failed, killed)
-  - `--limit`: Number of jobs to display
-- `get-job <job_id>`: Get detailed information about a specific job
-- `kill-job <job_id>`: Kill a running job
-- `requeue-job <job_id>`: Requeue a failed/killed job
-
-**Priority Management:**
-- `boost-priority <job_id> --amount <n>`: Increase job priority
-- `set-priority <job_id> --priority <n>`: Set absolute priority
+  - `--limit`: Number of jobs to display (default: 20)
+- `boost-priority <job_id>`: Increase job priority
+  - `--amount`: Priority boost amount (default: 100)
+- `set-priority <job_id> <priority>`: Set absolute priority (0-1000)
+  - `--reason`: Optional reason for change
 - `run-one`: Create and immediately execute a high-priority job
-  - `--overrides`: Hydra-style config overrides
+  - `--overrides`: Hydra-style config overrides (e.g., "model=resnet,lr=0.001")
   - `--priority`: Priority level (default: 850)
+  - `--config-path`: Path to config directory
+  - `--config-name`: Config file name (default: config.yaml)
+- `upload-configs`: Generate and upload experiment configurations
+  - `--sweep`: Parameter sweeps (e.g., "model=resnet,vit lr=0.01,0.001")
+  - `--priority`: Set initial priority (0-1000)
 
-**Maintenance:**
-- `reap-stale`: Clean up stale jobs (jobs without recent heartbeats)
-- `cleanup-storage`: Remove old job data and logs
-- `reset-db`: Reset the local job database (files_local mode only)
+**Admin Commands (`manager-cli admin <command>`):**
+- `reap-stale-jobs`: Mark jobs with stale heartbeats as failed
+  - `--max-age-mins`: Heartbeat age threshold (default: 60)
+- `cleanup-run-data`: Remove old job data and upload directories
+
+**Examples:**
+```bash
+# Start manager with 2 GPUs, 2 workers each
+uv run python scripts/manager_cli.py system run --gpus-per-node 2 --workers-per-gpu 2
+
+# Check system status
+uv run python scripts/manager_cli.py system status
+
+# List queued jobs
+uv run python scripts/manager_cli.py job list-jobs --status queued
+
+# Upload configs with sweep
+uv run python scripts/manager_cli.py job upload-configs --sweep "model=resnet,vit lr=0.01,0.001"
+
+# Run single job immediately
+uv run python scripts/manager_cli.py job run-one --overrides "model=resnet,lr=0.001"
+
+# Clean up stale jobs
+uv run python scripts/manager_cli.py admin reap-stale-jobs
+```
 
 ### Key Design Patterns
 
@@ -146,6 +176,8 @@ The manager CLI (`scripts/manager_cli.py`) provides comprehensive job management
 - **Storage Abstraction**: Unified interface for local files and cloud storage
 - **Priority Queue**: Jobs processed by priority with reservation system
 - **Event-Driven Updates**: WebSocket for real-time UI updates
+- **Command Pattern CLI**: Extensible command architecture with grouped subcommands and centralized validation
+- **Environment Awareness**: SLURM-aware configuration with automatic directory management
 
 ### Development Workflow
 
