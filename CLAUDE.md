@@ -20,21 +20,22 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 - **Build**: `npm run build`
 - **Lint**: `npm run lint`
 
-### Supabase (for real database mode)
-- **Install Supabase CLI**: `npm install -g supabase` or via Homebrew
+### Supabase
+- **Install Supabase CLI**: `brew install supabase/tap/supabase` (recommended) or other methods
 - **Start local Supabase**: `supabase start` (requires Docker)
 - **Stop local Supabase**: `supabase stop`
+- **Reset local database**: `supabase db reset` (applies all migrations)
 
 ## Architecture Overview
 
-This is an experiment management system for coordinating deep learning experiments on SLURM GPU clusters. The system supports both local development (mock mode) and production deployment (real mode).
+This is an experiment management system for coordinating deep learning experiments on SLURM GPU clusters. The system supports three modes: local development with JSON files (files_local), local development with full Supabase features (supabase_local), and production deployment (supabase_remote).
 
 ### Components
 
 1. **Job Database Layer** (`src/dr_exp/job_db/`):
    - `BaseJobDB`: Abstract base class defining the interface
-   - `LocalJobDB`: Mock database using local JSON files for development
-   - `SupabaseJobDB`: Real PostgreSQL database client for production
+   - `LocalJobDB`: Simple database using local JSON files for basic development
+   - `SupabaseJobDB`: PostgreSQL database client for both local and production Supabase
    - Factory pattern in `utils/jobdb_factory.py` switches between them via `EXPMGR_MODE` env var
 
 2. **Manager/Worker System** (`src/dr_exp/manage/`):
@@ -64,7 +65,7 @@ This is an experiment management system for coordinating deep learning experimen
 
 6. **Logging System** (`src/dr_exp/logging/`):
    - `StructuredLogger`: Comprehensive metrics and artifact logging
-   - Local file storage in mock mode
+   - Local file storage in files_local mode
    - Supabase object storage in production mode
    - Configurable logging paths and formats
 
@@ -75,11 +76,28 @@ This is an experiment management system for coordinating deep learning experimen
 
 ### Environment Configuration
 
-- `EXPMGR_MODE`: Set to "mock" for local development, "real" for production
+- `EXPMGR_MODE`: Database mode selection
+  - `"files_local"`: Local JSON files (simple, no Docker required)
+  - `"supabase_local"`: Local Supabase with full features (requires Docker)
+  - `"supabase_remote"`: Production Supabase (requires cloud account)
 - `DR_EXP_BASE_PATH`: Base directory for job data storage
 - `ADMIN_API_KEY`: API key for admin endpoints (defaults to "testkey")
-- Supabase connection vars: `SUPABASE_URL`, `SUPABASE_KEY`, `SUPABASE_SERVICE_ROLE_KEY`
+- Supabase connection vars (for supabase_remote): `SUPABASE_URL`, `SUPABASE_KEY`, `SUPABASE_SERVICE_ROLE_KEY`
 - `PYTHONPATH`: Should include the project root for proper imports
+
+**Local Supabase Setup:**
+```bash
+# Start local Supabase (auto-applies migrations)
+supabase start
+
+# Set mode for local Supabase
+export EXPMGR_MODE=supabase_local
+
+# Local Supabase automatically configures:
+# - URL: http://127.0.0.1:54321
+# - Service role key: Auto-configured
+# - Storage bucket: experiment-artifacts
+```
 
 ### CLI Commands
 
@@ -106,7 +124,7 @@ The manager CLI (`scripts/manager_cli.py`) provides comprehensive job management
 **Maintenance:**
 - `reap-stale`: Clean up stale jobs (jobs without recent heartbeats)
 - `cleanup-storage`: Remove old job data and logs
-- `reset-db`: Reset the local job database (mock mode only)
+- `reset-db`: Reset the local job database (files_local mode only)
 
 ### Key Design Patterns
 
@@ -120,14 +138,27 @@ The manager CLI (`scripts/manager_cli.py`) provides comprehensive job management
 
 ### Development Workflow
 
-1. **Local Development Setup**:
+1. **Local Development Setup (Recommended: Supabase Local)**:
    ```bash
-   # Create .env file with mock mode
-   echo "EXPMGR_MODE=mock" > .env
-   
    # Install dependencies
    uv sync
    cd react-babysitter-ui && npm install && cd ..
+   
+   # Start local Supabase
+   supabase start
+   
+   # Set mode for local Supabase
+   export EXPMGR_MODE=supabase_local
+   
+   # Start backend and frontend
+   uv run uvicorn dr_exp.api.main:app --reload &
+   cd react-babysitter-ui && npm run dev
+   ```
+
+   **Alternative: Files Local (No Docker)**:
+   ```bash
+   # Set mode for simple file storage
+   export EXPMGR_MODE=files_local
    
    # Start backend and frontend
    uv run uvicorn dr_exp.api.main:app --reload &
@@ -136,8 +167,8 @@ The manager CLI (`scripts/manager_cli.py`) provides comprehensive job management
 
 2. **Running Experiments**:
    ```bash
-   # Upload configs with priority
-   uv run python scripts/manager_cli.py upload-configs --sweep "model=resnet,vit" --priority 500
+   # Upload configs with priority (works with any mode)
+   uv run python -m scripts.manager_cli upload-configs --sweep "model=resnet,vit" --priority 500
    
    # Start manager (spawns workers)
    uv run python scripts/run_manager.py
@@ -148,7 +179,7 @@ The manager CLI (`scripts/manager_cli.py`) provides comprehensive job management
 
 3. **Testing**:
    ```bash
-   # Run all tests
+   # Run all tests (most run in files_local mode for speed)
    uv run pytest
    
    # Run specific test module
@@ -156,10 +187,28 @@ The manager CLI (`scripts/manager_cli.py`) provides comprehensive job management
    
    # Run with coverage
    uv run pytest --cov=dr_exp
+   
+   # Run Supabase integration tests (requires local Supabase)
+   uv run python scripts/test_supabase.py --type isolated
+   
+   # Run all Supabase tests with database reset
+   uv run python scripts/test_supabase.py --type all --reset-db
    ```
 
-4. **Production Deployment**:
-   - Set `EXPMGR_MODE=real` with Supabase credentials
+4. **Database Management**:
+   ```bash
+   # Local Supabase: Reset and reapply migrations
+   supabase db reset
+   
+   # Files Local: Reset JSON database
+   uv run python scripts/reset_local_jobdb.py
+   
+   # View local Supabase data in browser
+   open http://127.0.0.1:54323
+   ```
+
+5. **Production Deployment**:
+   - Set `EXPMGR_MODE=supabase_remote` with Supabase credentials
    - Deploy on SLURM cluster
    - Submit jobs via `sbatch scripts/slurm_job.sbatch`
    - Monitor via web UI or CLI
@@ -168,7 +217,7 @@ The manager CLI (`scripts/manager_cli.py`) provides comprehensive job management
 
 - **Unit Tests**: Each component has dedicated unit tests
 - **Integration Tests**: Manager/worker interaction, API endpoints
-- **Mock Mode Testing**: Most tests run in mock mode for speed
+- **Files Local Testing**: Most tests run in files_local mode for speed
 - **Fixtures**: Shared test utilities in `conftest.py` files
 - **Test Organization**: Tests mirror source structure in `tests/`
 

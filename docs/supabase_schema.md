@@ -5,11 +5,45 @@
 Supabase acts as the central database and object store for experiment coordination. It stores:
 
 * Hydra-generated configs and sweep metadata
-* Job state and assignment tracking
+* Job state and assignment tracking with priority-based scheduling
 * Metrics, artifact paths, and structured errors
 * Post-run summaries for analysis and UI display
 
 This schema provides the foundation for job lifecycle control, observability, reproducibility, and researcher interactivity.
+
+## Database Setup
+
+The system supports both local development and production deployment:
+
+### Local Development (Recommended)
+```bash
+# Install Supabase CLI
+brew install supabase/tap/supabase
+
+# Start local instance (applies migrations automatically)
+supabase start
+
+# Set environment mode
+export EXPMGR_MODE=supabase_local
+```
+
+### Production Deployment
+```bash
+# Set environment mode with credentials
+export EXPMGR_MODE=supabase_remote
+export SUPABASE_URL="your_project_url"
+export SUPABASE_SERVICE_ROLE_KEY="your_service_role_key"
+```
+
+## Database Migrations
+
+The schema is managed through SQL migrations in `supabase/migrations/`:
+
+- `0001_initial_schema.sql`: Core tables and relationships
+- `0002_add_priority_and_reservations.sql`: Priority system and job reservations
+- `0003_create_storage_bucket.sql`: Storage bucket for experiment artifacts
+
+All migrations are automatically applied when running `supabase start` or `supabase db reset`.
 
 ---
 
@@ -47,7 +81,7 @@ Tracks training jobs with config references, current status, progress metrics, l
 | ------------------------ | --------- | -------------------------------------------------------------- |
 | id                       | UUID      | Primary key                                                    |
 | config\_id               | UUID      | Foreign key to `sweep_configs.id`                              |
-| status                   | text      | `queued`, `running`, `completed`, `failed`, `deleted`          |
+| status                   | text      | `queued`, `running`, `completed`, `failed`, `killed`, `deleted`          |
 | retry\_index             | int       | Retry count for this logical job                               |
 | assigned\_worker         | text      | Default = `"unassigned"`; updated when a worker claims the job |
 | heartbeat                | timestamp | Last update from worker                                        |
@@ -69,6 +103,10 @@ Tracks training jobs with config references, current status, progress metrics, l
 | code\_version            | text      | Git SHA of training code                                       |
 | start\_time              | timestamp | When training began                                            |
 | end\_time                | timestamp | When training ended (only set for completed or failed jobs)    |
+| priority                 | int       | Job priority (0-1000, higher = more urgent)                   |
+| reserved\_for\_worker    | text      | Worker ID that can claim this job (NULL for unreserved)       |
+| reservation\_expires\_at | timestamp | When job reservation expires (NULL for permanent)             |
+| created\_at              | timestamp | When job was created                                           |
 
 ### 4. `metrics`
 
@@ -129,6 +167,37 @@ Each run’s artifacts may use arbitrary subdirectories inside `artifacts/` for 
 
 ---
 
+## Priority System
+
+The jobs table includes a comprehensive priority-based scheduling system:
+
+### Priority Classes
+- **SYSTEM (900-1000):** Critical system maintenance and urgent fixes
+- **URGENT (700-899):** Deadline-driven experiments and "run one" jobs  
+- **HIGH (400-699):** Important experiments that should run soon
+- **NORMAL (100-399):** Default priority range for regular experiments
+- **LOW (0-99):** Background jobs that can run when resources are available
+
+### Job Reservations
+Jobs can be reserved for specific workers with automatic timeout:
+- `reserved_for_worker`: Worker ID that can claim this job
+- `reservation_expires_at`: When reservation expires (NULL for permanent)
+- Reserved jobs bypass normal queue order when claimed by the designated worker
+- Expired reservations are treated as unreserved jobs
+
+### PostgreSQL Functions
+
+#### `claim_next_job(worker_id_input TEXT)`
+Atomically claims the next available job for a worker, respecting priority and reservations:
+
+1. **Reserved jobs for this worker** (not expired)
+2. **Unreserved jobs** by priority (highest first), then by creation time (oldest first)
+3. **Expired reservations** by priority and creation time
+
+Returns the full job record if a job was claimed, or empty result if no jobs available.
+
+---
+
 ## Notes
 
 * Row-Level Security (RLS) is not currently enforced but may be added in the future to restrict field mutability.
@@ -136,5 +205,6 @@ Each run’s artifacts may use arbitrary subdirectories inside `artifacts/` for 
 * Metrics, errors, and failures are append-only and can be manually purged via admin tools.
 * Deleted jobs retain the row (status = `deleted`) but associated blobs (artifacts, metrics) are removed.
 * Interface and code version hashes are stored per job to support compatibility and reproducibility checks.
+* Priority changes are logged with timestamps and reasons for audit trails.
 * Storage TTL, retention policies, and artifact metadata are deferred for future development.
 

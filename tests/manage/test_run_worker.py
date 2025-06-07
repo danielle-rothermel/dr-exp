@@ -11,7 +11,7 @@ def make_config():
 
 
 def test_worker_success(tmp_path):
-    client = LocalJobDB(JobDBConfig(base_path=str(tmp_path, storage_path=str(tmp_path + "/storage", mode="mock")), storage_path=str(tmp_path / "storage")
+    client = LocalJobDB(JobDBConfig(base_path=str(tmp_path, storage_path=str(tmp_path + "/storage", mode="files_local")), storage_path=str(tmp_path / "storage")
     )
     job = client.add_job(make_config(), "sweep1", status="queued")
 
@@ -44,7 +44,7 @@ def test_worker_success(tmp_path):
 
 
 def test_worker_no_job(tmp_path):
-    client = LocalJobDB(JobDBConfig(base_path=str(tmp_path, storage_path=str(tmp_path + "/storage", mode="mock")), storage_path=str(tmp_path / "storage")
+    client = LocalJobDB(JobDBConfig(base_path=str(tmp_path, storage_path=str(tmp_path + "/storage", mode="files_local")), storage_path=str(tmp_path / "storage")
     )
     work_dir = tmp_path / "work"
     result = run_worker.run_worker(
@@ -60,7 +60,7 @@ def test_worker_no_job(tmp_path):
 
 
 def test_worker_training_failure(tmp_path):
-    client = LocalJobDB(JobDBConfig(base_path=str(tmp_path, storage_path=str(tmp_path + "/storage", mode="mock")), storage_path=str(tmp_path / "storage")
+    client = LocalJobDB(JobDBConfig(base_path=str(tmp_path, storage_path=str(tmp_path + "/storage", mode="files_local")), storage_path=str(tmp_path / "storage")
     )
     job = client.add_job(make_config(), "sweep1", status="queued")
 

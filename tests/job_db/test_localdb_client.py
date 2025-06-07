@@ -18,7 +18,7 @@ def mock_client(tmp_path):
     config = JobDBConfig(
         base_path=str(tmp_path),
         storage_path=str(tmp_path / "storage"),
-        mode="mock"
+        mode="files_local"
     )
     client = LocalJobDB(config)
     return client
@@ -44,7 +44,7 @@ def test_client_initialization(tmp_path):
     config = JobDBConfig(
         base_path=str(tmp_path),
         storage_path=str(tmp_path / "storage"),
-        mode="mock"
+        mode="files_local"
     )
     client = LocalJobDB(config)
     assert os.path.exists(client.storage_dir)

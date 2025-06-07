@@ -16,7 +16,7 @@ def test_base_job_db_inheritance():
     """Test that BaseJobDB is properly inherited by concrete implementations."""
     assert issubclass(LocalJobDB, BaseJobDB)
     assert issubclass(SupabaseJobDB, BaseJobDB)
-    config = JobDBConfig(base_path="/tmp", storage_path="/tmp/storage", mode="mock")
+    config = JobDBConfig(base_path="/tmp", storage_path="/tmp/storage", mode="files_local")
     assert isinstance(LocalJobDB(config), BaseJobDB)
 
 
@@ -89,7 +89,7 @@ def test_base_job_db_optional_methods_raise_not_implemented():
 
 def test_local_job_db_implements_optional_methods():
     """Test that LocalJobDB properly implements optional methods."""
-    config = JobDBConfig(base_path="/tmp", storage_path="/tmp/storage", mode="mock")
+    config = JobDBConfig(base_path="/tmp", storage_path="/tmp/storage", mode="files_local")
     db = LocalJobDB(config)
     
     # These should not raise NotImplementedError
@@ -101,7 +101,7 @@ def test_local_job_db_implements_optional_methods():
 
 def test_interface_consistency():
     """Test that both implementations have consistent interfaces."""
-    local_config = JobDBConfig(base_path="/tmp", storage_path="/tmp/storage", mode="mock")
+    local_config = JobDBConfig(base_path="/tmp", storage_path="/tmp/storage", mode="files_local")
     local_db = LocalJobDB(local_config)
     
     # Use a valid JWT format for testing (this is a fake JWT that will pass format validation)
@@ -114,7 +114,7 @@ def test_interface_consistency():
         storage_path="/tmp/storage",
         supabase_url="http://test",
         supabase_key=fake_jwt,
-        mode="real"
+        mode="supabase_remote"
     )
     with unittest.mock.patch('dr_exp.job_db.supabase_job_db.create_client'):
         supabase_db = SupabaseJobDB(supabase_config)

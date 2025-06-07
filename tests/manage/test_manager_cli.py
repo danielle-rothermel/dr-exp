@@ -20,7 +20,7 @@ def test_discover_gpus(monkeypatch, capsys):
 
 
 def test_run_worker_subcommand(tmp_path, monkeypatch):
-    client = LocalJobDB(JobDBConfig(base_path=str(tmp_path, storage_path=str(tmp_path + "/storage", mode="mock")), storage_path=str(tmp_path / "storage")
+    client = LocalJobDB(JobDBConfig(base_path=str(tmp_path, storage_path=str(tmp_path + "/storage", mode="files_local")), storage_path=str(tmp_path / "storage")
     )
     client.add_job(make_config(), "s1", status="queued")
     monkeypatch.setenv("DR_EXP_BASE_PATH", str(tmp_path))
@@ -40,7 +40,7 @@ def test_run_subcommand_invokes_manager(tmp_path, monkeypatch):
         called["run"] = True
 
     monkeypatch.setattr("dr_exp.manage.manager_logic.Manager.run", fake_run)
-    client = LocalJobDB(JobDBConfig(base_path=str(tmp_path, storage_path=str(tmp_path + "/storage", mode="mock")), storage_path=str(tmp_path / "storage")
+    client = LocalJobDB(JobDBConfig(base_path=str(tmp_path, storage_path=str(tmp_path + "/storage", mode="files_local")), storage_path=str(tmp_path / "storage")
     )
 
     def fake_get_client(base_path="."):
@@ -67,7 +67,7 @@ def test_run_subcommand_invokes_manager(tmp_path, monkeypatch):
 
 
 def test_reap_stale_jobs_subcommand(tmp_path, monkeypatch, capsys):
-    client = LocalJobDB(JobDBConfig(base_path=str(tmp_path, storage_path=str(tmp_path + "/storage", mode="mock")), storage_path=str(tmp_path / "storage")
+    client = LocalJobDB(JobDBConfig(base_path=str(tmp_path, storage_path=str(tmp_path + "/storage", mode="files_local")), storage_path=str(tmp_path / "storage")
     )
     job = client.add_job(make_config(), "s1", status="running")
     old = datetime.now(UTC) - timedelta(minutes=10)
@@ -97,7 +97,7 @@ def test_upload_configs_subcommand(tmp_path, monkeypatch, capsys):
         / "train_examples"
         / "configs"
     )
-    client = LocalJobDB(JobDBConfig(base_path=str(tmp_path, storage_path=str(tmp_path + "/storage", mode="mock")), storage_path=str(tmp_path / "storage")
+    client = LocalJobDB(JobDBConfig(base_path=str(tmp_path, storage_path=str(tmp_path + "/storage", mode="files_local")), storage_path=str(tmp_path / "storage")
     )
 
     monkeypatch.setattr("scripts.upload_configs.LocalJobDB", lambda: client)
@@ -118,7 +118,7 @@ def test_upload_configs_subcommand(tmp_path, monkeypatch, capsys):
 
 
 def test_cleanup_run_data_subcommand(tmp_path, monkeypatch, capsys):
-    client = LocalJobDB(JobDBConfig(base_path=str(tmp_path, storage_path=str(tmp_path + "/storage", mode="mock")), storage_path=str(tmp_path / "storage")
+    client = LocalJobDB(JobDBConfig(base_path=str(tmp_path, storage_path=str(tmp_path + "/storage", mode="files_local")), storage_path=str(tmp_path / "storage")
     )
     run_dir = Path(client.jobs_dir) / "run_x"
     run_dir.mkdir(parents=True)

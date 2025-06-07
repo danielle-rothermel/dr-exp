@@ -30,7 +30,7 @@ def test_reset_mock_db(tmp_path, monkeypatch):
     storage_path = str(tmp_path / "storage")
     
     # Mock the config to use our test paths
-    mock_config = JobDBConfig(base_path=base, storage_path=storage_path, mode="mock")
+    mock_config = JobDBConfig(base_path=base, storage_path=storage_path, mode="files_local")
     
     with patch('scripts.reset_local_jobdb.JobDBConfig.from_env') as mock_from_env:
         mock_from_env.return_value = mock_config
