@@ -37,19 +37,23 @@ dr_exp is a distributed job scheduler for machine learning experiments. Its core
 - Supabase connection vars (for supabase_remote): `SUPABASE_URL`, `SUPABASE_KEY`, `SUPABASE_SERVICE_ROLE_KEY`
 - `PYTHONPATH`: Should include the project root for proper imports
 
-## Current Problem + Refactoring Plan
+## Test Refactoring Plan (Phase 1 ✅ Complete)
 
-The core of the system—the coordination between the Manager and Worker—is not being reliably tested. The key integration tests in tests/manage/test_integration.py are currently skipped (@pytest.mark.skip) because they are flaky and non-deterministic, largely due to a reliance on time.sleep() for synchronization. This represents a critical gap in our confidence in the system's stability.
+**Phase 1 COMPLETED**: Critical manager-worker integration tests have been fixed and are now reliable.
 
-To address this, a comprehensive, four-phase plan has been developed, as detailed in test_refactor_plan.md. This plan goes beyond just fixing the skipped tests; it aims to systematically improve the entire test suite's reliability, maintainability, and coverage.
+Continue with the remaining phases outlined in `test_refactor_plan.md`:
 
-Your task is to execute the full plan outlined in test_refactor_plan.md. You will proceed through the phases in order, starting with the most critical fixes. This structured approach will:
+- **Phase 2**: Enhance test infrastructure with better fixtures
+- **Phase 3**: Add missing edge case coverage and concurrency tests  
+- **Phase 4**: Optimize test performance and maintainability
 
-- Restore confidence in the core functionality.
-- Build a robust and deterministic testing infrastructure.
-- Expand coverage to include critical edge cases and error conditions.
+## Test Development Reference
 
-Begin with Phase 1, which focuses on fixing the skipped integration tests. Refer to test_refactor_plan.md for the specific implementation details for each phase.
+- **test_refactor_plan.md**: Four-phase plan with Phase 1 solutions and Phase 2+ guidance
+- **TESTING_PATTERNS.md**: Technical patterns and best practices for reliable test development
+- **tests/manage/test_integration.py**: Reference implementation of fixed integration tests
+
+Key patterns: Use direct `trainer_fn` parameters, event-driven synchronization, and deterministic timing with `mock_time` fixture.
 
 
 

@@ -1,31 +1,80 @@
-Phase 1: Fix Skipped Integration Tests (Critical)
+Phase 1: Fix Skipped Integration Tests (Critical) ✅ COMPLETED
 
 Issue: Core manager-worker integration tests are skipped due to timing and mocking problems.
 
-Solutions:
-1. Replace time-based timing with event-driven patterns:
-- Use threading.Event for synchronization instead of sleep()
-- Implement deterministic mock time advancement
-- Add timeout protections with proper error messages
-2. Fix mock patching scope issues:
-- Use proper mock context managers
-- Ensure mocks are applied at the correct module level
-- Add mock verification to ensure patches are working
-3. Improve heartbeat testing:
-- Mock the datetime.now() function for deterministic timing
-- Use configurable heartbeat intervals in tests
-- Add explicit heartbeat verification points
+## Implemented Solutions:
+
+### 1. Event-Driven Patterns:
+- **threading.Event**: Use `threading.Event` for synchronization instead of `time.sleep()`
+- **mock_time fixture**: Provides controlled datetime advancement with `mock_time.advance(seconds)`
+- **Event coordination**: See `event_driven_mock_train` context manager for reusable patterns
+
+### 2. Fixed Mock Patching:
+- **Direct trainer_fn**: Use `trainer_fn` parameter in `run_worker()` calls instead of patching `default_train`
+- **Import-time binding issue**: Avoid patching `default_train` due to default parameter evaluation at import time
+- **Status mapping**: Mock trainers must return `{"status": "success"}` not `"completed"`
+
+### 3. Deterministic Timing:
+- **Mock datetime**: Patch `dr_exp.job_db.local_job_db.datetime` for stale job detection
+- **Controlled advancement**: Use `mock_time.advance()` instead of real time delays
+- **Heartbeat testing**: Fast intervals with event-driven completion
+
+## Reference Implementation Pattern:
+```python
+# Correct approach for Phase 2+
+from dr_exp.manage.worker import run_worker
+
+def mock_train(config, logger, *args, **kwargs):
+    return {"final_val_acc": 0.95, "status": "success"}  # Note: "success" not "completed"
+
+status = run_worker(
+    base_path=integration_config.job_db_config.base_path,
+    max_claim_attempts=integration_config.max_claim_attempts,
+    heartbeat_interval=integration_config.worker_heartbeat_interval,
+    trainer_fn=mock_train,  # Direct parameter, not patching
+    client=factory.job_db,
+    worker_id="test_worker"
+)
+```
 
 Phase 2: Enhance Test Infrastructure (High Priority)
 
-1. Create deterministic test fixtures:
-- Time-controlled fixtures for heartbeat testing
-- Database state management with proper isolation
-- Improved factory patterns for test data creation
-2. Add test utilities:
-- Event-driven synchronization helpers
-- Mock time management utilities
-- Database state verification tools
+## Build on Phase 1 Infrastructure:
+
+### 1. Enhanced Time-Controlled Fixtures:
+- **Extend mock_time**: Add support for complex multi-worker timing scenarios
+- **Reusable timing patterns**: Create fixtures for common timing tests (startup delays, concurrent operations)
+- **Time-aware database operations**: Combine mock_time with database state changes
+
+### 2. Database State Management:
+- **Isolation utilities**: Ensure each test gets fresh database state beyond basic `tmp_path`
+- **State verification tools**: Add helpers to check job counts, statuses, and database consistency
+- **Factory improvements**: Standardize job creation patterns with realistic test data
+
+### 3. Event-Driven Test Utilities:
+- **Synchronization helpers**: Build on `threading.Event` patterns from Phase 1
+- **Worker coordination**: Tools for testing multiple workers with controlled timing
+- **Database change notifications**: Event-driven patterns for database state changes
+
+## Implementation Guide:
+```python
+# Extend existing patterns
+@pytest.fixture
+def enhanced_mock_time(mock_time):
+    """Enhanced timing with database operation coordination."""
+    # Build on Phase 1's mock_time fixture
+    
+@pytest.fixture  
+def isolated_job_db(integration_config):
+    """Job database with guaranteed isolation and verification utilities."""
+    # Ensure complete isolation between tests
+    
+def create_test_jobs(factory, count=3, priority_range=(100, 900)):
+    """Standardized test job creation with realistic data."""
+    # Consistent job creation patterns
+```
+
+Reference Phase 1's `event_driven_mock_train` and `mock_time` fixtures in tests/manage/test_integration.py for proven patterns.
 
 Phase 3: Strengthen Edge Case Coverage (Medium Priority)
 
