@@ -3,7 +3,7 @@ from __future__ import annotations
 import json
 import logging
 import os
-from typing import Any, Dict, List
+from typing import Any, Dict, List, Optional
 
 from dotenv import load_dotenv
 
@@ -74,13 +74,16 @@ class MetricsLoader:
         self.client = client
         self.cache: LRUCache[str, List[Dict[str, Any]]] = LRUCache(maxsize=maxsize)
 
-    def load(self, run_id: str) -> List[Dict[str, Any]]:
+    def load(self, run_id: str, limit: Optional[int] = 500) -> List[Dict[str, Any]]:
         """Return metrics for a run, loading them if necessary.
 
         Parameters
         ----------
         run_id : str
             Identifier of the run to load metrics for.
+        limit : int, optional
+            Maximum number of recent metrics to return, by default 500.
+            If None, returns all metrics.
 
         Returns
         -------
@@ -91,31 +94,15 @@ class MetricsLoader:
         ------
         FileNotFoundError
             If the metrics file for ``run_id`` does not exist.
-        NotImplementedError
-            If metrics retrieval for the real client is not implemented.
         """
-        if run_id in self.cache:
-            return self.cache[run_id]
-        if not hasattr(self.client, "storage_dir"):
-            raise NotImplementedError(
-                "Metrics retrieval requires a client with storage_dir"
-            )
-        storage_root = self.client.storage_dir
-        metrics_path = os.path.join(
-            storage_root,
-            f"run_{run_id}",
-            "metrics.jsonl",
-        )
-        if not os.path.exists(metrics_path):
-            raise FileNotFoundError(metrics_path)
-        metrics: List[Dict[str, Any]] = []
-        with open(metrics_path, "r") as f:
-            for line in f:
-                if line.strip():
-                    metrics.append(json.loads(line))
-        if len(metrics) > 100:
-            metrics = metrics[-100:]
-        self.cache[run_id] = metrics
+        # Use cache key that includes the limit to avoid cache misses
+        cache_key = f"{run_id}:{limit}"
+        if cache_key in self.cache:
+            return self.cache[cache_key]
+        
+        # Use the abstract interface method instead of direct file access
+        metrics = self.client.get_metrics(run_id, limit=limit)
+        self.cache[cache_key] = metrics
         return metrics
 
 
@@ -173,10 +160,17 @@ def create_app(base_path: str = ".") -> FastAPI:
         return ConfigResponse(config=cfg)
 
     @app.get("/metrics/{run_id}", response_model=MetricsResponse)
-    async def get_metrics(run_id: str) -> MetricsResponse:
-        """Fetch metrics for the given run."""
+    async def get_metrics(run_id: str, limit: Optional[int] = 500) -> MetricsResponse:
+        """Fetch metrics for the given run.
+        
+        Parameters
+        ----------
+        limit : int, optional
+            Maximum number of recent metrics to return, by default 500.
+            Set to None to return all metrics.
+        """
         try:
-            metrics = loader.load(run_id)
+            metrics = loader.load(run_id, limit=limit)
         except FileNotFoundError:
             raise HTTPException(status_code=404, detail="Metrics not found")
         return MetricsResponse(metrics=metrics)

@@ -823,5 +823,52 @@ class SupabaseJobDB(BaseJobDB):
             print(f"Error getting queue summary: {e}")
             return []
 
+    def get_metrics(self, run_id: str, limit: Optional[int] = 500) -> List[Dict[str, Any]]:
+        """Get metrics for a specific run.
+        
+        For Supabase, this attempts to download metrics from storage first,
+        falling back to local storage if available.
+        
+        Parameters
+        ----------
+        run_id : str
+            Identifier of the run to load metrics for.
+        limit : int, optional
+            Maximum number of recent metrics to return, by default 500.
+            If None, returns all metrics.
+            
+        Returns
+        -------
+        List[Dict[str, Any]]
+            List of metrics records for the run.
+            
+        Raises
+        ------
+        FileNotFoundError
+            If metrics for the run do not exist.
+        """
+        import json
+        import os
+        
+        # Try local storage first (faster)
+        local_metrics_path = os.path.join(self.storage_dir, f"run_{run_id}", "metrics.jsonl")
+        
+        if os.path.exists(local_metrics_path):
+            metrics = []
+            with open(local_metrics_path, "r") as f:
+                for line in f:
+                    if line.strip():
+                        metrics.append(json.loads(line))
+            
+            # Apply limit if specified
+            if limit is not None and len(metrics) > limit:
+                metrics = metrics[-limit:]
+                
+            return metrics
+        
+        # TODO: Implement Supabase storage download when needed
+        # For now, raise FileNotFoundError to maintain consistent interface
+        raise FileNotFoundError(f"Metrics not found for run {run_id}")
+
 
 __all__ = ["SupabaseJobDB"]

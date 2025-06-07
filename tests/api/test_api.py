@@ -50,11 +50,19 @@ def test_metrics_endpoint(client, sb_client, tmp_path):
         for i in range(105):
             f.write(json.dumps({"step": i}) + "\n")
 
+    # Test default limit (500) - should return all 105 metrics
     resp = client.get(f"/metrics/{run_id}")
     assert resp.status_code == 200
     metrics = resp.json()["metrics"]
-    assert len(metrics) == 100
+    assert len(metrics) == 105
     assert metrics[-1]["step"] == 104
+
+    # Test custom limit
+    resp = client.get(f"/metrics/{run_id}?limit=10")
+    assert resp.status_code == 200
+    metrics = resp.json()["metrics"]
+    assert len(metrics) == 10
+    assert metrics[-1]["step"] == 104  # Should be last 10 metrics
 
 
 def test_admin_actions(client, sb_client):

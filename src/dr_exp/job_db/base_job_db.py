@@ -282,6 +282,30 @@ class BaseJobDB(ABC):
         """
         pass
     
+    @abstractmethod
+    def get_metrics(self, run_id: str, limit: Optional[int] = 500) -> List[Dict[str, Any]]:
+        """Get metrics for a specific run.
+        
+        Parameters
+        ----------
+        run_id : str
+            Identifier of the run to load metrics for.
+        limit : int, optional
+            Maximum number of recent metrics to return, by default 500.
+            If None, returns all metrics.
+            
+        Returns
+        -------
+        List[Dict[str, Any]]
+            List of metrics records for the run.
+            
+        Raises
+        ------
+        FileNotFoundError
+            If metrics for the run do not exist.
+        """
+        pass
+    
     # =========================================================================
     # END NEW INTERFACE METHODS
     # =========================================================================
