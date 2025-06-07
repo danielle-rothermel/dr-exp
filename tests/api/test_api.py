@@ -342,3 +342,56 @@ def test_filtering_and_sorting(tmp_path, monkeypatch):
     # Test invalid sort order
     resp = client.get("/jobs?paginated=true&sort_order=invalid")
     assert resp.status_code == 400
+
+
+def test_health_endpoint(client):
+    """Test health check endpoint."""
+    resp = client.get("/health")
+    assert resp.status_code == 200
+    data = resp.json()
+    
+    assert "status" in data
+    assert "timestamp" in data
+    assert "uptime_seconds" in data
+    assert "version" in data
+    assert "database_status" in data
+    assert "job_stats" in data
+    
+    # Check that uptime is a positive number
+    assert data["uptime_seconds"] >= 0
+    assert data["version"] == "1.0.0"
+    assert data["database_status"] in ["healthy", "unhealthy"]
+
+
+def test_metrics_endpoint_monitoring(client, sb_client):
+    """Test system metrics endpoint."""
+    # Add some jobs first
+    sb_client.add_job({"a": 1}, "sweep1", status="queued")
+    sb_client.add_job({"b": 2}, "sweep2", status="running")
+    sb_client.add_job({"c": 3}, "sweep3", status="completed")
+    
+    resp = client.get("/metrics")
+    assert resp.status_code == 200
+    data = resp.json()
+    
+    assert "timestamp" in data
+    assert "uptime_seconds" in data
+    assert "active_connections" in data
+    assert "job_stats" in data
+    assert "total_jobs" in data
+    assert "queue_depth" in data
+    assert "running_jobs" in data
+    
+    # Check metrics values
+    assert data["uptime_seconds"] >= 0
+    assert data["active_connections"] >= 0
+    assert data["total_jobs"] >= 3
+    assert data["queue_depth"] >= 1  # at least one queued job
+    assert data["running_jobs"] >= 1  # at least one running job
+    
+    # Check job stats structure
+    job_stats = data["job_stats"]
+    assert isinstance(job_stats, dict)
+    for status in ["queued", "running", "completed", "failed", "killed"]:
+        assert status in job_stats
+        assert isinstance(job_stats[status], int)

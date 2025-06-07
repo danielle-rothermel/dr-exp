@@ -111,3 +111,26 @@ class PaginatedJobsResponse(BaseModel):
     pages: int = Field(..., ge=0, description="Total number of pages")
     has_next: bool = Field(..., description="Whether there is a next page")
     has_prev: bool = Field(..., description="Whether there is a previous page")
+
+
+class HealthResponse(BaseModel):
+    """API health check response."""
+    
+    status: str = Field(..., description="Health status (healthy/unhealthy)")
+    timestamp: str = Field(..., description="Current timestamp")
+    uptime_seconds: float = Field(..., description="API uptime in seconds")
+    version: str = Field(..., description="API version")
+    database_status: str = Field(..., description="Database connection status")
+    job_stats: Dict[str, int] = Field(..., description="Current job statistics by status")
+
+
+class SystemMetricsResponse(BaseModel):
+    """System metrics response."""
+    
+    timestamp: str = Field(..., description="Metrics collection timestamp")
+    uptime_seconds: float = Field(..., description="API uptime in seconds")
+    active_connections: int = Field(..., description="Number of active WebSocket connections")
+    job_stats: Dict[str, int] = Field(..., description="Job statistics by status")
+    total_jobs: int = Field(..., description="Total number of jobs in system")
+    queue_depth: int = Field(..., description="Number of queued jobs")
+    running_jobs: int = Field(..., description="Number of currently running jobs")

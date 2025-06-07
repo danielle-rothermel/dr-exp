@@ -4,6 +4,9 @@ import asyncio
 import json
 import logging
 import os
+import time
+from collections import Counter
+from datetime import datetime, timezone
 from typing import Any, Dict, List, Optional, Set
 from enum import Enum
 
@@ -18,6 +21,7 @@ from dr_exp.api.models import (
     BoostPriorityRequest,
     ConfigResponse,
     ErrorResponse,
+    HealthResponse,
     JobModel,
     KillRequest,
     MetricsResponse,
@@ -26,12 +30,16 @@ from dr_exp.api.models import (
     RequeueRequest,
     SetPriorityRequest,
     SuccessResponse,
+    SystemMetricsResponse,
 )
 from dr_exp.utils.jobdb_factory import get_job_db_client
 from dr_exp.job_db.base_job_db import BaseJobDB
 
 load_dotenv()
 logger = logging.getLogger(__name__)
+
+# Track API startup time for health checks
+API_STARTUP_TIME = time.time()
 
 
 class UserRole(str, Enum):
@@ -197,6 +205,54 @@ def require_reader_or_admin(user_role: UserRole = Depends(authenticate_user)) ->
     return user_role
 
 
+def get_job_statistics(client: BaseJobDB) -> Dict[str, int]:
+    """Get job statistics by status.
+    
+    Parameters
+    ----------
+    client : BaseJobDB
+        Database client to query jobs from.
+        
+    Returns
+    -------
+    Dict[str, int]
+        Dictionary mapping status names to counts.
+    """
+    try:
+        jobs = client.list_jobs()
+        status_counts = Counter(job.get("status", "unknown") for job in jobs)
+        
+        # Ensure all standard statuses are represented
+        for status in ["queued", "running", "completed", "failed", "killed"]:
+            if status not in status_counts:
+                status_counts[status] = 0
+                
+        return dict(status_counts)
+    except Exception as e:
+        logger.error(f"Error collecting job statistics: {e}")
+        return {"error": 1}
+
+
+def check_database_health(client: BaseJobDB) -> str:
+    """Check if database is accessible.
+    
+    Parameters
+    ----------
+    client : BaseJobDB
+        Database client to test.
+        
+    Returns
+    -------
+    str
+        Status string: "healthy" or "unhealthy".
+    """
+    try:
+        # Try a simple operation to verify database connectivity
+        client.has_queued_jobs()
+        return "healthy"
+    except Exception as e:
+        logger.error(f"Database health check failed: {e}")
+        return "unhealthy"
 
 
 def raise_job_not_found(job_id: str) -> None:
@@ -451,6 +507,37 @@ def create_app(base_path: str = ".") -> FastAPI:
         response.headers["X-XSS-Protection"] = "1; mode=block"
         response.headers["Referrer-Policy"] = "strict-origin-when-cross-origin"
         return response
+    
+    # Add request logging middleware
+    @app.middleware("http")
+    async def request_logging_middleware(request, call_next):
+        start_time = time.time()
+        
+        # Log request
+        client_ip = request.client.host if request.client else "unknown"
+        logger.info(f"Request started: {request.method} {request.url.path} from {client_ip}")
+        
+        try:
+            response = await call_next(request)
+            process_time = time.time() - start_time
+            
+            # Log response
+            logger.info(
+                f"Request completed: {request.method} {request.url.path} "
+                f"-> {response.status_code} in {process_time:.3f}s"
+            )
+            
+            # Add timing header
+            response.headers["X-Process-Time"] = str(process_time)
+            return response
+            
+        except Exception as e:
+            process_time = time.time() - start_time
+            logger.error(
+                f"Request failed: {request.method} {request.url.path} "
+                f"after {process_time:.3f}s - {str(e)}"
+            )
+            raise
 
     client = get_job_db_client()
     loader = MetricsLoader(client)
@@ -745,6 +832,55 @@ def create_app(base_path: str = ".") -> FastAPI:
                 status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
                 detail=f"Failed to set priority for job {req.job_id}: {str(e)}"
             )
+
+    @app.get("/health", response_model=HealthResponse, tags=["monitoring"])
+    async def health_check() -> HealthResponse:
+        """Check API health status and basic system information."""
+        current_time = datetime.now(timezone.utc)
+        uptime = time.time() - API_STARTUP_TIME
+        
+        # Check database health
+        db_status = check_database_health(client)
+        
+        # Get job statistics
+        job_stats = get_job_statistics(client)
+        
+        # Determine overall health status
+        overall_status = "healthy" if db_status == "healthy" and "error" not in job_stats else "unhealthy"
+        
+        return HealthResponse(
+            status=overall_status,
+            timestamp=current_time.isoformat(),
+            uptime_seconds=uptime,
+            version="1.0.0",
+            database_status=db_status,
+            job_stats=job_stats
+        )
+
+    @app.get("/metrics", response_model=SystemMetricsResponse, tags=["monitoring"])
+    async def system_metrics() -> SystemMetricsResponse:
+        """Get detailed system metrics for monitoring and observability."""
+        current_time = datetime.now(timezone.utc)
+        uptime = time.time() - API_STARTUP_TIME
+        
+        # Get job statistics
+        job_stats = get_job_statistics(client)
+        total_jobs = sum(job_stats.values()) if "error" not in job_stats else 0
+        queue_depth = job_stats.get("queued", 0)
+        running_jobs = job_stats.get("running", 0)
+        
+        # Get active WebSocket connections count
+        active_connections = len(manager.active_connections)
+        
+        return SystemMetricsResponse(
+            timestamp=current_time.isoformat(),
+            uptime_seconds=uptime,
+            active_connections=active_connections,
+            job_stats=job_stats,
+            total_jobs=total_jobs,
+            queue_depth=queue_depth,
+            running_jobs=running_jobs
+        )
 
     return app
 
