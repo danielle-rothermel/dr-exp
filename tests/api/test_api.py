@@ -188,7 +188,7 @@ def test_pagination(tmp_path, monkeypatch):
         job = sb_client.add_job({"index": i}, f"sweep{i}", status="queued")
         jobs.append(job)
     
-    # Test backward compatibility (non-paginated)
+    # Test non-paginated response (default)
     resp = client.get("/jobs")
     assert resp.status_code == 200
     data = resp.json()
@@ -233,4 +233,108 @@ def test_pagination(tmp_path, monkeypatch):
     
     # Test invalid per_page
     resp = client.get("/jobs?paginated=true&per_page=101")
+    assert resp.status_code == 400
+
+
+def test_filtering_and_sorting(tmp_path, monkeypatch):
+    """Test job filtering and sorting functionality."""
+    # Create isolated app for this test
+    monkeypatch.setenv("ADMIN_API_KEY", "secret")
+    monkeypatch.setenv("EXPMGR_MODE", "files_local")
+    monkeypatch.setenv("DR_EXP_BASE_PATH", str(tmp_path))
+    
+    from dr_exp.api.main import create_app
+    from fastapi.testclient import TestClient
+    
+    app = create_app(base_path=str(tmp_path))
+    client = TestClient(app)
+    sb_client = app.state.client
+    
+    # Create jobs with different statuses and priorities
+    job1 = sb_client.add_job({"name": "job1"}, "sweep1", status="queued", priority=100)
+    job2 = sb_client.add_job({"name": "job2"}, "sweep2", status="running", priority=200)
+    job3 = sb_client.add_job({"name": "job3"}, "sweep3", status="completed", priority=300)
+    job4 = sb_client.add_job({"name": "job4"}, "sweep4", status="failed", priority=150)
+    
+    # Test status filtering
+    resp = client.get("/jobs?job_status=queued")
+    assert resp.status_code == 200
+    data = resp.json()
+    assert len(data) == 1
+    assert data[0]["id"] == job1["id"]
+    
+    resp = client.get("/jobs?job_status=running")
+    assert resp.status_code == 200
+    data = resp.json()
+    assert len(data) == 1
+    assert data[0]["id"] == job2["id"]
+    
+    # Test priority filtering
+    resp = client.get("/jobs?priority_min=200")
+    assert resp.status_code == 200
+    data = resp.json()
+    assert len(data) == 2  # job2 (200) and job3 (300)
+    priorities = [job["priority"] for job in data]
+    assert all(p >= 200 for p in priorities)
+    
+    resp = client.get("/jobs?priority_max=150")
+    assert resp.status_code == 200
+    data = resp.json()
+    assert len(data) == 2  # job1 (100) and job4 (150)
+    priorities = [job["priority"] for job in data]
+    assert all(p <= 150 for p in priorities)
+    
+    resp = client.get("/jobs?priority_min=150&priority_max=250")
+    assert resp.status_code == 200
+    data = resp.json()
+    assert len(data) == 2  # job2 (200) and job4 (150)
+    priorities = [job["priority"] for job in data]
+    assert all(150 <= p <= 250 for p in priorities)
+    
+    # Test sorting by priority (ascending)
+    resp = client.get("/jobs?sort_by=priority&sort_order=asc")
+    assert resp.status_code == 200
+    data = resp.json()
+    priorities = [job["priority"] for job in data]
+    assert priorities == sorted(priorities)  # Should be [100, 150, 200, 300]
+    
+    # Test sorting by priority (descending)
+    resp = client.get("/jobs?sort_by=priority&sort_order=desc")
+    assert resp.status_code == 200
+    data = resp.json()
+    priorities = [job["priority"] for job in data]
+    assert priorities == sorted(priorities, reverse=True)  # Should be [300, 200, 150, 100]
+    
+    # Test sorting by status
+    resp = client.get("/jobs?sort_by=status&sort_order=asc")
+    assert resp.status_code == 200
+    data = resp.json()
+    statuses = [job["status"] for job in data]
+    assert statuses == sorted(statuses)
+    
+    # Test combined filtering and sorting with pagination
+    resp = client.get("/jobs?paginated=true&job_status=queued&sort_by=priority&sort_order=desc&page=1&per_page=10")
+    assert resp.status_code == 200
+    data = resp.json()
+    assert data["total"] == 1
+    assert len(data["jobs"]) == 1
+    assert data["jobs"][0]["status"] == "queued"
+    
+    # Test invalid status
+    resp = client.get("/jobs?paginated=true&job_status=invalid")
+    assert resp.status_code == 400
+    
+    # Test invalid priority range
+    resp = client.get("/jobs?paginated=true&priority_min=1001")
+    assert resp.status_code == 400
+    
+    resp = client.get("/jobs?paginated=true&priority_min=200&priority_max=100")
+    assert resp.status_code == 400
+    
+    # Test invalid sort field
+    resp = client.get("/jobs?paginated=true&sort_by=invalid")
+    assert resp.status_code == 400
+    
+    # Test invalid sort order
+    resp = client.get("/jobs?paginated=true&sort_order=invalid")
     assert resp.status_code == 400
