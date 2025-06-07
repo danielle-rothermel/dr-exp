@@ -1,4 +1,5 @@
 import json
+import logging
 import os
 import shutil
 import tempfile
@@ -11,6 +12,8 @@ import portalocker
 
 from .base_job_db import BaseJobDB, StaleJobInfo
 from .config import JobDBConfig
+
+logger = logging.getLogger(__name__)
 
 
 class LocalJobDB(BaseJobDB):
@@ -84,7 +87,7 @@ class LocalJobDB(BaseJobDB):
                 with open(path, "r") as f:
                     jobs.append(json.load(f))
             except Exception as e:  # pragma: no cover - unexpected read error
-                print(f"Error reading job file {path}: {e}")
+                logger.error(f"Error reading job file {path}: {e}")
         return jobs
 
     # --- Interface methods based on docs/supabase_mock.md ---
@@ -100,7 +103,7 @@ class LocalJobDB(BaseJobDB):
         ----------
         worker_id : str, optional
             Identifier of the worker claiming the job. If not provided,
-            a random worker ID will be generated.
+            a mock worker ID will be generated.
             
         Returns
         -------
@@ -130,15 +133,16 @@ class LocalJobDB(BaseJobDB):
                                 try:
                                     with portalocker.Lock(job_file_path, mode="r+b", flags=portalocker.LOCK_EX):
                                         self._atomic_write(job_file_path, json.dumps(job_data, indent=4))
-                                except:
-                                    pass  # Continue even if cleanup fails
+                                except Exception as e:
+                                    logger.warning(f"Failed to clear expired reservation for job {job_id}: {e}")
+                                    # Continue even if cleanup fails
                             elif job_data["reserved_for_worker"] != worker_id:
                                 # Skip jobs reserved for other workers
                                 continue
                         
                         queued_jobs.append((job_file_path, job_data))
             except Exception as e:
-                print(f"Error reading job file {job_file_path}: {e}")
+                logger.error(f"Error reading job file {job_file_path}: {e}")
                 continue
 
         if not queued_jobs:
@@ -174,7 +178,7 @@ class LocalJobDB(BaseJobDB):
                         )
                         return current_job_data
             except Exception as e:
-                print(f"Error claiming job file {job_file_path}: {e}")
+                logger.error(f"Error claiming job file {job_file_path}: {e}")
                 continue
 
         return None
@@ -196,7 +200,7 @@ class LocalJobDB(BaseJobDB):
         """
         job_file_path = os.path.join(self.jobs_dir, f"{job_id}.json")
         if not os.path.exists(job_file_path):
-            # print(f"Job file not found for update: {job_file_path}") # Debug
+            # logger.debug(f"Job file not found for update: {job_file_path}")
             # In a real scenario, you might raise an error or return a status
             # For now, let's assume it might be created if it's a new job being fully defined
             # Or simply do nothing if it strictly means "update existing"
@@ -215,7 +219,7 @@ class LocalJobDB(BaseJobDB):
                 self._atomic_write(job_file_path, json.dumps(existing_data, indent=4))
             return {"success": True, "message": "Job updated"}
         except Exception as e:
-            print(f"Error updating job {job_id}: {e}")
+            logger.error(f"Error updating job {job_id}: {e}")
             return {"success": False, "message": str(e)}
 
     def log_metrics(self, job_id: str, metrics_list: List[Dict[str, Any]]) -> None:
@@ -244,7 +248,7 @@ class LocalJobDB(BaseJobDB):
                 f.flush()
                 os.fsync(f.fileno())
         except Exception as e:
-            print(f"Error logging metrics for job {job_id}: {e}")
+            logger.error(f"Error logging metrics for job {job_id}: {e}")
 
     def record_failure(
         self,
@@ -287,7 +291,7 @@ class LocalJobDB(BaseJobDB):
                 os.fsync(f.fileno())
             return {"success": True}
         except Exception as e:
-            print(f"Error recording failure for job {job_id}: {e}")
+            logger.error(f"Error recording failure for job {job_id}: {e}")
             return {"success": False, "message": str(e)}
 
     def upload_artifact(self, job_id: str, local_path: str, remote_path_suffix: str) -> Dict[str, Any]:
@@ -312,8 +316,13 @@ class LocalJobDB(BaseJobDB):
         dict[str, Any]
             Result of the upload operation including the storage path.
         """
+        # Input validation for security - only reject dangerous relative paths
+        if not local_path or ".." in local_path:
+            logger.warning(f"Invalid local path provided: {local_path}")
+            return {"success": False, "message": "Invalid local path"}
+            
         if not os.path.exists(local_path):
-            print(f"Local artifact not found: {local_path}")
+            logger.warning(f"Local artifact not found: {local_path}")
             return {"success": False, "message": "Local artifact not found"}
 
         # Determine if it's a root file (like metrics.jsonl) or an artifact subdirectory file
@@ -340,7 +349,7 @@ class LocalJobDB(BaseJobDB):
                 shutil.copy2(local_path, destination_path)
             return {"success": True, "storage_path": destination_path}
         except Exception as e:
-            print(f"Error uploading artifact for job {job_id}: {e}")
+            logger.error(f"Error uploading artifact for job {job_id}: {e}")
             return {"success": False, "message": str(e)}
 
     # --- Helper/Additional methods that would be needed ---
@@ -379,7 +388,7 @@ class LocalJobDB(BaseJobDB):
         job_data = self.get_job_details(job_id)
         if job_data and "config_json" in job_data:
             return job_data["config_json"]
-        # print(f"Config not found for job {job_id}") # Debug
+        # logger.debug(f"Config not found for job {job_id}")
         return None
 
     def add_job(
@@ -423,10 +432,8 @@ class LocalJobDB(BaseJobDB):
         job_file_path = os.path.join(self.jobs_dir, f"{job_id}.json")
         with portalocker.Lock(job_file_path, mode="wb", flags=portalocker.LOCK_EX):
             self._atomic_write(job_file_path, json.dumps(job_data, indent=4))
-        print(f"Added new job {job_id}")  # Debug
-        print("Job Data:")
-        for k, v in job_data.items():
-            print(f" - {k + ':':20} {v}")
+        logger.info(f"Added new job {job_id}")
+        logger.debug("Job Data: " + ", ".join(f"{k}={v}" for k, v in job_data.items()))
         return job_data
 
     # Priority management methods
@@ -672,7 +679,7 @@ class LocalJobDB(BaseJobDB):
         with portalocker.Lock(job_file_path, mode="wb", flags=portalocker.LOCK_EX):
             self._atomic_write(job_file_path, json.dumps(job_data, indent=4))
         
-        print(f"Added reserved job {job_id} for worker {reserved_for_worker}")
+        logger.info(f"Added reserved job {job_id} for worker {reserved_for_worker}")
         return job_data
 
     # =========================================================================
@@ -696,7 +703,7 @@ class LocalJobDB(BaseJobDB):
                         running_jobs.append(job_data)
                         
                 except (json.JSONDecodeError, KeyError) as e:
-                    print(f"Error reading job file {filename}: {e}")
+                    logger.error(f"Error reading job file {filename}: {e}")
                     continue
                     
         except FileNotFoundError:
@@ -739,7 +746,7 @@ class LocalJobDB(BaseJobDB):
                     ))
                     
             except (ValueError, TypeError) as e:
-                print(f"Error parsing heartbeat for job {job_id}: {e}")
+                logger.error(f"Error parsing heartbeat for job {job_id}: {e}")
                 continue
         
         return stale_jobs
@@ -778,7 +785,7 @@ class LocalJobDB(BaseJobDB):
                     results[job_id] = True
                     
             except Exception as e:
-                print(f"Error marking job {job_id} as failed: {e}")
+                logger.error(f"Error marking job {job_id} as failed: {e}")
                 results[job_id] = False
         
         return results

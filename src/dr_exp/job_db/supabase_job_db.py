@@ -1,5 +1,6 @@
 # Example: experiment_manager/core/supabase_client.py
 
+import logging
 import os
 import shutil
 import tempfile
@@ -9,6 +10,8 @@ from datetime import datetime, timezone, timedelta
 
 from .base_job_db import BaseJobDB, StaleJobInfo
 from .config import JobDBConfig
+
+logger = logging.getLogger(__name__)
 
 
 class SupabaseJobDB(BaseJobDB):
@@ -41,9 +44,9 @@ class SupabaseJobDB(BaseJobDB):
             raise ValueError("Supabase URL and Key must be provided in config.")
         try:
             self.supabase: Client = create_client(config.supabase_url, config.supabase_key)
-            print("Successfully connected to Supabase.")
+            logger.info("Successfully connected to Supabase.")
         except Exception as e:
-            print(f"Failed to connect to Supabase: {e}")
+            logger.error(f"Failed to connect to Supabase: {e}")
             raise
 
     def claim_job(
@@ -76,7 +79,7 @@ class SupabaseJobDB(BaseJobDB):
                 return response.data[0]  # RPC might return a list with one item
             return None
         except Exception as e:
-            print(f"Error claiming job: {e}")
+            logger.error(f"Error claiming job: {e}")
             return None
 
     def update_job(self, job_id: str, data: Dict[str, Any]) -> Dict[str, Any]:
@@ -108,7 +111,7 @@ class SupabaseJobDB(BaseJobDB):
             # If no data and no error, it might mean no row matched the filter.
             return {"success": False, "message": "Job not found or update failed."}
         except Exception as e:
-            print(f"Error updating job {job_id}: {e}")
+            logger.error(f"Error updating job {job_id}: {e}")
             return {"success": False, "message": str(e)}
 
     def get_job_details(self, job_id: str) -> Optional[Dict[str, Any]]:
@@ -134,7 +137,7 @@ class SupabaseJobDB(BaseJobDB):
             )
             return response.data if response.data else None
         except Exception as e:
-            print(f"Error getting job details for {job_id}: {e}")
+            logger.error(f"Error getting job details for {job_id}: {e}")
             return None
 
     def get_config_for_job(self, job_id: str) -> Optional[Dict[str, Any]]:
@@ -165,7 +168,7 @@ class SupabaseJobDB(BaseJobDB):
                     return response.data.get("config_json")
             return None
         except Exception as e:
-            print(f"Error getting config for job {job_id}: {e}")
+            logger.error(f"Error getting config for job {job_id}: {e}")
             return None
 
     def log_metrics_file(
@@ -211,7 +214,7 @@ class SupabaseJobDB(BaseJobDB):
             self.update_job(job_id, {"metrics_path": remote_db_path})
             return {"success": True, "storage_path": remote_db_path}
         except Exception as e:
-            print(f"Error uploading metrics file for job {job_id}: {e}")
+            logger.error(f"Error uploading metrics file for job {job_id}: {e}")
             return {"success": False, "message": str(e)}
 
     def record_failure(
@@ -258,7 +261,7 @@ class SupabaseJobDB(BaseJobDB):
             )
             return {"success": True}
         except Exception as e:
-            print(f"Error recording failure for job {job_id}: {e}")
+            logger.error(f"Error recording failure for job {job_id}: {e}")
             return {"success": False, "message": str(e)}
 
     def upload_artifact(
@@ -322,7 +325,7 @@ class SupabaseJobDB(BaseJobDB):
                     )
             return {"success": True, "storage_path": remote_full_path}
         except Exception as e:
-            print(f"Error uploading artifact '{local_path}' for job {job_id}: {e}")
+            logger.error(f"Error uploading artifact '{local_path}' for job {job_id}: {e}")
             return {"success": False, "message": str(e)}
 
     # --- Methods primarily for Config Generator ---
@@ -353,7 +356,7 @@ class SupabaseJobDB(BaseJobDB):
             )
             return response.data[0] if response.data else None
         except Exception as e:
-            print(f"Error adding sweep config cluster: {e}")
+            logger.error(f"Error adding sweep config cluster: {e}")
             return None
 
     def check_sweep_config_exists(self, config_hash: str) -> Optional[Dict[str, Any]]:
@@ -368,7 +371,7 @@ class SupabaseJobDB(BaseJobDB):
             )
             return response.data if response.data else None
         except Exception as e:
-            print(f"Error checking sweep config existence: {e}")
+            logger.error(f"Error checking sweep config existence: {e}")
             return None
 
     def add_sweep_config(
@@ -406,7 +409,7 @@ class SupabaseJobDB(BaseJobDB):
             response = self.supabase.table("sweep_configs").insert(data).execute()
             return response.data[0] if response.data else None
         except Exception as e:
-            print(f"Error adding sweep config: {e}")
+            logger.error(f"Error adding sweep config: {e}")
             return None
 
     def add_job_entry(
@@ -457,7 +460,7 @@ class SupabaseJobDB(BaseJobDB):
             response = self.supabase.table("jobs").insert(data).execute()
             return response.data[0] if response.data else None
         except Exception as e:
-            print(f"Error adding job entry: {e}")
+            logger.error(f"Error adding job entry: {e}")
             return None
 
     # Priority management methods
@@ -507,7 +510,7 @@ class SupabaseJobDB(BaseJobDB):
                 return {"success": False, "message": "Job not found or update failed"}
                 
         except Exception as e:
-            print(f"Error updating job priority for {job_id}: {e}")
+            logger.error(f"Error updating job priority for {job_id}: {e}")
             return {"success": False, "message": str(e)}
 
     def boost_job_priority(
@@ -566,7 +569,7 @@ class SupabaseJobDB(BaseJobDB):
                 return {"success": False, "message": "Priority boost failed"}
                 
         except Exception as e:
-            print(f"Error boosting job priority for {job_id}: {e}")
+            logger.error(f"Error boosting job priority for {job_id}: {e}")
             return {"success": False, "message": str(e)}
 
     def list_jobs_by_priority(
@@ -608,7 +611,7 @@ class SupabaseJobDB(BaseJobDB):
             return response.data if response.data else []
             
         except Exception as e:
-            print(f"Error listing jobs by priority: {e}")
+            logger.error(f"Error listing jobs by priority: {e}")
             return []
 
     # Job reservation methods
@@ -668,12 +671,12 @@ class SupabaseJobDB(BaseJobDB):
                 job_record = response.data[0]
                 # Add the config_json to the response for consistency with LocalJobDB
                 job_record["config_json"] = job_config
-                print(f"Added reserved job {job_record['id']} for worker {reserved_for_worker}")
+                logger.info(f"Added reserved job {job_record['id']} for worker {reserved_for_worker}")
                 return job_record
             else:
                 raise Exception("No data returned from insert")
         except Exception as e:
-            print(f"Error adding reserved job: {e}")
+            logger.error(f"Error adding reserved job: {e}")
             return {"success": False, "message": str(e)}
 
     # =========================================================================
@@ -691,7 +694,7 @@ class SupabaseJobDB(BaseJobDB):
             )
             return response.data or []
         except Exception as e:
-            print(f"Error listing running jobs: {e}")
+            logger.error(f"Error listing running jobs: {e}")
             return []
 
     def get_stale_jobs(self, max_age_seconds: int) -> List[StaleJobInfo]:
@@ -730,13 +733,13 @@ class SupabaseJobDB(BaseJobDB):
                             age_seconds=age_seconds
                         ))
                 except (ValueError, TypeError) as e:
-                    print(f"Error parsing heartbeat for job {job.get('id')}: {e}")
+                    logger.error(f"Error parsing heartbeat for job {job.get('id')}: {e}")
                     continue
             
             return stale_jobs
             
         except Exception as e:
-            print(f"Error getting stale jobs: {e}")
+            logger.error(f"Error getting stale jobs: {e}")
             return []
 
     def mark_jobs_failed(
@@ -772,7 +775,7 @@ class SupabaseJobDB(BaseJobDB):
                 results[job_id] = job_id in updated_job_ids
                 
         except Exception as e:
-            print(f"Error in batch update, falling back to individual updates: {e}")
+            logger.warning(f"Error in batch update, falling back to individual updates: {e}")
             
             # Fallback: individual updates
             for job_id in job_ids:
@@ -789,7 +792,7 @@ class SupabaseJobDB(BaseJobDB):
                     )
                     results[job_id] = bool(response.data)
                 except Exception as e:
-                    print(f"Error marking job {job_id} as failed: {e}")
+                    logger.error(f"Error marking job {job_id} as failed: {e}")
                     results[job_id] = False
         
         return results
@@ -806,7 +809,7 @@ class SupabaseJobDB(BaseJobDB):
             )
             return len(response.data or []) > 0
         except Exception as e:
-            print(f"Error checking for queued jobs: {e}")
+            logger.error(f"Error checking for queued jobs: {e}")
             return False
 
     def get_queue_summary(self, limit: int = 5) -> List[Dict[str, Any]]:
@@ -825,7 +828,7 @@ class SupabaseJobDB(BaseJobDB):
             return response.data or []
             
         except Exception as e:
-            print(f"Error getting queue summary: {e}")
+            logger.error(f"Error getting queue summary: {e}")
             return []
 
     def get_metrics(self, run_id: str, limit: Optional[int] = 500) -> List[Dict[str, Any]]:
@@ -889,14 +892,14 @@ class SupabaseJobDB(BaseJobDB):
                             try:
                                 metrics.append(json.loads(line))
                             except json.JSONDecodeError as e:
-                                print(f"Warning: Failed to parse metrics line: {line[:100]}... Error: {e}")
+                                logger.warning(f"Failed to parse metrics line: {line[:100]}... Error: {e}")
                                 continue
                     
                     # Apply limit if specified
                     if limit is not None and len(metrics) > limit:
                         metrics = metrics[-limit:]
                         
-                    print(f"Successfully downloaded {len(metrics)} metrics from Supabase storage for run {run_id}")
+                    logger.info(f"Successfully downloaded {len(metrics)} metrics from Supabase storage for run {run_id}")
                     return metrics
                 else:
                     raise FileNotFoundError(f"Metrics file not found in Supabase storage for run {run_id}")
@@ -904,10 +907,10 @@ class SupabaseJobDB(BaseJobDB):
             except Exception as e:
                 if attempt == max_retries - 1:
                     # Last attempt failed
-                    print(f"Error downloading metrics from Supabase storage for run {run_id} after {max_retries} attempts: {e}")
+                    logger.error(f"Error downloading metrics from Supabase storage for run {run_id} after {max_retries} attempts: {e}")
                     raise FileNotFoundError(f"Could not retrieve metrics from storage: {e}")
                 else:
-                    print(f"Retry {attempt + 1}/{max_retries} for downloading metrics from Supabase storage for run {run_id}: {e}")
+                    logger.warning(f"Retry {attempt + 1}/{max_retries} for downloading metrics from Supabase storage for run {run_id}: {e}")
                     continue
 
     def finalize_job(self, job_id: str, final_status: str, metadata: Dict[str, Any]) -> Dict[str, Any]:
