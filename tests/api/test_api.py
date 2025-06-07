@@ -97,3 +97,44 @@ def test_list_jobs_endpoint(client, sb_client):
     ids = {j["id"] for j in data}
     assert job1["id"] in ids
     assert job2["id"] in ids
+
+
+def test_priority_endpoints(client, sb_client):
+    job = sb_client.add_job({"a": 1}, "sweep1", status="queued", priority=100)
+    job_id = job["id"]
+
+    headers = {"X-API-Key": "secret"}
+    
+    # Test boost priority
+    boost_resp = client.post(
+        "/job/boost-priority", 
+        json={"job_id": job_id, "boost_amount": 50}, 
+        headers=headers
+    )
+    assert boost_resp.status_code == 200
+    boost_data = boost_resp.json()
+    assert boost_data["job_id"] == job_id
+    assert boost_data["old_priority"] == 100
+    assert boost_data["new_priority"] == 150
+    assert boost_data["success"] is True
+
+    # Test set priority
+    set_resp = client.post(
+        "/job/set-priority",
+        json={"job_id": job_id, "priority": 300, "reason": "urgent experiment"},
+        headers=headers
+    )
+    assert set_resp.status_code == 200
+    set_data = set_resp.json()
+    assert set_data["job_id"] == job_id
+    assert set_data["old_priority"] == 150  # From previous boost
+    assert set_data["new_priority"] == 300
+    assert set_data["success"] is True
+
+    # Test unauthorized access
+    bad_resp = client.post(
+        "/job/boost-priority", 
+        json={"job_id": job_id, "boost_amount": 50},
+        headers={"X-API-Key": "bad"}
+    )
+    assert bad_resp.status_code == 401
