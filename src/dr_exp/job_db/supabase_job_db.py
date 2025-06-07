@@ -56,6 +56,8 @@ class SupabaseJobDB(BaseJobDB):
         worker_id : str, optional
             Identifier of the worker claiming the job. Defaults to
             ``"unassigned_worker"``.
+        respect_reservations : bool, optional
+            Whether to respect job reservations, by default True.
 
         Returns
         -------
