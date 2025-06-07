@@ -200,7 +200,7 @@ class LocalJobDB(BaseJobDB):
         """
         job_file_path = os.path.join(self.jobs_dir, f"{job_id}.json")
         if not os.path.exists(job_file_path):
-            # print(f"Job file not found for update: {job_file_path}") # Debug
+            # logger.debug(f"Job file not found for update: {job_file_path}")
             # In a real scenario, you might raise an error or return a status
             # For now, let's assume it might be created if it's a new job being fully defined
             # Or simply do nothing if it strictly means "update existing"
@@ -383,7 +383,7 @@ class LocalJobDB(BaseJobDB):
         job_data = self.get_job_details(job_id)
         if job_data and "config_json" in job_data:
             return job_data["config_json"]
-        # print(f"Config not found for job {job_id}") # Debug
+        # logger.debug(f"Config not found for job {job_id}")
         return None
 
     def add_job(
@@ -427,10 +427,8 @@ class LocalJobDB(BaseJobDB):
         job_file_path = os.path.join(self.jobs_dir, f"{job_id}.json")
         with portalocker.Lock(job_file_path, mode="wb", flags=portalocker.LOCK_EX):
             self._atomic_write(job_file_path, json.dumps(job_data, indent=4))
-        print(f"Added new job {job_id}")  # Debug
-        print("Job Data:")
-        for k, v in job_data.items():
-            print(f" - {k + ':':20} {v}")
+        logger.info(f"Added new job {job_id}")
+        logger.debug("Job Data: " + ", ".join(f"{k}={v}" for k, v in job_data.items()))
         return job_data
 
     # Priority management methods
@@ -676,7 +674,7 @@ class LocalJobDB(BaseJobDB):
         with portalocker.Lock(job_file_path, mode="wb", flags=portalocker.LOCK_EX):
             self._atomic_write(job_file_path, json.dumps(job_data, indent=4))
         
-        print(f"Added reserved job {job_id} for worker {reserved_for_worker}")
+        logger.info(f"Added reserved job {job_id} for worker {reserved_for_worker}")
         return job_data
 
     # =========================================================================

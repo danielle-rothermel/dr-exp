@@ -44,7 +44,7 @@ class SupabaseJobDB(BaseJobDB):
             raise ValueError("Supabase URL and Key must be provided in config.")
         try:
             self.supabase: Client = create_client(config.supabase_url, config.supabase_key)
-            print("Successfully connected to Supabase.")
+            logger.info("Successfully connected to Supabase.")
         except Exception as e:
             logger.error(f"Failed to connect to Supabase: {e}")
             raise
@@ -671,7 +671,7 @@ class SupabaseJobDB(BaseJobDB):
                 job_record = response.data[0]
                 # Add the config_json to the response for consistency with LocalJobDB
                 job_record["config_json"] = job_config
-                print(f"Added reserved job {job_record['id']} for worker {reserved_for_worker}")
+                logger.info(f"Added reserved job {job_record['id']} for worker {reserved_for_worker}")
                 return job_record
             else:
                 raise Exception("No data returned from insert")
@@ -899,7 +899,7 @@ class SupabaseJobDB(BaseJobDB):
                     if limit is not None and len(metrics) > limit:
                         metrics = metrics[-limit:]
                         
-                    print(f"Successfully downloaded {len(metrics)} metrics from Supabase storage for run {run_id}")
+                    logger.info(f"Successfully downloaded {len(metrics)} metrics from Supabase storage for run {run_id}")
                     return metrics
                 else:
                     raise FileNotFoundError(f"Metrics file not found in Supabase storage for run {run_id}")
