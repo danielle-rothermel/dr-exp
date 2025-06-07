@@ -70,17 +70,31 @@ def test_admin_actions(client, sb_client):
     job_id = job["id"]
 
     headers = {"X-API-Key": "secret"}
+    
+    # Test kill endpoint
     r = client.post("/job/kill", json={"job_id": job_id}, headers=headers)
     assert r.status_code == 200
+    kill_resp = r.json()
+    assert kill_resp["success"] is True
+    assert kill_resp["job_id"] == job_id
+    assert "marked for termination" in kill_resp["message"]
+    
     job_data = sb_client.get_job_details(job_id)
     assert job_data.get("kill_requested") is True
 
+    # Test requeue endpoint
     r = client.post("/job/requeue", json={"job_id": job_id}, headers=headers)
     assert r.status_code == 200
+    requeue_resp = r.json()
+    assert requeue_resp["success"] is True
+    assert requeue_resp["job_id"] == job_id
+    assert "requeued for retry" in requeue_resp["message"]
+    
     job_data = sb_client.get_job_details(job_id)
     assert job_data["status"] == "queued"
     assert job_data["retry_index"] == 1
 
+    # Test unauthorized access
     bad = client.post(
         "/job/kill", json={"job_id": job_id}, headers={"X-API-Key": "bad"}
     )

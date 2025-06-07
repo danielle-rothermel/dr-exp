@@ -62,3 +62,19 @@ class PriorityResponse(BaseModel):
     new_priority: int
     success: bool
     message: str
+
+
+class ErrorResponse(BaseModel):
+    """Standardized error response model."""
+
+    error: str
+    detail: str
+    job_id: str | None = None
+
+
+class SuccessResponse(BaseModel):
+    """Standardized success response model."""
+
+    success: bool = True
+    message: str
+    job_id: str | None = None
