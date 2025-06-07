@@ -187,6 +187,12 @@ The manager CLI (`scripts/manager_cli.py`) provides comprehensive job management
    
    # Run with coverage
    uv run pytest --cov=dr_exp
+   
+   # Run Supabase integration tests (requires local Supabase)
+   uv run python scripts/test_supabase.py --type isolated
+   
+   # Run all Supabase tests with database reset
+   uv run python scripts/test_supabase.py --type all --reset-db
    ```
 
 4. **Database Management**:
