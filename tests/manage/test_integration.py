@@ -106,7 +106,7 @@ class TestManagerWorkerIntegration:
         # Mock the actual training function to avoid real execution
         def mock_train(config, logger, *args, **kwargs):
             """Mock training function that simulates work."""
-            logger.log_metric("test_metric", 0.95)
+            logger.log({"test_metric": 0.95})
             return {"final_val_acc": 0.95, "status": "success"}
         
         # Run worker to process jobs
@@ -485,8 +485,8 @@ class TestFullSystemIntegration:
             else:
                 final_accuracy = 0.90
             
-            logger.log_metric("accuracy", final_accuracy)
-            logger.log_metric("loss", 0.1)
+            logger.log({"accuracy": final_accuracy})
+            logger.log({"loss": 0.1})
             
             results.append({
                 "model": config["model"],
@@ -551,13 +551,13 @@ class TestFullSystemIntegration:
             if call_count == 1:
                 raise RuntimeError("Simulated training failure")
             else:
-                logger.log_metric("recovery_metric", 0.85)
+                logger.log({"recovery_metric": 0.85})
                 return {"final_val_acc": 0.85, "status": "success"}
         
         # Use direct trainer_fn to bypass import issues
         from dr_exp.manage.worker import run_worker
         
-        # First attempt should complete (worker completes), but job should fail
+        # First attempt should fail due to training exception
         status1 = run_worker(
             base_path=integration_config.job_db_config.base_path,
             max_claim_attempts=integration_config.max_claim_attempts,
@@ -566,7 +566,7 @@ class TestFullSystemIntegration:
             client=factory.job_db,
             worker_id="failure_worker_1"
         )
-        assert status1 == "completed"  # Worker completed successfully
+        assert status1 == "failed"  # Worker reports failure due to training exception
         
         # Verify job marked as failed (training failed)
         job_details = factory.job_db.get_job_details(failing_job["id"])
