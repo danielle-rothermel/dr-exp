@@ -1,4 +1,4 @@
-"""Streamlined manager implementation using abstract interface methods."""
+"""Manager implementation using abstract interface methods."""
 
 import logging
 import os
@@ -12,7 +12,7 @@ from dr_exp.job_db.base_job_db import BaseJobDB
 from .process_manager import ProcessManager
 
 
-class StreamlinedManager:
+class Manager:
     """Manager that coordinates workers using only abstract interface methods.
     
     This manager eliminates database-specific code paths by delegating all
@@ -30,7 +30,7 @@ class StreamlinedManager:
         client: Optional[BaseJobDB] = None,
         process_manager: Optional[ProcessManager] = None,
     ) -> None:
-        """Create a new StreamlinedManager.
+        """Create a new Manager.
         
         Parameters
         ----------
@@ -198,7 +198,7 @@ class StreamlinedManager:
         signal.signal(signal.SIGTERM, self._handle_signal)
         signal.signal(signal.SIGINT, self._handle_signal)
         
-        logging.info("Starting StreamlinedManager with %d GPUs, %d workers per GPU", 
+        logging.info("Starting Manager with %d GPUs, %d workers per GPU", 
                     len(self.gpus), self.workers_per_gpu)
         
         # Start all workers
@@ -230,7 +230,7 @@ class StreamlinedManager:
         finally:
             # Always stop workers on exit
             self.stop_all_workers()
-            logging.info("StreamlinedManager shutdown complete")
+            logging.info("Manager shutdown complete")
 
 
-__all__ = ["StreamlinedManager"]
+__all__ = ["Manager"]

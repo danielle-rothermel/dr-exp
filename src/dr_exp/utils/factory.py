@@ -1,12 +1,12 @@
-"""Streamlined factory for creating integrated system components."""
+"""Factory for creating integrated system components."""
 
 import os
 from typing import Optional, List
 from dotenv import load_dotenv
 
 from dr_exp.job_db import BaseJobDB, JobDBConfig
-from dr_exp.manage.streamlined_manager import StreamlinedManager
-from dr_exp.manage.streamlined_worker import run_streamlined_worker
+from dr_exp.manage.manager import Manager
+from dr_exp.manage.worker import run_worker
 from dr_exp.manage.process_manager import ProcessManager, BaseProcessManager
 from .jobdb_factory import get_job_db_client
 
@@ -14,7 +14,7 @@ load_dotenv()
 
 
 class SystemConfig:
-    """Configuration for the streamlined experiment management system."""
+    """Configuration for the experiment management system."""
     
     def __init__(
         self,
@@ -102,8 +102,8 @@ class SystemConfig:
             raise ValueError("worker_heartbeat_interval must be less than heartbeat_timeout")
 
 
-class StreamlinedFactory:
-    """Factory for creating streamlined system components."""
+class Factory:
+    """Factory for creating system components."""
     
     def __init__(self, config: Optional[SystemConfig] = None):
         """Initialize the factory with system configuration.
@@ -136,15 +136,15 @@ class StreamlinedFactory:
             )
         return self._process_manager
     
-    def create_manager(self) -> StreamlinedManager:
-        """Create a streamlined manager instance.
+    def create_manager(self) -> Manager:
+        """Create a manager instance.
         
         Returns
         -------
-        StreamlinedManager
+        Manager
             Configured manager instance ready to run.
         """
-        return StreamlinedManager(
+        return Manager(
             gpus=self.config.gpus,
             workers_per_gpu=self.config.workers_per_gpu,
             heartbeat_timeout=self.config.heartbeat_timeout,
@@ -156,17 +156,17 @@ class StreamlinedFactory:
     
     def run_worker(
         self,
-        worker_id: str = "streamlined_worker",
+        worker_id: str = "worker",
         work_dir: Optional[str] = None,
         target_job_id: Optional[str] = None,
         respect_reservations: bool = True
     ) -> str:
-        """Run a streamlined worker instance.
+        """Run a worker instance.
         
         Parameters
         ----------
         worker_id : str, optional
-            Worker identifier, by default "streamlined_worker".
+            Worker identifier, by default "worker".
         work_dir : str, optional
             Work directory. If None, creates temporary directory.
         target_job_id : str, optional
@@ -179,7 +179,7 @@ class StreamlinedFactory:
         str
             Final status of job execution.
         """
-        return run_streamlined_worker(
+        return run_worker(
             base_path=self.config.job_db_config.base_path,
             work_dir=work_dir,
             max_claim_attempts=self.config.max_claim_attempts,
@@ -236,8 +236,8 @@ class StreamlinedFactory:
         }
 
 
-def create_streamlined_system(config: Optional[SystemConfig] = None) -> StreamlinedFactory:
-    """Create a streamlined experiment management system.
+def create_system(config: Optional[SystemConfig] = None) -> Factory:
+    """Create an experiment management system.
     
     This is the main entry point for creating a fully configured system
     with all components properly integrated.
@@ -249,13 +249,13 @@ def create_streamlined_system(config: Optional[SystemConfig] = None) -> Streamli
     
     Returns
     -------
-    StreamlinedFactory
+    Factory
         Factory instance for creating managers and workers.
         
     Examples
     --------
     # Create system with defaults from environment
-    system = create_streamlined_system()
+    system = create_system()
     
     # Run a manager
     manager = system.create_manager()
@@ -267,11 +267,11 @@ def create_streamlined_system(config: Optional[SystemConfig] = None) -> Streamli
     # Get system status
     status = system.get_system_status()
     """
-    return StreamlinedFactory(config)
+    return Factory(config)
 
 
 __all__ = [
     "SystemConfig",
-    "StreamlinedFactory", 
-    "create_streamlined_system"
+    "Factory", 
+    "create_system"
 ]

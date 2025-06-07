@@ -1,17 +1,17 @@
-"""Tests for the streamlined factory and configuration."""
+"""Tests for the factory and configuration."""
 
 import os
 import tempfile
 import pytest
 from unittest.mock import Mock, patch
 
-from dr_exp.utils.streamlined_factory import (
+from dr_exp.utils.factory import (
     SystemConfig, 
-    StreamlinedFactory, 
-    create_streamlined_system
+    Factory, 
+    create_system
 )
 from dr_exp.job_db import JobDBConfig, LocalJobDB
-from dr_exp.manage.streamlined_manager import StreamlinedManager
+from dr_exp.manage.manager import Manager
 from dr_exp.manage.process_manager import ProcessManager
 
 
@@ -126,23 +126,23 @@ class TestSystemConfig:
             temp_config.validate()
 
 
-class TestStreamlinedFactory:
-    """Test the StreamlinedFactory class."""
+class TestFactory:
+    """Test the Factory class."""
     
     def test_initialization_with_config(self, temp_config):
         """Test factory initialization with config."""
-        factory = StreamlinedFactory(temp_config)
+        factory = Factory(temp_config)
         assert factory.config is temp_config
     
     def test_initialization_default_config(self):
         """Test factory initialization with default config."""
         with patch.dict('os.environ', {"EXPMGR_MODE": "files_local", "DR_EXP_BASE_PATH": "/tmp"}):
-            factory = StreamlinedFactory()
+            factory = Factory()
             assert isinstance(factory.config, SystemConfig)
     
     def test_job_db_property(self, temp_config):
         """Test job database property."""
-        factory = StreamlinedFactory(temp_config)
+        factory = Factory(temp_config)
         
         # First access should create the instance
         job_db = factory.job_db
@@ -154,7 +154,7 @@ class TestStreamlinedFactory:
     
     def test_process_manager_property(self, temp_config):
         """Test process manager property."""
-        factory = StreamlinedFactory(temp_config)
+        factory = Factory(temp_config)
         
         # First access should create the instance
         pm = factory.process_manager
@@ -166,10 +166,10 @@ class TestStreamlinedFactory:
     
     def test_create_manager(self, temp_config):
         """Test creating a manager."""
-        factory = StreamlinedFactory(temp_config)
+        factory = Factory(temp_config)
         manager = factory.create_manager()
         
-        assert isinstance(manager, StreamlinedManager)
+        assert isinstance(manager, Manager)
         assert manager.gpus == ["0", "1"]
         assert manager.workers_per_gpu == 2
         assert manager.heartbeat_timeout == 30
@@ -177,12 +177,12 @@ class TestStreamlinedFactory:
     
     def test_run_worker(self, temp_config):
         """Test running a worker."""
-        factory = StreamlinedFactory(temp_config)
+        factory = Factory(temp_config)
         
         # Add a job for the worker to claim
         job = factory.job_db.add_job({"test": "config"}, "sweep1", status="queued")
         
-        with patch('dr_exp.utils.streamlined_factory.run_streamlined_worker') as mock_run:
+        with patch('dr_exp.utils.factory.run_worker') as mock_run:
             mock_run.return_value = "completed"
             
             status = factory.run_worker(
@@ -201,7 +201,7 @@ class TestStreamlinedFactory:
     
     def test_get_system_status_empty(self, temp_config):
         """Test getting system status with no jobs."""
-        factory = StreamlinedFactory(temp_config)
+        factory = Factory(temp_config)
         status = factory.get_system_status()
         
         assert status["configuration"]["gpus"] == ["0", "1"]
@@ -218,7 +218,7 @@ class TestStreamlinedFactory:
     
     def test_get_system_status_with_jobs(self, temp_config):
         """Test getting system status with jobs."""
-        factory = StreamlinedFactory(temp_config)
+        factory = Factory(temp_config)
         
         # Add some jobs
         job1 = factory.job_db.add_job({"test": 1}, "sweep1", status="queued", priority=800)
@@ -241,27 +241,27 @@ class TestStreamlinedFactory:
 
 
 class TestCreateStreamlinedSystem:
-    """Test the create_streamlined_system function."""
+    """Test the create_system function."""
     
     def test_create_with_config(self, temp_config):
         """Test creating system with provided config."""
-        system = create_streamlined_system(temp_config)
+        system = create_system(temp_config)
         
-        assert isinstance(system, StreamlinedFactory)
+        assert isinstance(system, Factory)
         assert system.config is temp_config
     
     def test_create_with_default_config(self):
         """Test creating system with default config."""
         with patch.dict('os.environ', {"EXPMGR_MODE": "files_local", "DR_EXP_BASE_PATH": "/tmp"}):
-            system = create_streamlined_system()
+            system = create_system()
             
-            assert isinstance(system, StreamlinedFactory)
+            assert isinstance(system, Factory)
             assert isinstance(system.config, SystemConfig)
     
     def test_full_workflow_example(self, temp_config):
         """Test a complete workflow example."""
         # Create system
-        system = create_streamlined_system(temp_config)
+        system = create_system(temp_config)
         
         # Add a job
         job = system.job_db.add_job({"epochs": 5}, "test_sweep", status="queued")
@@ -272,7 +272,7 @@ class TestCreateStreamlinedSystem:
         
         # Create manager (don't run it)
         manager = system.create_manager()
-        assert isinstance(manager, StreamlinedManager)
+        assert isinstance(manager, Manager)
         
         # The workflow demonstrates the integration works correctly
         assert manager.job_db is system.job_db
@@ -303,7 +303,7 @@ class TestIntegration:
         )
         
         # Create factory and verify all components
-        factory = StreamlinedFactory(system_config)
+        factory = Factory(system_config)
         
         # Test job database
         job_db = factory.job_db

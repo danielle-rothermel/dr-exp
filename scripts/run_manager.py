@@ -1,11 +1,11 @@
 #!/usr/bin/env python3
-"""Run a streamlined manager using the new architecture."""
+"""Run a manager using the new architecture."""
 
 import argparse
 import sys
 from typing import List, Optional
 
-from dr_exp.utils.streamlined_factory import create_streamlined_system, SystemConfig
+from dr_exp.utils.factory import create_system, SystemConfig
 from dr_exp.job_db import JobDBConfig
 
 
@@ -19,8 +19,8 @@ def discover_gpus(gpus_per_node: int) -> List[str]:
 
 
 def main():
-    """Run the streamlined manager."""
-    parser = argparse.ArgumentParser(description="Run streamlined experiment manager")
+    """Run the manager."""
+    parser = argparse.ArgumentParser(description="Run experiment manager")
     
     # GPU configuration
     parser.add_argument(
@@ -102,13 +102,13 @@ def main():
             multiprocessing_start_method=args.start_method
         )
         
-        # Create streamlined system
-        system = create_streamlined_system(system_config)
+        # Create system
+        system = create_system(system_config)
         
         if args.status:
             # Show system status
             status = system.get_system_status()
-            print("=== Streamlined System Status ===")
+            print("=== System Status ===")
             print(f"Mode: {status['configuration']['mode']}")
             print(f"GPUs: {status['configuration']['gpus']}")
             print(f"Workers per GPU: {status['configuration']['workers_per_gpu']}")
@@ -132,7 +132,7 @@ def main():
             return
         
         # Create and run manager
-        print("Starting streamlined manager...")
+        print("Starting manager...")
         print(f"Configuration: {len(system_config.gpus)} GPUs, {system_config.workers_per_gpu} workers/GPU")
         print(f"Mode: {system_config.job_db_config.mode}")
         print(f"Base directory: {system_config.manager_base_dir}")

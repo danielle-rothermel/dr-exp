@@ -1,4 +1,4 @@
-"""Tests for the StreamlinedManager implementation."""
+"""Tests for the Manager implementation."""
 
 import os
 import tempfile
@@ -6,7 +6,7 @@ import pytest
 from datetime import datetime, timezone, timedelta
 from unittest.mock import Mock, patch
 
-from dr_exp.manage.streamlined_manager import StreamlinedManager
+from dr_exp.manage.manager import Manager
 from dr_exp.manage.process_manager import MockProcessManager
 from dr_exp.job_db import StaleJobInfo
 
@@ -59,8 +59,8 @@ def mock_process_manager():
 
 @pytest.fixture
 def streamlined_manager(temp_dir, mock_job_db, mock_process_manager):
-    """Create a StreamlinedManager for testing."""
-    return StreamlinedManager(
+    """Create a Manager for testing."""
+    return Manager(
         gpus=["0", "1"],
         workers_per_gpu=2,
         heartbeat_timeout=30,
@@ -71,8 +71,8 @@ def streamlined_manager(temp_dir, mock_job_db, mock_process_manager):
     )
 
 
-class TestStreamlinedManager:
-    """Test the StreamlinedManager implementation."""
+class TestManager:
+    """Test the Manager implementation."""
     
     def test_initialization(self, streamlined_manager, temp_dir, mock_job_db, mock_process_manager):
         """Test manager initialization."""
@@ -297,13 +297,13 @@ class TestStreamlinedManager:
         assert streamlined_manager.shutdown
 
 
-class TestStreamlinedManagerIntegration:
-    """Integration tests for StreamlinedManager with real components."""
+class TestManagerIntegration:
+    """Integration tests for Manager with real components."""
     
     def test_with_default_factory(self, temp_dir):
         """Test manager creation with default job database factory."""
         # This should use the factory to create a real job database
-        manager = StreamlinedManager(
+        manager = Manager(
             gpus=["0"],
             workers_per_gpu=1,
             heartbeat_timeout=30,
@@ -321,7 +321,7 @@ class TestStreamlinedManagerIntegration:
     
     def test_with_default_process_manager(self, temp_dir, mock_job_db):
         """Test manager creation with default process manager."""
-        manager = StreamlinedManager(
+        manager = Manager(
             gpus=["0"],
             workers_per_gpu=1,
             heartbeat_timeout=30,

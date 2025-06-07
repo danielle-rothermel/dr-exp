@@ -1,4 +1,4 @@
-"""Streamlined worker implementation with improved error handling and separation of concerns."""
+"""Worker implementation with improved error handling and separation of concerns."""
 
 from __future__ import annotations
 
@@ -230,7 +230,7 @@ class JobExecutor:
         return self.client.upload_artifact(self.job_id, bundle_zip, "bundle.zip")
 
 
-def run_streamlined_worker(
+def run_worker(
     base_path: str = "./job_data",
     work_dir: Optional[str] = None,
     max_claim_attempts: int = 5,
@@ -337,7 +337,7 @@ def _claim_job(
 
 
 __all__ = [
-    "run_streamlined_worker", 
+    "run_worker", 
     "HeartbeatManager", 
     "JobExecutor",
     "managed_work_directory"

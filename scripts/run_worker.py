@@ -1,23 +1,23 @@
 #!/usr/bin/env python3
-"""Run a streamlined worker using the new architecture."""
+"""Run a worker using the new architecture."""
 
 import argparse
 import sys
 import os
 
-from dr_exp.utils.streamlined_factory import create_streamlined_system, SystemConfig
+from dr_exp.utils.factory import create_system, SystemConfig
 from dr_exp.job_db import JobDBConfig
 
 
 def main():
-    """Run the streamlined worker."""
-    parser = argparse.ArgumentParser(description="Run streamlined experiment worker")
+    """Run the worker."""
+    parser = argparse.ArgumentParser(description="Run experiment worker")
     
     # Worker identification
     parser.add_argument(
         "--worker-id",
-        default="streamlined_worker",
-        help="Worker identifier (default: streamlined_worker)"
+        default="worker",
+        help="Worker identifier (default: worker)"
     )
     
     # Job targeting
@@ -86,10 +86,10 @@ def main():
             worker_heartbeat_interval=args.heartbeat_interval
         )
         
-        # Create streamlined system
-        system = create_streamlined_system(system_config)
+        # Create system
+        system = create_system(system_config)
         
-        print(f"Starting streamlined worker: {args.worker_id}")
+        print(f"Starting worker: {args.worker_id}")
         print(f"Mode: {system_config.job_db_config.mode}")
         if args.target_job_id:
             print(f"Target job: {args.target_job_id}")

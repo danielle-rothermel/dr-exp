@@ -8,7 +8,7 @@ from typing import Sequence
 
 from dotenv import load_dotenv
 
-from dr_exp.utils.streamlined_factory import create_streamlined_system, SystemConfig
+from dr_exp.utils.factory import create_system, SystemConfig
 from dr_exp.utils.job_reaper import reap_stale_jobs
 from dr_exp.utils.storage_cleanup import cleanup_uploaded_runs
 from dr_exp.utils.jobdb_factory import get_job_db_client
@@ -182,7 +182,7 @@ def build_arg_parser() -> argparse.ArgumentParser:
 
 
 def _cmd_run(args: argparse.Namespace) -> None:
-    """Run the streamlined manager."""
+    """Run the manager."""
     slurm_job_id = os.environ.get("SLURM_JOB_ID", str(os.getpid()))
     base_dir = os.path.join("./manager_runs", f"job_{slurm_job_id}")
     
@@ -194,8 +194,8 @@ def _cmd_run(args: argparse.Namespace) -> None:
         manager_base_dir=base_dir,
     )
     
-    # Create and run streamlined manager
-    system = create_streamlined_system(system_config)
+    # Create and run manager
+    system = create_system(system_config)
     manager = system.create_manager()
     manager.run()
 
@@ -207,8 +207,8 @@ def _cmd_discover_gpus(args: argparse.Namespace) -> None:
 
 
 def _cmd_run_worker(args: argparse.Namespace) -> None:
-    """Run a streamlined worker."""
-    system = create_streamlined_system()
+    """Run a worker."""
+    system = create_system()
     status = system.run_worker(
         worker_id=args.worker_id,
         work_dir=args.work_dir
@@ -289,7 +289,7 @@ def _cmd_run_one(args: argparse.Namespace) -> str:
     print(f"Created job {job['id']} with priority {args.priority}")
     
     # Run worker targeting this specific job
-    system = create_streamlined_system()
+    system = create_system()
     status = system.run_worker(
         worker_id="run_one_worker",
         target_job_id=job["id"]

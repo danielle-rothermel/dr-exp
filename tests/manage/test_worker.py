@@ -1,4 +1,4 @@
-"""Tests for the streamlined worker implementation."""
+"""Tests for the worker implementation."""
 
 import os
 import tempfile
@@ -8,8 +8,8 @@ from unittest.mock import Mock, patch
 from datetime import datetime, UTC
 
 from dr_exp.job_db import LocalJobDB, JobDBConfig
-from dr_exp.manage.streamlined_worker import (
-    run_streamlined_worker,
+from dr_exp.manage.worker import (
+    run_worker,
     HeartbeatManager,
     JobExecutor,
     managed_work_directory,
@@ -163,7 +163,7 @@ class TestStreamlinedWorker:
         job = temp_client.add_job(make_config(), "sweep1", status="queued")
         
         work_dir = tmp_path / "work"
-        status = run_streamlined_worker(
+        status = run_worker(
             base_path=str(tmp_path),
             work_dir=str(work_dir),
             heartbeat_interval=0.01,  # Fast heartbeat for testing
@@ -196,7 +196,7 @@ class TestStreamlinedWorker:
     def test_worker_no_job(self, tmp_path, temp_client):
         """Test worker when no jobs are available."""
         work_dir = tmp_path / "work"
-        result = run_streamlined_worker(
+        result = run_worker(
             base_path=str(tmp_path),
             work_dir=str(work_dir),
             max_claim_attempts=2,
@@ -215,7 +215,7 @@ class TestStreamlinedWorker:
             raise RuntimeError("Training failed")
         
         work_dir = tmp_path / "work"
-        status = run_streamlined_worker(
+        status = run_worker(
             base_path=str(tmp_path),
             work_dir=str(work_dir),
             heartbeat_interval=0.01,
@@ -241,7 +241,7 @@ class TestStreamlinedWorker:
         """Test worker with specific target job ID."""
         job = temp_client.add_job(make_config(), "sweep1", status="queued")
         
-        status = run_streamlined_worker(
+        status = run_worker(
             base_path=str(tmp_path),
             heartbeat_interval=0.01,
             client=temp_client,
@@ -258,7 +258,7 @@ class TestStreamlinedWorker:
     
     def test_worker_with_nonexistent_target_job(self, tmp_path, temp_client):
         """Test worker with nonexistent target job ID."""
-        status = run_streamlined_worker(
+        status = run_worker(
             base_path=str(tmp_path),
             heartbeat_interval=0.01,
             client=temp_client,
@@ -275,7 +275,7 @@ class TestStreamlinedWorker:
         
         # Mock get_config_for_job to return None
         with patch.object(temp_client, 'get_config_for_job', return_value=None):
-            status = run_streamlined_worker(
+            status = run_worker(
                 base_path=str(tmp_path),
                 heartbeat_interval=0.01,
                 client=temp_client,

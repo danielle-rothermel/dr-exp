@@ -13,7 +13,7 @@ class TestDiscoverGpus:
     
     def test_discover_gpus_from_env(self):
         """Test GPU discovery from environment variable."""
-        from scripts.run_streamlined_manager import discover_gpus
+        from scripts.run_manager import discover_gpus
         
         with patch.dict('os.environ', {'CUDA_VISIBLE_DEVICES': '1,3,5'}):
             gpus = discover_gpus(4)
@@ -21,7 +21,7 @@ class TestDiscoverGpus:
     
     def test_discover_gpus_default(self):
         """Test GPU discovery with default behavior."""
-        from scripts.run_streamlined_manager import discover_gpus
+        from scripts.run_manager import discover_gpus
         
         with patch.dict('os.environ', {}, clear=True):
             gpus = discover_gpus(3)
@@ -29,7 +29,7 @@ class TestDiscoverGpus:
     
     def test_discover_gpus_empty_env(self):
         """Test GPU discovery with empty environment variable."""
-        from scripts.run_streamlined_manager import discover_gpus
+        from scripts.run_manager import discover_gpus
         
         with patch.dict('os.environ', {'CUDA_VISIBLE_DEVICES': ''}):
             gpus = discover_gpus(2)
@@ -41,7 +41,7 @@ class TestScriptImports:
     
     def test_manager_script_import(self):
         """Test manager script can be imported."""
-        from scripts.run_streamlined_manager import main, discover_gpus
+        from scripts.run_manager import main, discover_gpus
         
         assert main is not None
         assert discover_gpus is not None
@@ -50,7 +50,7 @@ class TestScriptImports:
     
     def test_worker_script_import(self):
         """Test worker script can be imported.""" 
-        from scripts.run_streamlined_worker import main
+        from scripts.run_worker import main
         
         assert main is not None
         assert callable(main)
