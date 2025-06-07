@@ -183,13 +183,13 @@ npm run dev
 ```bash
 export EXPMGR_MODE=supabase_local
 # Upload some experiment configurations
-uv run python -m scripts.manager_cli upload-configs --sweep "model=resnet,vit lr=0.01,0.001"
+uv run python scripts/manager_cli.py job upload-configs --sweep "model=resnet,vit lr=0.01,0.001"
 
 # Start the manager to run the jobs
-uv run python scripts/run_manager.py --gpus-per-node 1 --workers-per-gpu 1
+uv run python scripts/manager_cli.py system run --gpus-per-node 1 --workers-per-gpu 1
 
 # Or run individual workers for testing
-uv run python scripts/run_worker.py --worker-id dev_worker
+uv run python scripts/manager_cli.py system run-worker dev_worker ./work
 ```
 
 Visit `http://localhost:5173` to see the jobs in the UI!
@@ -223,7 +223,7 @@ For actual cluster experiments:
 
 2. **Upload experiment configurations:**
    ```bash
-   uv run python -m scripts.manager_cli upload-configs --sweep "model=resnet,vit optim=adam,sgd"
+   uv run python scripts/manager_cli.py job upload-configs --sweep "model=resnet,vit optim=adam,sgd"
    ```
 
 3. **Submit to SLURM:**
@@ -232,7 +232,7 @@ For actual cluster experiments:
    sbatch scripts/slurm_job.sbatch
    
    # Option 2: Use the manager CLI directly
-   uv run python scripts/manager_cli.py run --gpus-per-node 4 --workers-per-gpu 2
+   uv run python scripts/manager_cli.py system run --gpus-per-node 4 --workers-per-gpu 2
    ```
 
 ## 6. Priority System Usage
@@ -251,37 +251,49 @@ The system includes a comprehensive priority-based job scheduling system with th
 **Upload jobs with priority:**
 ```bash
 # Upload with high priority for urgent experiments
-uv run python scripts/upload_configs.py --priority 800 --sweep "model=resnet,vit optim=adam,sgd"
+uv run python scripts/manager_cli.py job upload-configs --priority 800 --sweep "model=resnet,vit optim=adam,sgd"
 
 # Upload with normal priority (default is 100)
-uv run python scripts/upload_configs.py --sweep "lr=0.001,0.01"
+uv run python scripts/manager_cli.py job upload-configs --sweep "lr=0.001,0.01"
 ```
 
 **List jobs by priority:**
 ```bash
 # List queued jobs ordered by priority (highest first)
-uv run python -m scripts.manager_cli list-jobs --status queued --limit 20
+uv run python scripts/manager_cli.py job list-jobs --status queued --limit 20
 
 # List all jobs regardless of status
-uv run python -m scripts.manager_cli list-jobs --status queued running completed --limit 50
+uv run python scripts/manager_cli.py job list-jobs --status queued running completed --limit 50
 ```
 
 **Manage job priorities:**
 ```bash
 # Boost a job's priority by 200 points
-uv run python -m scripts.manager_cli boost-priority <job_id> --amount 200
+uv run python scripts/manager_cli.py job boost-priority <job_id> --amount 200
 
 # Set exact priority with reason
-uv run python -m scripts.manager_cli set-priority <job_id> 900 --reason "Critical deadline tomorrow"
+uv run python scripts/manager_cli.py job set-priority <job_id> 900 --reason "Critical deadline tomorrow"
 ```
 
 **Run single job immediately:**
 ```bash
 # Reserve and run a single job with URGENT priority, bypassing the queue
-uv run python -m scripts.manager_cli run-one --overrides "model=resnet lr=0.001" --priority 850
+uv run python scripts/manager_cli.py job run-one --overrides "model=resnet,lr=0.001" --priority 850
 
 # Run with custom config
-uv run python -m scripts.manager_cli run-one --config-name my_config.yaml --overrides "epochs=50"
+uv run python scripts/manager_cli.py job run-one --config-name my_config.yaml --overrides "epochs=50"
+```
+
+**System monitoring and maintenance:**
+```bash
+# Check system status and environment information
+uv run python scripts/manager_cli.py system status
+
+# Clean up stale jobs
+uv run python scripts/manager_cli.py admin reap-stale-jobs
+
+# Remove old run data
+uv run python scripts/manager_cli.py admin cleanup-run-data
 ```
 
 ### Advanced Features

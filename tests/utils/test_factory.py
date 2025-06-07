@@ -81,7 +81,7 @@ class TestSystemConfig:
             storage_path=str(tmp_path / "storage"),
             mode="files_local"
         )
-        config = SystemConfig(job_db_config=job_db_config)
+        config = SystemConfig(job_db_config=job_db_config, auto_detect_environment=False)
         assert config.manager_base_dir == str(tmp_path / "manager")
     
     def test_validation_success(self, temp_config):
