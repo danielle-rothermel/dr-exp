@@ -1,109 +1,77 @@
-Phase 1: Fix Skipped Integration Tests (Critical) ✅ COMPLETED
+# Test Refactoring Plan - Phases 1-2 Complete ✅
 
-Issue: Core manager-worker integration tests are skipped due to timing and mocking problems.
+## Completed Work Summary
 
-## Implemented Solutions:
+**Phase 1 (Critical Integration Tests)**: Fixed skipped manager-worker integration tests with event-driven patterns and deterministic timing.
 
-### 1. Event-Driven Patterns:
-- **threading.Event**: Use `threading.Event` for synchronization instead of `time.sleep()`
-- **mock_time fixture**: Provides controlled datetime advancement with `mock_time.advance(seconds)`
-- **Event coordination**: See `event_driven_mock_train` context manager for reusable patterns
+**Phase 2 (Enhanced Test Infrastructure)**: Built comprehensive test fixtures and utilities:
+- Enhanced time control with named milestones (`enhanced_mock_time`)
+- Database isolation and verification (`isolated_job_db`)
+- Multi-worker coordination (`worker_coordination`)
+- Specialized testing utilities (`heartbeat_monitor`, `stale_job_detector`, etc.)
 
-### 2. Fixed Mock Patching:
-- **Direct trainer_fn**: Use `trainer_fn` parameter in `run_worker()` calls instead of patching `default_train`
-- **Import-time binding issue**: Avoid patching `default_train` due to default parameter evaluation at import time
-- **Status mapping**: Mock trainers must return `{"status": "success"}` not `"completed"`
+**Reference Implementation**: See `tests/manage/test_phase2_infrastructure.py` for working examples of all patterns.
 
-### 3. Deterministic Timing:
-- **Mock datetime**: Patch `dr_exp.job_db.local_job_db.datetime` for stale job detection
-- **Controlled advancement**: Use `mock_time.advance()` instead of real time delays
-- **Heartbeat testing**: Fast intervals with event-driven completion
+**Key Testing Patterns**: Use direct `trainer_fn` parameters, event-driven synchronization, and enhanced fixtures.
 
-## Reference Implementation Pattern:
+## Phase 3: Strengthen Edge Case Coverage (Current Priority)
+
+### Current Issues to Address:
+**Integration Test Failures**: 4 tests in `tests/manage/test_integration.py` are returning `'failed'` instead of `'completed'` status, indicating error handling issues.
+
+### 1. Error Scenario Testing:
+- **Database connection failures** during operations
+- **Worker crash recovery scenarios** (investigate current failure pattern)
+- **Logger interface issues** (likely cause of current failures)
+- **Memory pressure testing**
+- **Training function exception handling**
+
+### 2. Concurrency Testing Improvements:
+- **Race condition tests** using Phase 2's worker coordination infrastructure
+- **Resource contention scenarios** with multiple workers competing for jobs
+- **Thread safety validation** for job claiming and updates
+- **Simultaneous worker startup/shutdown** edge cases
+
+### 3. Implementation Strategy:
 ```python
-# Correct approach for Phase 2+
-from dr_exp.manage.worker import run_worker
-
-def mock_train(config, logger, *args, **kwargs):
-    return {"final_val_acc": 0.95, "status": "success"}  # Note: "success" not "completed"
-
-status = run_worker(
-    base_path=integration_config.job_db_config.base_path,
-    max_claim_attempts=integration_config.max_claim_attempts,
-    heartbeat_interval=integration_config.worker_heartbeat_interval,
-    trainer_fn=mock_train,  # Direct parameter, not patching
-    client=factory.job_db,
-    worker_id="test_worker"
-)
+# Use Phase 2 infrastructure for systematic edge case testing
+def test_worker_crash_recovery(worker_coordination, isolated_job_db, enhanced_mock_time):
+    # Use enhanced fixtures to create deterministic crash scenarios
+    
+def test_database_connection_failure(integration_system, heartbeat_monitor):
+    # Simulate connection failures during job execution
+    
+def test_concurrent_job_claiming(worker_coordination, priority_job_factory):
+    # Test race conditions in job claiming with multiple workers
 ```
 
-Phase 2: Enhance Test Infrastructure (High Priority)
+**Reference Infrastructure**: Use fixtures from `tests/conftest.py` and `tests/manage/conftest.py` built in Phase 2.
 
-## Build on Phase 1 Infrastructure:
+## Phase 4: Test Performance and Maintainability (Lower Priority)
 
-### 1. Enhanced Time-Controlled Fixtures:
-- **Extend mock_time**: Add support for complex multi-worker timing scenarios
-- **Reusable timing patterns**: Create fixtures for common timing tests (startup delays, concurrent operations)
-- **Time-aware database operations**: Combine mock_time with database state changes
+### 1. Performance Optimization:
+- **Parallelize independent test suites** using pytest-xdist
+- **Reduce database setup overhead** with shared fixtures where safe
+- **Cache expensive fixture creation** for commonly used test data
+- **Optimize test selection** with better markers and categories
 
-### 2. Database State Management:
-- **Isolation utilities**: Ensure each test gets fresh database state beyond basic `tmp_path`
-- **State verification tools**: Add helpers to check job counts, statuses, and database consistency
-- **Factory improvements**: Standardize job creation patterns with realistic test data
+### 2. Maintainability Improvements:
+- **Reduce test code duplication** by extending Phase 2's reusable patterns
+- **Standardize assertion patterns** using Phase 2's verification utilities
+- **Improve test documentation** with better docstrings and examples
+- **Enhance test reporting** with custom pytest plugins for better failure analysis
 
-### 3. Event-Driven Test Utilities:
-- **Synchronization helpers**: Build on `threading.Event` patterns from Phase 1
-- **Worker coordination**: Tools for testing multiple workers with controlled timing
-- **Database change notifications**: Event-driven patterns for database state changes
+### 3. Long-term Sustainability:
+- **Test categorization** with comprehensive pytest markers
+- **Performance monitoring** for test suite execution time
+- **Maintenance automation** for keeping test data and fixtures current
+- **Documentation integration** linking tests to architectural documentation
 
-## Implementation Guide:
-```python
-# Extend existing patterns
-@pytest.fixture
-def enhanced_mock_time(mock_time):
-    """Enhanced timing with database operation coordination."""
-    # Build on Phase 1's mock_time fixture
-    
-@pytest.fixture  
-def isolated_job_db(integration_config):
-    """Job database with guaranteed isolation and verification utilities."""
-    # Ensure complete isolation between tests
-    
-def create_test_jobs(factory, count=3, priority_range=(100, 900)):
-    """Standardized test job creation with realistic data."""
-    # Consistent job creation patterns
-```
+## Implementation Priority for Remaining Work
 
-Reference Phase 1's `event_driven_mock_train` and `mock_time` fixtures in tests/manage/test_integration.py for proven patterns.
+1. **Immediate (Phase 3)**: Fix failing integration tests and add systematic edge case coverage
+2. **High (Phase 3)**: Improve concurrency testing using Phase 2 infrastructure  
+3. **Medium (Phase 4)**: Performance optimization and maintainability improvements
+4. **Ongoing (Phase 4)**: Long-term sustainability and automation
 
-Phase 3: Strengthen Edge Case Coverage (Medium Priority)
-
-1. Add missing error scenarios:
-- Database connection failures during operations
-- Worker crash recovery scenarios
-- Memory pressure testing
-2. Improve concurrency testing:
-- Add more sophisticated race condition tests
-- Test resource contention scenarios
-- Validate thread safety assumptions
-
-Phase 4: Test Performance and Maintainability (Lower Priority)
-
-1. Optimize test execution:
-- Parallelize independent test suites
-- Reduce test database setup overhead
-- Cache expensive fixture creation
-2. Improve test maintainability:
-- Reduce test code duplication
-- Add more descriptive test names and documentation
-- Standardize assertion patterns
-
-Implementation Priority
-
-1. Immediate (Week 1): Fix the 5 skipped integration tests - these test core system functionality
-2. High (Week 2): Improve test infrastructure and timing patterns
-3. Medium (Week 3-4): Enhance edge case coverage and concurrency testing
-4. Ongoing: Performance and maintainability improvements
-
-The most critical issue is that the integration tests - which validate the core manager-worker coordination that is central to the system's value proposition - are
-currently skipped. This represents a significant gap in confidence for the codebase's reliability.
+**Critical Focus**: The 4 failing integration tests represent gaps in error handling that need systematic investigation and resolution as part of Phase 3's edge case coverage work.
