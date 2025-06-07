@@ -13,7 +13,7 @@ from enum import Enum
 from dotenv import load_dotenv
 
 from cachetools import LRUCache
-from fastapi import Depends, FastAPI, Header, HTTPException, status, Security, WebSocket, WebSocketDisconnect
+from fastapi import Depends, FastAPI, Header, HTTPException, status, Security, WebSocket, WebSocketDisconnect, APIRouter
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
 
@@ -485,8 +485,63 @@ def create_app(base_path: str = ".") -> FastAPI:
     """
     app = FastAPI(
         title="DR Experiment Manager API",
-        description="API for managing deep learning experiments",
-        version="1.0.0"
+        description="""
+        ## API for Managing Deep Learning Experiments
+        
+        This API provides comprehensive management for deep learning experiment workflows,
+        including job queuing, priority management, metrics collection, and real-time monitoring.
+        
+        ### Features
+        - **Job Management**: Queue, execute, and monitor experiment jobs
+        - **Priority System**: Advanced job prioritization with boost capabilities (0-1000 scale)
+        - **Real-time Updates**: WebSocket support for live job status updates
+        - **Metrics Collection**: Comprehensive experiment metrics and artifact storage
+        - **Authentication**: Role-based access control with admin and reader roles
+        - **Monitoring**: Health checks and system metrics for observability
+        - **Filtering & Pagination**: Advanced job listing with search capabilities
+        
+        ### Authentication
+        All admin endpoints require Bearer token authentication:
+        - **Admin Role**: Full access to job management and priority controls
+        - **Reader Role**: Read-only access to job data and metrics
+        
+        ### Job Priority System
+        Jobs are processed by priority (0-1000, higher = more urgent):
+        - **SYSTEM (900-1000)**: Critical system operations
+        - **URGENT (700-899)**: High-priority research experiments  
+        - **HIGH (500-699)**: Important experiments
+        - **NORMAL (200-499)**: Standard experiments (default: 100)
+        - **LOW (0-199)**: Background/cleanup jobs
+        
+        ### WebSocket Real-time Updates
+        Connect to `/ws` for real-time job status updates and system notifications.
+        """,
+        version="1.0.0",
+        contact={
+            "name": "DR Experiment Manager",
+            "url": "https://github.com/your-org/dr-exp",
+        },
+        license_info={
+            "name": "MIT",
+        },
+        openapi_tags=[
+            {
+                "name": "jobs",
+                "description": "Job management and querying operations"
+            },
+            {
+                "name": "admin", 
+                "description": "Administrative operations requiring elevated permissions"
+            },
+            {
+                "name": "monitoring",
+                "description": "Health checks and system metrics"
+            },
+            {
+                "name": "websocket",
+                "description": "Real-time communication endpoints"
+            }
+        ]
     )
 
     # Add CORS middleware
@@ -547,6 +602,28 @@ def create_app(base_path: str = ".") -> FastAPI:
     app.state.loader = loader
     app.state.manager = manager
 
+    # Create API version routers
+    v1_router = APIRouter(prefix="/api/v1", tags=["v1"])
+    
+    # Add API info endpoint
+    @app.get("/api", tags=["api-info"])
+    async def api_info():
+        """Get API version information and available endpoints."""
+        return {
+            "name": "DR Experiment Manager API",
+            "version": "1.0.0",
+            "versions": {
+                "v1": {
+                    "status": "stable",
+                    "prefix": "/api/v1",
+                    "docs": "/docs"
+                }
+            },
+            "health_check": "/health",
+            "metrics": "/metrics",
+            "websocket": "/ws"
+        }
+
     @app.websocket("/ws")
     async def websocket_endpoint(websocket: WebSocket):
         """WebSocket endpoint for real-time job updates."""
@@ -560,7 +637,7 @@ def create_app(base_path: str = ".") -> FastAPI:
         except WebSocketDisconnect:
             manager.disconnect(websocket)
 
-    @app.get("/jobs")
+    @app.get("/jobs", tags=["jobs"])
     async def list_jobs(
         page: int = 1, 
         per_page: int = 20,
@@ -663,7 +740,7 @@ def create_app(base_path: str = ".") -> FastAPI:
             # Return simple list (with filters/sorting still applied)
             return [JobModel.model_validate(j) for j in jobs]
 
-    @app.get("/job/{job_id}", response_model=JobModel)
+    @app.get("/job/{job_id}", response_model=JobModel, tags=["jobs"])
     async def get_job(job_id: str) -> JobModel:
         """Retrieve details for a specific job."""
         job = client.get_job_details(job_id)
@@ -671,7 +748,7 @@ def create_app(base_path: str = ".") -> FastAPI:
             raise_job_not_found(job_id)
         return JobModel.model_validate(job)
 
-    @app.get("/config/{job_id}", response_model=ConfigResponse)
+    @app.get("/config/{job_id}", response_model=ConfigResponse, tags=["jobs"])
     async def get_config(job_id: str) -> ConfigResponse:
         """Return the configuration associated with ``job_id``."""
         cfg = client.get_config_for_job(job_id)
@@ -679,7 +756,7 @@ def create_app(base_path: str = ".") -> FastAPI:
             raise_config_not_found(job_id)
         return ConfigResponse(config=cfg)
 
-    @app.get("/metrics/{run_id}", response_model=MetricsResponse)
+    @app.get("/metrics/{run_id}", response_model=MetricsResponse, tags=["jobs"])
     async def get_metrics(run_id: str, limit: Optional[int] = 500) -> MetricsResponse:
         """Fetch metrics for the given run.
         
@@ -695,7 +772,7 @@ def create_app(base_path: str = ".") -> FastAPI:
             raise_metrics_not_found(run_id)
         return MetricsResponse(metrics=metrics, count=len(metrics))
 
-    @app.post("/job/kill", dependencies=[Depends(require_admin)], response_model=SuccessResponse)
+    @app.post("/job/kill", dependencies=[Depends(require_admin)], response_model=SuccessResponse, tags=["admin"])
     async def kill_job(req: KillRequest) -> SuccessResponse:
         """Mark ``job_id`` as killed."""
         job = client.get_job_details(req.job_id)
@@ -724,7 +801,7 @@ def create_app(base_path: str = ".") -> FastAPI:
             job_id=req.job_id
         )
 
-    @app.post("/job/requeue", dependencies=[Depends(require_admin)], response_model=SuccessResponse)
+    @app.post("/job/requeue", dependencies=[Depends(require_admin)], response_model=SuccessResponse, tags=["admin"])
     async def requeue_job(req: RequeueRequest) -> SuccessResponse:
         """Requeue ``job_id`` for another attempt."""
         job = client.get_job_details(req.job_id)
@@ -755,7 +832,7 @@ def create_app(base_path: str = ".") -> FastAPI:
             job_id=req.job_id
         )
 
-    @app.post("/job/boost-priority", dependencies=[Depends(require_admin)], response_model=PriorityResponse)
+    @app.post("/job/boost-priority", dependencies=[Depends(require_admin)], response_model=PriorityResponse, tags=["admin"])
     async def boost_priority(req: BoostPriorityRequest) -> PriorityResponse:
         """Boost the priority of a job by the specified amount."""
         job = client.get_job_details(req.job_id)
@@ -794,7 +871,7 @@ def create_app(base_path: str = ".") -> FastAPI:
                 detail=f"Failed to boost priority for job {req.job_id}: {str(e)}"
             )
 
-    @app.post("/job/set-priority", dependencies=[Depends(require_admin)], response_model=PriorityResponse)
+    @app.post("/job/set-priority", dependencies=[Depends(require_admin)], response_model=PriorityResponse, tags=["admin"])
     async def set_priority(req: SetPriorityRequest) -> PriorityResponse:
         """Set the absolute priority of a job."""
         job = client.get_job_details(req.job_id)
@@ -881,6 +958,22 @@ def create_app(base_path: str = ".") -> FastAPI:
             queue_depth=queue_depth,
             running_jobs=running_jobs
         )
+
+    # Add version deprecation headers middleware
+    @app.middleware("http")
+    async def add_version_headers(request, call_next):
+        response = await call_next(request)
+        
+        # Add version headers to all responses
+        response.headers["X-API-Version"] = "1.0.0"
+        
+        # Add deprecation notice for non-versioned endpoints (except health/metrics/ws)
+        path = request.url.path
+        if not path.startswith("/api/") and path not in ["/health", "/metrics", "/ws", "/docs", "/openapi.json", "/redoc"]:
+            response.headers["X-API-Deprecation-Notice"] = "Unversioned endpoints are deprecated. Use /api/v1 prefix."
+            response.headers["X-API-Migration-Guide"] = "Replace /jobs with /api/v1/jobs, etc."
+        
+        return response
 
     return app
 

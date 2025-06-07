@@ -395,3 +395,55 @@ def test_metrics_endpoint_monitoring(client, sb_client):
     for status in ["queued", "running", "completed", "failed", "killed"]:
         assert status in job_stats
         assert isinstance(job_stats[status], int)
+
+
+def test_api_info_endpoint(client):
+    """Test API information endpoint."""
+    resp = client.get("/api")
+    assert resp.status_code == 200
+    data = resp.json()
+    
+    assert "name" in data
+    assert "version" in data
+    assert "versions" in data
+    assert "health_check" in data
+    assert "metrics" in data
+    assert "websocket" in data
+    
+    # Check version info structure
+    assert "v1" in data["versions"]
+    v1_info = data["versions"]["v1"]
+    assert v1_info["status"] == "stable"
+    assert v1_info["prefix"] == "/api/v1"
+    assert v1_info["docs"] == "/docs"
+
+
+def test_api_version_headers(client):
+    """Test that API version headers are added to responses."""
+    resp = client.get("/health")
+    assert resp.status_code == 200
+    
+    # Check version headers
+    assert "X-API-Version" in resp.headers
+    assert resp.headers["X-API-Version"] == "1.0.0"
+
+
+def test_deprecation_headers(client):
+    """Test that deprecation headers are added to non-versioned endpoints."""
+    resp = client.get("/jobs")
+    assert resp.status_code == 200
+    
+    # Check deprecation headers
+    assert "X-API-Deprecation-Notice" in resp.headers
+    assert "X-API-Migration-Guide" in resp.headers
+    assert "deprecated" in resp.headers["X-API-Deprecation-Notice"].lower()
+
+
+def test_no_deprecation_headers_for_excluded_paths(client):
+    """Test that deprecation headers are not added to excluded paths."""
+    resp = client.get("/health")
+    assert resp.status_code == 200
+    
+    # Should not have deprecation headers
+    assert "X-API-Deprecation-Notice" not in resp.headers
+    assert "X-API-Migration-Guide" not in resp.headers
