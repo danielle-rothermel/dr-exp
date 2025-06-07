@@ -606,7 +606,7 @@ def create_app(base_path: str = ".") -> FastAPI:
             metrics = loader.load(run_id, limit=limit)
         except FileNotFoundError:
             raise_metrics_not_found(run_id)
-        return MetricsResponse(metrics=metrics)
+        return MetricsResponse(metrics=metrics, count=len(metrics))
 
     @app.post("/job/kill", dependencies=[Depends(require_admin)], response_model=SuccessResponse)
     async def kill_job(req: KillRequest) -> SuccessResponse:
