@@ -12,6 +12,7 @@
 - **Advanced Job Management:** Boost job priorities, set reservations, and list jobs by priority with comprehensive CLI tools.
 - **Reproducibility:** Captures code versions, configurations, and (planned) environment details.
 - **Modular & Agent-Ready Design:** Components are designed with clear interfaces for independent development and testing, suitable for agentic coders.
+- **Streamlined Architecture:** Recently refactored to eliminate mixed responsibilities and improve maintainability through abstract interface methods.
 ## 3. System Architecture
 - The system comprises several key components that interact to manage the experiment lifecycle:
 - ```plain text
@@ -38,14 +39,25 @@
   ```
 - For a detailed breakdown, please refer to the design documents in the `docs/` directory.
 ### Core Components:
-- **Config Generator (CLI):** Generates and uploads Hydra-based experiment configurations to Supabase.
-- **Supabase:** Central PostgreSQL database and object storage.
-- **SLURM Manager:** Python script launched by SLURM `sbatch`; manages worker processes on allocated nodes/GPUs.
-- **Worker Process:** Python script that claims jobs, runs training logic, logs metrics/artifacts using `StructuredLogger`, and uploads results.
- - **StructuredLogger:** Python class in `dr_exp.logging` that handles local logging of metrics, checkpoints, and artifacts.
-- **FastAPI Backend:** Serves as the API layer between Supabase and the UI/other clients.
-- **React Babysitter UI:** Web interface for monitoring and controlling experiments.
-- **Mock Components:** Local mocks for Supabase, FastAPI, and the training function to facilitate offline development and testing.
+
+#### **Database Layer (`src/dr_exp/job_db/`)**
+- **BaseJobDB:** Abstract interface with streamlined methods for job operations
+- **LocalJobDB:** JSON file-based storage for development and testing
+- **SupabaseJobDB:** PostgreSQL database client for both local and production
+- **JobDBConfig:** Unified configuration system for all database modes
+
+#### **Manager/Worker System (`src/dr_exp/manage/`)**
+- **Manager:** Coordinates workers using only abstract interface methods (no database-specific code)
+- **Worker:** Handles job execution with improved error handling and separation of concerns  
+- **ProcessManager:** Abstracts multiprocessing for clean worker lifecycle management
+- **Factory:** Creates properly integrated system components with shared configuration
+
+#### **Supporting Components**
+- **Config Generator (CLI):** Generates and uploads Hydra-based experiment configurations
+- **StructuredLogger:** Handles metrics, checkpoints, and artifact logging with storage abstraction
+- **FastAPI Backend:** API layer with WebSocket support for real-time monitoring
+- **React Babysitter UI:** Web interface for experiment monitoring and control
+- **Priority System:** Comprehensive job scheduling with reservations and audit trails
 ## 4. Getting Started
 ### 4.1. Prerequisites
 - Python (e.g., 3.9+)
@@ -60,12 +72,12 @@
 dr_exp/
 ├── src/
 │   └── dr_exp/
-│       ├── api/             # FastAPI backend
-│       ├── job_db/          # Database helpers (LocalDBClient, Supabase client)
-│       ├── manage/          # Manager and worker logic
-│       ├── logging/         # Structured logging utilities
+│       ├── api/             # FastAPI backend with WebSocket support
+│       ├── job_db/          # Database abstraction layer (BaseJobDB, LocalJobDB, SupabaseJobDB)
+│       ├── manage/          # Streamlined manager, worker, and process management
+│       ├── logging/         # Structured logging with storage abstraction
 │       ├── train_examples/  # Example trainer and Hydra configs
-│       └── utils/           # Helper utilities
+│       └── utils/           # Factory, priority system, and helper utilities
 ├── supabase/            # Supabase project configuration and migrations
 ├── react-babysitter-ui/ # React frontend
 ├── scripts/             # CLI entry points and helpers
@@ -167,10 +179,17 @@ cd react-babysitter-ui
 npm run dev
 ```
 
-**Terminal 4 - Upload Some Jobs:**
+**Terminal 4 - Upload and Run Jobs:**
 ```bash
 export EXPMGR_MODE=supabase_local
+# Upload some experiment configurations
 uv run python -m scripts.manager_cli upload-configs --sweep "model=resnet,vit lr=0.01,0.001"
+
+# Start the manager to run the jobs
+uv run python scripts/run_manager.py --gpus-per-node 1 --workers-per-gpu 1
+
+# Or run individual workers for testing
+uv run python scripts/run_worker.py --worker-id dev_worker
 ```
 
 Visit `http://localhost:5173` to see the jobs in the UI!
@@ -209,7 +228,11 @@ For actual cluster experiments:
 
 3. **Submit to SLURM:**
    ```bash
+   # Option 1: Use the SLURM batch script
    sbatch scripts/slurm_job.sbatch
+   
+   # Option 2: Use the manager CLI directly
+   uv run python scripts/manager_cli.py run --gpus-per-node 4 --workers-per-gpu 2
    ```
 
 ## 6. Priority System Usage
