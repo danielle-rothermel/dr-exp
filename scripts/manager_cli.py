@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 import argparse
-import os
+import sys
 from typing import Sequence
 
 from dotenv import load_dotenv
@@ -11,18 +11,16 @@ from dotenv import load_dotenv
 from dr_exp.utils.factory import create_system, SystemConfig
 from dr_exp.utils.job_reaper import reap_stale_jobs
 from dr_exp.utils.storage_cleanup import cleanup_uploaded_runs
-from dr_exp.utils.jobdb_factory import get_job_db_client
-from . import upload_configs
+from dr_exp.utils.gpu_discovery import discover_gpus
+from dr_exp.utils.cli_config import CLI_DEFAULTS
+from dr_exp.utils.cli_validation import (
+    ValidationError, validate_priority, validate_job_id, 
+    validate_positive_int, validate_job_statuses, validate_config_overrides
+)
+from dr_exp.utils.run_one_config import create_run_one_job, get_default_config_path
+from scripts import upload_configs
 
 load_dotenv()
-
-
-def discover_gpus(gpus_per_node: int) -> list[str]:
-    """Return list of visible GPU IDs as strings."""
-    env = os.environ.get("CUDA_VISIBLE_DEVICES")
-    if env:
-        return [g.strip() for g in env.split(",") if g.strip()]
-    return [str(i) for i in range(gpus_per_node)]
 
 
 def build_arg_parser() -> argparse.ArgumentParser:
@@ -40,26 +38,26 @@ def build_arg_parser() -> argparse.ArgumentParser:
     run_parser.add_argument(
         "--gpus-per-node",
         type=int,
-        default=1,
-        help="Number of GPUs available on this node",
+        default=CLI_DEFAULTS.GPUS_PER_NODE,
+        help=f"Number of GPUs available on this node (default: {CLI_DEFAULTS.GPUS_PER_NODE})",
     )
     run_parser.add_argument(
         "--workers-per-gpu",
         type=int,
-        default=1,
-        help="Number of worker processes to spawn per GPU",
+        default=CLI_DEFAULTS.WORKERS_PER_GPU,
+        help=f"Number of worker processes to spawn per GPU (default: {CLI_DEFAULTS.WORKERS_PER_GPU})",
     )
     run_parser.add_argument(
-        "--heartbeat-interval",
+        "--heartbeat-timeout",
         type=int,
-        default=10,
-        help="Seconds between heartbeat checks",
+        default=CLI_DEFAULTS.HEARTBEAT_TIMEOUT,
+        help=f"Worker heartbeat timeout in seconds (default: {CLI_DEFAULTS.HEARTBEAT_TIMEOUT})",
     )
     run_parser.add_argument(
         "--idle-timeout-mins",
         type=int,
-        default=30,
-        help="Minutes of inactivity before the manager shuts down",
+        default=CLI_DEFAULTS.IDLE_TIMEOUT_MINS,
+        help=f"Minutes of inactivity before the manager shuts down (default: {CLI_DEFAULTS.IDLE_TIMEOUT_MINS})",
     )
 
     dg_parser = subparsers.add_parser(
@@ -70,8 +68,8 @@ def build_arg_parser() -> argparse.ArgumentParser:
     dg_parser.add_argument(
         "--gpus-per-node",
         type=int,
-        default=1,
-        help="Total GPUs on the node if CUDA_VISIBLE_DEVICES is not set",
+        default=CLI_DEFAULTS.GPUS_PER_NODE,
+        help=f"Total GPUs on the node if CUDA_VISIBLE_DEVICES is not set (default: {CLI_DEFAULTS.GPUS_PER_NODE})",
     )
 
     worker_parser = subparsers.add_parser(
@@ -90,20 +88,14 @@ def build_arg_parser() -> argparse.ArgumentParser:
     reap_parser.add_argument(
         "--max-age-mins",
         type=int,
-        default=60,
-        help="Heartbeat age threshold in minutes",
-    )
-    reap_parser.add_argument(
-        "--base-path", default=".", help="Base path for LocalDBClient"
+        default=CLI_DEFAULTS.DEFAULT_MAX_AGE_MINS,
+        help=f"Heartbeat age threshold in minutes (default: {CLI_DEFAULTS.DEFAULT_MAX_AGE_MINS})",
     )
 
     cleanup_parser = subparsers.add_parser(
         "cleanup-run-data",
         help="Delete run directories that have finished uploading",
         description="Remove run_* folders containing finished.flag",
-    )
-    cleanup_parser.add_argument(
-        "--base-path", default=".", help="Base path for SupabaseMockClient"
     )
     upload_parser = subparsers.add_parser(
         "upload-configs",
@@ -121,17 +113,14 @@ def build_arg_parser() -> argparse.ArgumentParser:
     priority_parser.add_argument(
         "--status",
         nargs="*",
-        default=["queued"],
-        help="Filter by job status (default: queued)",
+        default=CLI_DEFAULTS.DEFAULT_JOB_STATUS,
+        help=f"Filter by job status (default: {CLI_DEFAULTS.DEFAULT_JOB_STATUS})",
     )
     priority_parser.add_argument(
         "--limit",
         type=int,
-        default=20,
-        help="Maximum number of jobs to display (default: 20)",
-    )
-    priority_parser.add_argument(
-        "--base-path", default=".", help="Base path for database client"
+        default=CLI_DEFAULTS.DEFAULT_JOB_LIMIT,
+        help=f"Maximum number of jobs to display (default: {CLI_DEFAULTS.DEFAULT_JOB_LIMIT})",
     )
 
     boost_parser = subparsers.add_parser(
@@ -143,11 +132,8 @@ def build_arg_parser() -> argparse.ArgumentParser:
     boost_parser.add_argument(
         "--amount",
         type=int,
-        default=100,
-        help="Priority boost amount (default: 100)",
-    )
-    boost_parser.add_argument(
-        "--base-path", default=".", help="Base path for database client"
+        default=CLI_DEFAULTS.PRIORITY_BOOST_AMOUNT,
+        help=f"Priority boost amount (default: {CLI_DEFAULTS.PRIORITY_BOOST_AMOUNT})",
     )
 
     set_priority_parser = subparsers.add_parser(
@@ -161,9 +147,6 @@ def build_arg_parser() -> argparse.ArgumentParser:
         "--reason",
         help="Optional reason for priority change",
     )
-    set_priority_parser.add_argument(
-        "--base-path", default=".", help="Base path for database client"
-    )
 
     # Run one command
     run_one_parser = subparsers.add_parser(
@@ -172,10 +155,19 @@ def build_arg_parser() -> argparse.ArgumentParser:
         description="Create a reserved high-priority job and execute it immediately",
     )
     run_one_parser.add_argument(
-        "--overrides", default="", help="Hydra-style config overrides"
+        "--overrides", default="", help="Hydra-style config overrides (e.g., 'model=resnet,lr=0.001')"
     )
     run_one_parser.add_argument(
-        "--priority", type=int, default=850, help="Job priority (default: 850)"
+        "--priority", type=int, default=CLI_DEFAULTS.RUN_ONE_PRIORITY, 
+        help=f"Job priority (default: {CLI_DEFAULTS.RUN_ONE_PRIORITY})"
+    )
+    run_one_parser.add_argument(
+        "--config-path", default=get_default_config_path(),
+        help="Path to config directory (default: auto-detected)"
+    )
+    run_one_parser.add_argument(
+        "--config-name", default="config.yaml",
+        help="Config file name (default: config.yaml)"
     )
 
     return parser
@@ -183,119 +175,225 @@ def build_arg_parser() -> argparse.ArgumentParser:
 
 def _cmd_run(args: argparse.Namespace) -> None:
     """Run the manager."""
-    slurm_job_id = os.environ.get("SLURM_JOB_ID", str(os.getpid()))
-    base_dir = os.path.join("./manager_runs", f"job_{slurm_job_id}")
-    
-    # Create system configuration
-    system_config = SystemConfig(
-        workers_per_gpu=args.workers_per_gpu,
-        heartbeat_timeout=args.heartbeat_interval * 2,  # Convert interval to timeout
-        idle_timeout_mins=args.idle_timeout_mins,
-        manager_base_dir=base_dir,
-    )
-    
-    # Create and run manager
-    system = create_system(system_config)
-    manager = system.create_manager()
-    manager.run()
+    try:
+        # Validate inputs
+        validate_positive_int(args.gpus_per_node, "gpus-per-node")
+        validate_positive_int(args.workers_per_gpu, "workers-per-gpu")
+        validate_positive_int(args.heartbeat_timeout, "heartbeat-timeout")
+        validate_positive_int(args.idle_timeout_mins, "idle-timeout-mins")
+        
+        # Discover GPUs
+        gpus = discover_gpus(args.gpus_per_node)
+        
+        # Create system configuration
+        system_config = SystemConfig(
+            gpus=gpus,
+            workers_per_gpu=args.workers_per_gpu,
+            heartbeat_timeout=args.heartbeat_timeout,
+            idle_timeout_mins=args.idle_timeout_mins,
+        )
+        
+        # Create and run manager
+        system = create_system(system_config)
+        manager = system.create_manager()
+        manager.run()
+        
+    except ValidationError as e:
+        print(f"Error: {e}", file=sys.stderr)
+        sys.exit(1)
+    except Exception as e:
+        print(f"Failed to run manager: {e}", file=sys.stderr)
+        sys.exit(1)
 
 
 def _cmd_discover_gpus(args: argparse.Namespace) -> None:
-    gpus = discover_gpus(args.gpus_per_node)
-    for g in gpus:
-        print(g)
+    """Discover and list available GPUs."""
+    try:
+        validate_positive_int(args.gpus_per_node, "gpus-per-node")
+        gpus = discover_gpus(args.gpus_per_node)
+        for g in gpus:
+            print(g)
+    except ValidationError as e:
+        print(f"Error: {e}", file=sys.stderr)
+        sys.exit(1)
+    except Exception as e:
+        print(f"Failed to discover GPUs: {e}", file=sys.stderr)
+        sys.exit(1)
 
 
 def _cmd_run_worker(args: argparse.Namespace) -> None:
     """Run a worker."""
-    system = create_system()
-    status = system.run_worker(
-        worker_id=args.worker_id,
-        work_dir=args.work_dir
-    )
-    print(f"Worker completed with status: {status}")
+    try:
+        # Basic validation
+        if not args.worker_id.strip():
+            raise ValidationError("Worker ID cannot be empty")
+        if not args.work_dir.strip():
+            raise ValidationError("Work directory cannot be empty")
+            
+        system = create_system()
+        status = system.run_worker(
+            worker_id=args.worker_id,
+            work_dir=args.work_dir
+        )
+        print(f"Worker completed with status: {status}")
+        
+        # Set exit code based on status
+        if status not in ["completed", "success"]:
+            sys.exit(1)
+            
+    except ValidationError as e:
+        print(f"Error: {e}", file=sys.stderr)
+        sys.exit(1)
+    except Exception as e:
+        print(f"Failed to run worker: {e}", file=sys.stderr)
+        sys.exit(1)
 
 
 def _cmd_reap_stale_jobs(args: argparse.Namespace) -> None:
-    client = get_job_db_client()
-    count = reap_stale_jobs(client, args.max_age_mins)
-    print(f"Marked {count} stale job(s) as failed")
+    """Mark stale jobs as failed."""
+    try:
+        validate_positive_int(args.max_age_mins, "max-age-mins")
+        
+        system = create_system()
+        client = system.job_db
+        count = reap_stale_jobs(client, args.max_age_mins)
+        print(f"Marked {count} stale job(s) as failed")
+        
+    except ValidationError as e:
+        print(f"Error: {e}", file=sys.stderr)
+        sys.exit(1)
+    except Exception as e:
+        print(f"Failed to reap stale jobs: {e}", file=sys.stderr)
+        sys.exit(1)
 
 
 def _cmd_cleanup_run_data(args: argparse.Namespace) -> None:
-    client = get_job_db_client()
-    count = cleanup_uploaded_runs(client)
-    print(f"Removed {count} run directory(s)")
+    """Clean up uploaded run data."""
+    try:
+        system = create_system()
+        client = system.job_db
+        count = cleanup_uploaded_runs(client)
+        print(f"Removed {count} run directory(s)")
+        
+    except Exception as e:
+        print(f"Failed to cleanup run data: {e}", file=sys.stderr)
+        sys.exit(1)
 
 
 def _cmd_list_jobs(args: argparse.Namespace) -> None:
     """List jobs ordered by priority."""
-    client = get_job_db_client()
-    jobs = client.list_jobs_by_priority(status_filter=args.status, limit=args.limit)
-    
-    if not jobs:
-        print("No jobs found matching criteria")
-        return
-    
-    print(f"{'Job ID':<40} {'Priority':<8} {'Status':<10} {'Created':<20}")
-    print("-" * 80)
-    for job in jobs:
-        job_id = str(job.get("id", ""))[:36]
-        priority = job.get("priority", 100)
-        status = job.get("status", "unknown")
-        created = job.get("created_at", "")[:19] if job.get("created_at") else ""
-        print(f"{job_id:<40} {priority:<8} {status:<10} {created:<20}")
+    try:
+        validate_job_statuses(args.status)
+        validate_positive_int(args.limit, "limit")
+        
+        system = create_system()
+        client = system.job_db
+        jobs = client.list_jobs_by_priority(status_filter=args.status, limit=args.limit)
+        
+        if not jobs:
+            print("No jobs found matching criteria")
+            return
+        
+        print(f"{'Job ID':<40} {'Priority':<8} {'Status':<10} {'Created':<20}")
+        print("-" * 80)
+        for job in jobs:
+            job_id = str(job.get("id", ""))[:36]
+            priority = job.get("priority", 100)
+            status = job.get("status", "unknown")
+            created = job.get("created_at", "")[:19] if job.get("created_at") else ""
+            print(f"{job_id:<40} {priority:<8} {status:<10} {created:<20}")
+            
+    except ValidationError as e:
+        print(f"Error: {e}", file=sys.stderr)
+        sys.exit(1)
+    except Exception as e:
+        print(f"Failed to list jobs: {e}", file=sys.stderr)
+        sys.exit(1)
 
 
 def _cmd_boost_priority(args: argparse.Namespace) -> None:
     """Boost job priority by specified amount."""
-    client = get_job_db_client()
-    result = client.boost_job_priority(args.job_id, boost_amount=args.amount)
-    
-    if result.get("success"):
-        print(f"Priority boosted: {result['old_priority']} -> {result['new_priority']}")
-    else:
-        print(f"Failed to boost priority: {result.get('message', 'Unknown error')}")
+    try:
+        validate_job_id(args.job_id)
+        validate_positive_int(args.amount, "amount")
+        
+        system = create_system()
+        client = system.job_db
+        result = client.boost_job_priority(args.job_id, boost_amount=args.amount)
+        
+        if result.get("success"):
+            print(f"Priority boosted: {result['old_priority']} -> {result['new_priority']}")
+        else:
+            print(f"Failed to boost priority: {result.get('message', 'Unknown error')}")
+            sys.exit(1)
+            
+    except ValidationError as e:
+        print(f"Error: {e}", file=sys.stderr)
+        sys.exit(1)
+    except Exception as e:
+        print(f"Failed to boost priority: {e}", file=sys.stderr)
+        sys.exit(1)
 
 
 def _cmd_set_priority(args: argparse.Namespace) -> None:
     """Set job priority to exact value."""
-    client = get_job_db_client()
-    result = client.update_job_priority(args.job_id, args.priority, reason=args.reason)
-    
-    if result.get("success"):
-        print(f"Priority updated to {args.priority}")
-        if args.reason:
-            print(f"Reason: {args.reason}")
-    else:
-        print(f"Failed to update priority: {result.get('message', 'Unknown error')}")
+    try:
+        validate_job_id(args.job_id)
+        validate_priority(args.priority)
+        
+        system = create_system()
+        client = system.job_db
+        result = client.update_job_priority(args.job_id, args.priority, reason=args.reason)
+        
+        if result.get("success"):
+            print(f"Priority updated to {args.priority}")
+            if args.reason:
+                print(f"Reason: {args.reason}")
+        else:
+            print(f"Failed to update priority: {result.get('message', 'Unknown error')}")
+            sys.exit(1)
+            
+    except ValidationError as e:
+        print(f"Error: {e}", file=sys.stderr)
+        sys.exit(1)
+    except Exception as e:
+        print(f"Failed to set priority: {e}", file=sys.stderr)
+        sys.exit(1)
 
 
 def _cmd_run_one(args: argparse.Namespace) -> str:
     """Create and immediately run a high-priority job."""
-    client = get_job_db_client()
-    
-    # Create a simple config (this is simplified - in practice would parse overrides)
-    config = {"run_one": True, "priority": args.priority}
-    if args.overrides:
-        # Simple override parsing (in practice would use Hydra)
-        for override in args.overrides.split(","):
-            if "=" in override:
-                key, value = override.split("=", 1)
-                config[key.strip()] = value.strip()
-    
-    # Add job with high priority
-    job = client.add_job(config, "run_one_sweep", status="queued", priority=args.priority)
-    print(f"Created job {job['id']} with priority {args.priority}")
-    
-    # Run worker targeting this specific job
-    system = create_system()
-    status = system.run_worker(
-        worker_id="run_one_worker",
-        target_job_id=job["id"]
-    )
-    print(f"Job completed with status: {status}")
-    return status
+    try:
+        validate_priority(args.priority)
+        overrides = validate_config_overrides(args.overrides)
+        
+        system = create_system()
+        client = system.job_db
+        
+        # Create job using proper config generation
+        job = create_run_one_job(
+            client=client,
+            base_config_path=args.config_path,
+            config_name=args.config_name,
+            overrides=overrides,
+            priority=args.priority
+        )
+        print(f"Created job {job['id']} with priority {args.priority}")
+        
+        # Run worker targeting this specific job
+        status = system.run_worker(
+            worker_id="run_one_worker",
+            target_job_id=job["id"]
+        )
+        print(f"Job completed with status: {status}")
+        return status
+        
+    except ValidationError as e:
+        print(f"Error: {e}", file=sys.stderr)
+        sys.exit(1)
+    except Exception as e:
+        print(f"Failed to run job: {e}", file=sys.stderr)
+        sys.exit(1)
 
 
 def main(argv: Sequence[str] | None = None) -> None:
@@ -314,8 +412,12 @@ def main(argv: Sequence[str] | None = None) -> None:
     elif args.command == "cleanup-run-data":
         _cmd_cleanup_run_data(args)
     elif args.command == "upload-configs":
-        jobs = upload_configs.run(args)
-        print(f"Created {len(jobs)} job(s)")
+        try:
+            jobs = upload_configs.run(args)
+            print(f"Created {len(jobs)} job(s)")
+        except Exception as e:
+            print(f"Failed to upload configs: {e}", file=sys.stderr)
+            sys.exit(1)
     elif args.command == "list-jobs":
         _cmd_list_jobs(args)
     elif args.command == "boost-priority":
@@ -325,9 +427,10 @@ def main(argv: Sequence[str] | None = None) -> None:
     elif args.command == "run-one":
         status = _cmd_run_one(args)
         exit_code = 0 if status in ["completed", "success"] else 1
-        exit(exit_code)
+        sys.exit(exit_code)
     else:  # pragma: no cover - fallback
         parser.print_help()
+        sys.exit(1)
 
 
 __all__ = ["main", "build_arg_parser"]

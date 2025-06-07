@@ -6,16 +6,8 @@ import sys
 from typing import List, Optional
 
 from dr_exp.utils.factory import create_system, SystemConfig
+from dr_exp.utils.gpu_discovery import discover_gpus
 from dr_exp.job_db import JobDBConfig
-
-
-def discover_gpus(gpus_per_node: int) -> List[str]:
-    """Discover available GPUs from environment."""
-    import os
-    env = os.environ.get("CUDA_VISIBLE_DEVICES")
-    if env:
-        return [g.strip() for g in env.split(",") if g.strip()]
-    return [str(i) for i in range(gpus_per_node)]
 
 
 def main():
