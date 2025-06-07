@@ -1,10 +1,13 @@
 """Base class for job database clients."""
 
+import logging
 import os
 from abc import ABC, abstractmethod
 from datetime import datetime, UTC
 from typing import Any, Dict, List, Optional
 from dataclasses import dataclass
+
+logger = logging.getLogger(__name__)
 
 
 @dataclass
@@ -535,7 +538,7 @@ class BaseJobDB(ABC):
             with open(flag_path, "w"):
                 pass
         except Exception as e:
-            print(f"Error writing finished flag for job {job_id}: {e}")
+            logger.error(f"Error writing finished flag for job {job_id}: {e}")
     
     def _clamp_priority(self, priority: int) -> int:
         """Ensure priority is within valid range (0-1000).
