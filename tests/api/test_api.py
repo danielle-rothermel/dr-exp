@@ -162,3 +162,75 @@ def test_websocket_connection(client):
         # Receive the echo
         data = websocket.receive_text()
         assert "Echo: test message" in data
+
+
+def test_pagination(tmp_path, monkeypatch):
+    """Test job listing pagination with isolated database."""
+    # Create isolated app for this test
+    monkeypatch.setenv("ADMIN_API_KEY", "secret")
+    monkeypatch.setenv("EXPMGR_MODE", "files_local")
+    monkeypatch.setenv("DR_EXP_BASE_PATH", str(tmp_path))
+    
+    from dr_exp.api.main import create_app
+    from fastapi.testclient import TestClient
+    
+    app = create_app(base_path=str(tmp_path))
+    client = TestClient(app)
+    sb_client = app.state.client
+    
+    # Verify we start with no jobs
+    existing_jobs = client.get("/jobs").json()
+    assert len(existing_jobs) == 0, f"Expected 0 jobs but found {len(existing_jobs)}"
+    
+    # Create multiple jobs for pagination testing
+    jobs = []
+    for i in range(25):
+        job = sb_client.add_job({"index": i}, f"sweep{i}", status="queued")
+        jobs.append(job)
+    
+    # Test backward compatibility (non-paginated)
+    resp = client.get("/jobs")
+    assert resp.status_code == 200
+    data = resp.json()
+    assert isinstance(data, list)
+    assert len(data) == 25
+    
+    # Test paginated response
+    resp = client.get("/jobs?paginated=true&page=1&per_page=10")
+    assert resp.status_code == 200
+    data = resp.json()
+    
+    # Check pagination metadata
+    assert data["total"] == 25
+    assert data["page"] == 1
+    assert data["per_page"] == 10
+    assert data["pages"] == 3
+    assert data["has_next"] is True
+    assert data["has_prev"] is False
+    assert len(data["jobs"]) == 10
+    
+    # Test second page
+    resp = client.get("/jobs?paginated=true&page=2&per_page=10")
+    assert resp.status_code == 200
+    data = resp.json()
+    assert data["page"] == 2
+    assert data["has_next"] is True
+    assert data["has_prev"] is True
+    assert len(data["jobs"]) == 10
+    
+    # Test last page
+    resp = client.get("/jobs?paginated=true&page=3&per_page=10")
+    assert resp.status_code == 200
+    data = resp.json()
+    assert data["page"] == 3
+    assert data["has_next"] is False
+    assert data["has_prev"] is True
+    assert len(data["jobs"]) == 5  # Remaining jobs
+    
+    # Test invalid page number
+    resp = client.get("/jobs?paginated=true&page=0")
+    assert resp.status_code == 400
+    
+    # Test invalid per_page
+    resp = client.get("/jobs?paginated=true&per_page=101")
+    assert resp.status_code == 400

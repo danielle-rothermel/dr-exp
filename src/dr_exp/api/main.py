@@ -21,6 +21,7 @@ from dr_exp.api.models import (
     JobModel,
     KillRequest,
     MetricsResponse,
+    PaginatedJobsResponse,
     PriorityResponse,
     RequeueRequest,
     SetPriorityRequest,
@@ -255,6 +256,46 @@ def raise_metrics_not_found(run_id: str) -> None:
     )
 
 
+def paginate_jobs(jobs: List[Dict[str, Any]], page: int, per_page: int) -> PaginatedJobsResponse:
+    """Paginate a list of jobs.
+    
+    Parameters
+    ----------
+    jobs : List[Dict[str, Any]]
+        Complete list of jobs to paginate.
+    page : int
+        Page number (1-based).
+    per_page : int
+        Number of jobs per page.
+        
+    Returns
+    -------
+    PaginatedJobsResponse
+        Paginated response with metadata.
+    """
+    import math
+    
+    total = len(jobs)
+    pages = math.ceil(total / per_page) if per_page > 0 else 0
+    
+    # Calculate offset
+    start = (page - 1) * per_page
+    end = start + per_page
+    
+    # Slice the jobs list
+    paginated_jobs = jobs[start:end]
+    
+    return PaginatedJobsResponse(
+        jobs=[JobModel.model_validate(job) for job in paginated_jobs],
+        total=total,
+        page=page,
+        per_page=per_page,
+        pages=pages,
+        has_next=page < pages,
+        has_prev=page > 1
+    )
+
+
 class MetricsLoader:
     """Load and cache run metrics from storage."""
 
@@ -365,11 +406,43 @@ def create_app(base_path: str = ".") -> FastAPI:
         except WebSocketDisconnect:
             manager.disconnect(websocket)
 
-    @app.get("/jobs", response_model=List[JobModel])
-    async def list_jobs() -> List[JobModel]:
-        """Return a list of available jobs."""
+    @app.get("/jobs")
+    async def list_jobs(
+        page: int = 1, 
+        per_page: int = 20,
+        paginated: bool = False
+    ):
+        """Return a list of available jobs with optional pagination.
+        
+        Parameters
+        ----------
+        page : int, optional
+            Page number (1-based), by default 1
+        per_page : int, optional
+            Number of jobs per page, by default 20
+        paginated : bool, optional
+            Whether to return paginated response with metadata, by default False
+            If False, returns simple list for backward compatibility
+        """
         jobs = client.list_jobs()
-        return [JobModel.model_validate(j) for j in jobs]
+        
+        if paginated:
+            # Validate pagination parameters
+            if page < 1:
+                raise HTTPException(
+                    status_code=status.HTTP_400_BAD_REQUEST,
+                    detail="Page number must be >= 1"
+                )
+            if per_page < 1 or per_page > 100:
+                raise HTTPException(
+                    status_code=status.HTTP_400_BAD_REQUEST,
+                    detail="per_page must be between 1 and 100"
+                )
+            
+            return paginate_jobs(jobs, page, per_page)
+        else:
+            # Backward compatibility: return simple list
+            return [JobModel.model_validate(j) for j in jobs]
 
     @app.get("/job/{job_id}", response_model=JobModel)
     async def get_job(job_id: str) -> JobModel:
