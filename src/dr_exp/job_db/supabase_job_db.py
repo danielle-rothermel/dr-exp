@@ -47,25 +47,30 @@ class SupabaseJobDB(BaseJobDB):
             raise
 
     def claim_job(
-        self, worker_id: str = "unassigned_worker", respect_reservations: bool = True
+        self, worker_id: Optional[str] = None, respect_reservations: bool = True
     ) -> Optional[Dict[str, Any]]:
         """Claim the next available queued job.
 
         Parameters
         ----------
         worker_id : str, optional
-            Identifier of the worker claiming the job. Defaults to
-            ``"unassigned_worker"``.
+            Identifier of the worker claiming the job. If None,
+            defaults to "unassigned_worker".
+        respect_reservations : bool, optional
+            Whether to respect job reservations, by default True.
 
         Returns
         -------
         dict[str, Any] | None
             The claimed job record or ``None`` if no job is available.
         """
+        # Handle None worker_id by providing default
+        effective_worker_id = worker_id or "unassigned_worker"
+        
         try:
             # Assumes a PostgreSQL function `claim_next_job(worker_id_input TEXT)` exists
             response = self.supabase.rpc(
-                "claim_next_job", {"worker_id_input": worker_id}
+                "claim_next_job", {"worker_id_input": effective_worker_id}
             ).execute()
             if response.data:
                 return response.data[0]  # RPC might return a list with one item
