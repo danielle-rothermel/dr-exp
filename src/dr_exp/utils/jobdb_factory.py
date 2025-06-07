@@ -31,7 +31,7 @@ def get_job_db_client(config: Optional[JobDBConfig] = None) -> BaseJobDB:
     
     config.validate()
     
-    if config.mode == "supabase_remote":
+    if config.mode in ["supabase_remote", "supabase_local"]:
         return SupabaseJobDB(config)
     else:
         return LocalJobDB(config)
