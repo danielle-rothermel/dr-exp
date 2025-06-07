@@ -1,0 +1,11 @@
+# AlexNet-style model for testing - smallest available in deconCNN  
+source: custom
+name: alexnet_cifar
+architecture: CifarAlexNet
+layers: 8
+nonlinearity: relu
+norm_type: batchnorm
+dropout_prob: 0.5
+use_residual: false
+init_method: he
+num_classes: 10
