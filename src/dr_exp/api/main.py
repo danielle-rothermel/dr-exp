@@ -4,12 +4,14 @@ import json
 import logging
 import os
 from typing import Any, Dict, List, Optional
+from enum import Enum
 
 from dotenv import load_dotenv
 
 from cachetools import LRUCache
-from fastapi import Depends, FastAPI, Header, HTTPException, status
+from fastapi import Depends, FastAPI, Header, HTTPException, status, Security
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
 
 from dr_exp.api.models import (
     BoostPriorityRequest,
@@ -30,6 +32,16 @@ load_dotenv()
 logger = logging.getLogger(__name__)
 
 
+class UserRole(str, Enum):
+    """User roles for API access control."""
+    ADMIN = "admin"
+    READER = "reader"
+
+
+# Security scheme for Bearer token authentication
+security = HTTPBearer()
+
+
 def get_admin_key() -> str:
     """Return the API key used for admin endpoints.
 
@@ -42,24 +54,102 @@ def get_admin_key() -> str:
     return os.getenv("ADMIN_API_KEY", "testkey")
 
 
-def verify_api_key(x_api_key: str = Header(...)) -> None:
-    """Validate an incoming API key.
+def get_reader_key() -> str:
+    """Return the API key used for read-only endpoints.
 
+    Returns
+    -------
+    str
+        The value of ``READER_API_KEY`` from the environment or ``"readkey"`` if
+        the variable is not set.
+    """
+    return os.getenv("READER_API_KEY", "readkey")
+
+
+def authenticate_user(credentials: HTTPAuthorizationCredentials = Security(security)) -> UserRole:
+    """Authenticate a user and return their role.
+    
     Parameters
     ----------
-    x_api_key : str
-        The value of the ``X-API-KEY`` header supplied by the client.
-
+    credentials : HTTPAuthorizationCredentials
+        Bearer token credentials from the Authorization header.
+        
+    Returns
+    -------
+    UserRole
+        The authenticated user's role.
+        
     Raises
     ------
     HTTPException
-        If the provided key does not match :func:`get_admin_key`.
+        If the token is invalid or missing.
     """
-    if x_api_key != get_admin_key():
+    token = credentials.credentials
+    
+    # Check for admin access
+    if token == get_admin_key():
+        return UserRole.ADMIN
+    
+    # Check for reader access
+    if token == get_reader_key():
+        return UserRole.READER
+    
+    # Invalid token
+    raise HTTPException(
+        status_code=status.HTTP_401_UNAUTHORIZED,
+        detail="Invalid authentication token",
+        headers={"WWW-Authenticate": "Bearer"},
+    )
+
+
+def require_admin(user_role: UserRole = Depends(authenticate_user)) -> UserRole:
+    """Dependency that requires admin role.
+    
+    Parameters
+    ----------
+    user_role : UserRole
+        The authenticated user's role.
+        
+    Returns
+    -------
+    UserRole
+        The user's role if they are an admin.
+        
+    Raises
+    ------
+    HTTPException
+        If the user is not an admin.
+    """
+    if user_role != UserRole.ADMIN:
         raise HTTPException(
-            status_code=status.HTTP_401_UNAUTHORIZED, 
-            detail="Invalid API key"
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Admin access required"
         )
+    return user_role
+
+
+def require_reader_or_admin(user_role: UserRole = Depends(authenticate_user)) -> UserRole:
+    """Dependency that requires reader or admin role.
+    
+    Parameters
+    ----------
+    user_role : UserRole
+        The authenticated user's role.
+        
+    Returns
+    -------
+    UserRole
+        The user's role if they have read access.
+        
+    Raises
+    ------
+    HTTPException
+        If the user has no valid role.
+    """
+    # Both reader and admin roles have read access
+    return user_role
+
+
 
 
 def raise_job_not_found(job_id: str) -> None:
@@ -183,7 +273,11 @@ def create_app(base_path: str = ".") -> FastAPI:
     FastAPI
         A fully configured application ready to run.
     """
-    app = FastAPI()
+    app = FastAPI(
+        title="DR Experiment Manager API",
+        description="API for managing deep learning experiments",
+        version="1.0.0"
+    )
 
     # Add CORS middleware
     app.add_middleware(
@@ -193,6 +287,16 @@ def create_app(base_path: str = ".") -> FastAPI:
         allow_methods=["*"],
         allow_headers=["*"],
     )
+    
+    # Add security headers middleware
+    @app.middleware("http")
+    async def add_security_headers(request, call_next):
+        response = await call_next(request)
+        response.headers["X-Content-Type-Options"] = "nosniff"
+        response.headers["X-Frame-Options"] = "DENY"
+        response.headers["X-XSS-Protection"] = "1; mode=block"
+        response.headers["Referrer-Policy"] = "strict-origin-when-cross-origin"
+        return response
 
     client = get_job_db_client()
     loader = MetricsLoader(client)
@@ -238,7 +342,7 @@ def create_app(base_path: str = ".") -> FastAPI:
             raise_metrics_not_found(run_id)
         return MetricsResponse(metrics=metrics)
 
-    @app.post("/job/kill", dependencies=[Depends(verify_api_key)], response_model=SuccessResponse)
+    @app.post("/job/kill", dependencies=[Depends(require_admin)], response_model=SuccessResponse)
     async def kill_job(req: KillRequest) -> SuccessResponse:
         """Mark ``job_id`` as killed."""
         job = client.get_job_details(req.job_id)
@@ -259,7 +363,7 @@ def create_app(base_path: str = ".") -> FastAPI:
             job_id=req.job_id
         )
 
-    @app.post("/job/requeue", dependencies=[Depends(verify_api_key)], response_model=SuccessResponse)
+    @app.post("/job/requeue", dependencies=[Depends(require_admin)], response_model=SuccessResponse)
     async def requeue_job(req: RequeueRequest) -> SuccessResponse:
         """Requeue ``job_id`` for another attempt."""
         job = client.get_job_details(req.job_id)
@@ -281,7 +385,7 @@ def create_app(base_path: str = ".") -> FastAPI:
             job_id=req.job_id
         )
 
-    @app.post("/job/boost-priority", dependencies=[Depends(verify_api_key)], response_model=PriorityResponse)
+    @app.post("/job/boost-priority", dependencies=[Depends(require_admin)], response_model=PriorityResponse)
     async def boost_priority(req: BoostPriorityRequest) -> PriorityResponse:
         """Boost the priority of a job by the specified amount."""
         job = client.get_job_details(req.job_id)
@@ -309,7 +413,7 @@ def create_app(base_path: str = ".") -> FastAPI:
                 detail=f"Failed to boost priority for job {req.job_id}: {str(e)}"
             )
 
-    @app.post("/job/set-priority", dependencies=[Depends(verify_api_key)], response_model=PriorityResponse)
+    @app.post("/job/set-priority", dependencies=[Depends(require_admin)], response_model=PriorityResponse)
     async def set_priority(req: SetPriorityRequest) -> PriorityResponse:
         """Set the absolute priority of a job."""
         job = client.get_job_details(req.job_id)

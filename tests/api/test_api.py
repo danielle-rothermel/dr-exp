@@ -69,7 +69,7 @@ def test_admin_actions(client, sb_client):
     job = sb_client.add_job({"a": 1}, "sweep1", status="failed")
     job_id = job["id"]
 
-    headers = {"X-API-Key": "secret"}
+    headers = {"Authorization": "Bearer secret"}
     
     # Test kill endpoint
     r = client.post("/job/kill", json={"job_id": job_id}, headers=headers)
@@ -96,7 +96,7 @@ def test_admin_actions(client, sb_client):
 
     # Test unauthorized access
     bad = client.post(
-        "/job/kill", json={"job_id": job_id}, headers={"X-API-Key": "bad"}
+        "/job/kill", json={"job_id": job_id}, headers={"Authorization": "Bearer bad"}
     )
     assert bad.status_code == 401
 
@@ -117,7 +117,7 @@ def test_priority_endpoints(client, sb_client):
     job = sb_client.add_job({"a": 1}, "sweep1", status="queued", priority=100)
     job_id = job["id"]
 
-    headers = {"X-API-Key": "secret"}
+    headers = {"Authorization": "Bearer secret"}
     
     # Test boost priority
     boost_resp = client.post(
@@ -149,6 +149,6 @@ def test_priority_endpoints(client, sb_client):
     bad_resp = client.post(
         "/job/boost-priority", 
         json={"job_id": job_id, "boost_amount": 50},
-        headers={"X-API-Key": "bad"}
+        headers={"Authorization": "Bearer bad"}
     )
     assert bad_resp.status_code == 401
