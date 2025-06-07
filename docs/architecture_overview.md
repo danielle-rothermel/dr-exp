@@ -239,16 +239,22 @@ uv run pytest tests/manage/test_integration.py  # Integration tests
 ## Integration Points
 
 ### FastAPI Backend
-- Reads job status for UI display
-- Provides WebSocket for real-time updates
-- Admin endpoints for job management
-- No direct communication with manager/workers
+- Comprehensive REST API with authentication and role-based access control
+- Real-time WebSocket communication for job status updates
+- Advanced job querying with pagination, filtering, and sorting
+- Priority management endpoints for job queue control
+- System monitoring with health checks and metrics
+- Request logging and performance monitoring
+- API versioning with deprecation management
+- No direct communication with manager/workers (database-mediated)
 
 ### React Frontend
-- Real-time job monitoring
-- Priority-aware job display
-- Interactive job management
-- WebSocket integration for live updates
+- Real-time job monitoring with WebSocket integration
+- Advanced job filtering, sorting, and pagination
+- Priority-aware job display and queue management
+- Authenticated job control (kill, requeue, priority management)
+- System health monitoring and API status display
+- Role-based access control (admin vs reader permissions)
 
 ### SLURM Integration
 - Batch job submission via `sbatch`

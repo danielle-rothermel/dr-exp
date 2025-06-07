@@ -53,15 +53,19 @@ def test_metrics_endpoint(client, sb_client, tmp_path):
     # Test default limit (500) - should return all 105 metrics
     resp = client.get(f"/metrics/{run_id}")
     assert resp.status_code == 200
-    metrics = resp.json()["metrics"]
+    data = resp.json()
+    metrics = data["metrics"]
     assert len(metrics) == 105
+    assert data["count"] == 105
     assert metrics[-1]["step"] == 104
 
     # Test custom limit
     resp = client.get(f"/metrics/{run_id}?limit=10")
     assert resp.status_code == 200
-    metrics = resp.json()["metrics"]
+    data = resp.json()
+    metrics = data["metrics"]
     assert len(metrics) == 10
+    assert data["count"] == 10
     assert metrics[-1]["step"] == 104  # Should be last 10 metrics
 
 
@@ -338,3 +342,108 @@ def test_filtering_and_sorting(tmp_path, monkeypatch):
     # Test invalid sort order
     resp = client.get("/jobs?paginated=true&sort_order=invalid")
     assert resp.status_code == 400
+
+
+def test_health_endpoint(client):
+    """Test health check endpoint."""
+    resp = client.get("/health")
+    assert resp.status_code == 200
+    data = resp.json()
+    
+    assert "status" in data
+    assert "timestamp" in data
+    assert "uptime_seconds" in data
+    assert "version" in data
+    assert "database_status" in data
+    assert "job_stats" in data
+    
+    # Check that uptime is a positive number
+    assert data["uptime_seconds"] >= 0
+    assert data["version"] == "1.0.0"
+    assert data["database_status"] in ["healthy", "unhealthy"]
+
+
+def test_metrics_endpoint_monitoring(client, sb_client):
+    """Test system metrics endpoint."""
+    # Add some jobs first
+    sb_client.add_job({"a": 1}, "sweep1", status="queued")
+    sb_client.add_job({"b": 2}, "sweep2", status="running")
+    sb_client.add_job({"c": 3}, "sweep3", status="completed")
+    
+    resp = client.get("/metrics")
+    assert resp.status_code == 200
+    data = resp.json()
+    
+    assert "timestamp" in data
+    assert "uptime_seconds" in data
+    assert "active_connections" in data
+    assert "job_stats" in data
+    assert "total_jobs" in data
+    assert "queue_depth" in data
+    assert "running_jobs" in data
+    
+    # Check metrics values
+    assert data["uptime_seconds"] >= 0
+    assert data["active_connections"] >= 0
+    assert data["total_jobs"] >= 3
+    assert data["queue_depth"] >= 1  # at least one queued job
+    assert data["running_jobs"] >= 1  # at least one running job
+    
+    # Check job stats structure
+    job_stats = data["job_stats"]
+    assert isinstance(job_stats, dict)
+    for status in ["queued", "running", "completed", "failed", "killed"]:
+        assert status in job_stats
+        assert isinstance(job_stats[status], int)
+
+
+def test_api_info_endpoint(client):
+    """Test API information endpoint."""
+    resp = client.get("/api")
+    assert resp.status_code == 200
+    data = resp.json()
+    
+    assert "name" in data
+    assert "version" in data
+    assert "versions" in data
+    assert "health_check" in data
+    assert "metrics" in data
+    assert "websocket" in data
+    
+    # Check version info structure
+    assert "v1" in data["versions"]
+    v1_info = data["versions"]["v1"]
+    assert v1_info["status"] == "stable"
+    assert v1_info["prefix"] == "/api/v1"
+    assert v1_info["docs"] == "/docs"
+
+
+def test_api_version_headers(client):
+    """Test that API version headers are added to responses."""
+    resp = client.get("/health")
+    assert resp.status_code == 200
+    
+    # Check version headers
+    assert "X-API-Version" in resp.headers
+    assert resp.headers["X-API-Version"] == "1.0.0"
+
+
+def test_deprecation_headers(client):
+    """Test that deprecation headers are added to non-versioned endpoints."""
+    resp = client.get("/jobs")
+    assert resp.status_code == 200
+    
+    # Check deprecation headers
+    assert "X-API-Deprecation-Notice" in resp.headers
+    assert "X-API-Migration-Guide" in resp.headers
+    assert "deprecated" in resp.headers["X-API-Deprecation-Notice"].lower()
+
+
+def test_no_deprecation_headers_for_excluded_paths(client):
+    """Test that deprecation headers are not added to excluded paths."""
+    resp = client.get("/health")
+    assert resp.status_code == 200
+    
+    # Should not have deprecation headers
+    assert "X-API-Deprecation-Notice" not in resp.headers
+    assert "X-API-Migration-Guide" not in resp.headers
