@@ -8,7 +8,7 @@
 - **"Run One" Functionality:** Reserve and immediately execute single high-priority jobs bypassing the queue.
 - **Robust Job Execution:** Designed for SLURM environments, with considerations for error handling and job management.
 - **Centralized Data Management:** Uses Supabase (PostgreSQL and Object Storage) as a single source of truth for all experiment-related data.
-- **Real-time Monitoring & Control:** A React-based web UI (Babysitter UI) provides live insights and control over experiments via a FastAPI backend.
+- **Real-time Monitoring & Control:** A React-based web UI (Babysitter UI) provides live insights and control over experiments via a comprehensive FastAPI backend with WebSocket support.
 - **Advanced Job Management:** Boost job priorities, set reservations, and list jobs by priority with comprehensive CLI tools.
 - **Reproducibility:** Captures code versions, configurations, and (planned) environment details.
 - **Modular & Agent-Ready Design:** Components are designed with clear interfaces for independent development and testing, suitable for agentic coders.
@@ -55,7 +55,7 @@
 #### **Supporting Components**
 - **Config Generator (CLI):** Generates and uploads Hydra-based experiment configurations
 - **StructuredLogger:** Handles metrics, checkpoints, and artifact logging with storage abstraction
-- **FastAPI Backend:** API layer with WebSocket support for real-time monitoring
+- **FastAPI Backend:** Comprehensive REST API with authentication, WebSocket support, and system monitoring
 - **React Babysitter UI:** Web interface for experiment monitoring and control
 - **Priority System:** Comprehensive job scheduling with reservations and audit trails
 ## 4. Getting Started
@@ -72,7 +72,7 @@
 dr_exp/
 ├── src/
 │   └── dr_exp/
-│       ├── api/             # FastAPI backend with WebSocket support
+│       ├── api/             # FastAPI backend with REST API, WebSocket, and monitoring
 │       ├── job_db/          # Database abstraction layer (BaseJobDB, LocalJobDB, SupabaseJobDB)
 │       ├── manage/          # Streamlined manager, worker, and process management
 │       ├── logging/         # Structured logging with storage abstraction
@@ -167,10 +167,10 @@ SUPABASE_SERVICE_ROLE_KEY="your_supabase_service_role_key"
 supabase start
 ```
 
-**Terminal 2 - Start Backend:**
+**Terminal 2 - Start Backend API:**
 ```bash
 export EXPMGR_MODE=supabase_local
-uv run uvicorn dr_exp.api.main:app --reload
+uv run uvicorn dr_exp.api.main:app --reload  # API available at http://localhost:8000
 ```
 
 **Terminal 3 - Start Frontend:**
@@ -192,7 +192,11 @@ uv run python scripts/manager_cli.py system run --gpus-per-node 1 --workers-per-
 uv run python scripts/manager_cli.py system run-worker dev_worker ./work
 ```
 
-Visit `http://localhost:5173` to see the jobs in the UI!
+**Access the System:**
+- **Frontend UI:** `http://localhost:5173` - Real-time job monitoring interface
+- **API Documentation:** `http://localhost:8000/docs` - Interactive Swagger UI
+- **API Health Check:** `http://localhost:8000/health` - System status
+- **WebSocket:** `ws://localhost:8000/ws` - Real-time updates
 
 ### 5.2. Database Management
 
@@ -337,7 +341,63 @@ uv run python scripts/manager_cli.py admin cleanup-run-data
 ```plain text
 uv run pytest
 ```
-## 8. Documentation
+## 8. API and Web Interface
+
+### 8.1. FastAPI Backend
+The system provides a comprehensive REST API with the following features:
+
+**Core Endpoints:**
+- **Job Management:** List, query, and retrieve job details with pagination and filtering
+- **Priority Control:** Boost priorities and set absolute priority levels (admin only)
+- **Job Operations:** Kill and requeue jobs with proper authentication
+- **Metrics Access:** Retrieve training metrics and experiment data
+- **System Monitoring:** Health checks and system metrics for observability
+
+**Real-time Features:**
+- **WebSocket Support:** Live job status updates and priority changes
+- **Authentication:** Role-based Bearer token authentication (admin/reader)
+- **Monitoring:** Request logging and performance timing headers
+
+**API Documentation:**
+- **Interactive Docs:** `http://localhost:8000/docs` (Swagger UI)
+- **Alternative Docs:** `http://localhost:8000/redoc` (ReDoc format)
+- **API Reference:** See `docs/api_reference.md` for complete specification
+
+### 8.2. React Frontend
+The Babysitter UI provides real-time experiment monitoring with:
+- Job table with status, priority, and progress tracking
+- Advanced filtering and sorting capabilities
+- WebSocket integration for live updates
+- Job detail views with metrics visualization
+- Admin controls for priority management
+
+### 8.3. Authentication
+**Development Tokens:**
+```bash
+# Admin access (full permissions)
+export ADMIN_API_KEY=testkey
+
+# Reader access (read-only)  
+export READER_API_KEY=readkey
+```
+
+**API Usage:**
+```bash
+# Health check (public)
+curl http://localhost:8000/health
+
+# List jobs (public)
+curl http://localhost:8000/jobs
+
+# Kill job (admin only)
+curl -X POST http://localhost:8000/job/kill \
+  -H "Authorization: Bearer testkey" \
+  -H "Content-Type: application/json" \
+  -d '{"job_id": "your-job-id"}'
+```
+
+## 9. Documentation
+- **API Reference:** Complete REST API specification in `docs/api_reference.md`
 - **Component Specifications:** Detailed design documents live in the `docs/` directory.  See `docs/supabase_schema.md`, `docs/manager_flow.md`, `docs/manager_cli.md`, and `docs/frontend_ui.md`.
 - **Priority System:** Comprehensive documentation of the priority-based job scheduling system is in `docs/priority_system.md`.
 - **Training Examples:** Example configs and the dummy trainer are described in `docs/train_examples.md`.
