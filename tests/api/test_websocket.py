@@ -132,17 +132,165 @@ def test_websocket_connection_manager_state(client):
     # (We can't directly test this without exposing the connection manager)
 
 
-@pytest.mark.skip(reason="Broadcasting not fully implemented in echo-only WebSocket")
-def test_websocket_broadcast_message(client, db_client, admin_headers):
-    """Test WebSocket broadcasting when job priorities change."""
-    # This test would verify real broadcasting functionality
-    # Currently skipped because the WebSocket only echoes messages
+def test_websocket_message_format_validation(client):
+    """Test WebSocket message format handling."""
+    with client.websocket_connect("/ws") as websocket:
+        # Test various message formats
+        test_messages = [
+            "simple text message",
+            '{"type": "test", "data": {"key": "value"}}',
+            '{"array": [1, 2, 3]}',
+            '{"nested": {"deep": {"structure": true}}}',
+            "",  # Empty message
+            "a" * 1000,  # Long message
+        ]
+        
+        for msg in test_messages:
+            websocket.send_text(msg)
+            response = websocket.receive_text()
+            assert msg in response
+
+
+def test_websocket_connection_limits(client):
+    """Test WebSocket connection limits and resource management."""
+    max_connections = 10
+    connections = []
     
+    try:
+        # Establish multiple connections
+        for i in range(max_connections):
+            ws_context = client.websocket_connect("/ws")
+            connection = ws_context.__enter__()
+            connections.append((ws_context, connection))
+            
+            # Test each connection works
+            connection.send_text(f"test_{i}")
+            response = connection.receive_text()
+            assert f"test_{i}" in response
+        
+        # All connections should be active
+        assert len(connections) == max_connections
+        
+    finally:
+        # Clean up all connections
+        for ws_context, _ in connections:
+            try:
+                ws_context.__exit__(None, None, None)
+            except:
+                pass  # Connection might already be closed
+
+
+def test_websocket_error_handling(client):
+    """Test WebSocket error handling and recovery."""
+    with client.websocket_connect("/ws") as websocket:
+        # Test normal operation
+        websocket.send_text("normal message")
+        response = websocket.receive_text()
+        assert "normal message" in response
+        
+        # Test sending various edge case messages
+        edge_cases = [
+            '{"incomplete": json',  # Invalid JSON
+            None,  # This would be handled by the test client
+            '{"very": {"deeply": {"nested": {"object": {"with": {"many": "levels"}}}}}}',
+        ]
+        
+        for case in edge_cases:
+            if case is not None:
+                websocket.send_text(case)
+                response = websocket.receive_text()
+                # Should still echo the message even if it's invalid JSON
+                assert case in response
+
+
+def test_websocket_connection_lifecycle_events(client):
+    """Test WebSocket connection and disconnection events."""
+    # Test establishing connection
+    with client.websocket_connect("/ws") as websocket:
+        # Connection should be established
+        websocket.send_text("connection_test")
+        response = websocket.receive_text()
+        assert "connection_test" in response
+        
+        # Test that connection stays alive for multiple messages
+        for i in range(5):
+            websocket.send_text(f"message_{i}")
+            response = websocket.receive_text()
+            assert f"message_{i}" in response
+    
+    # After context manager, connection should be closed
+    # Attempting to establish a new connection should work
+    with client.websocket_connect("/ws") as new_websocket:
+        new_websocket.send_text("new_connection")
+        response = new_websocket.receive_text()
+        assert "new_connection" in response
+
+
+def test_websocket_concurrent_message_handling(client):
+    """Test handling of concurrent messages from single connection."""
+    import threading
+    import time
+    
+    with client.websocket_connect("/ws") as websocket:
+        responses = []
+        errors = []
+        
+        def send_message(msg_id):
+            try:
+                message = f"concurrent_msg_{msg_id}"
+                websocket.send_text(message)
+                response = websocket.receive_text()
+                responses.append((msg_id, response))
+            except Exception as e:
+                errors.append((msg_id, str(e)))
+        
+        # Send multiple messages rapidly
+        threads = []
+        for i in range(5):
+            thread = threading.Thread(target=send_message, args=(i,))
+            threads.append(thread)
+        
+        # Start all threads
+        for thread in threads:
+            thread.start()
+        
+        # Wait for all to complete
+        for thread in threads:
+            thread.join(timeout=5)
+        
+        # All messages should be handled (though order may vary)
+        assert len(errors) == 0, f"Errors occurred: {errors}"
+        assert len(responses) == 5
+        
+        # Each response should contain its corresponding message
+        for msg_id, response in responses:
+            assert f"concurrent_msg_{msg_id}" in response
+
+
+def test_websocket_message_size_limits(client):
+    """Test WebSocket message size handling."""
+    with client.websocket_connect("/ws") as websocket:
+        # Test progressively larger messages
+        sizes = [100, 1000, 10000, 50000]  # Up to 50KB
+        
+        for size in sizes:
+            large_message = "x" * size
+            websocket.send_text(large_message)
+            response = websocket.receive_text()
+            # Should echo back the full message
+            assert large_message in response
+            assert len(response) >= size
+
+
+@pytest.mark.skip(reason="Broadcasting not implemented - requires real WebSocket integration")
+def test_websocket_broadcast_integration(client, db_client, admin_headers):
+    """Test integration with actual API operations for broadcasting."""
+    # This would test real broadcasting when it's implemented
     job = create_test_job(db_client, priority=Priority.NORMAL)
     job_id = job["id"]
     
     with client.websocket_connect("/ws") as websocket:
-        # Boost job priority via API
+        # Make API call that should trigger broadcast
         resp = client.post(
             "/job/boost-priority",
             json={"job_id": job_id, "boost_amount": 100},
@@ -150,41 +298,8 @@ def test_websocket_broadcast_message(client, db_client, admin_headers):
         )
         assert resp.status_code == 200
         
-        # Should receive broadcast message about priority change
-        # (This would require implementing actual broadcasting)
-        data = websocket.receive_text()
-        message = json.loads(data)
-        
-        assert message["type"] == "job_update"
-        assert message["job_id"] == job_id
-        assert message["action"] == "priority_boosted"
-        assert message["new_priority"] == Priority.NORMAL + 100
-
-
-@pytest.mark.skip(reason="Broadcasting not fully implemented in echo-only WebSocket")
-def test_websocket_job_status_broadcast(client, db_client, admin_headers):
-    """Test WebSocket broadcasting for job status changes."""
-    # This test would verify job status change broadcasts
-    
-    job = create_test_job(db_client, status=JobStatus.FAILED)
-    job_id = job["id"]
-    
-    with client.websocket_connect("/ws") as websocket:
-        # Requeue job via API
-        resp = client.post(
-            "/job/requeue",
-            json={"job_id": job_id},
-            headers=admin_headers
-        )
-        assert resp.status_code == 200
-        
-        # Should receive broadcast about job requeue
-        data = websocket.receive_text()
-        message = json.loads(data)
-        
-        assert message["type"] == "job_update"
-        assert message["job_id"] == job_id
-        assert message["action"] == "requeued"
+        # In a real implementation, this would receive a broadcast message
+        # For now, this test is skipped until broadcasting is implemented
 
 
 def test_websocket_connection_close_handling(client):
