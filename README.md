@@ -49,10 +49,10 @@
 ## 4. Getting Started
 ### 4.1. Prerequisites
 - Python (e.g., 3.9+)
-- Node.js and npm (for Supabase CLI, if not using other installation methods like Homebrew)
+- Node.js and npm (for React frontend)
 - Docker (for running Supabase locally via `supabase start` during development)
-- A Supabase Account (for the remote cloud instance)
-- [Supabase CLI](https://supabase.com/docs/guides/cli/getting-started) installed and configured.
+- A Supabase Account (for the remote cloud instance, optional for local development)
+- [Supabase CLI](https://supabase.com/docs/guides/cli/getting-started) installed (via Homebrew: `brew install supabase/tap/supabase`)
 - Git
 ### 4.2. Repository Setup
 **Project Structure (Overview):**
@@ -76,68 +76,143 @@ dr_exp/
 ```
 ### 4.3. Environment Setup
 
-Python Backend
-```
+**Python Backend:**
+```bash
 uv sync
-uv run python scripts/start_backend.py
 ```
 
-Frontend
-```
+**React Frontend:**
+```bash
 cd react-babysitter-ui
 npm install
-npm run dev
+```
+
+**Local Supabase (Recommended for Development):**
+```bash
+# Start local Supabase development server
+supabase start
+
+# The migrations will be automatically applied
 ```
 
 ### 4.4. Configuration
-- The system will rely on environment variables for sensitive information like Supabase keys. Create a `.env` file (and add it to `.gitignore`) for local development. Example:
-```plain text
-# .env - For local development (DO NOT COMMIT if it contains real secrets)
-# Supabase connection details for the REAL client (not the mock)
-SUPABASE_URL="your_supabase_project_url"
-SUPABASE_KEY="your_supabase_anon_key"
-SUPABASE_SERVICE_ROLE_KEY="your_supabase_service_role_key"
 
-# Mode for client selection (mock or real)
-EXPMGR_MODE="mock" # Set to "real" to use actual Supabase
+The system supports three modes for data storage:
+
+#### 4.4.1. Local Supabase Mode (Recommended for Development)
+
+This mode uses a local PostgreSQL database with the full Supabase feature set, perfect for development and testing.
+
+**Setup:**
+```bash
+# 1. Start local Supabase
+supabase start
+
+# 2. Set environment mode
+export EXPMGR_MODE=supabase_local
+
+# 3. Run the system
+uv run uvicorn dr_exp.api.main:app --reload
 ```
-- Your application code will need to load these (e.g., using `python-dotenv`).
 
-## 5. Running the System (High-Level)
-    - Detailed instructions will evolve as components are built.
-        - Mock Mode (for local development/testing):
-        - Set EXPMGR_MODE="mock" in your environment. This will use the LocalDBClient.
-        - You can reset the mock environment using:
-        - ```plain text
-          uv run python scripts/reset_mock_db.py
-          ```
+The local mode automatically configures:
+- **Database URL:** `http://127.0.0.1:54321`
+- **Service Role Key:** Auto-configured from local Supabase
+- **Storage Bucket:** `experiment-artifacts` (created automatically)
 
-### 5.1 Local Backend and UI
-To experiment with the mock FastAPI backend and the React Babysitter UI together:
+**Database Schema:**
+- All tables are created via migrations in `supabase/migrations/`
+- Includes priority system (0-1000 range)
+- Job reservation system for worker-specific jobs
+- Storage integration for metrics and artifacts
 
-1. **Start the backend** from the repository root:
+#### 4.4.2. Files Local Mode (Simple Mock)
+
+Uses local JSON files for development without Docker dependency.
+
+```bash
+export EXPMGR_MODE=files_local
+```
+
+#### 4.4.3. Production Supabase Mode
+
+For production deployment with cloud Supabase.
+
+Create a `.env` file:
+```bash
+# .env - For production (DO NOT COMMIT real secrets)
+EXPMGR_MODE=supabase_remote
+SUPABASE_URL="your_supabase_project_url"
+SUPABASE_SERVICE_ROLE_KEY="your_supabase_service_role_key"
+```
+
+## 5. Running the System
+
+### 5.1. Quick Start (Local Supabase)
+
+**Terminal 1 - Start Supabase:**
+```bash
+supabase start
+```
+
+**Terminal 2 - Start Backend:**
+```bash
+export EXPMGR_MODE=supabase_local
+uv run uvicorn dr_exp.api.main:app --reload
+```
+
+**Terminal 3 - Start Frontend:**
+```bash
+cd react-babysitter-ui
+npm run dev
+```
+
+**Terminal 4 - Upload Some Jobs:**
+```bash
+export EXPMGR_MODE=supabase_local
+uv run python -m scripts.manager_cli upload-configs --sweep "model=resnet,vit lr=0.01,0.001"
+```
+
+Visit `http://localhost:5173` to see the jobs in the UI!
+
+### 5.2. Database Management
+
+**Reset Local Database:**
+```bash
+# Reset and reapply all migrations
+supabase db reset
+
+# Or for files_local mode
+uv run python scripts/reset_local_jobdb.py
+```
+
+**View Database:**
+```bash
+# Open Supabase Studio (local)
+open http://127.0.0.1:54323
+```
+
+### 5.3. SLURM Mode (Production)
+
+For actual cluster experiments:
+
+1. **Set production mode:**
    ```bash
-   uv run uvicorn dr_exp.api.main:app --reload
+   export EXPMGR_MODE=supabase_remote
+   # Or configure .env file with production Supabase credentials
    ```
-   The server listens on `http://localhost:8000`.
 
-2. **Start the React UI** in another terminal:
+2. **Upload experiment configurations:**
    ```bash
-   cd react-babysitter-ui
-   npm install   # first time only
-   npm run dev
+   uv run python -m scripts.manager_cli upload-configs --sweep "model=resnet,vit optim=adam,sgd"
    ```
-   Vite serves the app at `http://localhost:5173` and it queries `http://localhost:8000/jobs`.
 
-Opening the UI should display the jobs table fetched from the backend.
-        - SLURM Mode (for actual experiments):
-        - This will involve:
-            1. Setting `EXPMGR_MODE="real"`.
-           2. Using `python scripts/manager_cli.py upload-configs` to populate Supabase with experiment configurations.
-            3. Submitting jobs to SLURM via an `sbatch` script that runs the `SLURM Manager`.
-           4. A starter script is provided at `scripts/slurm_job.sbatch`.
+3. **Submit to SLURM:**
+   ```bash
+   sbatch scripts/slurm_job.sbatch
+   ```
 
-## 5.2. Priority System Usage
+## 6. Priority System Usage
 
 The system includes a comprehensive priority-based job scheduling system with the following capabilities:
 
@@ -202,18 +277,32 @@ uv run python -m scripts.manager_cli run-one --config-name my_config.yaml --over
 - Manager logs top queued jobs by priority during idle periods
 - Real-time priority-aware job claiming ensures highest priority jobs run first
 
-## 6. Development
-### 6.1. Mocks
-- **LocalDBClient:** Simulates Supabase interactions locally. See `dr_exp/job_db/local_job_db.py`.
-- Example training code and Hydra configs live in `src/dr_exp/train_examples`.
-- Other mocks, including the FastAPI backend and mock training function, are implemented as described in the PRD.
-### 6.2. Testing
+## 7. Development
+### 7.1. Development Modes
+
+**Local Supabase (`EXPMGR_MODE=supabase_local`):**
+- Full PostgreSQL database with Supabase features
+- Real-time updates, storage, and all production functionality
+- Perfect for testing database migrations and complex workflows
+- Requires Docker but provides the most realistic development environment
+
+**Files Local (`EXPMGR_MODE=files_local`):**
+- Simple JSON file storage in `job_data/` directory
+- No external dependencies (no Docker required)
+- Good for basic development and testing
+- Reset with `uv run python scripts/reset_local_jobdb.py`
+
+**Production (`EXPMGR_MODE=supabase_remote`):**
+- Cloud Supabase instance for actual experiments
+- Requires Supabase account and project setup
+
+### 7.2. Testing
 - Tests are written using pytest and located in the tests/ directory.
 - To run tests:
 ```plain text
 uv run pytest
 ```
-## 7. Documentation
+## 8. Documentation
 - **Component Specifications:** Detailed design documents live in the `docs/` directory.  See `docs/supabase_schema.md`, `docs/manager_flow.md`, `docs/manager_cli.md`, and `docs/frontend_ui.md`.
 - **Priority System:** Comprehensive documentation of the priority-based job scheduling system is in `docs/priority_system.md`.
 - **Training Examples:** Example configs and the dummy trainer are described in `docs/train_examples.md`.
