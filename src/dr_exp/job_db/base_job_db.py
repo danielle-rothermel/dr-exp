@@ -1,6 +1,8 @@
 """Base class for job database clients."""
 
+import os
 from abc import ABC, abstractmethod
+from datetime import datetime, UTC
 from typing import Any, Dict, List, Optional
 
 
@@ -12,9 +14,23 @@ class BaseJobDB(ABC):
     Includes support for priority-based job scheduling and queue management.
     """
     
-    # Required attributes that subclasses must provide
-    jobs_dir: str
-    storage_dir: str
+    def __init__(self, base_path: str = ".", storage_path: str = "./storage"):
+        """Initialize common attributes for all job database implementations.
+        
+        Parameters
+        ----------
+        base_path : str, optional
+            Base directory under which job data is stored, by default ".".
+        storage_path : str, optional
+            Directory for artifact and run output storage, by default "./storage".
+        """
+        self.base_path = os.path.abspath(base_path)
+        self.storage_dir = os.path.abspath(storage_path)
+        self.jobs_dir = os.path.join(self.base_path, "job_data")
+        
+        # Create directories if needed
+        os.makedirs(self.jobs_dir, exist_ok=True)
+        os.makedirs(self.storage_dir, exist_ok=True)
     
     @abstractmethod
     def claim_job(
@@ -338,6 +354,69 @@ class BaseJobDB(ABC):
             The created job record with reservation information.
         """
         pass
+
+    # Common implementations that can be shared
+    
+    def finalize_job(self, job_id: str, final_status: str, metadata: Dict[str, Any]) -> Dict[str, Any]:
+        """Finalize a job with the given status and metadata.
+        
+        This is a common implementation that can be overridden if needed.
+        
+        Parameters
+        ----------
+        job_id : str
+            Identifier of the job.
+        final_status : str
+            Final status string to record.
+        metadata : dict[str, Any]
+            Additional fields to store on the job record.
+            
+        Returns
+        -------
+        dict[str, Any]
+            Result of the finalization operation.
+        """
+        update_data = {
+            "status": final_status,
+            "end_time": datetime.now(UTC).isoformat() + "Z",
+        }
+        update_data.update(metadata)
+        result = self.update_job(job_id, update_data)
+        if result.get("success"):
+            self._write_finished_flag(job_id)
+        return result
+    
+    def _write_finished_flag(self, job_id: str) -> None:
+        """Create an empty finished.flag file for a completed job.
+        
+        Parameters
+        ----------
+        job_id : str
+            Job identifier for which to create the finished flag.
+        """
+        run_dir = os.path.join(self.storage_dir, f"run_{job_id}")
+        os.makedirs(run_dir, exist_ok=True)
+        flag_path = os.path.join(run_dir, "finished.flag")
+        try:
+            with open(flag_path, "w"):
+                pass
+        except Exception as e:
+            print(f"Error writing finished flag for job {job_id}: {e}")
+    
+    def _clamp_priority(self, priority: int) -> int:
+        """Ensure priority is within valid range (0-1000).
+        
+        Parameters
+        ----------
+        priority : int
+            Priority value to clamp.
+            
+        Returns
+        -------
+        int
+            Priority value clamped to valid range (0-1000).
+        """
+        return max(0, min(1000, priority))
 
 
 __all__ = ["BaseJobDB"]

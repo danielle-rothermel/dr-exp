@@ -3,9 +3,7 @@
 import pytest
 from abc import ABC
 
-from dr_exp.job_db.base_job_db import BaseJobDB
-from dr_exp.job_db.local_job_db import LocalJobDB
-from dr_exp.job_db.supabase_job_db import SupabaseJobDB
+from dr_exp.job_db import BaseJobDB, LocalJobDB, SupabaseJobDB, JobDBConfig
 
 
 def test_base_job_db_is_abstract():
@@ -18,7 +16,8 @@ def test_base_job_db_inheritance():
     """Test that BaseJobDB is properly inherited by concrete implementations."""
     assert issubclass(LocalJobDB, BaseJobDB)
     assert issubclass(SupabaseJobDB, BaseJobDB)
-    assert isinstance(LocalJobDB(base_path="/tmp", storage_path="/tmp/storage"), BaseJobDB)
+    config = JobDBConfig(base_path="/tmp", storage_path="/tmp/storage", mode="mock")
+    assert isinstance(LocalJobDB(config), BaseJobDB)
 
 
 def test_base_job_db_enforces_abstract_methods():
@@ -90,7 +89,8 @@ def test_base_job_db_optional_methods_raise_not_implemented():
 
 def test_local_job_db_implements_optional_methods():
     """Test that LocalJobDB properly implements optional methods."""
-    db = LocalJobDB(base_path="/tmp", storage_path="/tmp/storage")
+    config = JobDBConfig(base_path="/tmp", storage_path="/tmp/storage", mode="mock")
+    db = LocalJobDB(config)
     
     # These should not raise NotImplementedError
     jobs = db.list_jobs()
@@ -101,15 +101,23 @@ def test_local_job_db_implements_optional_methods():
 
 def test_interface_consistency():
     """Test that both implementations have consistent interfaces."""
-    local_db = LocalJobDB(base_path="/tmp", storage_path="/tmp/storage")
+    local_config = JobDBConfig(base_path="/tmp", storage_path="/tmp/storage", mode="mock")
+    local_db = LocalJobDB(local_config)
     
     # Use a valid JWT format for testing (this is a fake JWT that will pass format validation)
     fake_jwt = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiIxMjM0NTY3ODkwIiwibmFtZSI6IkpvaG4gRG9lIiwiaWF0IjoxNTE2MjM5MDIyfQ.SflKxwRJSMeKKF2QT4fwpMeJf36POk6yJV_adQssw5c"
     
     # Mock the Supabase client creation to avoid network calls
     import unittest.mock
+    supabase_config = JobDBConfig(
+        base_path="/tmp",
+        storage_path="/tmp/storage",
+        supabase_url="http://test",
+        supabase_key=fake_jwt,
+        mode="real"
+    )
     with unittest.mock.patch('dr_exp.job_db.supabase_job_db.create_client'):
-        supabase_db = SupabaseJobDB("http://test", fake_jwt, base_path="/tmp")
+        supabase_db = SupabaseJobDB(supabase_config)
     
     # Both should be instances of BaseJobDB
     assert isinstance(local_db, BaseJobDB)

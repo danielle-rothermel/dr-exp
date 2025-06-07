@@ -1,7 +1,7 @@
 import argparse
 from typing import Optional
 
-from dr_exp.utils.jobdb_factory import get_supabase_client
+from dr_exp.utils.jobdb_factory import get_job_db_client
 from dr_exp.utils.job_reaper import reap_stale_jobs
 
 
@@ -19,7 +19,7 @@ def build_arg_parser() -> argparse.ArgumentParser:
 
 def main(argv: Optional[list[str]] = None) -> None:
     args = build_arg_parser().parse_args(argv)
-    client = get_supabase_client(base_path=args.base_path)
+    client = get_job_db_client()
     count = reap_stale_jobs(client, args.max_age_mins)
     print(f"Marked {count} stale job(s) as failed")
 

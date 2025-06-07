@@ -9,8 +9,7 @@ from pathlib import Path
 from typing import Sequence
 
 from dr_exp.utils import config_upload
-from dr_exp.utils.jobdb_factory import get_supabase_client
-from dr_exp.job_db.local_job_db import LocalJobDB
+from dr_exp.utils.jobdb_factory import get_job_db_client
 from dr_exp.manage.worker_logic import run_worker
 from dr_exp.utils.priority import PriorityClass
 
@@ -78,7 +77,7 @@ def run(args: argparse.Namespace) -> str:
         Final status of the job execution.
     """
     # Get database client
-    client = get_supabase_client(base_path=args.base_path)
+    client = get_job_db_client()
     
     # Generate worker ID if not provided
     worker_id = args.worker_id or f"run_one_{uuid.uuid4().hex[:8]}"
