@@ -831,8 +831,8 @@ class SupabaseJobDB(BaseJobDB):
     def get_metrics(self, run_id: str, limit: Optional[int] = 500) -> List[Dict[str, Any]]:
         """Get metrics for a specific run.
         
-        For Supabase, this attempts to download metrics from storage first,
-        falling back to local storage if available.
+        For Supabase, this first checks local storage for faster access,
+        then downloads from Supabase storage bucket with retry logic.
         
         Parameters
         ----------
@@ -850,7 +850,7 @@ class SupabaseJobDB(BaseJobDB):
         Raises
         ------
         FileNotFoundError
-            If metrics for the run do not exist.
+            If metrics for the run do not exist in local or remote storage.
         """
         import json
         import os
@@ -871,9 +871,6 @@ class SupabaseJobDB(BaseJobDB):
                 
             return metrics
         
-        # TODO: Implement Supabase storage download when needed
-        # For now, raise FileNotFoundError to maintain consistent interface
-        raise FileNotFoundError(f"Metrics not found for run {run_id}")
         # Implement Supabase storage download with retry logic
         storage_path = f"run_{run_id}/metrics.jsonl"
         max_retries = 3
