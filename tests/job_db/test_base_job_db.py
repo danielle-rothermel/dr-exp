@@ -89,6 +89,9 @@ def test_base_job_db_optional_methods_raise_not_implemented():
 
         def get_queue_summary(self, limit=5):
             return []
+
+        def get_metrics(self, run_id, limit=None):
+            return []
     
     db = MinimalJobDB()
     

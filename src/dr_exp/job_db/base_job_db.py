@@ -490,10 +490,11 @@ class BaseJobDB(ABC):
 
     # Common implementations that can be shared
     
-    def finalize_job(self, job_id: str, final_status: str, metadata: Dict[str, Any]) -> Dict[str, Any]:
-        """Finalize a job with the given status and metadata.
+    def _default_finalize_job_logic(self, job_id: str, final_status: str, metadata: Dict[str, Any]) -> Dict[str, Any]:
+        """Default finalization logic that subclasses can use.
         
-        This is a common implementation that can be overridden if needed.
+        This helper method provides common job finalization logic.
+        Subclasses can call this from their finalize_job implementations.
         
         Parameters
         ----------

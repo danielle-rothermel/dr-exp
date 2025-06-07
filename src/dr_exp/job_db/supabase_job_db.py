@@ -870,5 +870,9 @@ class SupabaseJobDB(BaseJobDB):
         # For now, raise FileNotFoundError to maintain consistent interface
         raise FileNotFoundError(f"Metrics not found for run {run_id}")
 
+    def finalize_job(self, job_id: str, final_status: str, metadata: Dict[str, Any]) -> Dict[str, Any]:
+        """Finalize a job with the given status and metadata."""
+        return self._default_finalize_job_logic(job_id, final_status, metadata)
+
 
 __all__ = ["SupabaseJobDB"]
