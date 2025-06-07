@@ -37,14 +37,19 @@ dr_exp is a distributed job scheduler for machine learning experiments. Its core
 - Supabase connection vars (for supabase_remote): `SUPABASE_URL`, `SUPABASE_KEY`, `SUPABASE_SERVICE_ROLE_KEY`
 - `PYTHONPATH`: Should include the project root for proper imports
 
-## Test Infrastructure (Phases 1-2 ✅ Complete)
+## Testing
 
-**Current Status**: Enhanced test infrastructure is available for reliable testing.
+**Test Infrastructure:**
+- Comprehensive test suite with enhanced fixtures in `tests/conftest.py` and `tests/manage/conftest.py`
+- Parallel test execution using pytest-xdist for improved performance
+- Test categorization with markers for fast/slow/concurrency/integration tests
 
-**Available Test Infrastructure:**
-- Enhanced fixtures in `tests/conftest.py` and `tests/manage/conftest.py`
-- Reference patterns in `tests/manage/test_phase2_infrastructure.py`
-- See `test_refactor_plan.md` for remaining Phase 3-4 work
+**Running Tests:**
+- **All tests**: `uv run pytest`
+- **Parallel execution**: `uv run pytest -n auto`
+- **Fast tests only**: `uv run pytest -m "fast"`
+- **Skip slow tests**: `uv run pytest -m "not slow"`
+- **Specific test types**: `uv run pytest -m "concurrency"` or `uv run pytest -m "integration"`
 
 **Key Testing Patterns:** Use direct `trainer_fn` parameters, event-driven synchronization, and enhanced fixtures for deterministic testing.
 

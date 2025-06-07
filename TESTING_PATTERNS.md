@@ -1,6 +1,6 @@
 # Testing Patterns Reference
 
-This document provides technical patterns and best practices discovered during test refactoring.
+This document provides technical patterns and best practices for testing the dr_exp system.
 
 ## Mock Training Functions
 
