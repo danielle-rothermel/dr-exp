@@ -39,10 +39,12 @@ This is an experiment management system for coordinating deep learning experimen
    - Factory pattern in `utils/jobdb_factory.py` switches between them via `EXPMGR_MODE` env var
 
 2. **Manager/Worker System** (`src/dr_exp/manage/`):
-   - `manager_logic.py`: Spawns and monitors worker processes on SLURM nodes
-   - `worker_logic.py`: Individual workers that claim jobs and execute training
+   - `manager.py`: Streamlined manager that coordinates workers using abstract interface methods
+   - `worker.py`: Individual workers with improved error handling and separation of concerns
+   - `process_manager.py`: Process management abstraction for launching and monitoring workers
    - Heartbeat system for health monitoring and automatic recovery
    - Support for multiple workers per GPU (configurable)
+   - Clean separation between coordination logic and database implementation details
 
 3. **Priority System** (`src/dr_exp/utils/priority.py`):
    - Priority range: 0-1000 with predefined classes (SYSTEM, URGENT, HIGH, NORMAL, LOW)
@@ -73,6 +75,13 @@ This is an experiment management system for coordinating deep learning experimen
    - Dummy trainer implementation demonstrating integration
    - Hydra configs for experiment configuration
    - Example parameter sweeps and overrides
+
+8. **System Factory** (`src/dr_exp/utils/factory.py`):
+   - `SystemConfig`: Unified configuration for all system components
+   - `Factory`: Creates properly integrated managers, workers, and database clients
+   - `create_system()`: Main entry point for system initialization
+   - Environment-aware configuration with reasonable defaults
+   - Shared instances to ensure consistency across components
 
 ### Environment Configuration
 
@@ -128,10 +137,12 @@ The manager CLI (`scripts/manager_cli.py`) provides comprehensive job management
 
 ### Key Design Patterns
 
-- **Factory Pattern**: Database client selection based on environment
-- **Abstract Base Classes**: Consistent interfaces for job DB and logging
-- **Multiprocessing**: Manager spawns worker processes with proper isolation
-- **Heartbeat System**: Workers send regular heartbeats, manager monitors health
+- **Streamlined Architecture**: Clean separation between coordination logic and implementation details
+- **Abstract Interface Methods**: Manager uses only abstract methods, eliminating database-specific code paths
+- **Factory Pattern**: Unified system creation with shared instances and consistent configuration
+- **Process Management Abstraction**: Clean separation between manager coordination and process lifecycle
+- **Improved Error Handling**: Structured error management with comprehensive logging and recovery
+- **Heartbeat System**: Workers send regular heartbeats, manager monitors health with automatic recovery
 - **Storage Abstraction**: Unified interface for local files and cloud storage
 - **Priority Queue**: Jobs processed by priority with reservation system
 - **Event-Driven Updates**: WebSocket for real-time UI updates
@@ -170,11 +181,17 @@ The manager CLI (`scripts/manager_cli.py`) provides comprehensive job management
    # Upload configs with priority (works with any mode)
    uv run python -m scripts.manager_cli upload-configs --sweep "model=resnet,vit" --priority 500
    
-   # Start manager (spawns workers)
-   uv run python scripts/run_manager.py
+   # Start manager (spawns workers automatically)
+   uv run python scripts/run_manager.py --gpus-per-node 2 --workers-per-gpu 2
    
-   # Or run individual workers
-   uv run python scripts/run_worker.py
+   # Or run individual workers (useful for development/testing)
+   uv run python scripts/run_worker.py --worker-id dev_worker
+   
+   # Use the manager CLI for comprehensive control
+   uv run python scripts/manager_cli.py run --gpus-per-node 2 --workers-per-gpu 2
+   
+   # Run a single high-priority job immediately
+   uv run python scripts/manager_cli.py run-one --overrides "model=resnet,lr=0.001"
    ```
 
 3. **Testing**:
@@ -213,10 +230,32 @@ The manager CLI (`scripts/manager_cli.py`) provides comprehensive job management
    - Submit jobs via `sbatch scripts/slurm_job.sbatch`
    - Monitor via web UI or CLI
 
+### Architecture Improvements (Recent Refactoring)
+
+The system has been significantly refactored to achieve a cleaner, more maintainable architecture:
+
+- **Streamlined Interface Methods**: New abstract methods in `BaseJobDB` eliminate database-specific code from manager
+  - `list_running_jobs()`: Get currently running jobs
+  - `get_stale_jobs()`: Find jobs with stale heartbeats  
+  - `mark_jobs_failed()`: Batch job failure marking
+  - `has_queued_jobs()`: Quick queue status check
+  - `get_queue_summary()`: Preview of queued jobs
+
+- **Clean Separation of Concerns**: 
+  - Manager focuses purely on coordination logic
+  - Workers handle job execution with improved error handling
+  - Process management abstracted into `ProcessManager`
+  - Factory pattern ensures consistent system configuration
+
+- **Improved Error Handling**: Structured error management with comprehensive logging and recovery mechanisms
+
+- **Integration Tests**: Comprehensive test suite demonstrating end-to-end workflows
+
 ### Testing Strategy
 
 - **Unit Tests**: Each component has dedicated unit tests
-- **Integration Tests**: Manager/worker interaction, API endpoints
+- **Integration Tests**: Manager/worker coordination and system-wide functionality  
+- **Interface Tests**: Verify abstract interface compliance across implementations
 - **Files Local Testing**: Most tests run in files_local mode for speed
 - **Fixtures**: Shared test utilities in `conftest.py` files
 - **Test Organization**: Tests mirror source structure in `tests/`
