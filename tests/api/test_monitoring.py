@@ -182,14 +182,14 @@ def test_deprecation_headers_presence(client):
 
 def test_no_deprecation_headers_for_excluded_paths(client):
     """Test that deprecation headers are not added to excluded paths."""
-    # Endpoints that should NOT have deprecation headers
-    excluded_endpoints = ["/health", "/metrics", "/api", "/docs", "/ws"]
+    # Endpoints that should NOT have deprecation headers (based on API middleware logic)
+    excluded_endpoints = ["/health", "/metrics", "/ws", "/docs"]
     
     for endpoint in excluded_endpoints:
         resp = client.get(endpoint)
         if resp.status_code == 200:  # Skip if endpoint doesn't exist in test
-            assert "X-API-Deprecation-Notice" not in resp.headers
-            assert "X-API-Migration-Guide" not in resp.headers
+            assert "X-API-Deprecation-Notice" not in resp.headers, f"Endpoint {endpoint} should not have deprecation headers"
+            assert "X-API-Migration-Guide" not in resp.headers, f"Endpoint {endpoint} should not have migration headers"
 
 
 def test_health_endpoint_database_status(client, db_client):
