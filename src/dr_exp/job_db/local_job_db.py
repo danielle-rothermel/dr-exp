@@ -103,7 +103,7 @@ class LocalJobDB(BaseJobDB):
         ----------
         worker_id : str, optional
             Identifier of the worker claiming the job. If not provided,
-            a random worker ID will be generated.
+            a mock worker ID will be generated.
             
         Returns
         -------
@@ -316,6 +316,11 @@ class LocalJobDB(BaseJobDB):
         dict[str, Any]
             Result of the upload operation including the storage path.
         """
+        # Input validation for security - only reject dangerous relative paths
+        if not local_path or ".." in local_path:
+            logger.warning(f"Invalid local path provided: {local_path}")
+            return {"success": False, "message": "Invalid local path"}
+            
         if not os.path.exists(local_path):
             logger.warning(f"Local artifact not found: {local_path}")
             return {"success": False, "message": "Local artifact not found"}
