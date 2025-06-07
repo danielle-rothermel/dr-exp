@@ -1,15 +1,16 @@
 from __future__ import annotations
 
+import asyncio
 import json
 import logging
 import os
-from typing import Any, Dict, List, Optional
+from typing import Any, Dict, List, Optional, Set
 from enum import Enum
 
 from dotenv import load_dotenv
 
 from cachetools import LRUCache
-from fastapi import Depends, FastAPI, Header, HTTPException, status, Security
+from fastapi import Depends, FastAPI, Header, HTTPException, status, Security, WebSocket, WebSocketDisconnect
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
 
@@ -40,6 +41,51 @@ class UserRole(str, Enum):
 
 # Security scheme for Bearer token authentication
 security = HTTPBearer()
+
+
+class ConnectionManager:
+    """WebSocket connection manager for real-time updates."""
+    
+    def __init__(self):
+        self.active_connections: Set[WebSocket] = set()
+    
+    async def connect(self, websocket: WebSocket):
+        """Accept a new WebSocket connection."""
+        await websocket.accept()
+        self.active_connections.add(websocket)
+        logger.info(f"WebSocket connected. Total connections: {len(self.active_connections)}")
+    
+    def disconnect(self, websocket: WebSocket):
+        """Remove a WebSocket connection."""
+        self.active_connections.discard(websocket)
+        logger.info(f"WebSocket disconnected. Total connections: {len(self.active_connections)}")
+    
+    async def send_personal_message(self, message: str, websocket: WebSocket):
+        """Send a message to a specific WebSocket connection."""
+        try:
+            await websocket.send_text(message)
+        except Exception as e:
+            logger.error(f"Error sending personal message: {e}")
+            self.disconnect(websocket)
+    
+    async def broadcast(self, message: dict):
+        """Broadcast a message to all connected clients."""
+        if not self.active_connections:
+            return
+        
+        message_text = json.dumps(message)
+        disconnected = set()
+        
+        for connection in self.active_connections:
+            try:
+                await connection.send_text(message_text)
+            except Exception as e:
+                logger.error(f"Error broadcasting to connection: {e}")
+                disconnected.add(connection)
+        
+        # Remove disconnected clients
+        for connection in disconnected:
+            self.disconnect(connection)
 
 
 def get_admin_key() -> str:
@@ -300,9 +346,24 @@ def create_app(base_path: str = ".") -> FastAPI:
 
     client = get_job_db_client()
     loader = MetricsLoader(client)
+    manager = ConnectionManager()
 
     app.state.client = client
     app.state.loader = loader
+    app.state.manager = manager
+
+    @app.websocket("/ws")
+    async def websocket_endpoint(websocket: WebSocket):
+        """WebSocket endpoint for real-time job updates."""
+        await manager.connect(websocket)
+        try:
+            while True:
+                # Keep connection alive and listen for client messages
+                data = await websocket.receive_text()
+                # Echo back for now - could be used for client commands later
+                await manager.send_personal_message(f"Echo: {data}", websocket)
+        except WebSocketDisconnect:
+            manager.disconnect(websocket)
 
     @app.get("/jobs", response_model=List[JobModel])
     async def list_jobs() -> List[JobModel]:
@@ -358,6 +419,14 @@ def create_app(base_path: str = ".") -> FastAPI:
                 detail=f"Failed to kill job {req.job_id}: {result.get('error', 'Unknown error')}"
             )
         
+        # Broadcast job update via WebSocket
+        await manager.broadcast({
+            "type": "job_update",
+            "job_id": req.job_id,
+            "action": "kill_requested",
+            "message": f"Job {req.job_id} marked for termination"
+        })
+        
         return SuccessResponse(
             message=f"Job {req.job_id} marked for termination",
             job_id=req.job_id
@@ -380,6 +449,15 @@ def create_app(base_path: str = ".") -> FastAPI:
                 detail=f"Failed to requeue job {req.job_id}: {result.get('error', 'Unknown error')}"
             )
         
+        # Broadcast job update via WebSocket
+        await manager.broadcast({
+            "type": "job_update",
+            "job_id": req.job_id,
+            "action": "requeued",
+            "retry_index": retry,
+            "message": f"Job {req.job_id} requeued for retry (attempt {retry})"
+        })
+        
         return SuccessResponse(
             message=f"Job {req.job_id} requeued for retry (attempt {retry})",
             job_id=req.job_id
@@ -398,6 +476,17 @@ def create_app(base_path: str = ".") -> FastAPI:
         try:
             result = client.boost_job_priority(req.job_id, req.boost_amount)
             new_priority = result.get("new_priority", old_priority)
+            
+            # Broadcast priority update via WebSocket
+            await manager.broadcast({
+                "type": "job_update",
+                "job_id": req.job_id,
+                "action": "priority_boosted",
+                "old_priority": old_priority,
+                "new_priority": new_priority,
+                "boost_amount": req.boost_amount,
+                "message": f"Job {req.job_id} priority boosted by {req.boost_amount}"
+            })
             
             return PriorityResponse(
                 job_id=req.job_id,
@@ -426,6 +515,17 @@ def create_app(base_path: str = ".") -> FastAPI:
         try:
             result = client.update_job_priority(req.job_id, req.priority, req.reason)
             new_priority = result.get("new_priority", req.priority)
+            
+            # Broadcast priority update via WebSocket
+            await manager.broadcast({
+                "type": "job_update",
+                "job_id": req.job_id,
+                "action": "priority_set",
+                "old_priority": old_priority,
+                "new_priority": new_priority,
+                "reason": req.reason,
+                "message": f"Job {req.job_id} priority set to {req.priority}"
+            })
             
             return PriorityResponse(
                 job_id=req.job_id,
