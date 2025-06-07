@@ -20,6 +20,8 @@ from dr_exp.manage.process_manager import MockProcessManager
 class TestDatabaseErrorScenarios:
     """Test error scenarios involving database operations."""
     
+    @pytest.mark.edge_case
+    @pytest.mark.fast
     def test_worker_handles_database_connection_failure(self, isolated_job_db, worker_execution_helper):
         """Test worker behavior when database connection fails during execution."""
         # Create a job
@@ -51,6 +53,8 @@ class TestDatabaseErrorScenarios:
         job_details = isolated_job_db.get_job_details(job["id"])
         assert job_details["status"] == "completed"
     
+    @pytest.mark.edge_case
+    @pytest.mark.fast
     def test_worker_handles_config_fetch_failure(self, integration_system):
         """Test worker behavior when job config cannot be fetched."""
         # Create a job
@@ -76,6 +80,8 @@ class TestDatabaseErrorScenarios:
         # Config missing should result in finalize_success being False
         assert job_details["finalize_success"] is False
     
+    @pytest.mark.edge_case
+    @pytest.mark.fast
     def test_worker_handles_artifact_upload_failure(self, isolated_job_db, worker_execution_helper):
         """Test worker behavior when artifact upload fails."""
         # Create a job
@@ -102,14 +108,17 @@ class TestDatabaseErrorScenarios:
 class TestTrainingFunctionErrors:
     """Test various training function error scenarios."""
     
+    @pytest.mark.edge_case
+    @pytest.mark.slow
+    @pytest.mark.timeout
     def test_training_function_timeout(self, isolated_job_db, worker_execution_helper):
         """Test worker behavior when training function hangs."""
         # Create a job
         job = isolated_job_db.add_test_job({"test": "timeout"})
         
-        # Training function that simulates hanging
+        # Training function that simulates hanging (optimized for faster testing)
         def hanging_train(config, logger):
-            time.sleep(10)  # This would hang in real scenario
+            time.sleep(1)  # Reduced from 10s to 1s for faster testing
             return {"final_val_acc": 0.95, "status": "success"}
         
         # Use a very short timeout for testing
@@ -119,6 +128,8 @@ class TestTrainingFunctionErrors:
             # For this test, we just verify the timeout mechanism would be called
             assert status in ["completed", "failed"]  # Depends on implementation
     
+    @pytest.mark.edge_case
+    @pytest.mark.fast
     def test_training_function_memory_error(self, isolated_job_db, worker_execution_helper):
         """Test worker behavior when training function runs out of memory."""
         # Create a job
@@ -139,6 +150,8 @@ class TestTrainingFunctionErrors:
         assert job_details["final_val_acc"] is None
         assert job_details["num_epochs"] == 0
     
+    @pytest.mark.edge_case
+    @pytest.mark.fast
     def test_training_function_user_interrupt(self, isolated_job_db, worker_execution_helper):
         """Test worker behavior when training is interrupted by user."""
         # Create a job
@@ -156,6 +169,8 @@ class TestTrainingFunctionErrors:
         assert job_details["status"] == "failed"
         assert job_details["train_status"] == "crash"
     
+    @pytest.mark.edge_case
+    @pytest.mark.fast
     def test_training_function_corrupted_data(self, isolated_job_db, worker_execution_helper):
         """Test worker behavior when training encounters corrupted data."""
         # Create a job
@@ -176,6 +191,9 @@ class TestTrainingFunctionErrors:
 class TestConcurrencyAndRaceConditions:
     """Test concurrency issues and race conditions."""
     
+    @pytest.mark.edge_case
+    @pytest.mark.concurrency
+    @pytest.mark.slow
     def test_multiple_workers_claiming_same_job(self, isolated_job_db, worker_coordination):
         """Test that multiple workers cannot claim the same job."""
         # Create a single high-priority job
@@ -231,6 +249,9 @@ class TestConcurrencyAndRaceConditions:
         job_details = isolated_job_db.get_job_details(job["id"])
         assert job_details["status"] == "completed"
     
+    @pytest.mark.edge_case
+    @pytest.mark.concurrency
+    @pytest.mark.fast
     def test_concurrent_job_claiming_with_priorities(self, priority_job_factory, worker_coordination):
         """Test priority ordering is maintained under concurrent access."""
         # Create jobs with different priorities
@@ -282,6 +303,9 @@ class TestConcurrencyAndRaceConditions:
         assert execution_order[1] == "priority_500" 
         assert execution_order[2] == "priority_100"
     
+    @pytest.mark.edge_case
+    @pytest.mark.concurrency
+    @pytest.mark.fast
     def test_worker_crash_during_execution(self, isolated_job_db, enhanced_mock_time):
         """Test system recovery when worker crashes during job execution."""
         # Create a job and claim it (simulating worker taking it)
@@ -319,6 +343,9 @@ class TestConcurrencyAndRaceConditions:
         stale_job_details = isolated_job_db.get_job_details(claimed_job["id"])
         assert stale_job_details["status"] == "failed"
     
+    @pytest.mark.edge_case
+    @pytest.mark.concurrency
+    @pytest.mark.slow
     def test_high_frequency_job_creation_and_processing(self, isolated_job_db):
         """Test system behavior under high-frequency job creation and processing."""
         # Create many jobs rapidly
@@ -377,6 +404,9 @@ class TestConcurrencyAndRaceConditions:
         completed_jobs = isolated_job_db.get_jobs_by_status("completed")
         assert len(completed_jobs) == 20
     
+    @pytest.mark.edge_case
+    @pytest.mark.concurrency
+    @pytest.mark.fast
     def test_concurrent_database_access_patterns(self, isolated_job_db):
         """Test various concurrent database access patterns."""
         from datetime import datetime, UTC
@@ -453,6 +483,8 @@ class TestConcurrencyAndRaceConditions:
 class TestResourceConstraints:
     """Test system behavior under resource constraints."""
     
+    @pytest.mark.edge_case
+    @pytest.mark.fast
     def test_disk_space_exhaustion(self, isolated_job_db, worker_execution_helper):
         """Test worker behavior when disk space is exhausted."""
         # Create a job
@@ -472,6 +504,8 @@ class TestResourceConstraints:
         assert job_details["status"] == "failed"
         assert job_details["train_status"] == "crash"
     
+    @pytest.mark.edge_case
+    @pytest.mark.fast
     def test_temporary_directory_cleanup(self, isolated_job_db, worker_execution_helper):
         """Test that temporary directories are properly cleaned up."""
         # Create a job
@@ -504,6 +538,8 @@ class TestResourceConstraints:
         for work_dir in created_work_dirs:
             assert not os.path.exists(work_dir), f"Work directory {work_dir} was not cleaned up"
     
+    @pytest.mark.edge_case
+    @pytest.mark.fast
     def test_logger_resource_limits(self, isolated_job_db, worker_execution_helper):
         """Test logger behavior under resource constraints."""
         # Create a job
@@ -531,6 +567,8 @@ class TestResourceConstraints:
 class TestRecoveryMechanisms:
     """Test various recovery mechanisms and resilience patterns."""
     
+    @pytest.mark.edge_case
+    @pytest.mark.fast
     def test_automatic_job_retry_after_failure(self, isolated_job_db, worker_execution_helper):
         """Test automatic retry mechanism for failed jobs."""
         # Create a job that will fail initially
@@ -578,6 +616,8 @@ class TestRecoveryMechanisms:
         assert final_details["status"] == "completed"
         assert final_details["retry_index"] == 2
     
+    @pytest.mark.edge_case
+    @pytest.mark.fast
     def test_graceful_shutdown_during_training(self, isolated_job_db, worker_execution_helper):
         """Test graceful shutdown when training is in progress."""
         # Create a job
@@ -621,6 +661,9 @@ class TestRecoveryMechanisms:
         job_details = isolated_job_db.get_job_details(job["id"])
         assert job_details["status"] in ["completed", "failed"]  # Depends on implementation
     
+    @pytest.mark.edge_case
+    @pytest.mark.integration
+    @pytest.mark.fast
     def test_manager_recovery_after_restart(self, integration_system, enhanced_mock_time):
         """Test manager recovery after unexpected restart."""
         # Create multiple jobs in different states
