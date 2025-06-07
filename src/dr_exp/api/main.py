@@ -21,6 +21,7 @@ from dr_exp.api.models import (
     JobModel,
     KillRequest,
     MetricsResponse,
+    PaginatedJobsResponse,
     PriorityResponse,
     RequeueRequest,
     SetPriorityRequest,
@@ -255,6 +256,113 @@ def raise_metrics_not_found(run_id: str) -> None:
     )
 
 
+def filter_and_sort_jobs(
+    jobs: List[Dict[str, Any]], 
+    status: Optional[str] = None,
+    priority_min: Optional[int] = None,
+    priority_max: Optional[int] = None,
+    sort_by: str = "created_at",
+    sort_order: str = "desc"
+) -> List[Dict[str, Any]]:
+    """Filter and sort a list of jobs.
+    
+    Parameters
+    ----------
+    jobs : List[Dict[str, Any]]
+        Complete list of jobs to filter and sort.
+    status : str, optional
+        Filter by job status (queued, running, completed, failed, killed).
+    priority_min : int, optional
+        Minimum priority threshold (inclusive).
+    priority_max : int, optional
+        Maximum priority threshold (inclusive).
+    sort_by : str, optional
+        Field to sort by, by default "created_at".
+        Valid values: created_at, priority, status, retry_index
+    sort_order : str, optional
+        Sort order, by default "desc". Valid values: asc, desc
+        
+    Returns
+    -------
+    List[Dict[str, Any]]
+        Filtered and sorted list of jobs.
+    """
+    filtered_jobs = jobs.copy()
+    
+    # Apply status filter
+    if status:
+        filtered_jobs = [job for job in filtered_jobs if job.get("status") == status]
+    
+    # Apply priority filters
+    if priority_min is not None:
+        filtered_jobs = [job for job in filtered_jobs if job.get("priority", 100) >= priority_min]
+    
+    if priority_max is not None:
+        filtered_jobs = [job for job in filtered_jobs if job.get("priority", 100) <= priority_max]
+    
+    # Apply sorting
+    valid_sort_fields = {"created_at", "priority", "status", "retry_index"}
+    if sort_by not in valid_sort_fields:
+        sort_by = "created_at"
+    
+    reverse = sort_order.lower() == "desc"
+    
+    try:
+        if sort_by == "priority":
+            filtered_jobs.sort(key=lambda job: job.get("priority", 100), reverse=reverse)
+        elif sort_by == "retry_index":
+            filtered_jobs.sort(key=lambda job: job.get("retry_index", 0), reverse=reverse)
+        elif sort_by == "status":
+            filtered_jobs.sort(key=lambda job: job.get("status", ""), reverse=reverse)
+        else:  # created_at
+            filtered_jobs.sort(key=lambda job: job.get("created_at", ""), reverse=reverse)
+    except Exception:
+        # If sorting fails, return unsorted list
+        pass
+    
+    return filtered_jobs
+
+
+def paginate_jobs(jobs: List[Dict[str, Any]], page: int, per_page: int) -> PaginatedJobsResponse:
+    """Paginate a list of jobs.
+    
+    Parameters
+    ----------
+    jobs : List[Dict[str, Any]]
+        Complete list of jobs to paginate.
+    page : int
+        Page number (1-based).
+    per_page : int
+        Number of jobs per page.
+        
+    Returns
+    -------
+    PaginatedJobsResponse
+        Paginated response with metadata.
+    """
+    import math
+    
+    total = len(jobs)
+    pages = math.ceil(total / per_page) if per_page > 0 else 0
+    
+    # Calculate offset
+    start = (page - 1) * per_page
+    end = start + per_page
+    
+    # Slice the jobs list
+    paginated_jobs = jobs[start:end]
+    
+    return PaginatedJobsResponse(
+        jobs=[JobModel.model_validate(job) for job in paginated_jobs],
+        total=total,
+        page=page,
+        per_page=per_page,
+        pages=pages,
+        has_next=page < pages,
+        has_prev=page > 1
+    )
+
+
 class MetricsLoader:
     """Load and cache run metrics from storage."""
 
@@ -365,11 +473,108 @@ def create_app(base_path: str = ".") -> FastAPI:
         except WebSocketDisconnect:
             manager.disconnect(websocket)
 
-    @app.get("/jobs", response_model=List[JobModel])
-    async def list_jobs() -> List[JobModel]:
-        """Return a list of available jobs."""
+    @app.get("/jobs")
+    async def list_jobs(
+        page: int = 1, 
+        per_page: int = 20,
+        paginated: bool = False,
+        job_status: Optional[str] = None,
+        priority_min: Optional[int] = None,
+        priority_max: Optional[int] = None,
+        sort_by: str = "created_at",
+        sort_order: str = "desc"
+    ):
+        """Return a list of available jobs with optional pagination, filtering, and sorting.
+        
+        Parameters
+        ----------
+        page : int, optional
+            Page number (1-based), by default 1
+        per_page : int, optional
+            Number of jobs per page, by default 20
+        paginated : bool, optional
+            Whether to return paginated response with metadata, by default False
+            If False, returns simple list
+        job_status : str, optional
+            Filter by job status (queued, running, completed, failed, killed)
+        priority_min : int, optional
+            Minimum priority threshold (inclusive)
+        priority_max : int, optional
+            Maximum priority threshold (inclusive)
+        sort_by : str, optional
+            Field to sort by, by default "created_at"
+            Valid values: created_at, priority, status, retry_index
+        sort_order : str, optional
+            Sort order, by default "desc". Valid values: asc, desc
+        """
         jobs = client.list_jobs()
-        return [JobModel.model_validate(j) for j in jobs]
+        
+        # Apply filtering and sorting
+        jobs = filter_and_sort_jobs(
+            jobs, 
+            status=job_status,
+            priority_min=priority_min,
+            priority_max=priority_max,
+            sort_by=sort_by,
+            sort_order=sort_order
+        )
+        
+        if paginated:
+            # Validate pagination parameters
+            if page < 1:
+                raise HTTPException(
+                    status_code=status.HTTP_400_BAD_REQUEST,
+                    detail="Page number must be >= 1"
+                )
+            if per_page < 1 or per_page > 100:
+                raise HTTPException(
+                    status_code=status.HTTP_400_BAD_REQUEST,
+                    detail="per_page must be between 1 and 100"
+                )
+            
+            # Validate filter parameters
+            valid_statuses = {"queued", "running", "completed", "failed", "killed"}
+            if job_status and job_status not in valid_statuses:
+                raise HTTPException(
+                    status_code=status.HTTP_400_BAD_REQUEST,
+                    detail=f"Invalid status. Valid values: {', '.join(valid_statuses)}"
+                )
+            
+            if priority_min is not None and (priority_min < 0 or priority_min > 1000):
+                raise HTTPException(
+                    status_code=status.HTTP_400_BAD_REQUEST,
+                    detail="priority_min must be between 0 and 1000"
+                )
+            
+            if priority_max is not None and (priority_max < 0 or priority_max > 1000):
+                raise HTTPException(
+                    status_code=status.HTTP_400_BAD_REQUEST,
+                    detail="priority_max must be between 0 and 1000"
+                )
+            
+            if priority_min is not None and priority_max is not None and priority_min > priority_max:
+                raise HTTPException(
+                    status_code=status.HTTP_400_BAD_REQUEST,
+                    detail="priority_min cannot be greater than priority_max"
+                )
+            
+            valid_sort_fields = {"created_at", "priority", "status", "retry_index"}
+            if sort_by not in valid_sort_fields:
+                raise HTTPException(
+                    status_code=status.HTTP_400_BAD_REQUEST,
+                    detail=f"Invalid sort_by. Valid values: {', '.join(valid_sort_fields)}"
+                )
+            
+            if sort_order.lower() not in {"asc", "desc"}:
+                raise HTTPException(
+                    status_code=status.HTTP_400_BAD_REQUEST,
+                    detail="sort_order must be 'asc' or 'desc'"
+                )
+            
+            return paginate_jobs(jobs, page, per_page)
+        else:
+            # Return simple list (with filters/sorting still applied)
+            return [JobModel.model_validate(j) for j in jobs]
 
     @app.get("/job/{job_id}", response_model=JobModel)
     async def get_job(job_id: str) -> JobModel:

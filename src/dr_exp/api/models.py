@@ -78,3 +78,15 @@ class SuccessResponse(BaseModel):
     success: bool = True
     message: str
     job_id: str | None = None
+
+
+class PaginatedJobsResponse(BaseModel):
+    """Paginated response for job listings."""
+
+    jobs: List[JobModel]
+    total: int
+    page: int
+    per_page: int
+    pages: int
+    has_next: bool
+    has_prev: bool
