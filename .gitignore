@@ -2,6 +2,7 @@
 temp.patch
 job_data/
 storage/
+.coverage
 
 mock_db/*.json
 mock_db/*.jsonl
