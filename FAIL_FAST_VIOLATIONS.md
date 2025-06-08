@@ -57,23 +57,24 @@ except Exception as e:
 
 **Impact:** ✅ **RESOLVED** - Jobs with upload failures now fail immediately, preventing data loss and inconsistent job state.
 
-### 3. Infrastructure Management Silent Failures
+### 3. Infrastructure Management Silent Failures ✅ **FIXED**
 
 **File:** `src/dr_exp/manage/process_manager.py`
 
-#### Worker Launch Failures (Lines 132-134)
-```python
-except Exception as e:
-    print(f"Error launching worker {worker_id}: {e}")
-    return False
-```
-**Impact:** System continues with fewer workers than expected; GPU allocation failures ignored.
+#### Worker Launch Failures ✅ **FIXED**
+- ✅ **Lines 136-139**: launch_worker() now raises RuntimeError instead of returning False
+- ✅ **Lines 183-186**: restart_worker() now raises RuntimeError instead of returning False
+- ✅ **Manager logic**: Only attempts to restart workers that are actually managed
+- ✅ **Interface updated**: Abstract methods now use exceptions instead of boolean returns
+- ✅ **MockProcessManager**: Updated to match new exception-based interface
 
-#### Environment Variable Defaults (Lines 13, 112)
-```python
-base_path = os.environ.get("DR_EXP_BASE_PATH", "./job_data")
-```
-**Impact:** Critical paths default to potentially incorrect locations.
+**Impact:** ✅ **RESOLVED** - Infrastructure failures now immediately halt the system instead of continuing with degraded capacity.
+
+#### Environment Variable Defaults ✅ **FIXED**
+- ✅ **Lines 15-17**: run_worker_main() now requires DR_EXP_BASE_PATH environment variable
+- ✅ **Lines 115-118**: ProcessManager constructor now requires DR_EXP_BASE_PATH environment variable
+
+**Impact:** ✅ **RESOLVED** - Critical configuration must be explicitly set, preventing misconfigurations and silent failures.
 
 ## High Priority Violations
 
@@ -221,31 +222,43 @@ started_at: Optional[str] = Field(None, ...)
 4. **Infrastructure Management** - 6 silent failure points
 5. **Configuration/Training** - 10+ loose interface violations
 
-## Recommended Remediation Plan
+## Implementation Status
 
-### Phase 1: Critical Infrastructure (Week 1)
-1. Fix database operations to raise exceptions instead of returning None
-2. Make heartbeat failures fatal after brief retry
-3. Make upload failures fail the entire job
-4. Require environment variables for critical paths
+### ✅ PHASE 1 COMPLETED: Critical Infrastructure 
+**All 5 critical violations fixed and committed:**
 
-### Phase 2: Data Integrity (Week 2)  
-1. Replace `.get()` patterns with direct access for required fields
-2. Add strict validation for job priorities and status
-3. Make API model fields required where appropriate
-4. Remove exception swallowing in critical paths
+1. ✅ **Database operations** now raise exceptions (commit 8a8e730)
+2. ✅ **Heartbeat failures** now fail jobs after 3 attempts (commit ec77b7d)  
+3. ✅ **Upload failures** now fail entire job (commit 830b566)
+4. ✅ **Priority system** uses strict validation (commit cb18df8)
+5. ✅ **Process manager** requires environment variables (commit f635af9)
 
-### Phase 3: Interface Contracts (Week 3)
-1. Replace loose dictionary interfaces with strict dataclasses
-2. Add type validation for configuration and training parameters
-3. Standardize error response formats
-4. Remove default fallbacks for authentication and security
+### 🔄 PHASE 2 IN PROGRESS: Remaining Violations
 
-### Phase 4: Systematic Review (Week 4)
-1. Add automated linting rules to prevent regression
-2. Update tests to verify failure propagation
-3. Document strict interface contracts
-4. Review all remaining `.get()` usage for legitimacy
+**Next agent should continue with remaining medium priority violations:**
+
+#### 🎯 IMMEDIATE NEXT STEPS:
+1. **Fix API layer masking errors** (lines 398-400, 87-89, 120, 132, 803, 841 in `src/dr_exp/api/main.py`)
+2. **Fix CLI command result masking** (lines 42, 49 in CLI commands)
+3. **Update failing tests** to handle new strict requirements (13 tests failing)
+
+#### 📋 REMAINING VIOLATIONS TO FIX:
+- **API silent sorting failures** - return unsorted data instead of failing
+- **WebSocket silent disconnects** - clients don't know connection failed  
+- **CLI .get() patterns** - mask operation failures with defaults
+- **Authentication defaults** - fallback to "testkey"/"readkey"
+- **Test suite** - needs environment variable fixes for new strict requirements
+
+### 🧪 CURRENT TEST STATUS:
+- ✅ **321 tests passing** (with `-m "not supabase"`)
+- ❌ **13 tests failing** due to new strict environment variable requirements
+- 📍 **Key failing test files**: `test_process_manager.py`, `test_factory.py`, `test_manager.py`
+
+### 📝 COMPLETION CRITERIA:
+- All violations in document marked as ✅ FIXED
+- All tests passing with fail-fast behavior intact
+- No `.get()` patterns for required data
+- No exception swallowing in critical paths
 
 ## Testing Strategy
 

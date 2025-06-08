@@ -85,8 +85,9 @@ class ConnectionManager:
         try:
             await websocket.send_text(message)
         except Exception as e:
-            logger.error(f"Error sending personal message: {e}")
+            logger.error(f"Critical WebSocket failure sending message: {e}")
             self.disconnect(websocket)
+            raise RuntimeError(f"WebSocket communication failed: {e}") from e
 
     async def broadcast(self, message: dict):
         """Broadcast a message to all connected clients."""
@@ -100,8 +101,9 @@ class ConnectionManager:
             try:
                 await connection.send_text(message_text)
             except Exception as e:
-                logger.error(f"Error broadcasting to connection: {e}")
+                logger.error(f"Critical WebSocket failure during broadcast: {e}")
                 disconnected.add(connection)
+                # Continue with other connections but track failures
 
         # Remove disconnected clients
         for connection in disconnected:
@@ -114,10 +116,17 @@ def get_admin_key() -> str:
     Returns
     -------
     str
-        The value of ``ADMIN_API_KEY`` from the environment or ``"testkey"`` if
-        the variable is not set.
+        The value of ``ADMIN_API_KEY`` from the environment.
+        
+    Raises
+    ------
+    RuntimeError
+        If ADMIN_API_KEY environment variable is not set.
     """
-    return os.getenv("ADMIN_API_KEY", "testkey")
+    key = os.getenv("ADMIN_API_KEY")
+    if key is None:
+        raise RuntimeError("ADMIN_API_KEY environment variable must be set")
+    return key
 
 
 def get_reader_key() -> str:
@@ -126,10 +135,17 @@ def get_reader_key() -> str:
     Returns
     -------
     str
-        The value of ``READER_API_KEY`` from the environment or ``"readkey"`` if
-        the variable is not set.
+        The value of ``READER_API_KEY`` from the environment.
+        
+    Raises
+    ------
+    RuntimeError
+        If READER_API_KEY environment variable is not set.
     """
-    return os.getenv("READER_API_KEY", "readkey")
+    key = os.getenv("READER_API_KEY")
+    if key is None:
+        raise RuntimeError("READER_API_KEY environment variable must be set")
+    return key
 
 
 def authenticate_user(
@@ -384,25 +400,21 @@ def filter_and_sort_jobs(
 
     reverse = sort_order.lower() == "desc"
 
-    try:
-        if sort_by == "priority":
-            filtered_jobs.sort(
-                key=lambda job: job["priority"],
-                reverse=reverse,  # Fail fast if priority missing
-            )
-        elif sort_by == "retry_index":
-            filtered_jobs.sort(
-                key=lambda job: job.get("retry_index", 0), reverse=reverse
-            )
-        elif sort_by == "status":
-            filtered_jobs.sort(key=lambda job: job.get("status", ""), reverse=reverse)
-        else:  # created_at
-            filtered_jobs.sort(
-                key=lambda job: job.get("created_at", ""), reverse=reverse
-            )
-    except Exception:
-        # If sorting fails, return unsorted list
-        pass
+    if sort_by == "priority":
+        filtered_jobs.sort(
+            key=lambda job: job["priority"],
+            reverse=reverse,  # Fail fast if priority missing
+        )
+    elif sort_by == "retry_index":
+        filtered_jobs.sort(
+            key=lambda job: job["retry_index"], reverse=reverse
+        )
+    elif sort_by == "status":
+        filtered_jobs.sort(key=lambda job: job["status"], reverse=reverse)
+    else:  # created_at
+        filtered_jobs.sort(
+            key=lambda job: job["created_at"], reverse=reverse
+        )
 
     return filtered_jobs
 
@@ -805,10 +817,10 @@ def create_app(base_path: str = ".") -> FastAPI:
         logger.info("Kill requested for job %s", req.job_id)
         result = client.update_job(req.job_id, {"kill_requested": True})
 
-        if not result.get("success", True):
+        if not result["success"]:
             raise HTTPException(
                 status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-                detail=f"Failed to kill job {req.job_id}: {result.get('error', 'Unknown error')}",
+                detail=f"Failed to kill job {req.job_id}: {result['error']}",
             )
 
         # Broadcast job update via WebSocket
@@ -837,16 +849,16 @@ def create_app(base_path: str = ".") -> FastAPI:
         if job is None:
             raise_job_not_found(req.job_id)
 
-        retry = job.get("retry_index", 0) + 1
+        retry = job["retry_index"] + 1
         logger.info("Requeue requested for job %s", req.job_id)
         result = client.update_job(
             req.job_id, {"status": "queued", "retry_index": retry}
         )
 
-        if not result.get("success", True):
+        if not result["success"]:
             raise HTTPException(
                 status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-                detail=f"Failed to requeue job {req.job_id}: {result.get('error', 'Unknown error')}",
+                detail=f"Failed to requeue job {req.job_id}: {result['error']}",
             )
 
         # Broadcast job update via WebSocket
