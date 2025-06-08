@@ -137,7 +137,12 @@ class JobExecutor:
             wlog.flush()
             
             try:
-                result = self.trainer_fn(cfg, logger)
+                # Unwrap training config from dr_exp metadata structure
+                # cfg has structure: {"config": {...}, "metadata": {...}}
+                # Training functions should only receive the training config
+                training_config = cfg["config"]
+                
+                result = self.trainer_fn(training_config, logger)
                 wlog.write(f"Training completed successfully\n")
                 return result
                 

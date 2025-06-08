@@ -15,6 +15,7 @@ from dr_exp.job_db import JobDBConfig, LocalJobDB
 from dr_exp.manage.manager import Manager
 from dr_exp.manage.worker import run_worker
 from dr_exp.manage.process_manager import MockProcessManager
+from tests.conftest import make_wrapped_config
 
 
 @pytest.fixture
@@ -95,11 +96,11 @@ class TestManagerWorkerIntegration:
         
         # Add test jobs
         job1 = factory.job_db.add_job(
-            {"test_param": "value1"}, "test_sweep", 
+            make_wrapped_config({"test_param": "value1"}), "test_sweep", 
             status="queued", priority=100
         )
         job2 = factory.job_db.add_job(
-            {"test_param": "value2"}, "test_sweep", 
+            make_wrapped_config({"test_param": "value2"}), "test_sweep", 
             status="queued", priority=200
         )
         
@@ -164,8 +165,7 @@ class TestManagerWorkerIntegration:
         jobs = []
         for i in range(4):
             job = factory.job_db.add_job(
-                {"job_number": i}, "multi_job_sweep",
-                status="queued", priority=100 + i
+            make_wrapped_config({"job_number": i}), "multi_job_sweep", status="queued", priority=100 + i
             )
             jobs.append(job)
         
@@ -190,8 +190,7 @@ class TestManagerWorkerIntegration:
         
         # Create job and simulate it being claimed but worker dying
         job = factory.job_db.add_job(
-            {"test": "stale_job"}, "stale_sweep",
-            status="queued", priority=100
+            make_wrapped_config({"test": "stale_job"}), "stale_sweep", status="queued", priority=100
         )
         
         # Claim the job manually to simulate worker claiming it
@@ -239,16 +238,13 @@ class TestManagerWorkerIntegration:
         
         # Add jobs with different priorities (higher number = higher priority)
         low_priority_job = factory.job_db.add_job(
-            {"priority_test": "low"}, "priority_sweep",
-            status="queued", priority=100
+            make_wrapped_config({"priority_test": "low"}), "priority_sweep", status="queued", priority=100
         )
         high_priority_job = factory.job_db.add_job(
-            {"priority_test": "high"}, "priority_sweep", 
-            status="queued", priority=900
+            make_wrapped_config({"priority_test": "high"}), "priority_sweep", status="queued", priority=900
         )
         medium_priority_job = factory.job_db.add_job(
-            {"priority_test": "medium"}, "priority_sweep",
-            status="queued", priority=500
+            make_wrapped_config({"priority_test": "medium"}), "priority_sweep", status="queued", priority=500
         )
         
         
@@ -284,8 +280,7 @@ class TestManagerWorkerIntegration:
         
         # Add a job that takes a bit of time to complete
         job = factory.job_db.add_job(
-            {"heartbeat_test": True}, "heartbeat_sweep",
-            status="queued", priority=100
+            make_wrapped_config({"heartbeat_test": True}), "heartbeat_sweep", status="queued", priority=100
         )
         
         heartbeat_updates = []
@@ -345,12 +340,10 @@ class TestManagerWorkerIntegration:
         
         # Add jobs in different states
         queued_job = factory.job_db.add_job(
-            {"status": "queued"}, "status_sweep",
-            status="queued", priority=100
+            make_wrapped_config({"status": "queued"}), "status_sweep", status="queued", priority=100
         )
         running_job = factory.job_db.add_job(
-            {"status": "running"}, "status_sweep", 
-            status="running", priority=200
+            make_wrapped_config({"status": "running"}), "status_sweep", status="running", priority=200
         )
         
         # Get system status
@@ -415,14 +408,12 @@ class TestFactoryIntegration:
         
         # Add job for targeted execution
         target_job = factory.job_db.add_job(
-            {"target": True}, "target_sweep",
-            status="queued", priority=100
+            make_wrapped_config({"target": True}), "target_sweep", status="queued", priority=100
         )
         
         # Add decoy job that shouldn't be processed
         decoy_job = factory.job_db.add_job(
-            {"target": False}, "target_sweep",
-            status="queued", priority=200  # Higher priority, but we'll target specific job
+            make_wrapped_config({"target": False}), "target_sweep", status="queued", priority=200  # Higher priority, but we'll target specific job
         )
         
         def mock_train(config, logger, *args, **kwargs):
@@ -466,9 +457,7 @@ class TestFullSystemIntegration:
         for model in ["resnet", "vit"]:
             for lr in [0.01, 0.001]:
                 job = factory.job_db.add_job(
-                    {"model": model, "lr": lr, "epochs": 1},
-                    "experiment_sweep",
-                    status="queued",
+            make_wrapped_config({"model": model, "lr": lr, "epochs": 1}), "experiment_sweep", status="queued",
                     priority=100
                 )
                 experiment_jobs.append(job)
@@ -537,8 +526,7 @@ class TestFullSystemIntegration:
         
         # Create job that will initially fail
         failing_job = factory.job_db.add_job(
-            {"will_fail": True}, "failure_sweep",
-            status="queued", priority=100
+            make_wrapped_config({"will_fail": True}), "failure_sweep", status="queued", priority=100
         )
         
         call_count = 0

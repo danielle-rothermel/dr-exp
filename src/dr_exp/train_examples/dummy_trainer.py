@@ -22,10 +22,23 @@ def train(cfg: Any, logger: Optional[BaseLogger] = None) -> Dict[str, Any]:
     dict[str, Any]
         Summary information about the run.
     """
-    train_cfg = (
-        cfg.get("train", {}) if isinstance(cfg, dict) else getattr(cfg, "train", {})
-    )
-    num_epochs = int(train_cfg.get("num_epochs", 10))
+    # Extract num_epochs from config - check multiple possible locations for compatibility
+    num_epochs = 10  # default
+    if isinstance(cfg, dict):
+        # Try top-level fields first (for dr_exp wrapped configs)
+        num_epochs = cfg.get("max_epochs", cfg.get("epochs", num_epochs))
+        # Check nested train config (for direct test calls and backwards compatibility)
+        train_cfg = cfg.get("train", {})
+        if "num_epochs" in train_cfg:
+            num_epochs = train_cfg["num_epochs"]  # Override with nested value if present
+    else:
+        # Handle object-style configs
+        num_epochs = getattr(cfg, "max_epochs", getattr(cfg, "epochs", num_epochs))
+        # Check nested train attribute
+        if hasattr(cfg, "train") and isinstance(cfg.train, dict) and "num_epochs" in cfg.train:
+            num_epochs = cfg.train["num_epochs"]
+    
+    num_epochs = int(num_epochs)
 
     if logger is None:
         # Get log_dir from config if available, otherwise use default
