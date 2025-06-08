@@ -7,13 +7,6 @@ repos:
       - id: check-merge-conflict
       - id: debug-statements
 
-  - repo: https://github.com/astral-sh/ruff-pre-commit
-    rev: v0.1.8
-    hooks:
-      - id: ruff
-        args: [--fix, --exit-non-zero-on-fix]
-      - id: ruff-format
-
   - repo: local
     hooks:
       - id: ruff-check
@@ -25,6 +18,15 @@ repos:
         name: Run ruff format
         entry: uv run ruff format
         language: system
+        pass_filenames: false
+
+  - repo: local
+    hooks:
+      - id: mypy
+        name: Run mypy
+        entry: uv run mypy src/ && uv run mypy scripts/ && uv run mypy tests/
+        language: system
+        types: [python]
         pass_filenames: false
 
   - repo: local

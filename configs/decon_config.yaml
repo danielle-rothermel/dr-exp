@@ -27,6 +27,7 @@ data:
 
 proj_dir_name: deconcnn
 
+limit_train_batches:
 load_checkpoint:
 enable_checkpointing: False
 log_every: 1
