@@ -435,12 +435,14 @@ def test_add_job_with_priority(mock_client, sample_job_config, sample_sweep_conf
     assert job["priority"] == 500
     assert job["priority_boost_count"] == 0
     
-    # Test priority clamping
-    job_high = mock_client.add_job(sample_job_config, sample_sweep_config_id, priority=1500)
-    assert job_high["priority"] == 1000  # Clamped to max
+    # Test priority validation - should raise ValueError for invalid priorities
+    import pytest
     
-    job_low = mock_client.add_job(sample_job_config, sample_sweep_config_id, priority=-50)
-    assert job_low["priority"] == 0  # Clamped to min
+    with pytest.raises(ValueError, match="Priority must be between 0 and 1000, got 1500"):
+        mock_client.add_job(sample_job_config, sample_sweep_config_id, priority=1500)
+    
+    with pytest.raises(ValueError, match="Priority must be between 0 and 1000, got -50"):
+        mock_client.add_job(sample_job_config, sample_sweep_config_id, priority=-50)
 
 
 def test_update_job_priority(mock_client, sample_job_config, sample_sweep_config_id):
@@ -482,9 +484,10 @@ def test_boost_job_priority(mock_client, sample_job_config, sample_sweep_config_
     assert boosted_job["priority"] == 350
     assert boosted_job["priority_boost_count"] == 1
     
-    # Test boost with clamping
+    # Test boost with validation - should return failure for out-of-range result
     result = mock_client.boost_job_priority(job_id, boost_amount=800)
-    assert result["new_priority"] == 1000  # Clamped to max
+    assert result["success"] is False
+    assert "Priority must be between 0 and 1000, got 1150" in result["message"]
 
 
 def test_list_jobs_by_priority(mock_client, sample_job_config, sample_sweep_config_id):

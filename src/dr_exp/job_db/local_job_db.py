@@ -414,8 +414,8 @@ class LocalJobDB(BaseJobDB):
             The created job record with generated job ID.
         """
         job_id = str(uuid.uuid4())
-        # Clamp priority to valid range
-        priority = self._clamp_priority(priority)
+        # Validate priority is in valid range
+        priority = self._validate_priority(priority)
         
         job_data = {
             "id": job_id,
@@ -460,8 +460,8 @@ class LocalJobDB(BaseJobDB):
         dict[str, Any]
             Result of the priority update operation.
         """
-        # Clamp priority to valid range
-        new_priority = self._clamp_priority(new_priority)
+        # Validate priority is in valid range
+        new_priority = self._validate_priority(new_priority)
         
         job_file_path = os.path.join(self.jobs_dir, f"{job_id}.json")
         if not os.path.exists(job_file_path):
@@ -527,7 +527,7 @@ class LocalJobDB(BaseJobDB):
                     job_data = json.load(f)
 
                 old_priority = job_data.get("priority", 100)
-                new_priority = self._clamp_priority(old_priority + boost_amount)
+                new_priority = self._validate_priority(old_priority + boost_amount)
                 job_data["priority"] = new_priority
                 job_data["priority_boost_count"] = job_data.get("priority_boost_count", 0) + 1
                 
@@ -654,8 +654,8 @@ class LocalJobDB(BaseJobDB):
             The created job record with reservation information.
         """
         job_id = str(uuid.uuid4())
-        # Clamp priority to valid range
-        priority = self._clamp_priority(priority)
+        # Validate priority is in valid range
+        priority = self._validate_priority(priority)
         
         job_data = {
             "id": job_id,

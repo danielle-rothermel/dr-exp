@@ -540,20 +540,29 @@ class BaseJobDB(ABC):
         except Exception as e:
             logger.error(f"Error writing finished flag for job {job_id}: {e}")
     
-    def _clamp_priority(self, priority: int) -> int:
-        """Ensure priority is within valid range (0-1000).
+    def _validate_priority(self, priority: int) -> int:
+        """Validate priority is within valid range (0-1000).
         
         Parameters
         ----------
         priority : int
-            Priority value to clamp.
+            Priority value to validate.
             
         Returns
         -------
         int
-            Priority value clamped to valid range (0-1000).
+            The validated priority value.
+            
+        Raises
+        ------
+        ValueError
+            If priority is not an integer or is outside the valid range (0-1000).
         """
-        return max(0, min(1000, priority))
+        if not isinstance(priority, int):
+            raise ValueError(f"Priority must be an integer, got {type(priority).__name__}")
+        if not (0 <= priority <= 1000):
+            raise ValueError(f"Priority must be between 0 and 1000, got {priority}")
+        return priority
 
 
 __all__ = ["BaseJobDB", "StaleJobInfo"]
