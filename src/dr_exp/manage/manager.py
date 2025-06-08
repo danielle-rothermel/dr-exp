@@ -133,13 +133,15 @@ class Manager:
         # Restart affected workers - fail fast if infrastructure is compromised
         affected_workers = {job.assigned_worker for job in stale_jobs}
         managed_workers = set(self.process_manager.get_worker_status().keys())
-        
+
         for worker_id in affected_workers:
             if worker_id not in managed_workers:
                 # Worker not managed by process manager - likely external worker, log and continue
-                logging.warning(f"Cannot restart worker {worker_id}: not managed by process manager")
+                logging.warning(
+                    f"Cannot restart worker {worker_id}: not managed by process manager"
+                )
                 continue
-                
+
             try:
                 self.process_manager.restart_worker(worker_id)
                 logging.info("Restarted worker %s", worker_id)

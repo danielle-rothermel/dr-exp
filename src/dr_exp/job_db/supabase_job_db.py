@@ -571,32 +571,41 @@ class SupabaseJobDB(BaseJobDB):
         try:
             # Validate priority is in valid range
             priority = self._validate_priority(priority)
-            
+
             job_id = str(uuid.uuid4())
             now = datetime.now(UTC).isoformat()
-            
+
             # For Supabase workflow: sweep_config_id might be a hash, not a UUID
             # We need to find or create the sweep config entry first
             config_uuid = None
-            
+
             if len(sweep_config_id) == 64:  # Likely a SHA256 hash
                 # Look up existing sweep config by hash
-                config_response = self.supabase.table("sweep_configs").select("id").eq("config_hash", sweep_config_id).execute()
+                config_response = (
+                    self.supabase.table("sweep_configs")
+                    .select("id")
+                    .eq("config_hash", sweep_config_id)
+                    .execute()
+                )
                 if config_response.data:
                     config_uuid = config_response.data[0]["id"]
                 else:
                     # Create new sweep config entry
                     # First create a cluster if needed
-                    cluster_result = self.add_sweep_config_cluster("default_cluster", "Auto-created cluster")
+                    cluster_result = self.add_sweep_config_cluster(
+                        "default_cluster", "Auto-created cluster"
+                    )
                     cluster_id = cluster_result["id"]
-                    
+
                     # Then create the sweep config
-                    sweep_result = self.add_sweep_config(cluster_id, job_config, sweep_config_id)
+                    sweep_result = self.add_sweep_config(
+                        cluster_id, job_config, sweep_config_id
+                    )
                     config_uuid = sweep_result["id"]
             else:
                 # Assume it's already a UUID
                 config_uuid = sweep_config_id
-            
+
             # Create the job entry
             job_data = {
                 "id": job_id,
@@ -618,10 +627,10 @@ class SupabaseJobDB(BaseJobDB):
                 raise RuntimeError("Failed to create job entry: no data returned")
 
             created_job = response.data[0]
-            
+
             # Add the config_json for compatibility with LocalJobDB interface
             created_job["config_json"] = job_config
-            
+
             return created_job
 
         except Exception as e:

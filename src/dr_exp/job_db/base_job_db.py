@@ -69,12 +69,12 @@ class BaseJobDB(ABC):
 
     def _validate_update_data(self, data: Dict[str, Any]) -> None:
         """Validate job update data for dangerous operations.
-        
+
         Parameters
         ----------
         data : dict[str, Any]
             Fields to update on the job record.
-            
+
         Raises
         ------
         ValueError
@@ -84,19 +84,25 @@ class BaseJobDB(ABC):
         if "status" in data:
             valid_statuses = {"queued", "running", "completed", "failed", "killed"}
             if data["status"] not in valid_statuses:
-                raise ValueError(f"Invalid status '{data['status']}'. Must be one of: {valid_statuses}")
-        
+                raise ValueError(
+                    f"Invalid status '{data['status']}'. Must be one of: {valid_statuses}"
+                )
+
         # Validate priority range
         if "priority" in data:
             priority = data["priority"]
             if not isinstance(priority, int) or priority < 0 or priority > 1000:
-                raise ValueError(f"Invalid priority {priority}. Must be integer between 0 and 1000")
-        
+                raise ValueError(
+                    f"Invalid priority {priority}. Must be integer between 0 and 1000"
+                )
+
         # Validate retry_index is non-negative
         if "retry_index" in data:
             retry_index = data["retry_index"]
             if not isinstance(retry_index, int) or retry_index < 0:
-                raise ValueError(f"Invalid retry_index {retry_index}. Must be non-negative integer")
+                raise ValueError(
+                    f"Invalid retry_index {retry_index}. Must be non-negative integer"
+                )
 
     @abstractmethod
     def update_job(self, job_id: str, data: Dict[str, Any]) -> Dict[str, Any]:

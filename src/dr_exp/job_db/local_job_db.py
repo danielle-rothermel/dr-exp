@@ -620,7 +620,9 @@ class LocalJobDB(BaseJobDB):
         jobs.sort(
             key=lambda job: (
                 -job["priority"],  # Fail fast if priority missing
-                job["created_at"],  # Older jobs first at same priority - fail fast if missing
+                job[
+                    "created_at"
+                ],  # Older jobs first at same priority - fail fast if missing
             )
         )
 
@@ -755,7 +757,9 @@ class LocalJobDB(BaseJobDB):
         running_jobs = self.list_running_jobs()
 
         for job in running_jobs:
-            heartbeat_str = job.get("heartbeat")  # Optional field - legitimate use of .get()
+            heartbeat_str = job.get(
+                "heartbeat"
+            )  # Optional field - legitimate use of .get()
             assigned_worker = job["assigned_worker"]  # Required field
             job_id = job["id"]  # Required field
 

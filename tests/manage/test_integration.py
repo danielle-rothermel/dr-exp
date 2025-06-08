@@ -462,7 +462,10 @@ class TestFactoryIntegration:
     def test_factory_creates_consistent_components(self, integration_config):
         """Test that factory creates properly integrated components."""
         # Set required environment variable for ProcessManager
-        with patch.dict("os.environ", {"DR_EXP_BASE_PATH": integration_config.job_db_config.base_path}):
+        with patch.dict(
+            "os.environ",
+            {"DR_EXP_BASE_PATH": integration_config.job_db_config.base_path},
+        ):
             factory = create_system(integration_config)
 
             # Create manager and verify it uses the same job_db instance
