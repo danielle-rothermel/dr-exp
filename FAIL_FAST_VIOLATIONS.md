@@ -37,17 +37,17 @@ except Exception as e:
 - **Lines 107-114**: `update_job()` returns `{"success": False}` for both "job not found" and "database error"
 - **Lines 513-514**: Priority update conflates different failure types
 
-### 2. Worker Coordination Silent Failures
+### 2. Worker Coordination Silent Failures ✅ **FIXED**
 
 **File:** `src/dr_exp/manage/worker.py`
 
-#### Silent Heartbeat Failures (Lines 53-55)
-```python
-except Exception as e:
-    # Don't let heartbeat failures crash the worker
-    logging.warning(f"Heartbeat failed for job {self.job_id}: {e}")
-```
-**Impact:** Jobs continue without manager visibility, creating zombie jobs and double-assignment risks.
+#### Silent Heartbeat Failures ✅ **FIXED**
+- ✅ **Lines 53-55**: Heartbeat failures now tracked with retry limit and fail job after max failures
+- ✅ **Added failure tracking**: HeartbeatManager tracks failure_count with configurable max_failures
+- ✅ **Added has_failed() method**: JobExecutor checks heartbeat health after training
+- ✅ **Jobs fail properly**: Heartbeat failures now record_failure() and mark job as failed
+
+**Impact:** ✅ **RESOLVED** - Jobs with heartbeat failures now fail immediately after retry limit, preventing zombie jobs and double-assignment risks.
 
 #### Silent Upload Failures (Lines 194-211)
 ```python

@@ -237,37 +237,59 @@ class JobExecutor:
         # Finalize logger
         logger_meta = logger.finalize()
 
-        # Upload metrics (handle failures gracefully)
+        # Upload metrics - fail fast if upload fails
         try:
             metrics_upload = self.client.upload_artifact(
                 self.job_id, logger_meta["metrics_path"], "metrics.jsonl"
             )
+            if not metrics_upload["success"]:
+                raise RuntimeError(
+                    f"Metrics upload failed: {metrics_upload.get('error', 'Unknown error')}"
+                )
         except Exception as e:
-            logging.warning(f"Failed to upload metrics for job {self.job_id}: {e}")
-            metrics_upload = {"success": False, "error": str(e)}
+            logging.error(
+                f"Critical: Failed to upload metrics for job {self.job_id}: {e}"
+            )
+            # Record upload failure and fail the job
+            self.client.record_failure(
+                self.job_id, "upload_failure", f"Failed to upload training metrics: {e}"
+            )
+            self.client.finalize_job(self.job_id, "failed", {"finalize_success": False})
+            return
 
-        # Create and upload bundle (handle failures gracefully)
+        # Create and upload bundle - fail fast if upload fails
         try:
             bundle_upload = self._create_and_upload_bundle(
                 logger, work_dir, worker_log_path
             )
+            if not bundle_upload["success"]:
+                raise RuntimeError(
+                    f"Bundle upload failed: {bundle_upload.get('error', 'Unknown error')}"
+                )
         except Exception as e:
-            logging.warning(f"Failed to upload bundle for job {self.job_id}: {e}")
-            bundle_upload = {"success": False, "error": str(e)}
+            logging.error(
+                f"Critical: Failed to upload bundle for job {self.job_id}: {e}"
+            )
+            # Record upload failure and fail the job
+            self.client.record_failure(
+                self.job_id, "upload_failure", f"Failed to upload training bundle: {e}"
+            )
+            self.client.finalize_job(self.job_id, "failed", {"finalize_success": False})
+            return
 
-        # Finalize job with metadata
+        # Finalize job with metadata - uploads guaranteed to be successful at this point
         final_status = "completed" if train_status == "success" else "failed"
         metadata = {
             "final_val_acc": result.final_val_acc,  # Direct access - no .get() silent failures
             "final_train_loss": result.final_train_loss,
             "num_epochs": result.num_epochs,
             "train_status": train_status,
-            "metrics_storage_path": metrics_upload["storage_path"]
-            if metrics_upload["success"]
-            else None,
-            "bundle_storage_path": bundle_upload["storage_path"]
-            if bundle_upload["success"]
-            else None,
+            "metrics_storage_path": metrics_upload[
+                "storage_path"
+            ],  # Guaranteed to exist due to fail-fast
+            "bundle_storage_path": bundle_upload[
+                "storage_path"
+            ],  # Guaranteed to exist due to fail-fast
             "upload_complete_at": datetime.now(UTC).isoformat() + "Z",
             "finalize_success": logger_meta["finalize_success"],
         }
@@ -313,12 +335,8 @@ class JobExecutor:
             os.path.join(work_dir, "bundle"), "zip", bundle_dir
         )
 
-        # Upload bundle (handle failures gracefully)
-        try:
-            return self.client.upload_artifact(self.job_id, bundle_zip, "bundle.zip")
-        except Exception as e:
-            logging.warning(f"Failed to upload bundle for job {self.job_id}: {e}")
-            return {"success": False, "error": str(e)}
+        # Upload bundle - exceptions will be caught by caller for fail-fast behavior
+        return self.client.upload_artifact(self.job_id, bundle_zip, "bundle.zip")
 
 
 def run_worker(
