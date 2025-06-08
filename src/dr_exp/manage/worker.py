@@ -24,11 +24,16 @@ from dr_exp.training.result import TrainingResult
 class HeartbeatManager:
     """Manages heartbeat thread for a job."""
 
-    def __init__(self, client: BaseJobDB, job_id: str, interval: float):
+    def __init__(
+        self, client: BaseJobDB, job_id: str, interval: float, max_failures: int = 3
+    ):
         self.client = client
         self.job_id = job_id
         self.interval = interval
+        self.max_failures = max_failures
+        self.failure_count = 0
         self.stop_event = threading.Event()
+        self.failure_event = threading.Event()  # Signal catastrophic failure
         self.thread: Optional[threading.Thread] = None
 
     def start(self):
@@ -43,6 +48,10 @@ class HeartbeatManager:
             self.stop_event.set()
             self.thread.join(timeout=5)  # Give it time to finish gracefully
 
+    def has_failed(self) -> bool:
+        """Check if heartbeat system has failed catastrophically."""
+        return self.failure_event.is_set()
+
     def _heartbeat_loop(self):
         """Send heartbeats at a fixed interval until stop_event is set."""
         while not self.stop_event.is_set():
@@ -50,9 +59,20 @@ class HeartbeatManager:
                 self.client.update_job(
                     self.job_id, {"heartbeat": datetime.now(UTC).isoformat() + "Z"}
                 )
+                # Reset failure count on successful heartbeat
+                self.failure_count = 0
             except Exception as e:
-                # Don't let heartbeat failures crash the worker
-                logging.warning(f"Heartbeat failed for job {self.job_id}: {e}")
+                self.failure_count += 1
+                logging.error(
+                    f"Heartbeat failed for job {self.job_id} (attempt {self.failure_count}/{self.max_failures}): {e}"
+                )
+
+                if self.failure_count >= self.max_failures:
+                    logging.error(
+                        f"Critical: Heartbeat system failed after {self.max_failures} attempts for job {self.job_id}"
+                    )
+                    self.failure_event.set()  # Signal catastrophic failure
+                    break  # Stop trying
 
             # Use wait instead of sleep for more responsive shutdown
             if self.stop_event.wait(timeout=self.interval):
@@ -120,6 +140,21 @@ class JobExecutor:
         try:
             # Execute training
             result = self._execute_training(cfg, logger, worker_log_path)
+
+            # Check for heartbeat failures after training completes
+            if heartbeat_manager.has_failed():
+                logging.error(
+                    f"Job {self.job_id} failed due to heartbeat system failure"
+                )
+                self.client.record_failure(
+                    self.job_id,
+                    "heartbeat_failure",
+                    "Heartbeat system failed - worker lost connectivity",
+                )
+                self.client.finalize_job(
+                    self.job_id, "failed", {"finalize_success": False}
+                )
+                return "failed"
 
             # Determine train_status based on result status and error
             if result.status == "success":

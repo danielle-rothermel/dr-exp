@@ -10,29 +10,24 @@ This document catalogs violations of the "fail fast and loud" principle througho
 
 ## Critical Violations (Fix Immediately)
 
-### 1. Database Layer Silent Failures
+### 1. Database Layer Silent Failures ✅ **FIXED**
 
 **Files:** `src/dr_exp/job_db/supabase_job_db.py`, `src/dr_exp/job_db/local_job_db.py`
 
-#### Supabase Database Operations Returning None
-- **Line 85**: `claim_job()` returns `None` on database errors
-- **Line 143**: `get_job_details()` returns `None` on database errors  
-- **Line 174**: `get_config_for_job()` returns `None` on database errors
-- **Line 364**: `add_sweep_config_cluster()` returns `None` on database errors
-- **Line 379**: `check_sweep_config_exists()` returns `None` on database errors
-- **Line 417**: `add_sweep_config()` returns `None` on database errors
-- **Line 468**: `add_job_entry()` returns `None` on database errors
+#### Supabase Database Operations Returning None ✅ **FIXED**
+- ✅ **Line 85**: `claim_job()` now raises RuntimeError on database errors
+- ✅ **Line 143**: `get_job_details()` now raises RuntimeError on database errors  
+- ✅ **Line 174**: `get_config_for_job()` now raises RuntimeError on database errors
+- ✅ **Line 364**: `add_sweep_config_cluster()` now raises RuntimeError on database errors
+- ✅ **Line 379**: `check_sweep_config_exists()` now raises RuntimeError on database errors
+- ✅ **Line 417**: `add_sweep_config()` now raises RuntimeError on database errors
+- ✅ **Line 468**: `add_job_entry()` now raises RuntimeError on database errors
 
-**Impact:** Connection failures, schema mismatches, and database corruption are masked as "not found" results.
+**Impact:** ✅ **RESOLVED** - Database connection failures now immediately raise exceptions while preserving None returns for legitimate "not found" cases.
 
-**Fix:** Replace with specific exceptions:
+**Fix Applied:**
 ```python
-# Instead of:
-except Exception as e:
-    logger.error(f"Error claiming job: {e}")
-    return None
-
-# Use:
+# Now uses:
 except Exception as e:
     logger.error(f"Critical database error claiming job: {e}")
     raise RuntimeError(f"Database claim operation failed: {e}") from e
