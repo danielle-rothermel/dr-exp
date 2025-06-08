@@ -4,9 +4,10 @@ from typing import Any, Dict, Optional
 
 from dr_exp.logging.base_logger import BaseLogger
 from dr_exp.logging.structured_logger import StructuredLogger
+from dr_exp.training.result import TrainingResult, create_success_result
 
 
-def train(cfg: Any, logger: Optional[BaseLogger] = None) -> Dict[str, Any]:
+def train(cfg: Any, logger: Optional[BaseLogger] = None) -> TrainingResult:
     """Simulate a training run and log metrics.
 
     Parameters
@@ -19,7 +20,7 @@ def train(cfg: Any, logger: Optional[BaseLogger] = None) -> Dict[str, Any]:
 
     Returns
     -------
-    dict[str, Any]
+    TrainingResult
         Summary information about the run.
     """
     # Extract num_epochs from config - check multiple possible locations for compatibility
@@ -66,12 +67,16 @@ def train(cfg: Any, logger: Optional[BaseLogger] = None) -> Dict[str, Any]:
 
     logger_meta = logger.finalize()
 
-    return {
+    final_metrics = {
         "final_val_acc": final_val_acc,
         "final_train_loss": final_train_loss,
-        "num_epochs": num_epochs,
-        "status": "success",
-        "metrics_path": logger_meta["metrics_path"],
-        "artifacts_path": logger.paths.artifact_dir,
-        "num_checkpoints": logger_meta["num_checkpoints"],
+        "final_val_loss": final_train_loss  # Use train loss as val loss for dummy
     }
+    
+    return create_success_result(
+        final_metrics=final_metrics,
+        epochs=num_epochs,
+        logger_meta=logger_meta,
+        artifacts_path=logger.paths.artifact_dir,
+        training_time=0.1  # Dummy training time
+    )

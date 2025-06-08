@@ -18,6 +18,7 @@ from dr_exp.logging.structured_logger import StructuredLogger
 from dr_exp.utils.jobdb_factory import get_job_db_client
 from dr_exp.job_db.base_job_db import BaseJobDB
 from dr_exp.train_examples.dummy_trainer import train as default_train
+from dr_exp.training.result import TrainingResult
 
 
 class HeartbeatManager:
@@ -88,7 +89,7 @@ class JobExecutor:
         self,
         job: dict,
         client: BaseJobDB,
-        trainer_fn: Callable[[Any, BaseLogger], dict],
+        trainer_fn: Callable[[Any, BaseLogger], TrainingResult],
         logger_cls: type[BaseLogger],
         heartbeat_interval: float
     ):
@@ -119,7 +120,7 @@ class JobExecutor:
         try:
             # Execute training
             result = self._execute_training(cfg, logger, worker_log_path)
-            train_status = result.get("status", "success")
+            train_status = result.status  # Direct access - guaranteed to exist
             
             # Finalize logger and upload artifacts
             self._finalize_and_upload(logger, work_dir, worker_log_path, result, train_status)
@@ -130,7 +131,7 @@ class JobExecutor:
         finally:
             heartbeat_manager.stop()
     
-    def _execute_training(self, cfg: dict, logger: BaseLogger, worker_log_path: str) -> dict:
+    def _execute_training(self, cfg: dict, logger: BaseLogger, worker_log_path: str) -> TrainingResult:
         """Execute the training function with proper error handling."""
         with open(worker_log_path, "w") as wlog:
             wlog.write(f"Worker started for job {self.job_id}\n")
@@ -143,6 +144,11 @@ class JobExecutor:
                 training_config = cfg["config"]
                 
                 result = self.trainer_fn(training_config, logger)
+                
+                # Enforce TrainingResult type - fail immediately if wrong type
+                if not isinstance(result, TrainingResult):
+                    raise TypeError(f"Training function must return TrainingResult, got {type(result).__name__}")
+                
                 wlog.write(f"Training completed successfully\n")
                 return result
                 
@@ -155,20 +161,19 @@ class JobExecutor:
                 # Record failure in database
                 self.client.record_failure(self.job_id, type(e).__name__, str(e), stack)
                 
-                # Return failure result
-                return {
-                    "final_val_acc": None,
-                    "final_train_loss": None,
-                    "num_epochs": 0,
-                    "status": "crash",
-                }
+                # Return failure result as TrainingResult
+                from dr_exp.training.result import create_failure_result
+                return create_failure_result(
+                    error=f"{type(e).__name__}: {str(e)}",
+                    epochs=0
+                )
     
     def _finalize_and_upload(
         self, 
         logger: BaseLogger, 
         work_dir: str, 
         worker_log_path: str, 
-        result: dict, 
+        result: TrainingResult, 
         train_status: str
     ):
         """Finalize logger and upload all artifacts."""
@@ -186,9 +191,9 @@ class JobExecutor:
         # Finalize job with metadata
         final_status = "completed" if train_status == "success" else "failed"
         metadata = {
-            "final_val_acc": result.get("final_val_acc"),
-            "final_train_loss": result.get("final_train_loss"),
-            "num_epochs": result.get("num_epochs"),
+            "final_val_acc": result.final_val_acc,  # Direct access - no .get() silent failures
+            "final_train_loss": result.final_train_loss,
+            "num_epochs": result.num_epochs,
             "train_status": train_status,
             "metrics_storage_path": metrics_upload.get("storage_path"),
             "bundle_storage_path": bundle_upload.get("storage_path"),
@@ -240,7 +245,7 @@ def run_worker(
     work_dir: Optional[str] = None,
     max_claim_attempts: int = 5,
     heartbeat_interval: float = 5.0,
-    trainer_fn: Callable[[Any, BaseLogger], dict] = default_train,
+    trainer_fn: Callable[[Any, BaseLogger], TrainingResult] = default_train,
     logger_cls: type[BaseLogger] = StructuredLogger,
     client: Optional[BaseJobDB] = None,
     worker_id: str = "unassigned_worker",
@@ -265,7 +270,7 @@ def run_worker(
         How many times to poll for a job before giving up.
     heartbeat_interval : float, optional
         Seconds between heartbeat updates.
-    trainer_fn : Callable[[Any, BaseLogger], dict], optional
+    trainer_fn : Callable[[Any, BaseLogger], TrainingResult], optional
         Function implementing the training loop.
     logger_cls : type[BaseLogger], optional
         Logger class to instantiate.

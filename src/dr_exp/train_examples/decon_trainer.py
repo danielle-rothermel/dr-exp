@@ -8,6 +8,7 @@ import deconcnn
 
 from dr_exp.logging.base_logger import BaseLogger
 from dr_exp.logging.structured_logger import StructuredLogger
+from dr_exp.training.result import TrainingResult, create_success_result, create_failure_result
 
 
 def validate_and_extract_decon_config(dr_exp_cfg: Any) -> OmegaConf:
@@ -153,7 +154,7 @@ class DrExpLoggerAdapter:
         self.dr_exp_logger.log(clean_metrics)
 
 
-def train_with_decon(cfg: Any, logger: Optional[BaseLogger] = None) -> Dict[str, Any]:
+def train_with_decon(cfg: Any, logger: Optional[BaseLogger] = None) -> TrainingResult:
     """Training function integrating deconCNN with dr_exp.
     
     Parameters
@@ -165,8 +166,8 @@ def train_with_decon(cfg: Any, logger: Optional[BaseLogger] = None) -> Dict[str,
         
     Returns
     -------
-    Dict[str, Any]
-        Dictionary with required keys: "status", "final_val_acc", "final_train_loss", etc.
+    TrainingResult
+        Structured result with all required training metrics and metadata.
     """
     # 1. Setup logger first - if this fails, we can't log anything
     if logger is None:
@@ -175,17 +176,9 @@ def train_with_decon(cfg: Any, logger: Optional[BaseLogger] = None) -> Dict[str,
             logger = StructuredLogger(log_dir)
         except Exception as e:
             # No logger available, return basic failure info
-            return {
-                "status": "failed",
-                "error": f"Failed to create logger: {str(e)}",
-                "final_val_acc": 0.0,
-                "final_train_loss": float('inf'),
-                "num_epochs": 0,
-                "model_name": "unknown",
-                "metrics_path": "",
-                "artifacts_path": "",
-                "num_checkpoints": 0,
-            }
+            return create_failure_result(
+                error=f"Failed to create logger: {str(e)}"
+            )
     
     # Now we have a guaranteed logger, so we can proceed with training
     try:
@@ -256,18 +249,13 @@ def train_with_decon(cfg: Any, logger: Optional[BaseLogger] = None) -> Dict[str,
         logger_meta = logger.finalize()
         
         # 12. Return standardized results
-        return {
-            "status": "success",
-            "final_val_acc": final_metrics.get("final_val_acc", 0.0),
-            "final_train_loss": final_metrics.get("final_train_loss", 0.0),
-            "final_val_loss": final_metrics.get("final_val_loss", 0.0),
-            "num_epochs": decon_cfg.epochs,
-            "model_name": decon_cfg.model.name,
-            "training_time": training_time,
-            "metrics_path": logger_meta["metrics_path"],
-            "artifacts_path": logger.paths.artifact_dir,
-            "num_checkpoints": logger_meta["num_checkpoints"],
-        }
+        return create_success_result(
+            final_metrics=final_metrics,
+            epochs=decon_cfg.epochs,
+            logger_meta=logger_meta,
+            artifacts_path=logger.paths.artifact_dir,
+            training_time=training_time
+        )
         
     except Exception as e:
         # Handle any errors during training with detailed tracking
@@ -283,17 +271,12 @@ def train_with_decon(cfg: Any, logger: Optional[BaseLogger] = None) -> Dict[str,
         })
         logger_meta = logger.finalize()
         
-        return {
-            "status": "failed",
-            "error": error_msg,
-            "final_val_acc": 0.0,
-            "final_train_loss": float('inf'),
-            "num_epochs": 0,
-            "model_name": "unknown",
-            "metrics_path": logger_meta.get("metrics_path", ""),
-            "artifacts_path": logger.paths.artifact_dir,
-            "num_checkpoints": logger_meta.get("num_checkpoints", 0),
-        }
+        return create_failure_result(
+            error=error_msg,
+            metrics_path=logger_meta.get("metrics_path", ""),
+            artifacts_path=logger.paths.artifact_dir,
+            num_checkpoints=logger_meta.get("num_checkpoints", 0)
+        )
 
 
 # Alias for compatibility with dr_exp's expected interface
