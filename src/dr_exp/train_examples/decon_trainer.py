@@ -75,174 +75,101 @@ def validate_and_extract_decon_config(dr_exp_cfg: Any) -> OmegaConf:
     return decon_cfg
 
 
-def extract_validation_metrics_from_trainer(trainer, logger: BaseLogger) -> Dict[str, float]:
-    """Extract validation metrics from Lightning trainer.
+class DrExpClassificationModule:
+    """Wrapper around deconCNN's ClassificationModule that logs to dr_exp's StructuredLogger."""
     
-    Validation metrics should be reliably available in logged_metrics.
-    
-    Parameters
-    ----------
-    trainer : Lightning trainer
-        Trained Lightning trainer with logged metrics
-    logger : BaseLogger
-        Logger for recording extraction details
-        
-    Returns
-    -------
-    Dict[str, float]
-        Dictionary with validation metrics: final_val_acc, final_val_loss
-        
-    Raises
-    ------
-    ValueError
-        If validation metrics cannot be extracted
-    """
-    # Fail immediately if trainer doesn't have logged metrics
-    if not hasattr(trainer, 'logged_metrics'):
-        raise ValueError("Lightning trainer has no 'logged_metrics' attribute - training may have failed")
-    
-    logged_metrics = trainer.logged_metrics
-    if not logged_metrics:
-        raise ValueError("Lightning trainer.logged_metrics is empty - no metrics were recorded during training")
-    
-    available_keys = list(logged_metrics.keys())
-    
-    # Get validation metrics from logged_metrics (these should be reliably available)
-    val_acc = logged_metrics.get("val_acc") or logged_metrics.get("val_acc_epoch") 
-    val_loss = logged_metrics.get("val_loss") or logged_metrics.get("val_loss_epoch")
-    
-    # Fail if any required validation metric is missing  
-    if val_acc is None:
-        raise ValueError(f"Required metric 'val_acc' not found. Available keys: {available_keys}")
-        
-    if val_loss is None:
-        raise ValueError(f"Required metric 'val_loss' not found. Available keys: {available_keys}")
-    
-    # Convert to float and validate values - fail if invalid
-    try:
-        val_acc_float = float(val_acc) 
-        val_loss_float = float(val_loss)
-    except (ValueError, TypeError) as e:
-        raise ValueError(f"Failed to convert validation metrics to float: {e}")
-    
-    # Check for infinite or NaN values - fail if found
-    if not torch.isfinite(torch.tensor(val_acc_float)):
-        raise ValueError(f"val_acc is not finite: {val_acc_float}")
-    if not torch.isfinite(torch.tensor(val_loss_float)):
-        raise ValueError(f"val_loss is not finite: {val_loss_float}")
-    
-    return {
-        "final_val_acc": val_acc_float,
-        "final_val_loss": val_loss_float
-    }
-
-
-def extract_training_metrics_from_csv(trainer, logger: BaseLogger) -> Dict[str, float]:
-    """Extract training metrics from Lightning's automatically logged CSV file.
-    
-    This is more efficient than recalculating metrics on every batch.
-    Lightning automatically logs training metrics to metrics.csv in real-time.
-    
-    Parameters
-    ----------
-    trainer : Lightning trainer
-        Trained Lightning trainer
-    logger : BaseLogger
-        Logger for recording extraction details
-        
-    Returns
-    -------
-    Dict[str, float]
-        Dictionary with training metrics: final_train_loss, final_train_acc
-        
-    Raises
-    ------
-    ValueError
-        If CSV file cannot be found or training metrics are missing
-    """
-    import pandas as pd
-    import os
-    
-    # Find the Lightning CSV metrics file
-    # Lightning saves to {default_root_dir}/lightning_logs/version_0/metrics.csv
-    if hasattr(trainer, 'log_dir') and trainer.log_dir:
-        csv_path = os.path.join(trainer.log_dir, "metrics.csv")
-    else:
-        # Fallback: check if trainer has default_root_dir
-        if hasattr(trainer, 'default_root_dir') and trainer.default_root_dir:
-            csv_path = os.path.join(trainer.default_root_dir, "lightning_logs", "version_0", "metrics.csv")
-        else:
-            raise ValueError("Cannot determine Lightning CSV metrics file location")
-    
-    if not os.path.exists(csv_path):
-        raise ValueError(f"Lightning metrics CSV file not found at: {csv_path}")
-    
-    try:
-        # Read the CSV file
-        df = pd.read_csv(csv_path)
-        
-        # Filter to rows that have training metrics (train_loss and train_acc are not NaN)
-        train_rows = df.dropna(subset=['train_loss', 'train_acc'])
-        
-        if train_rows.empty:
-            raise ValueError("No training metrics found in Lightning CSV file")
-        
-        # Get the final (last) training metrics
-        final_row = train_rows.iloc[-1]
-        final_train_loss = float(final_row['train_loss'])
-        final_train_acc = float(final_row['train_acc'])
-        
-        # Validate the metrics
-        if not torch.isfinite(torch.tensor(final_train_loss)):
-            raise ValueError(f"final_train_loss is not finite: {final_train_loss}")
-        if not torch.isfinite(torch.tensor(final_train_acc)):
-            raise ValueError(f"final_train_acc is not finite: {final_train_acc}")
-        
-        return {
-            "final_train_loss": final_train_loss,
-            "final_train_acc": final_train_acc
-        }
-        
-    except Exception as e:
-        raise ValueError(f"Failed to extract training metrics from CSV {csv_path}: {str(e)}")
-
-
-class DrExpLoggerAdapter:
-    """Adapter to capture metrics from Lightning training and forward to dr_exp StructuredLogger."""
-    
-    def __init__(self, dr_exp_logger: BaseLogger):
+    def __init__(self, decon_module, dr_exp_logger: BaseLogger):
+        self.decon_module = decon_module
         self.dr_exp_logger = dr_exp_logger
-        self.current_epoch = 0
-        self.epoch_metrics = {}
+        self.final_metrics = {}
+        self.logged_epochs = set()  # Track which epochs we've already logged
         
-    def log_metrics(self, metrics: Dict[str, Any], step: Optional[int] = None):
-        """Log metrics to dr_exp logger."""
-        # Filter out None values and convert tensors to scalars
-        clean_metrics = {}
-        for key, value in metrics.items():
-            if value is not None:
-                if torch.is_tensor(value):
-                    clean_metrics[key] = value.item()
-                else:
-                    clean_metrics[key] = value
+        # Replace the original on_validation_epoch_end method
+        self._wrap_validation_epoch_end()
+    
+    def _wrap_validation_epoch_end(self):
+        """Wrap the validation epoch end to capture and log metrics."""
+        original_method = self.decon_module.on_validation_epoch_end
         
-        # Add step information
-        if step is not None:
-            clean_metrics["step"] = step
+        def wrapped_on_validation_epoch_end():
+            # Call the original method first
+            original_method()
             
-        # Log to dr_exp
-        self.dr_exp_logger.log(clean_metrics)
+            current_epoch = self.decon_module.current_epoch
+            
+            # Get metrics from trainer.logged_metrics
+            if hasattr(self.decon_module.trainer, 'logged_metrics'):
+                logged_metrics = self.decon_module.trainer.logged_metrics
+                
+                if logged_metrics:
+                    # Convert tensor metrics to floats
+                    epoch_metrics = {}
+                    for key, value in logged_metrics.items():
+                        if value is not None:
+                            if torch.is_tensor(value):
+                                epoch_metrics[key] = value.item()
+                            else:
+                                epoch_metrics[key] = float(value)
+                    
+                    # Only log if we have both training and validation metrics (complete epoch)
+                    # OR if this is epoch 0 and we have validation metrics (initial validation)
+                    has_train_metrics = "train_loss" in epoch_metrics and "train_acc" in epoch_metrics
+                    has_val_metrics = "val_loss" in epoch_metrics and "val_acc" in epoch_metrics
+                    
+                    should_log = False
+                    log_reason = ""
+                    
+                    if current_epoch == 0 and has_val_metrics and current_epoch not in self.logged_epochs:
+                        # Log initial validation (epoch 0) once
+                        should_log = True
+                        log_reason = "initial_validation"
+                    elif current_epoch > 0 and has_train_metrics and has_val_metrics and current_epoch not in self.logged_epochs:
+                        # Log complete epochs (with both training and validation)
+                        should_log = True
+                        log_reason = "complete_epoch"
+                    
+                    if should_log:
+                        # Add epoch information and log reason
+                        epoch_metrics["epoch"] = current_epoch
+                        
+                        # Log to dr_exp StructuredLogger
+                        self.dr_exp_logger.log(epoch_metrics)
+                        
+                        # Mark this epoch as logged
+                        self.logged_epochs.add(current_epoch)
+                        
+                        # Store as final metrics (will be overwritten each epoch)
+                        self.final_metrics = {
+                            "final_train_loss": epoch_metrics.get("train_loss"),
+                            "final_train_acc": epoch_metrics.get("train_acc"), 
+                            "final_val_loss": epoch_metrics.get("val_loss"),
+                            "final_val_acc": epoch_metrics.get("val_acc")
+                        }
+        
+        # Replace the method
+        self.decon_module.on_validation_epoch_end = wrapped_on_validation_epoch_end
+    
+    def get_final_metrics(self) -> Dict[str, float]:
+        """Get the final metrics from the last logged epoch."""
+        # Remove None values and ensure all values are floats
+        final_metrics = {}
+        for key, value in self.final_metrics.items():
+            if value is not None:
+                final_metrics[key] = float(value)
+        return final_metrics
 
 
-def train_with_decon(cfg: Any, logger: Optional[BaseLogger] = None) -> TrainingResult:
+def train_with_decon(cfg: Any = None, logger: Optional[BaseLogger] = None, **hydra_overrides) -> TrainingResult:
     """Training function integrating deconCNN with dr_exp.
     
     Parameters
     ----------
-    cfg : Any
-        Training configuration (unwrapped, native format from dr_exp)
+    cfg : Any, optional
+        If provided, will validate as deconCNN config. If None, will load from deconcnn_configs.
     logger : BaseLogger, optional
         dr_exp's StructuredLogger for metrics/checkpoints
+    hydra_overrides : dict
+        Override parameters for Hydra config composition
         
     Returns
     -------
@@ -252,7 +179,9 @@ def train_with_decon(cfg: Any, logger: Optional[BaseLogger] = None) -> TrainingR
     # 1. Setup logger first - if this fails, we can't log anything
     if logger is None:
         try:
-            log_dir = cfg.get("log_dir", "./logs") if isinstance(cfg, dict) else getattr(cfg, "log_dir", "./logs")
+            log_dir = "./logs"
+            if cfg:
+                log_dir = cfg.get("log_dir", "./logs") if isinstance(cfg, dict) else getattr(cfg, "log_dir", "./logs")
             logger = StructuredLogger(log_dir)
         except Exception as e:
             # No logger available, return basic failure info
@@ -263,14 +192,43 @@ def train_with_decon(cfg: Any, logger: Optional[BaseLogger] = None) -> TrainingR
     # Now we have a guaranteed logger, so we can proceed with training
     try:
         
-        # 2. Validate and extract config format
-        decon_cfg = validate_and_extract_decon_config(cfg)
+        # 2. Load config - either from provided cfg or from deconcnn_configs
+        if cfg is not None:
+            # Legacy path: validate provided config
+            decon_cfg = validate_and_extract_decon_config(cfg)
+        else:
+            # New path: load from deconcnn_configs with Hydra
+            from pathlib import Path
+            from hydra import compose, initialize_config_dir
+            from hydra.core.global_hydra import GlobalHydra
+            
+            # Clear any existing Hydra instance
+            GlobalHydra.instance().clear()
+            
+            # Get absolute path to deconcnn_configs
+            config_dir = str(Path("deconcnn_configs").absolute())
+            
+            # Default overrides for fast testing
+            default_overrides = [
+                "epochs=2",
+                "batch_size=32", 
+                "+limit_train_batches=2",
+                "machine=mac",
+                "model=alexnet_cifar",
+                "enable_checkpointing=false"
+            ]
+            
+            # Merge with any provided overrides
+            overrides = list(hydra_overrides.get('overrides', default_overrides))
+            
+            with initialize_config_dir(config_dir=config_dir, version_base=None):
+                decon_cfg = compose(config_name="config", overrides=overrides)
         
         # 3. Create deconCNN training components
         model, data_module, trainer = deconcnn.create_cifar10_training_components(decon_cfg)
         
-        # 4. Setup logging adapter
-        logging_adapter = DrExpLoggerAdapter(logger)
+        # 4. Wrap the Lightning module to log metrics to dr_exp
+        dr_exp_module = DrExpClassificationModule(model, logger)
         
         # 5. Log initial configuration
         logger.log({
@@ -291,15 +249,8 @@ def train_with_decon(cfg: Any, logger: Optional[BaseLogger] = None) -> TrainingR
         
         training_time = time.time() - initial_time
         
-        # 7. Extract final metrics - use Lightning's CSV file for training metrics
-        validation_metrics = extract_validation_metrics_from_trainer(trainer, logger)
-        training_metrics = extract_training_metrics_from_csv(trainer, logger)
-        
-        # Combine training and validation metrics
-        final_metrics = {
-            **training_metrics,
-            **validation_metrics
-        }
+        # 7. Get final metrics from our wrapper
+        final_metrics = dr_exp_module.get_final_metrics()
         
         # 8. Log final summary metrics
         summary_metrics = {
@@ -311,18 +262,10 @@ def train_with_decon(cfg: Any, logger: Optional[BaseLogger] = None) -> TrainingR
         }
         logger.log(summary_metrics)
         
-        # 9. Save model checkpoint if training completed successfully
-        if hasattr(model, 'state_dict'):
-            logger.save_checkpoint({
-                "model_state_dict": model.state_dict(),
-                "config": decon_cfg,
-                "final_metrics": final_metrics
-            }, tag="final_model")
-        
-        # 10. Finalize logger
+        # 9. Finalize logger
         logger_meta = logger.finalize()
         
-        # 11. Return standardized results
+        # 10. Return standardized results
         return create_success_result(
             final_metrics=final_metrics,
             epochs=decon_cfg.epochs,

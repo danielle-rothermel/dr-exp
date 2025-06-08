@@ -1,0 +1,5 @@
+source: timm
+sched_type: cosine_annealing
+lr_min: 0.0
+warmup_epochs: 5
+warmup_start_lr: 0.0
