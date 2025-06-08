@@ -1,49 +1,29 @@
 defaults:
   - _self_
+  - model: alexnet_cifar  # Use component config for AlexNet
+  - optim: adamw         # Use component config for AdamW
+  - machine: mac         # Use component config for local Mac
+  - paths: default       # Use component config for paths
+  - lrsched: cosine      # Use component config for cosine scheduler
+  - train_transforms: minimal  # Use component config for minimal transforms
+  - eval_transforms: minimal   # Use component config for minimal transforms
 
-# Configuration for deconCNN integration testing
-# This config works with the decon_adapter.py module
+# Configuration for deconCNN integration testing with proper Hydra composition
+# This config uses deconCNN's component structure for complete validation
 
 # Project identification
 project_name: "dr_exp_deconCNN_integration"
-experiment_name: "adapter_testing_v1"
+experiment_name: "validation_testing_v1"
 
 # Core training parameters
-epochs: 3
+epochs: 1  # Single epoch for fast testing
 batch_size: 32
 seed: 42
 train: true
 eval: true
 log_every: 10
 
-# Model configuration (smallest model for testing)
-model:
-  source: custom
-  name: alexnet_cifar
-  architecture: CifarAlexNet
-  layers: 8
-  nonlinearity: relu
-  norm_type: batchnorm
-  dropout_prob: 0.5
-  use_residual: false
-  init_method: he
-  num_classes: 10
-
-# Optimizer configuration
-optim:
-  name: adamw
-  lr: 0.01
-  weight_decay: 1e-4
-
-# Learning rate scheduler
-lrsched:
-  source: timm
-  sched_type: cosine_annealing
-  lr_min: 0.0
-  warmup_epochs: 1
-  warmup_start_lr: 0.001
-
-# Data configuration
+# Data configuration - complete as required by deconCNN
 data:
   name: cifar10
   num_workers: 2
@@ -52,42 +32,23 @@ data:
   train_val_split_factor: 0.1
   num_classes: 10
 
-# Transform configurations (minimal for fast testing)
-train_transforms:
-  rcc: false
-  hflip: true
-  randaug: false
-  colorjitter: false
-  mixup: false
-  cutmix: false
-  normalize_mean: [0.4914, 0.4822, 0.4465]
-  normalize_std: [0.2023, 0.1994, 0.2010]
-  label_smoothing: 0.0
-  rcc_scale_min: 1.0
-  rcc_init_size: 32
+# Hydra configuration for path resolution
+hydra:
+  run:
+    dir: ${paths.run_dir}
+  job_logging:
+    formatters:
+      simple:
+        format: "%(asctime)s - %(message)s"
+        datefmt: "%Y-%m-%d %H:%M:%S"
 
-eval_transforms:
-  normalize_mean: [0.4914, 0.4822, 0.4465]
-  normalize_std: [0.2023, 0.1994, 0.2010]
-  rcc: false
-  hflip: false
-  randaug: false
-  colorjitter: false
-  mixup: false
-  cutmix: false
+# Logging and checkpointing
+load_checkpoint: null
+write_checkpoint: true
 
-# Machine configuration
-machine:
-  device: mps
-  root_dir: /Users/daniellerothermel/drotherm
-  num_gpus: 1
-
-# Path configuration
-paths:
-  data: ${machine.root_dir}/data
-  logs: ${machine.root_dir}/logs
-  run_dir: ${paths.logs}/decon_integration_${now:%Y-%m-%d-%H-%M-%S}
-
-# Optional debugging settings
-clip_grad_norm: null
+# Loss and optimization settings
 loss: cross_entropy
+clip_grad_norm: null
+
+# dr_exp specific settings
+proj_dir_name: dr_exp_decon_integration

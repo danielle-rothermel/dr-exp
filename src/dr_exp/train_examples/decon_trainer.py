@@ -10,8 +10,11 @@ from dr_exp.logging.base_logger import BaseLogger
 from dr_exp.logging.structured_logger import StructuredLogger
 
 
-def convert_dr_exp_to_decon_config(dr_exp_cfg: Any) -> OmegaConf:
-    """Convert dr_exp config format to deconCNN's expected OmegaConf structure.
+def validate_and_extract_decon_config(dr_exp_cfg: Any) -> OmegaConf:
+    """Extract and validate deconCNN config from dr_exp wrapper.
+    
+    Uses deconCNN's own validation functions to ensure config correctness.
+    Fails fast if any required deconCNN fields are missing or invalid.
     
     Parameters
     ----------
@@ -21,144 +24,106 @@ def convert_dr_exp_to_decon_config(dr_exp_cfg: Any) -> OmegaConf:
     Returns
     -------
     OmegaConf
-        Configuration in deconCNN's expected format
+        Validated configuration in deconCNN's expected format
+        
+    Raises
+    ------
+    ValueError
+        If any required deconCNN config fields are missing or invalid
     """
-    # Handle both dict and object-style configs
-    if isinstance(dr_exp_cfg, dict):
-        cfg_dict = dr_exp_cfg
+    # Extract from dr_exp wrapper (if wrapped) or use directly
+    if isinstance(dr_exp_cfg, dict) and "config" in dr_exp_cfg:
+        config_dict = dr_exp_cfg["config"]  # Handle wrapped format from dr_exp
     else:
-        # Convert object to dict (handles DictConfig, Namespace, etc.)
-        cfg_dict = OmegaConf.to_container(dr_exp_cfg, resolve=True) if hasattr(dr_exp_cfg, '__dict__') else dr_exp_cfg.__dict__
+        config_dict = dr_exp_cfg  # Handle direct format
     
-    # Extract machine config or create defaults
-    machine_config = cfg_dict.get("machine", {})
-    root_dir = machine_config.get("root_dir", "/tmp/dr_exp_decon")
+    # Convert to OmegaConf for deconCNN compatibility
+    decon_cfg = OmegaConf.create(config_dict)
     
-    # Create proper paths structure expected by deconCNN
-    paths_config = cfg_dict.get("paths", {})
-    if not paths_config:
-        # Create paths structure based on deconCNN expectations
-        data_dir = f"{root_dir}/data"
-        logs_dir = f"{root_dir}/logs"
-        run_dir = f"{logs_dir}/decon_run_{int(time.time())}"
+    # Ensure basic structure exists before detailed validation
+    required_top_level = ["model", "optim", "lrsched", "data", "machine", "paths"]
+    missing_top_level = [f for f in required_top_level if f not in decon_cfg]
+    if missing_top_level:
+        raise ValueError(
+            f"Missing required top-level config sections: {missing_top_level}\n"
+            f"Config must include sections: {required_top_level}\n"
+            f"Use Hydra config composition to provide complete configurations."
+        )
+    
+    # Use deconCNN's own validation functions - these will fail fast with detailed errors
+    try:
+        # Validate model configuration
+        model_dict = OmegaConf.to_container(decon_cfg.model, resolve=True)
+        deconcnn.validate_model_config(model_dict)
         
-        paths_config = {
-            "data": data_dir,
-            "logs": logs_dir,
-            "run_dir": run_dir,
-            "dataset_cache_root": f"{data_dir}/cifar10/",
-            "agg_results": f"{data_dir}/run_results/"
+        # Validate optimizer configuration 
+        optim_dict = OmegaConf.to_container(decon_cfg.optim, resolve=True)
+        deconcnn.validate_optimizer_config(optim_dict)
+        
+        # Validate scheduler configuration
+        lrsched_dict = OmegaConf.to_container(decon_cfg.lrsched, resolve=True)
+        deconcnn.validate_scheduler_config(lrsched_dict)
+        
+        # Validate training configuration (epochs, batch_size, etc.)
+        training_dict = OmegaConf.to_container(decon_cfg, resolve=True)
+        deconcnn.validate_training_config(training_dict)
+        
+    except Exception as e:
+        raise ValueError(f"deconCNN config validation failed: {str(e)}")
+    
+    return decon_cfg
+
+
+def extract_final_metrics_from_trainer(trainer, logger: BaseLogger) -> Dict[str, float]:
+    """Extract final training metrics from Lightning trainer.
+    
+    Parameters
+    ----------
+    trainer : Lightning trainer
+        Trained Lightning trainer with logged metrics
+    logger : BaseLogger
+        Logger for recording any extraction warnings
+        
+    Returns
+    -------
+    Dict[str, float]
+        Dictionary with final metrics: final_train_loss, final_val_acc, final_val_loss
+    """
+    final_metrics = {}
+    
+    # Access Lightning's logged metrics if available
+    if hasattr(trainer, 'logged_metrics'):
+        logged_metrics = trainer.logged_metrics
+        # Extract key metrics with careful handling of tensor/scalar values
+        try:
+            train_loss = logged_metrics.get("train_loss", logged_metrics.get("train_loss_epoch", None))
+            val_acc = logged_metrics.get("val_acc", logged_metrics.get("val_acc_epoch", None))
+            val_loss = logged_metrics.get("val_loss", logged_metrics.get("val_loss_epoch", None))
+            
+            # Convert to float and handle potential None/inf values
+            final_metrics = {
+                "final_train_loss": float(train_loss) if train_loss is not None and torch.isfinite(torch.tensor(train_loss)) else 1.0,
+                "final_val_acc": float(val_acc) if val_acc is not None and torch.isfinite(torch.tensor(val_acc)) else 0.1,
+                "final_val_loss": float(val_loss) if val_loss is not None and torch.isfinite(torch.tensor(val_loss)) else 1.0
+            }
+        except (ValueError, TypeError, ZeroDivisionError) as e:
+            # Handle any conversion errors gracefully
+            logger.log({"metrics_extraction_warning": f"Error extracting metrics: {e}"})
+            final_metrics = {
+                "final_train_loss": 1.0,
+                "final_val_acc": 0.1,
+                "final_val_loss": 1.0
+            }
+    
+    # If no metrics available from trainer, provide reasonable defaults
+    if not final_metrics:
+        final_metrics = {
+            "final_train_loss": 1.0,  # Reasonable default for cross-entropy
+            "final_val_acc": 0.1,     # Conservative default for CIFAR-10
+            "final_val_loss": 1.0
         }
-    else:
-        # Use existing paths config but ensure required fields exist
-        data_dir = paths_config.get("data", f"{root_dir}/data")
-        logs_dir = paths_config.get("logs", f"{root_dir}/logs")
-        run_dir = paths_config.get("run_dir", f"{logs_dir}/decon_run_{int(time.time())}")
-        
-        paths_config.update({
-            "data": data_dir,
-            "logs": logs_dir,
-            "run_dir": run_dir,
-            "dataset_cache_root": paths_config.get("dataset_cache_root", f"{data_dir}/cifar10/"),
-            "agg_results": paths_config.get("agg_results", f"{data_dir}/run_results/")
-        })
     
-    # Create deconCNN config structure
-    decon_config = {
-        # Core training parameters
-        "epochs": cfg_dict.get("epochs", 2),
-        "batch_size": cfg_dict.get("batch_size", 32),
-        "seed": cfg_dict.get("seed", 42),
-        "train": cfg_dict.get("train", True),
-        "eval": cfg_dict.get("eval", True),
-        "log_every": cfg_dict.get("log_every", 10),
-        
-        # Model configuration
-        "model": cfg_dict.get("model", {
-            "name": "alexnet_cifar",
-            "architecture": "CifarAlexNet",
-            "layers": 8,
-            "nonlinearity": "relu",
-            "norm_type": "batchnorm",
-            "dropout_prob": 0.5,
-            "use_residual": False,
-            "init_method": "he",
-            "num_classes": 10
-        }),
-        
-        # Optimizer configuration
-        "optim": cfg_dict.get("optim", {
-            "name": "adamw",
-            "lr": 0.01,
-            "weight_decay": 1e-4
-        }),
-        
-        # Learning rate scheduler
-        "lrsched": cfg_dict.get("lrsched", {
-            "source": "timm",
-            "sched_type": "cosine_annealing",
-            "lr_min": 0.0,
-            "warmup_epochs": 1,
-            "warmup_start_lr": 0.001
-        }),
-        
-        # Data configuration
-        "data": cfg_dict.get("data", {
-            "name": "cifar10",
-            "num_workers": 2,
-            "download": True,
-            "data_split_seed": 42,
-            "train_val_split_factor": 0.1,
-            "num_classes": 10
-        }),
-        
-        # Transform configurations
-        "train_transforms": cfg_dict.get("train_transforms", {
-            "rcc": False,
-            "hflip": True,
-            "randaug": False,
-            "colorjitter": False,
-            "mixup": False,
-            "cutmix": False,
-            "normalize_mean": [0.4914, 0.4822, 0.4465],
-            "normalize_std": [0.2023, 0.1994, 0.2010],
-            "label_smoothing": 0.0,
-            "rcc_scale_min": 1.0,
-            "rcc_init_size": 32
-        }),
-        
-        "eval_transforms": cfg_dict.get("eval_transforms", {
-            "normalize_mean": [0.4914, 0.4822, 0.4465],
-            "normalize_std": [0.2023, 0.1994, 0.2010],
-            "rcc": False,
-            "hflip": False,
-            "randaug": False,
-            "colorjitter": False,
-            "mixup": False,
-            "cutmix": False
-        }),
-        
-        # Machine configuration
-        "machine": {
-            "device": machine_config.get("device", "mps" if torch.backends.mps.is_available() else "cuda" if torch.cuda.is_available() else "cpu"),
-            "root_dir": root_dir,
-            "num_gpus": machine_config.get("num_gpus", 1 if torch.cuda.is_available() else 0)
-        },
-        
-        # Paths configuration - critical for deconCNN
-        "paths": paths_config,
-        
-        # Additional deconCNN specific settings
-        "proj_dir_name": cfg_dict.get("proj_dir_name", "dr_exp_decon_integration"),
-        "load_checkpoint": cfg_dict.get("load_checkpoint", None),
-        "write_checkpoint": cfg_dict.get("write_checkpoint", True),
-        
-        # Loss configuration
-        "loss": cfg_dict.get("loss", "cross_entropy"),
-        "clip_grad_norm": cfg_dict.get("clip_grad_norm", None)
-    }
-    
-    return OmegaConf.create(decon_config)
+    return final_metrics
 
 
 class DrExpLoggerAdapter:
@@ -203,14 +168,30 @@ def train_with_decon(cfg: Any, logger: Optional[BaseLogger] = None) -> Dict[str,
     Dict[str, Any]
         Dictionary with required keys: "status", "final_val_acc", "final_train_loss", etc.
     """
-    try:
-        # 1. Setup logger
-        if logger is None:
+    # 1. Setup logger first - if this fails, we can't log anything
+    if logger is None:
+        try:
             log_dir = cfg.get("log_dir", "./logs") if isinstance(cfg, dict) else getattr(cfg, "log_dir", "./logs")
             logger = StructuredLogger(log_dir)
+        except Exception as e:
+            # No logger available, return basic failure info
+            return {
+                "status": "failed",
+                "error": f"Failed to create logger: {str(e)}",
+                "final_val_acc": 0.0,
+                "final_train_loss": float('inf'),
+                "num_epochs": 0,
+                "model_name": "unknown",
+                "metrics_path": "",
+                "artifacts_path": "",
+                "num_checkpoints": 0,
+            }
+    
+    # Now we have a guaranteed logger, so we can proceed with training
+    try:
         
-        # 2. Convert config format
-        decon_cfg = convert_dr_exp_to_decon_config(cfg)
+        # 2. Validate and extract config format
+        decon_cfg = validate_and_extract_decon_config(cfg)
         
         # 3. Create deconCNN training components
         model, data_module, trainer = deconcnn.create_cifar10_training_components(decon_cfg)
@@ -239,40 +220,7 @@ def train_with_decon(cfg: Any, logger: Optional[BaseLogger] = None) -> Dict[str,
         training_time = time.time() - initial_time
         
         # 7. Extract final metrics from the trained model
-        # Try to get metrics from the model's logged values
-        final_metrics = {}
-        
-        # Access Lightning's logged metrics if available
-        if hasattr(trainer, 'logged_metrics'):
-            logged_metrics = trainer.logged_metrics
-            # Extract key metrics with careful handling of tensor/scalar values
-            try:
-                train_loss = logged_metrics.get("train_loss", logged_metrics.get("train_loss_epoch", None))
-                val_acc = logged_metrics.get("val_acc", logged_metrics.get("val_acc_epoch", None))
-                val_loss = logged_metrics.get("val_loss", logged_metrics.get("val_loss_epoch", None))
-                
-                # Convert to float and handle potential None/inf values
-                final_metrics = {
-                    "final_train_loss": float(train_loss) if train_loss is not None and torch.isfinite(torch.tensor(train_loss)) else 1.0,
-                    "final_val_acc": float(val_acc) if val_acc is not None and torch.isfinite(torch.tensor(val_acc)) else 0.1,
-                    "final_val_loss": float(val_loss) if val_loss is not None and torch.isfinite(torch.tensor(val_loss)) else 1.0
-                }
-            except (ValueError, TypeError, ZeroDivisionError) as e:
-                # Handle any conversion errors gracefully
-                logger.log({"metrics_extraction_warning": f"Error extracting metrics: {e}"})
-                final_metrics = {
-                    "final_train_loss": 1.0,
-                    "final_val_acc": 0.1,
-                    "final_val_loss": 1.0
-                }
-        
-        # If no metrics available from trainer, provide reasonable defaults
-        if not final_metrics:
-            final_metrics = {
-                "final_train_loss": 1.0,  # Reasonable default for cross-entropy
-                "final_val_acc": 0.1,     # Conservative default for CIFAR-10
-                "final_val_loss": 1.0
-            }
+        final_metrics = extract_final_metrics_from_trainer(trainer, logger)
         
         # 8. Log final summary metrics
         summary_metrics = {
@@ -327,37 +275,25 @@ def train_with_decon(cfg: Any, logger: Optional[BaseLogger] = None) -> Dict[str,
         error_msg = f"deconCNN training failed: {str(e)}"
         error_traceback = traceback.format_exc()
         
-        if logger:
-            logger.log({
-                "error": error_msg, 
-                "error_traceback": error_traceback,
-                "status": "failed"
-            })
-            logger_meta = logger.finalize()
-            
-            return {
-                "status": "failed",
-                "error": error_msg,
-                "final_val_acc": 0.0,
-                "final_train_loss": float('inf'),
-                "num_epochs": 0,
-                "model_name": "unknown",
-                "metrics_path": logger_meta.get("metrics_path", ""),
-                "artifacts_path": logger.paths.artifact_dir if hasattr(logger, 'paths') else "",
-                "num_checkpoints": logger_meta.get("num_checkpoints", 0),
-            }
-        else:
-            return {
-                "status": "failed",
-                "error": error_msg,
-                "final_val_acc": 0.0,
-                "final_train_loss": float('inf'),
-                "num_epochs": 0,
-                "model_name": "unknown",
-                "metrics_path": "",
-                "artifacts_path": "",
-                "num_checkpoints": 0,
-            }
+        # Logger is guaranteed to exist at this point
+        logger.log({
+            "error": error_msg, 
+            "error_traceback": error_traceback,
+            "status": "failed"
+        })
+        logger_meta = logger.finalize()
+        
+        return {
+            "status": "failed",
+            "error": error_msg,
+            "final_val_acc": 0.0,
+            "final_train_loss": float('inf'),
+            "num_epochs": 0,
+            "model_name": "unknown",
+            "metrics_path": logger_meta.get("metrics_path", ""),
+            "artifacts_path": logger.paths.artifact_dir,
+            "num_checkpoints": logger_meta.get("num_checkpoints", 0),
+        }
 
 
 # Alias for compatibility with dr_exp's expected interface
