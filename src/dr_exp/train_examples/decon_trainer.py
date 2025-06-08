@@ -137,65 +137,74 @@ def extract_validation_metrics_from_trainer(trainer, logger: BaseLogger) -> Dict
     }
 
 
-class DrExpMetricsTracker:
-    """Custom Lightning module wrapper that ensures training metrics are properly tracked."""
+def extract_training_metrics_from_csv(trainer, logger: BaseLogger) -> Dict[str, float]:
+    """Extract training metrics from Lightning's automatically logged CSV file.
     
-    def __init__(self, lightning_module):
-        self.lightning_module = lightning_module
-        self.training_losses = []
-        self.training_accs = []
-        self.final_training_metrics = {}
-        
-        # Hook into the training step
-        self._wrap_training_step()
+    This is more efficient than recalculating metrics on every batch.
+    Lightning automatically logs training metrics to metrics.csv in real-time.
     
-    def _wrap_training_step(self):
-        """Wrap the training step to capture metrics directly."""
-        original_training_step = self.lightning_module.training_step
+    Parameters
+    ----------
+    trainer : Lightning trainer
+        Trained Lightning trainer
+    logger : BaseLogger
+        Logger for recording extraction details
         
-        def wrapped_training_step(batch, batch_idx):
-            # Call original training step
-            result = original_training_step(batch, batch_idx)
-            
-            # Extract loss from result or calculate it
-            if isinstance(result, dict) and 'loss' in result:
-                loss = result['loss']
-            else:
-                loss = result  # Assume result is the loss tensor
-            
-            # Calculate accuracy manually from the batch
-            x, y = batch
-            with torch.no_grad():
-                logits = self.lightning_module.model(x)
-                preds = torch.argmax(logits, dim=1)
-                acc = torch.sum(preds == y).float() / len(y)
-            
-            # Store metrics for epoch-end calculation
-            self.training_losses.append(loss.detach())
-            self.training_accs.append(acc.detach())
-            
-            return result
+    Returns
+    -------
+    Dict[str, float]
+        Dictionary with training metrics: final_train_loss, final_train_acc
         
-        self.lightning_module.training_step = wrapped_training_step
+    Raises
+    ------
+    ValueError
+        If CSV file cannot be found or training metrics are missing
+    """
+    import pandas as pd
+    import os
     
-    def on_train_epoch_end(self):
-        """Calculate final training metrics for the epoch."""
-        if self.training_losses:
-            final_train_loss = torch.stack(self.training_losses).mean().item()
-            final_train_acc = torch.stack(self.training_accs).mean().item()
-            
-            self.final_training_metrics = {
-                'final_train_loss': final_train_loss,
-                'final_train_acc': final_train_acc
-            }
-            
-            # Clear for next epoch
-            self.training_losses.clear()
-            self.training_accs.clear()
+    # Find the Lightning CSV metrics file
+    # Lightning saves to {default_root_dir}/lightning_logs/version_0/metrics.csv
+    if hasattr(trainer, 'log_dir') and trainer.log_dir:
+        csv_path = os.path.join(trainer.log_dir, "metrics.csv")
+    else:
+        # Fallback: check if trainer has default_root_dir
+        if hasattr(trainer, 'default_root_dir') and trainer.default_root_dir:
+            csv_path = os.path.join(trainer.default_root_dir, "lightning_logs", "version_0", "metrics.csv")
+        else:
+            raise ValueError("Cannot determine Lightning CSV metrics file location")
+    
+    if not os.path.exists(csv_path):
+        raise ValueError(f"Lightning metrics CSV file not found at: {csv_path}")
+    
+    try:
+        # Read the CSV file
+        df = pd.read_csv(csv_path)
         
-    def get_final_training_metrics(self):
-        """Get the final training metrics calculated manually."""
-        return self.final_training_metrics
+        # Filter to rows that have training metrics (train_loss and train_acc are not NaN)
+        train_rows = df.dropna(subset=['train_loss', 'train_acc'])
+        
+        if train_rows.empty:
+            raise ValueError("No training metrics found in Lightning CSV file")
+        
+        # Get the final (last) training metrics
+        final_row = train_rows.iloc[-1]
+        final_train_loss = float(final_row['train_loss'])
+        final_train_acc = float(final_row['train_acc'])
+        
+        # Validate the metrics
+        if not torch.isfinite(torch.tensor(final_train_loss)):
+            raise ValueError(f"final_train_loss is not finite: {final_train_loss}")
+        if not torch.isfinite(torch.tensor(final_train_acc)):
+            raise ValueError(f"final_train_acc is not finite: {final_train_acc}")
+        
+        return {
+            "final_train_loss": final_train_loss,
+            "final_train_acc": final_train_acc
+        }
+        
+    except Exception as e:
+        raise ValueError(f"Failed to extract training metrics from CSV {csv_path}: {str(e)}")
 
 
 class DrExpLoggerAdapter:
@@ -260,10 +269,7 @@ def train_with_decon(cfg: Any, logger: Optional[BaseLogger] = None) -> TrainingR
         # 3. Create deconCNN training components
         model, data_module, trainer = deconcnn.create_cifar10_training_components(decon_cfg)
         
-        # 4. Setup custom metrics tracker to ensure training metrics are captured
-        metrics_tracker = DrExpMetricsTracker(model)
-        
-        # 5. Setup logging adapter
+        # 4. Setup logging adapter
         logging_adapter = DrExpLoggerAdapter(logger)
         
         # 5. Log initial configuration
@@ -283,14 +289,11 @@ def train_with_decon(cfg: Any, logger: Optional[BaseLogger] = None) -> TrainingR
         # Train the model using deconCNN's training function
         deconcnn.train_model(trainer, model, data_module, decon_cfg)
         
-        # Finalize metrics tracking
-        metrics_tracker.on_train_epoch_end()
-        
         training_time = time.time() - initial_time
         
-        # 7. Extract final metrics - use our custom tracker for training metrics
+        # 7. Extract final metrics - use Lightning's CSV file for training metrics
         validation_metrics = extract_validation_metrics_from_trainer(trainer, logger)
-        training_metrics = metrics_tracker.get_final_training_metrics()
+        training_metrics = extract_training_metrics_from_csv(trainer, logger)
         
         # Combine training and validation metrics
         final_metrics = {
