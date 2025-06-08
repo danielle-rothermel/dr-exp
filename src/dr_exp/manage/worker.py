@@ -323,7 +323,7 @@ def _claim_job(
         try:
             client.update_job(target_job_id, {
                 "status": "running",
-                "worker_id": worker_id,
+                "assigned_worker": worker_id,
                 "claimed_at": datetime.now(UTC).isoformat() + "Z"
             })
             # Return the updated job details
