@@ -316,22 +316,10 @@ def train_with_decon(cfg: Any, logger: Optional[BaseLogger] = None) -> TrainingR
                 "final_metrics": final_metrics
             }, tag="final_model")
         
-        # 10. Create artifact summary
-        artifact_path = os.path.join(logger.paths.artifact_dir, "training_summary.txt")
-        with open(artifact_path, "w") as f:
-            f.write(f"deconCNN Training Summary\n")
-            f.write(f"========================\n")
-            f.write(f"Model: {decon_cfg.model.name}\n")
-            f.write(f"Epochs: {decon_cfg.epochs}\n")
-            f.write(f"Final Val Accuracy: {final_metrics.get('final_val_acc', 'N/A'):.4f}\n")
-            f.write(f"Final Train Loss: {final_metrics.get('final_train_loss', 'N/A'):.4f}\n")
-            f.write(f"Training Time: {training_time:.2f}s\n")
-        logger.log_artifact(artifact_path)
-        
-        # 11. Finalize logger
+        # 10. Finalize logger
         logger_meta = logger.finalize()
         
-        # 12. Return standardized results
+        # 11. Return standardized results
         return create_success_result(
             final_metrics=final_metrics,
             epochs=decon_cfg.epochs,
