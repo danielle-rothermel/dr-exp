@@ -38,3 +38,6 @@ dev = [
 
 [tool.uv.sources]
 deconcnn = { git = "https://github.com/drothermel/deconCNN" }
+
+[tool.ruff]
+include = ["src/**/*.py", "scripts/**/*.py", "tests/**/*.py"]

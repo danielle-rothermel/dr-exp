@@ -1,67 +1,15 @@
-# CLAUDE.md
-
-This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
-
-## Project Overview
-
 `dr_exp` is a distributed experiment management system for deep learning research. It coordinates job execution across GPU clusters using a priority-based queue system with real-time monitoring.
-
-## Development Commands
 
 ### Environment Setup
 ```bash
-# Python dependencies
 uv sync
-
-# Frontend dependencies  
-cd react-babysitter-ui && npm install
-
-# Local database (recommended for development)
-supabase start
 export EXPMGR_MODE=supabase_local
 ```
-
-### Running Services
-```bash
-# Backend API
-uv run uvicorn dr_exp.api.main:app --reload
-
-# Frontend
-cd react-babysitter-ui && npm run dev
-
-# Job management via CLI
-uv run python scripts/manager_cli.py job upload-configs --sweep "model=resnet,vit"
-uv run python scripts/manager_cli.py system run --gpus-per-node 2
-```
-
-### Testing & Quality
-```bash
-# Run tests with coverage
-uv run pytest --cov=dr_exp --cov-report=term-missing
-
-# Fast tests only
-uv run pytest -m "fast"
-
-# Skip Supabase-dependent tests
-uv run pytest -m "not supabase"
-
-# Linting
-cd react-babysitter-ui && npm run lint
-uv run ruff check src/ tests/
-```
-
-## Core Architecture
 
 ### Three-Mode System
 1. **`EXPMGR_MODE=files_local`**: JSON files, no dependencies
 2. **`EXPMGR_MODE=supabase_local`**: Local PostgreSQL via Docker
 3. **`EXPMGR_MODE=supabase_remote`**: Cloud PostgreSQL for production
-
-### Abstract Interface Pattern
-The system uses `BaseJobDB` abstract interface to eliminate mixed responsibilities:
-- `Manager` coordinates workers using only abstract methods
-- `LocalJobDB` and `SupabaseJobDB` implement the same interface
-- Factory pattern ensures consistent system configuration
 
 ### Component Structure
 - **`src/dr_exp/job_db/`**: Database abstraction layer
@@ -81,16 +29,8 @@ The system uses `BaseJobDB` abstract interface to eliminate mixed responsibiliti
 
 ## Key Development Patterns
 
-### Configuration Management
-- Uses Hydra for complex config composition
-- Supports hyperparameter sweeps via `--sweep` flag
-- Environment-aware configuration in `src/dr_exp/job_db/config.py`
-
-### Testing Strategy
+- Uses Hydra for complex config composition: supports hyperparameter sweeps via `--sweep` flag
 - 172+ tests with pytest markers: `supabase`, `slow`, `fast`, `integration`, `unit`
-- Event-driven testing using threading events for coordination
-- Mock fixtures with enhanced time mocking
-- Isolated test databases for parallel execution
 
 ### Database Operations
 Always use abstract interface methods in business logic:
@@ -107,12 +47,6 @@ Commands follow command pattern in `src/dr_exp/cli/commands/`:
 - Inherit from `BaseCommand`
 - Grouped by function: `job`, `system`, `admin`
 - Use `scripts/manager_cli.py` as entry point
-
-### Error Handling
-- Comprehensive logging with structured output
-- Graceful degradation for worker failures
-- Automatic job heartbeat monitoring
-- Stack trace preservation in error logging
 
 ## Integration Points
 
@@ -224,13 +158,7 @@ def train(config: TrainingConfig) -> TrainingResult:
 - Make required fields fail immediately if missing
 - Document and enforce exact contracts between components
 
-## deconCNN Integration Status
-
-**✅ COMPLETE**: Core integration between deconCNN and dr_exp is working
-- Training function: `src/dr_exp/train_examples/decon_trainer.py`
-- Type system: `src/dr_exp/training/result.py` with strict `TrainingResult` enforcement
-- Config system: Proper Hydra composition with deconCNN validation
-- Worker: `scripts/run_decon_worker.py` with type enforcement
+## deconCNN Integration
 
 **Usage:**
 ```bash
