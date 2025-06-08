@@ -120,11 +120,22 @@ class JobExecutor:
         try:
             # Execute training
             result = self._execute_training(cfg, logger, worker_log_path)
-            
+
             # Determine train_status based on result status and error
             if result.status == "success":
                 train_status = "success"
-            elif result.error and any(exc in result.error for exc in ["Exception", "Error", "RuntimeError", "ValueError", "MemoryError", "OSError", "IOError"]):
+            elif result.error and any(
+                exc in result.error
+                for exc in [
+                    "Exception",
+                    "Error",
+                    "RuntimeError",
+                    "ValueError",
+                    "MemoryError",
+                    "OSError",
+                    "IOError",
+                ]
+            ):
                 train_status = "crash"  # Training function crashed with exception
             else:
                 train_status = "failed"  # Training function returned failure status
@@ -216,12 +227,16 @@ class JobExecutor:
             "final_train_loss": result.final_train_loss,
             "num_epochs": result.num_epochs,
             "train_status": train_status,
-            "metrics_storage_path": metrics_upload["storage_path"] if metrics_upload["success"] else None,
-            "bundle_storage_path": bundle_upload["storage_path"] if bundle_upload["success"] else None,
+            "metrics_storage_path": metrics_upload["storage_path"]
+            if metrics_upload["success"]
+            else None,
+            "bundle_storage_path": bundle_upload["storage_path"]
+            if bundle_upload["success"]
+            else None,
             "upload_complete_at": datetime.now(UTC).isoformat() + "Z",
             "finalize_success": logger_meta["finalize_success"],
         }
-        
+
         # Add error details for failed jobs - single source of truth for failure recording
         if final_status == "failed" and result.error:
             metadata["error_message"] = result.error

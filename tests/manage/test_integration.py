@@ -84,11 +84,15 @@ def event_driven_mock_train(completion_events=None, execution_order=None, result
 
         # Return configured result
         default_result = create_success_result(
-            final_metrics={"final_val_acc": 0.95, "final_train_loss": 0.1, "final_val_loss": 0.15},
+            final_metrics={
+                "final_val_acc": 0.95,
+                "final_train_loss": 0.1,
+                "final_val_loss": 0.15,
+            },
             epochs=1,
             logger_meta={"metrics_path": "test_metrics.jsonl", "num_checkpoints": 0},
             artifacts_path=logger.paths.artifact_dir,
-            training_time=0.1
+            training_time=0.1,
         )
         return results.get(job_key, default_result)
 
@@ -123,11 +127,18 @@ class TestManagerWorkerIntegration:
             """Mock training function that simulates work."""
             logger.log({"test_metric": 0.95})
             return create_success_result(
-                final_metrics={"final_val_acc": 0.95, "final_train_loss": 0.1, "final_val_loss": 0.15},
+                final_metrics={
+                    "final_val_acc": 0.95,
+                    "final_train_loss": 0.1,
+                    "final_val_loss": 0.15,
+                },
                 epochs=1,
-                logger_meta={"metrics_path": "test_metrics.jsonl", "num_checkpoints": 0},
+                logger_meta={
+                    "metrics_path": "test_metrics.jsonl",
+                    "num_checkpoints": 0,
+                },
                 artifacts_path=logger.paths.artifact_dir,
-                training_time=0.1
+                training_time=0.1,
             )
 
         # Run worker to process jobs
@@ -288,11 +299,18 @@ class TestManagerWorkerIntegration:
             priority_level = config.get("priority_test")
             execution_order.append(priority_level)
             return create_success_result(
-                final_metrics={"final_val_acc": 0.95, "final_train_loss": 0.1, "final_val_loss": 0.15},
+                final_metrics={
+                    "final_val_acc": 0.95,
+                    "final_train_loss": 0.1,
+                    "final_val_loss": 0.15,
+                },
                 epochs=1,
-                logger_meta={"metrics_path": "test_metrics.jsonl", "num_checkpoints": 0},
+                logger_meta={
+                    "metrics_path": "test_metrics.jsonl",
+                    "num_checkpoints": 0,
+                },
                 artifacts_path=logger.paths.artifact_dir,
-                training_time=0.1
+                training_time=0.1,
             )
 
         # Use run_worker with custom trainer_fn to bypass the default_train import issue
@@ -334,11 +352,18 @@ class TestManagerWorkerIntegration:
             # Wait for test to verify heartbeats before completing
             training_can_complete.wait(timeout=5)
             return create_success_result(
-                final_metrics={"final_val_acc": 0.95, "final_train_loss": 0.1, "final_val_loss": 0.15},
+                final_metrics={
+                    "final_val_acc": 0.95,
+                    "final_train_loss": 0.1,
+                    "final_val_loss": 0.15,
+                },
                 epochs=1,
-                logger_meta={"metrics_path": "test_metrics.jsonl", "num_checkpoints": 0},
+                logger_meta={
+                    "metrics_path": "test_metrics.jsonl",
+                    "num_checkpoints": 0,
+                },
                 artifacts_path=logger.paths.artifact_dir,
-                training_time=0.1
+                training_time=0.1,
             )
 
         # Monitor heartbeat updates
@@ -486,11 +511,18 @@ class TestFactoryIntegration:
 
         def mock_train(config, logger, *args, **kwargs):
             return create_success_result(
-                final_metrics={"final_val_acc": 0.95, "final_train_loss": 0.1, "final_val_loss": 0.15},
+                final_metrics={
+                    "final_val_acc": 0.95,
+                    "final_train_loss": 0.1,
+                    "final_val_loss": 0.15,
+                },
                 epochs=1,
-                logger_meta={"metrics_path": "test_metrics.jsonl", "num_checkpoints": 0},
+                logger_meta={
+                    "metrics_path": "test_metrics.jsonl",
+                    "num_checkpoints": 0,
+                },
                 artifacts_path=logger.paths.artifact_dir,
-                training_time=0.1
+                training_time=0.1,
             )
 
         # Use direct trainer_fn to bypass import issues
@@ -561,11 +593,18 @@ class TestFullSystemIntegration:
             )
 
             return create_success_result(
-                final_metrics={"final_val_acc": final_accuracy, "final_train_loss": 0.1, "final_val_loss": 0.15},
+                final_metrics={
+                    "final_val_acc": final_accuracy,
+                    "final_train_loss": 0.1,
+                    "final_val_loss": 0.15,
+                },
                 epochs=1,
-                logger_meta={"metrics_path": "test_metrics.jsonl", "num_checkpoints": 0},
+                logger_meta={
+                    "metrics_path": "test_metrics.jsonl",
+                    "num_checkpoints": 0,
+                },
                 artifacts_path=logger.paths.artifact_dir,
-                training_time=0.1
+                training_time=0.1,
             )
 
         # Use direct trainer_fn to bypass import issues
@@ -628,11 +667,18 @@ class TestFullSystemIntegration:
             else:
                 logger.log({"recovery_metric": 0.85})
                 return create_success_result(
-                    final_metrics={"final_val_acc": 0.85, "final_train_loss": 0.1, "final_val_loss": 0.15},
+                    final_metrics={
+                        "final_val_acc": 0.85,
+                        "final_train_loss": 0.1,
+                        "final_val_loss": 0.15,
+                    },
                     epochs=1,
-                    logger_meta={"metrics_path": "test_metrics.jsonl", "num_checkpoints": 0},
+                    logger_meta={
+                        "metrics_path": "test_metrics.jsonl",
+                        "num_checkpoints": 0,
+                    },
                     artifacts_path=logger.paths.artifact_dir,
-                    training_time=0.1
+                    training_time=0.1,
                 )
 
         # Use direct trainer_fn to bypass import issues
