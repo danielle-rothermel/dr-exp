@@ -208,9 +208,10 @@ def train_with_decon(cfg: Dict[str, Any], logger: Optional[BaseLogger] = None) -
         dr_exp_module = DrExpClassificationModule(model, logger)
         
         # 5. Log initial configuration
+        model_name = getattr(decon_cfg.model, 'name', None) or getattr(decon_cfg.model, 'architecture', 'unknown')
         logger.log({
             "config_summary": {
-                "model_name": decon_cfg.model.name,
+                "model_name": model_name,
                 "epochs": decon_cfg.epochs,
                 "batch_size": decon_cfg.batch_size,
                 "learning_rate": decon_cfg.optim.lr,
