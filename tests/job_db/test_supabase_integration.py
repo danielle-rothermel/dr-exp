@@ -8,7 +8,6 @@ Run with: EXPMGR_MODE=supabase_local pytest tests/job_db/test_supabase_integrati
 
 import os
 import pytest
-from unittest.mock import patch
 from datetime import datetime, timezone, timedelta
 
 from dr_exp.job_db import SupabaseJobDB, JobDBConfig, StaleJobInfo

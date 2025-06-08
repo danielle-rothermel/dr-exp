@@ -1,6 +1,5 @@
 """Tests for job management endpoints."""
 
-import pytest
 from .conftest import create_test_job, create_test_metrics, Priority, JobStatus
 
 
@@ -68,7 +67,7 @@ def test_job_status_filtering(client, db_client):
     """Test filtering jobs by status."""
     queued_job = create_test_job(db_client, status=JobStatus.QUEUED)
     running_job = create_test_job(db_client, status=JobStatus.RUNNING)
-    completed_job = create_test_job(db_client, status=JobStatus.COMPLETED)
+    _completed_job = create_test_job(db_client, status=JobStatus.COMPLETED)
 
     # Test filtering by queued status
     resp = client.get("/jobs?job_status=queued")
@@ -89,9 +88,9 @@ def test_job_status_filtering(client, db_client):
 
 def test_priority_filtering(client, db_client):
     """Test filtering jobs by priority range."""
-    low_job = create_test_job(db_client, priority=Priority.LOW)
-    normal_job = create_test_job(db_client, priority=Priority.NORMAL)
-    high_job = create_test_job(db_client, priority=Priority.HIGH)
+    _low_job = create_test_job(db_client, priority=Priority.LOW)
+    _normal_job = create_test_job(db_client, priority=Priority.NORMAL)
+    _high_job = create_test_job(db_client, priority=Priority.HIGH)
 
     # Test minimum priority filter
     resp = client.get(f"/jobs?priority_min={Priority.NORMAL}")
@@ -123,9 +122,9 @@ def test_priority_filtering(client, db_client):
 def test_job_sorting(client, db_client):
     """Test sorting jobs by different fields."""
     # Create jobs with different priorities and times
-    job1 = create_test_job(db_client, priority=Priority.HIGH, sweep_config_id="job1") 
-    job2 = create_test_job(db_client, priority=Priority.LOW, sweep_config_id="job2")
-    job3 = create_test_job(db_client, priority=Priority.NORMAL, sweep_config_id="job3")
+    _job1 = create_test_job(db_client, priority=Priority.HIGH, sweep_config_id="job1") 
+    _job2 = create_test_job(db_client, priority=Priority.LOW, sweep_config_id="job2")
+    _job3 = create_test_job(db_client, priority=Priority.NORMAL, sweep_config_id="job3")
 
     # Test sorting by priority (ascending)
     resp = client.get("/jobs?sort_by=priority&sort_order=asc")

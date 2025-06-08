@@ -3,7 +3,6 @@
 
 import argparse
 import sys
-from typing import List, Optional
 
 from dr_exp.utils.factory import create_system, SystemConfig
 from dr_exp.utils.gpu_discovery import discover_gpus

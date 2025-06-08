@@ -1,6 +1,5 @@
 from __future__ import annotations
 
-import asyncio
 import json
 import logging
 import os
@@ -13,14 +12,13 @@ from enum import Enum
 from dotenv import load_dotenv
 
 from cachetools import LRUCache
-from fastapi import Depends, FastAPI, Header, HTTPException, status, Security, WebSocket, WebSocketDisconnect, APIRouter
+from fastapi import Depends, FastAPI, HTTPException, status, Security, WebSocket, WebSocketDisconnect
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
 
 from dr_exp.api.models import (
     BoostPriorityRequest,
     ConfigResponse,
-    ErrorResponse,
     HealthResponse,
     JobModel,
     KillRequest,
@@ -602,9 +600,6 @@ def create_app(base_path: str = ".") -> FastAPI:
     app.state.loader = loader
     app.state.manager = manager
 
-    # Create API version routers
-    v1_router = APIRouter(prefix="/api/v1", tags=["v1"])
-    
     # Add API info endpoint
     @app.get("/api", tags=["api-info"])
     async def api_info():

@@ -1,6 +1,5 @@
 """Tests for test isolation and consistency."""
 
-import pytest
 import tempfile
 from pathlib import Path
 from .conftest import create_test_job, JobStatus
@@ -168,7 +167,7 @@ def test_fixture_consistency(client, db_client, admin_headers, reader_headers):
 
 def test_test_data_consistency():
     """Test that test data generation is consistent and predictable."""
-    from .conftest import Priority, JobStatus
+    from .conftest import Priority
     
     # Test that constants are well-defined
     assert Priority.LOW < Priority.NORMAL < Priority.HIGH < Priority.URGENT

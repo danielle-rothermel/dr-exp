@@ -34,7 +34,7 @@ def start_supabase():
     print("🚀 Starting Supabase...")
     try:
         # Start Supabase in the background
-        process = subprocess.Popen(
+        subprocess.Popen(
             ["supabase", "start"],
             stdout=subprocess.PIPE,
             stderr=subprocess.PIPE,

@@ -1,9 +1,7 @@
 """Tests for the factory and configuration."""
 
-import os
-import tempfile
 import pytest
-from unittest.mock import Mock, patch
+from unittest.mock import patch
 
 from dr_exp.utils.factory import (
     SystemConfig, 
@@ -223,7 +221,7 @@ class TestFactory:
         # Add some jobs
         job1 = factory.job_db.add_job({"test": 1}, "sweep1", status="queued", priority=800)
         job2 = factory.job_db.add_job({"test": 2}, "sweep2", status="queued", priority=500)
-        job3 = factory.job_db.add_job({"test": 3}, "sweep3", status="running")
+        _job3 = factory.job_db.add_job({"test": 3}, "sweep3", status="running")
         
         status = factory.get_system_status()
         
@@ -264,7 +262,7 @@ class TestCreateStreamlinedSystem:
         system = create_system(temp_config)
         
         # Add a job
-        job = system.job_db.add_job({"epochs": 5}, "test_sweep", status="queued")
+        _job = system.job_db.add_job({"epochs": 5}, "test_sweep", status="queued")
         
         # Get status
         status = system.get_system_status()

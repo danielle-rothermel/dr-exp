@@ -1,6 +1,5 @@
 """Tests for job listing pagination and filtering."""
 
-import pytest
 from .conftest import create_test_job, Priority, JobStatus
 
 
@@ -91,11 +90,11 @@ def test_pagination_edge_cases(client, db_client):
 def test_pagination_with_filtering(client, db_client):
     """Test pagination combined with filtering."""
     # Create jobs with different statuses
-    queued_jobs = [
+    _queued_jobs = [
         create_test_job(db_client, status=JobStatus.QUEUED, sweep_config_id=f"queued{i}")
         for i in range(15)
     ]
-    running_jobs = [
+    _running_jobs = [
         create_test_job(db_client, status=JobStatus.RUNNING, sweep_config_id=f"running{i}")
         for i in range(10)
     ]

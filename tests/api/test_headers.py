@@ -1,7 +1,6 @@
 """Tests for HTTP response headers and security features."""
 
-import pytest
-from .conftest import create_test_job, Priority, JobStatus
+from .conftest import create_test_job, JobStatus
 
 
 def test_security_headers_present(client):

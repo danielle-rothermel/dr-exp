@@ -5,7 +5,7 @@ import os
 import signal
 import time
 from datetime import datetime, timedelta, UTC
-from typing import Dict, List, Optional
+from typing import List, Optional
 
 from dr_exp.utils.jobdb_factory import get_job_db_client
 from dr_exp.job_db.base_job_db import BaseJobDB

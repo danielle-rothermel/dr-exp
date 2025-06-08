@@ -1,5 +1,4 @@
 import os
-import pytest
 from unittest.mock import patch
 from scripts.reset_local_jobdb import reset_job_db
 from dr_exp.job_db import JobDBConfig

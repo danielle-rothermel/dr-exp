@@ -1,11 +1,9 @@
 """Tests for the worker implementation."""
 
 import os
-import tempfile
 import zipfile
 import pytest
 from unittest.mock import Mock, patch
-from datetime import datetime, UTC
 
 from dr_exp.job_db import LocalJobDB, JobDBConfig
 from dr_exp.manage.worker import (

@@ -149,7 +149,7 @@ class JobExecutor:
                 if not isinstance(result, TrainingResult):
                     raise TypeError(f"Training function must return TrainingResult, got {type(result).__name__}")
                 
-                wlog.write(f"Training completed successfully\n")
+                wlog.write("Training completed successfully\n")
                 return result
                 
             except Exception as e:

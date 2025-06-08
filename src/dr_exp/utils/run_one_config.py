@@ -3,7 +3,7 @@
 from typing import Dict, Any, List
 from pathlib import Path
 
-from dr_exp.utils.config_upload import generate_configs, parse_sweep, config_hash
+from dr_exp.utils.config_upload import generate_configs, config_hash
 from dr_exp.job_db.base_job_db import BaseJobDB
 
 

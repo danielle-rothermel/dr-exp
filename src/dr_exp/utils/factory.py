@@ -3,7 +3,6 @@
 import os
 from typing import Optional, List
 from dotenv import load_dotenv
-from pathlib import Path
 
 from dr_exp.job_db import BaseJobDB, JobDBConfig
 from dr_exp.manage.manager import Manager

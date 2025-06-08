@@ -1,6 +1,5 @@
 """Tests for API monitoring and system endpoints."""
 
-import pytest
 from .conftest import create_test_job, JobStatus
 
 
@@ -83,9 +82,9 @@ def test_metrics_endpoint_basic(client):
 def test_metrics_endpoint_job_counts(client, db_client):
     """Test that metrics endpoint returns accurate job counts."""
     # Start with clean state and create specific jobs
-    queued_jobs = [create_test_job(db_client, status=JobStatus.QUEUED) for _ in range(3)]
-    running_jobs = [create_test_job(db_client, status=JobStatus.RUNNING) for _ in range(2)]
-    completed_jobs = [create_test_job(db_client, status=JobStatus.COMPLETED) for _ in range(1)]
+    _queued_jobs = [create_test_job(db_client, status=JobStatus.QUEUED) for _ in range(3)]
+    _running_jobs = [create_test_job(db_client, status=JobStatus.RUNNING) for _ in range(2)]
+    _completed_jobs = [create_test_job(db_client, status=JobStatus.COMPLETED) for _ in range(1)]
     
     resp = client.get("/metrics")
     assert resp.status_code == 200
@@ -228,7 +227,6 @@ def test_metrics_endpoint_active_connections(client):
 def test_concurrent_health_checks(client):
     """Test multiple concurrent health check requests."""
     import threading
-    import time
     
     results = []
     errors = []

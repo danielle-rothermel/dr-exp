@@ -1,9 +1,6 @@
 """Tests for streamlined scripts - focused on import and basic functionality."""
 
-import pytest
-import sys
-from unittest.mock import Mock, patch, MagicMock
-from io import StringIO
+from unittest.mock import patch
 
 # Basic import and functionality tests since full script testing is complex
 

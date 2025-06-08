@@ -5,7 +5,6 @@ import pytest
 import tempfile
 import shutil
 import threading
-import time
 from pathlib import Path
 from datetime import datetime, UTC, timedelta
 from contextlib import contextmanager
@@ -217,7 +216,6 @@ def isolated_job_db(tmp_path):
         def reset_state(self):
             """Reset database to clean state."""
             # Clear all jobs by removing both job_data and storage directories
-            import shutil
             
             # Remove job_data directory (where job records are stored)
             job_data_dir = Path(self.config.base_path) / "job_data"

@@ -1,7 +1,6 @@
 """Input validation utilities for CLI commands."""
 
-import re
-from typing import List, Any
+from typing import List
 from pathlib import Path
 
 from dr_exp.utils.cli_config import CLI_DEFAULTS

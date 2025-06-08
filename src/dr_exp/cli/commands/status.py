@@ -41,7 +41,7 @@ class StatusCommand(BaseCommand):
         
         # Environment
         env = status['environment']
-        print(f"\n=== Environment ===")
+        print("\n=== Environment ===")
         print(f"Scheduler: {env['scheduler']}")
         if env['job_id']:
             print(f"Job ID: {env['job_id']}")
@@ -52,20 +52,20 @@ class StatusCommand(BaseCommand):
         
         # Job status
         job_status = status['job_status']
-        print(f"\n=== Job Status ===")
+        print("\n=== Job Status ===")
         print(f"Running jobs: {job_status['running_jobs']}")
         print(f"Queued jobs: {'Yes' if job_status['has_queued_jobs'] else 'No'}")
         print(f"Stale jobs: {job_status['stale_jobs']}")
         
         # Queue preview
         if status['queue_preview']:
-            print(f"\n=== Top Queued Jobs ===")
+            print("\n=== Top Queued Jobs ===")
             for job in status['queue_preview']:
                 print(f"  {job['id']}: priority {job['priority']}")
         
         # Stale jobs preview
         if status['stale_jobs_preview']:
-            print(f"\n=== Stale Jobs ===")
+            print("\n=== Stale Jobs ===")
             for job in status['stale_jobs_preview']:
                 print(f"  {job['job_id']}: worker {job['worker']}, {job['age_seconds']}s old")
         

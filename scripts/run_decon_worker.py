@@ -3,7 +3,6 @@
 
 import argparse
 import sys
-import os
 
 from dr_exp.utils.factory import create_system, SystemConfig
 from dr_exp.job_db import JobDBConfig
@@ -101,7 +100,7 @@ def main():
         print(f"Starting deconCNN worker: {args.worker_id}")
         print(f"Mode: {system_config.job_db_config.mode}")
         print(f"Base path: {system_config.job_db_config.base_path}")
-        print(f"Trainer: deconCNN integration")
+        print("Trainer: deconCNN integration")
         if args.target_job_id:
             print(f"Target job: {args.target_job_id}")
         if args.work_dir:

@@ -31,9 +31,9 @@ class TestStreamlinedInterface:
     def test_list_running_jobs_with_data(self, temp_local_db):
         """Test listing running jobs with mixed statuses."""
         # Create test jobs with different statuses
-        job1 = temp_local_db.add_job({"test": 1}, "sweep1", status="queued")
+        _job1 = temp_local_db.add_job({"test": 1}, "sweep1", status="queued")
         job2 = temp_local_db.add_job({"test": 2}, "sweep2", status="running")
-        job3 = temp_local_db.add_job({"test": 3}, "sweep3", status="completed")
+        _job3 = temp_local_db.add_job({"test": 3}, "sweep3", status="completed")
         job4 = temp_local_db.add_job({"test": 4}, "sweep4", status="running")
         
         running_jobs = temp_local_db.list_running_jobs()
@@ -156,7 +156,7 @@ class TestStreamlinedInterface:
         """Test queue summary with queued jobs."""
         # Create jobs with different priorities and statuses
         job1 = temp_local_db.add_job({"test": 1}, "sweep1", status="queued", priority=500)
-        job2 = temp_local_db.add_job({"test": 2}, "sweep2", status="running", priority=800)  # Should be ignored
+        _job2 = temp_local_db.add_job({"test": 2}, "sweep2", status="running", priority=800)  # Should be ignored
         job3 = temp_local_db.add_job({"test": 3}, "sweep3", status="queued", priority=100)
         job4 = temp_local_db.add_job({"test": 4}, "sweep4", status="queued", priority=900)
         

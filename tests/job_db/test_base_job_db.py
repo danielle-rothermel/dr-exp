@@ -1,7 +1,6 @@
 """Tests for the BaseJobDB abstract base class."""
 
 import pytest
-from abc import ABC
 
 from dr_exp.job_db import BaseJobDB, LocalJobDB, SupabaseJobDB, JobDBConfig
 

@@ -155,7 +155,6 @@ def test_abc_inheritance():
     assert issubclass(BaseLogger, ABC)
     
     # Test that abstract method decorator works
-    from abc import abstractmethod
     assert hasattr(BaseLogger.log, '__isabstractmethod__')
     assert hasattr(BaseLogger.save_checkpoint, '__isabstractmethod__')
     assert hasattr(BaseLogger.log_artifact, '__isabstractmethod__')

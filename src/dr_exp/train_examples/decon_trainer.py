@@ -1,6 +1,5 @@
-import os
 import time
-from typing import Any, Dict, List, Optional
+from typing import Any, Dict, Optional
 
 import torch
 from omegaconf import OmegaConf
@@ -117,16 +116,13 @@ class DrExpClassificationModule:
                     has_val_metrics = "val_loss" in epoch_metrics and "val_acc" in epoch_metrics
                     
                     should_log = False
-                    log_reason = ""
                     
                     if current_epoch == 0 and has_val_metrics and current_epoch not in self.logged_epochs:
                         # Log initial validation (epoch 0) once
                         should_log = True
-                        log_reason = "initial_validation"
                     elif current_epoch > 0 and has_train_metrics and has_val_metrics and current_epoch not in self.logged_epochs:
                         # Log complete epochs (with both training and validation)
                         should_log = True
-                        log_reason = "complete_epoch"
                     
                     if should_log:
                         # Add epoch information and log reason

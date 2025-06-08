@@ -9,7 +9,7 @@ import threading
 import time
 import tempfile
 import os
-from unittest.mock import patch, MagicMock
+from unittest.mock import patch
 from pathlib import Path
 
 from dr_exp.manage.worker import run_worker
@@ -114,7 +114,7 @@ class TestTrainingFunctionErrors:
     def test_training_function_timeout(self, isolated_job_db, worker_execution_helper):
         """Test worker behavior when training function hangs."""
         # Create a job
-        job = isolated_job_db.add_test_job({"test": "timeout"})
+        _job = isolated_job_db.add_test_job({"test": "timeout"})
         
         # Training function that simulates hanging (optimized for faster testing)
         def hanging_train(config, logger):
@@ -122,7 +122,7 @@ class TestTrainingFunctionErrors:
             return {"final_val_acc": 0.95, "status": "success"}
         
         # Use a very short timeout for testing
-        with patch('signal.alarm') as mock_alarm:
+        with patch('signal.alarm'):
             status = worker_execution_helper.run_worker_with_trainer(hanging_train)
             # In real implementation, this would timeout and return "failed"
             # For this test, we just verify the timeout mechanism would be called
@@ -255,7 +255,7 @@ class TestConcurrencyAndRaceConditions:
     def test_concurrent_job_claiming_with_priorities(self, priority_job_factory, worker_coordination):
         """Test priority ordering is maintained under concurrent access."""
         # Create jobs with different priorities
-        jobs = priority_job_factory.create_high_medium_low_jobs()
+        _jobs = priority_job_factory.create_high_medium_low_jobs()
         
         # Track execution order
         execution_order = []
@@ -309,7 +309,7 @@ class TestConcurrencyAndRaceConditions:
     def test_worker_crash_during_execution(self, isolated_job_db, enhanced_mock_time):
         """Test system recovery when worker crashes during job execution."""
         # Create a job and claim it (simulating worker taking it)
-        job = isolated_job_db.add_test_job({"test": "worker_crash"})
+        _job = isolated_job_db.add_test_job({"test": "worker_crash"})
         claimed_job = isolated_job_db.claim_job("crashed_worker")
         assert claimed_job is not None
         
@@ -412,7 +412,7 @@ class TestConcurrencyAndRaceConditions:
         from datetime import datetime, UTC
         
         # Create initial jobs
-        initial_jobs = isolated_job_db.create_test_jobs(count=10, priority_range=(100, 500))
+        _initial_jobs = isolated_job_db.create_test_jobs(count=10, priority_range=(100, 500))
         
         # Pattern 1: Concurrent job claiming
         claim_results = {}
@@ -426,7 +426,7 @@ class TestConcurrencyAndRaceConditions:
                         claimed_jobs.append(job["id"])
                         # Simulate some work before claiming next job
                         time.sleep(0.01)
-                except Exception as e:
+                except Exception:
                     pass  # Handle concurrent access gracefully
             claim_results[worker_id] = claimed_jobs
         
@@ -509,7 +509,7 @@ class TestResourceConstraints:
     def test_temporary_directory_cleanup(self, isolated_job_db, worker_execution_helper):
         """Test that temporary directories are properly cleaned up."""
         # Create a job
-        job = isolated_job_db.add_test_job({"test": "temp_cleanup"})
+        _job = isolated_job_db.add_test_job({"test": "temp_cleanup"})
         
         created_temp_dirs = []
         

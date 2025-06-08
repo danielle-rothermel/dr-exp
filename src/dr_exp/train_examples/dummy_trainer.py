@@ -1,6 +1,6 @@
 import os
 import time
-from typing import Any, Dict, Optional
+from typing import Any, Optional
 
 from dr_exp.logging.base_logger import BaseLogger
 from dr_exp.logging.structured_logger import StructuredLogger

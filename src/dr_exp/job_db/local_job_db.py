@@ -134,7 +134,7 @@ class LocalJobDB(BaseJobDB):
                                     with portalocker.Lock(job_file_path, mode="r+b", flags=portalocker.LOCK_EX):
                                         self._atomic_write(job_file_path, json.dumps(job_data, indent=4))
                                 except Exception as e:
-                                    logger.warning(f"Failed to clear expired reservation for job {job_id}: {e}")
+                                    logger.warning(f"Failed to clear expired reservation for job {job_data.get('job_id', 'unknown')}: {e}")
                                     # Continue even if cleanup fails
                             elif job_data["reserved_for_worker"] != worker_id:
                                 # Skip jobs reserved for other workers

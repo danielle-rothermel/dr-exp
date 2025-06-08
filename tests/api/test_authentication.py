@@ -1,6 +1,5 @@
 """Tests for API authentication and authorization."""
 
-import pytest
 from .conftest import create_test_job, Priority, JobStatus
 
 

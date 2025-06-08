@@ -2,7 +2,6 @@
 
 import time
 import threading
-import pytest
 from concurrent.futures import ThreadPoolExecutor, as_completed
 from .conftest import create_test_job, create_multiple_jobs, Priority, JobStatus
 
@@ -125,14 +124,12 @@ def test_concurrent_write_operations(client, db_client, admin_headers):
             threads.append(thread)
     
     # Start all threads
-    start_time = time.time()
     for thread in threads:
         thread.start()
     
     # Wait for all to complete
     for thread in threads:
         thread.join(timeout=30)
-    end_time = time.time()
     
     # Analyze results
     assert len(errors) == 0, f"Errors occurred: {errors}"
@@ -194,7 +191,7 @@ def test_load_testing_job_creation(client, db_client):
 def test_pagination_performance_with_large_dataset(client, db_client):
     """Test pagination performance with a larger dataset."""
     # Create a substantial number of jobs
-    jobs = create_multiple_jobs(
+    _jobs = create_multiple_jobs(
         db_client,
         count=100,
         status_distribution={
@@ -234,7 +231,7 @@ def test_pagination_performance_with_large_dataset(client, db_client):
 def test_filtering_performance(client, db_client):
     """Test performance of filtering operations on large datasets."""
     # Create jobs with various statuses and priorities
-    jobs = create_multiple_jobs(db_client, count=200)
+    _jobs = create_multiple_jobs(db_client, count=200)
     
     # Test different filtering scenarios
     filter_tests = [
@@ -262,7 +259,6 @@ def test_filtering_performance(client, db_client):
 def test_memory_usage_stability(client, db_client):
     """Test that repeated operations don't cause memory leaks."""
     import gc
-    import sys
     
     # Get baseline memory usage (approximate)
     gc.collect()

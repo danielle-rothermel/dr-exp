@@ -4,7 +4,7 @@ import os
 import tempfile
 import pytest
 from datetime import datetime, timezone, timedelta
-from unittest.mock import Mock, patch
+from unittest.mock import patch
 
 from dr_exp.manage.manager import Manager
 from dr_exp.manage.process_manager import MockProcessManager
@@ -270,7 +270,6 @@ class TestManager:
         """Test a single iteration of the run loop."""
         # Set up for one loop iteration
         loop_count = 0
-        original_sleep = None
         
         def mock_sleep(seconds):
             nonlocal loop_count

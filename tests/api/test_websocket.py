@@ -2,8 +2,7 @@
 
 import json
 import pytest
-from fastapi.testclient import TestClient
-from .conftest import create_test_job, Priority, JobStatus
+from .conftest import create_test_job, Priority
 
 
 def test_websocket_connection_basic(client):
@@ -97,7 +96,7 @@ def test_websocket_concurrent_connections(client):
         for ws, _ in connections:
             try:
                 ws.__exit__(None, None, None)
-            except:
+            except Exception:
                 pass  # Connection might already be closed
 
 
@@ -108,8 +107,6 @@ def test_websocket_connection_manager_state(client):
     
     # Start with no connections (we can't directly access the manager,
     # but we can test behavior that depends on it)
-    
-    connection_count_before = 0  # We'd need to expose this for real testing
     
     with client.websocket_connect("/ws") as ws1:
         # Connection should be tracked
@@ -176,7 +173,7 @@ def test_websocket_connection_limits(client):
         for ws_context, _ in connections:
             try:
                 ws_context.__exit__(None, None, None)
-            except:
+            except Exception:
                 pass  # Connection might already be closed
 
 
@@ -229,7 +226,6 @@ def test_websocket_connection_lifecycle_events(client):
 def test_websocket_concurrent_message_handling(client):
     """Test handling of concurrent messages from single connection."""
     import threading
-    import time
     
     with client.websocket_connect("/ws") as websocket:
         responses = []
@@ -290,7 +286,7 @@ def test_websocket_broadcast_integration(client, db_client, admin_headers):
     job = create_test_job(db_client, priority=Priority.NORMAL)
     job_id = job["id"]
     
-    with client.websocket_connect("/ws") as websocket:
+    with client.websocket_connect("/ws") as _websocket:
         # Make API call that should trigger broadcast
         resp = client.post(
             "/job/boost-priority",

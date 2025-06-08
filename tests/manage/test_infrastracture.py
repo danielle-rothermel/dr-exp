@@ -4,9 +4,7 @@ This module showcases the new testing patterns and fixtures developed for Phase 
 These tests serve as both validation of the infrastructure and examples for future development.
 """
 
-import pytest
 import threading
-from unittest.mock import patch
 
 from dr_exp.manage.worker import run_worker
 from tests.conftest import make_wrapped_config
@@ -94,8 +92,8 @@ class TestDatabaseStateManagement:
     def test_database_isolation(self, isolated_job_db):
         """Test that database isolation works correctly."""
         # Add some jobs
-        job1 = isolated_job_db.add_test_job({"test": "isolation_1"})
-        job2 = isolated_job_db.add_test_job({"test": "isolation_2"})
+        _job1 = isolated_job_db.add_test_job({"test": "isolation_1"})
+        _job2 = isolated_job_db.add_test_job({"test": "isolation_2"})
         
         # Verify jobs exist
         assert len(isolated_job_db.list_jobs()) == 2
@@ -121,7 +119,7 @@ class TestEventDrivenUtilities:
         trainer_fn = worker_coordination.create_coordinated_trainer(worker_id)
         
         # Add a job for the worker
-        job = integration_system.job_db.add_job(
+        _job = integration_system.job_db.add_job(
             make_wrapped_config({"test": "coordination"}), "coord_sweep", status="queued", priority=100)
         
         # Run worker in thread
@@ -217,7 +215,7 @@ class TestEventDrivenUtilities:
         # Since only 3 jobs exist and workers claim jobs individually,
         # we should have exactly 3 completed workers (one per job)
         completed_workers = [r for r in results if r["status"] == "completed"]
-        no_work_workers = [r for r in results if r["status"] == "no_work"]
+        _no_work_workers = [r for r in results if r["status"] == "no_work"]
         
         assert len(completed_workers) == 3, f"Expected 3 completed workers, got {len(completed_workers)}"
         assert len(results) == 3, f"Expected 3 total results, got {len(results)}"
@@ -229,7 +227,7 @@ class TestManageSpecificFixtures:
     def test_heartbeat_monitoring(self, heartbeat_monitor, integration_system):
         """Test heartbeat monitoring utilities."""
         # Add a job
-        job = integration_system.job_db.add_job(
+        _job = integration_system.job_db.add_job(
             make_wrapped_config({"test": "heartbeat_monitoring"}), "hb_sweep", status="queued", priority=100)
         
         # Start monitoring
@@ -342,7 +340,7 @@ class TestInfrastructureIntegration:
         enhanced_mock_time.set_milestone("test_start")
         
         # Phase 2: Create test jobs
-        jobs = isolated_job_db.create_test_jobs(count=2, priority_range=(100, 200))
+        _jobs = isolated_job_db.create_test_jobs(count=2, priority_range=(100, 200))
         isolated_job_db.verify_job_counts({"queued": 2})
         
         # Phase 3: Setup worker coordination

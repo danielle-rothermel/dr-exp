@@ -2,7 +2,7 @@
 
 import os
 import multiprocessing as mp
-from typing import Dict, List, Optional, Any
+from typing import Dict, Optional, Any
 from abc import ABC, abstractmethod
 
 from .worker import run_worker

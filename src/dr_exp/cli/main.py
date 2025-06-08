@@ -101,7 +101,7 @@ def main(argv: Optional[Sequence[str]] = None) -> int:
         # Execute the command
         return command.execute(args)
         
-    except KeyError as e:
+    except KeyError:
         print(f"Unknown command: {getattr(args, 'command', 'unknown')} in group {getattr(args, 'group', 'unknown')}", file=sys.stderr)
         parser.print_help()
         return 1

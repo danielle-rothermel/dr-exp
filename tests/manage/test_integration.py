@@ -1,17 +1,14 @@
 """Integration tests for the complete manager-worker architecture."""
 
-import os
-import tempfile
 import threading
-import time
 import pytest
-from unittest.mock import Mock, patch, MagicMock, call
+from unittest.mock import patch
 from pathlib import Path
 from datetime import datetime, UTC, timedelta
 from contextlib import contextmanager
 
 from dr_exp.utils.factory import create_system, SystemConfig
-from dr_exp.job_db import JobDBConfig, LocalJobDB
+from dr_exp.job_db import JobDBConfig
 from dr_exp.manage.manager import Manager
 from dr_exp.manage.worker import run_worker
 from dr_exp.manage.process_manager import MockProcessManager
@@ -112,7 +109,6 @@ class TestManagerWorkerIntegration:
         
         # Run worker to process jobs
         # Use direct trainer_fn to bypass import issues
-        from dr_exp.manage.worker import run_worker
         
         # Worker should claim and execute the higher priority job first
         status1 = run_worker(
@@ -237,13 +233,13 @@ class TestManagerWorkerIntegration:
         factory = create_system(integration_config)
         
         # Add jobs with different priorities (higher number = higher priority)
-        low_priority_job = factory.job_db.add_job(
+        _low_priority_job = factory.job_db.add_job(
             make_wrapped_config({"priority_test": "low"}), "priority_sweep", status="queued", priority=100
         )
-        high_priority_job = factory.job_db.add_job(
+        _high_priority_job = factory.job_db.add_job(
             make_wrapped_config({"priority_test": "high"}), "priority_sweep", status="queued", priority=900
         )
-        medium_priority_job = factory.job_db.add_job(
+        _medium_priority_job = factory.job_db.add_job(
             make_wrapped_config({"priority_test": "medium"}), "priority_sweep", status="queued", priority=500
         )
         
@@ -257,7 +253,6 @@ class TestManagerWorkerIntegration:
             return {"final_val_acc": 0.95, "status": "success"}
         
         # Use run_worker with custom trainer_fn to bypass the default_train import issue
-        from dr_exp.manage.worker import run_worker
         
         # Process all jobs with custom trainer function
         for i in range(3):
@@ -279,7 +274,7 @@ class TestManagerWorkerIntegration:
         factory = create_system(integration_config)
         
         # Add a job that takes a bit of time to complete
-        job = factory.job_db.add_job(
+        _job = factory.job_db.add_job(
             make_wrapped_config({"heartbeat_test": True}), "heartbeat_sweep", status="queued", priority=100
         )
         
@@ -342,7 +337,7 @@ class TestManagerWorkerIntegration:
         queued_job = factory.job_db.add_job(
             make_wrapped_config({"status": "queued"}), "status_sweep", status="queued", priority=100
         )
-        running_job = factory.job_db.add_job(
+        _running_job = factory.job_db.add_job(
             make_wrapped_config({"status": "running"}), "status_sweep", status="running", priority=200
         )
         
@@ -420,7 +415,6 @@ class TestFactoryIntegration:
             return {"final_val_acc": 0.95, "status": "success", "config": config}
         
         # Use direct trainer_fn to bypass import issues
-        from dr_exp.manage.worker import run_worker
         
         # Run worker targeting specific job
         status = run_worker(
@@ -486,7 +480,6 @@ class TestFullSystemIntegration:
             return {"final_val_acc": final_accuracy, "status": "success"}
         
         # Use direct trainer_fn to bypass import issues
-        from dr_exp.manage.worker import run_worker
         
         # Process all jobs
         for i in range(len(experiment_jobs)):
@@ -543,7 +536,6 @@ class TestFullSystemIntegration:
                 return {"final_val_acc": 0.85, "status": "success"}
         
         # Use direct trainer_fn to bypass import issues
-        from dr_exp.manage.worker import run_worker
         
         # First attempt should fail due to training exception
         status1 = run_worker(

@@ -1,9 +1,6 @@
 """Tests for API error boundaries and edge cases."""
 
-import json
-import pytest
-from pathlib import Path
-from .conftest import create_test_job, create_test_metrics, Priority, JobStatus
+from .conftest import create_test_job, create_test_metrics, JobStatus
 
 
 def test_malformed_json_requests(client, db_client, admin_headers):
@@ -148,7 +145,6 @@ def test_unicode_and_special_characters(client, db_client, admin_headers):
 def test_concurrent_operations_on_same_job(client, db_client, admin_headers):
     """Test concurrent operations on the same job."""
     import threading
-    import time
     
     job = create_test_job(db_client, status=JobStatus.FAILED)
     job_id = job["id"]

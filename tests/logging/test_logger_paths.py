@@ -1,7 +1,6 @@
 """Tests for the LoggerPathManager and LoggerPathConfig."""
 
 import os
-import pytest
 
 from dr_exp.logging.logger_paths import LoggerPathConfig, LoggerPathManager
 

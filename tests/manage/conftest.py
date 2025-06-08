@@ -2,7 +2,7 @@
 
 import pytest
 import threading
-from unittest.mock import patch, MagicMock
+from unittest.mock import patch
 from pathlib import Path
 
 from dr_exp.manage.manager import Manager

@@ -25,8 +25,8 @@ def reset_job_db() -> None:
             shutil.rmtree(path)
     
     # Create a new client to reinitialize directories
-    client = get_job_db_client(config)
-    print(f"JobDB reset complete")
+    get_job_db_client(config)
+    print("JobDB reset complete")
     print(f"  Job data: {jobs_dir}")
     print(f"  Storage: {storage_dir}")
 
@@ -36,7 +36,7 @@ def main() -> None:
 
     parser = argparse.ArgumentParser(description="Reset the local jobdb environment.")
     # No longer need base-path argument since we use config
-    args = parser.parse_args()
+    parser.parse_args()
     reset_job_db()
 
 
