@@ -884,7 +884,9 @@ def create_app(base_path: str = ".") -> FastAPI:
 
         try:
             result = client.boost_job_priority(req.job_id, req.boost_amount)
-            new_priority = result["new_priority"]  # Fail fast if operation result incomplete
+            new_priority = result[
+                "new_priority"
+            ]  # Fail fast if operation result incomplete
 
             # Broadcast priority update via WebSocket
             await manager.broadcast(
@@ -935,7 +937,9 @@ def create_app(base_path: str = ".") -> FastAPI:
 
         try:
             result = client.update_job_priority(req.job_id, req.priority, req.reason)
-            new_priority = result["new_priority"]  # Fail fast if operation result incomplete
+            new_priority = result[
+                "new_priority"
+            ]  # Fail fast if operation result incomplete
 
             # Broadcast priority update via WebSocket
             await manager.broadcast(

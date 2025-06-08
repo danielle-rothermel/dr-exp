@@ -77,16 +77,20 @@ base_path = os.environ.get("DR_EXP_BASE_PATH", "./job_data")
 
 ## High Priority Violations
 
-### 4. Priority System Data Corruption Masking
+### 4. Priority System Data Corruption Masking ✅ **FIXED**
 
 **Files:** Multiple
 
-#### Silent Priority Defaults
-- **`src/dr_exp/job_db/supabase_job_db.py:553`**: `old_priority = response.data.get("priority", 100)`
-- **`src/dr_exp/job_db/local_job_db.py:500,556`**: `old_priority = job_data.get("priority", 100)`
-- **`src/dr_exp/utils/priority.py:247`**: `base_priority = job.get("priority", PRIORITY_DEFAULT)`
+#### Silent Priority Defaults ✅ **FIXED**
+- ✅ **`src/dr_exp/job_db/supabase_job_db.py:613`**: Priority access now fails fast without defaults
+- ✅ **`src/dr_exp/job_db/local_job_db.py`**: All priority access now fails fast on missing data
+- ✅ **`src/dr_exp/utils/priority.py:247`**: Priority calculations now require valid priority fields
+- ✅ **`src/dr_exp/manage/manager.py`**: Queue logging requires priority and id fields
+- ✅ **`src/dr_exp/api/main.py`**: Priority filtering/sorting fails fast on missing priority
+- ✅ **`src/dr_exp/utils/factory.py`**: System status requires priority metadata  
+- ✅ **`src/dr_exp/cli/commands/list_jobs.py`**: Job listing requires priority, status, id fields
 
-**Impact:** Queue ordering corruption when priority data is missing.
+**Impact:** ✅ **RESOLVED** - Priority system now fails immediately on missing data instead of masking corruption with defaults.
 
 ### 5. API Layer Error Masking
 

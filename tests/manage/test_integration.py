@@ -461,16 +461,18 @@ class TestFactoryIntegration:
 
     def test_factory_creates_consistent_components(self, integration_config):
         """Test that factory creates properly integrated components."""
-        factory = create_system(integration_config)
+        # Set required environment variable for ProcessManager
+        with patch.dict("os.environ", {"DR_EXP_BASE_PATH": integration_config.job_db_config.base_path}):
+            factory = create_system(integration_config)
 
-        # Create manager and verify it uses the same job_db instance
-        manager = factory.create_manager()
-        assert manager.job_db is factory.job_db
+            # Create manager and verify it uses the same job_db instance
+            manager = factory.create_manager()
+            assert manager.job_db is factory.job_db
 
-        # Verify manager configuration matches factory config
-        assert manager.gpus == integration_config.gpus
-        assert manager.workers_per_gpu == integration_config.workers_per_gpu
-        assert manager.heartbeat_timeout == integration_config.heartbeat_timeout
+            # Verify manager configuration matches factory config
+            assert manager.gpus == integration_config.gpus
+            assert manager.workers_per_gpu == integration_config.workers_per_gpu
+            assert manager.heartbeat_timeout == integration_config.heartbeat_timeout
 
     def test_factory_environment_configuration(self, integration_config, tmp_path):
         """Test that factory respects environment configuration."""
