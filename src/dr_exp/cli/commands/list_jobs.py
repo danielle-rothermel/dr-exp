@@ -51,10 +51,10 @@ class ListJobsCommand(BaseCommand):
         print(f"{'Job ID':<40} {'Priority':<8} {'Status':<10} {'Created':<20}")
         print("-" * 80)
         for job in jobs:
-            job_id = str(job.get("id", ""))[:36]
-            priority = job.get("priority", 100)
-            status = job.get("status", "unknown")
-            created = job.get("created_at", "")[:19] if job.get("created_at") else ""
+            job_id = str(job["id"])[:36]  # Fail fast if id missing
+            priority = job["priority"]  # Fail fast if priority missing
+            status = job["status"]  # Fail fast if status missing
+            created = job["created_at"][:19] if job["created_at"] else ""
             print(f"{job_id:<40} {priority:<8} {status:<10} {created:<20}")
 
         return 0

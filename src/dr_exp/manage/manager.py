@@ -161,7 +161,10 @@ class Manager:
                 "No running jobs, but %d queued jobs remain. Top priorities: %s",
                 len(queue_summary),
                 [
-                    {"id": job.get("id"), "priority": job.get("priority", 100)}
+                    {
+                        "id": job["id"],
+                        "priority": job["priority"],
+                    }  # Fail fast if required fields missing
                     for job in queue_summary
                 ],
             )

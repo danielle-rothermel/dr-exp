@@ -277,9 +277,9 @@ class Factory:
             },
             "queue_preview": [
                 {
-                    "id": job.get("id"),
-                    "priority": job.get("priority", 100),
-                    "created_at": job.get("created_at"),
+                    "id": job["id"],  # Fail fast if id missing
+                    "priority": job["priority"],  # Fail fast if priority missing
+                    "created_at": job["created_at"],  # Fail fast if created_at missing
                 }
                 for job in queue_summary[:5]
             ],

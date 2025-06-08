@@ -365,12 +365,16 @@ def filter_and_sort_jobs(
     # Apply priority filters
     if priority_min is not None:
         filtered_jobs = [
-            job for job in filtered_jobs if job.get("priority", 100) >= priority_min
+            job
+            for job in filtered_jobs
+            if job["priority"] >= priority_min  # Fail fast if priority missing
         ]
 
     if priority_max is not None:
         filtered_jobs = [
-            job for job in filtered_jobs if job.get("priority", 100) <= priority_max
+            job
+            for job in filtered_jobs
+            if job["priority"] <= priority_max  # Fail fast if priority missing
         ]
 
     # Apply sorting
@@ -383,7 +387,8 @@ def filter_and_sort_jobs(
     try:
         if sort_by == "priority":
             filtered_jobs.sort(
-                key=lambda job: job.get("priority", 100), reverse=reverse
+                key=lambda job: job["priority"],
+                reverse=reverse,  # Fail fast if priority missing
             )
         elif sort_by == "retry_index":
             filtered_jobs.sort(
@@ -872,14 +877,14 @@ def create_app(base_path: str = ".") -> FastAPI:
         if job is None:
             raise_job_not_found(req.job_id)
 
-        old_priority = job.get("priority", 100)
+        old_priority = job["priority"]  # Fail fast if priority missing
         logger.info(
             "Priority boost requested for job %s: +%d", req.job_id, req.boost_amount
         )
 
         try:
             result = client.boost_job_priority(req.job_id, req.boost_amount)
-            new_priority = result.get("new_priority", old_priority)
+            new_priority = result["new_priority"]  # Fail fast if operation result incomplete
 
             # Broadcast priority update via WebSocket
             await manager.broadcast(
@@ -920,7 +925,7 @@ def create_app(base_path: str = ".") -> FastAPI:
         if job is None:
             raise_job_not_found(req.job_id)
 
-        old_priority = job.get("priority", 100)
+        old_priority = job["priority"]  # Fail fast if priority missing
         logger.info(
             "Priority set requested for job %s: %d (reason: %s)",
             req.job_id,
@@ -930,7 +935,7 @@ def create_app(base_path: str = ".") -> FastAPI:
 
         try:
             result = client.update_job_priority(req.job_id, req.priority, req.reason)
-            new_priority = result.get("new_priority", req.priority)
+            new_priority = result["new_priority"]  # Fail fast if operation result incomplete
 
             # Broadcast priority update via WebSocket
             await manager.broadcast(

@@ -49,13 +49,13 @@ except Exception as e:
 
 **Impact:** ✅ **RESOLVED** - Jobs with heartbeat failures now fail immediately after retry limit, preventing zombie jobs and double-assignment risks.
 
-#### Silent Upload Failures (Lines 194-211)
-```python
-except Exception as e:
-    logging.warning(f"Failed to upload metrics for job {self.job_id}: {e}")
-    metrics_upload = {"success": False, "error": str(e)}
-```
-**Impact:** Jobs marked "complete" despite missing training artifacts.
+#### Silent Upload Failures ✅ **FIXED**
+- ✅ **Lines 240-258**: Metrics upload failures now fail the job immediately with record_failure()
+- ✅ **Lines 260-278**: Bundle upload failures now fail the job immediately with record_failure()
+- ✅ **Removed graceful degradation**: Jobs no longer marked "completed" with missing artifacts
+- ✅ **Simplified metadata**: Upload paths guaranteed to exist due to fail-fast behavior
+
+**Impact:** ✅ **RESOLVED** - Jobs with upload failures now fail immediately, preventing data loss and inconsistent job state.
 
 ### 3. Infrastructure Management Silent Failures
 
