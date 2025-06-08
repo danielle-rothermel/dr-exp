@@ -22,6 +22,7 @@ seed: 42
 train: true
 eval: true
 log_every: 10
+limit_train_batches: null  # Can be overridden for fast debugging
 
 # Data configuration - complete as required by deconCNN
 data:

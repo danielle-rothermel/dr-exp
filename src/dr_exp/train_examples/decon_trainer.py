@@ -75,56 +75,127 @@ def validate_and_extract_decon_config(dr_exp_cfg: Any) -> OmegaConf:
     return decon_cfg
 
 
-def extract_final_metrics_from_trainer(trainer, logger: BaseLogger) -> Dict[str, float]:
-    """Extract final training metrics from Lightning trainer.
+def extract_validation_metrics_from_trainer(trainer, logger: BaseLogger) -> Dict[str, float]:
+    """Extract validation metrics from Lightning trainer.
+    
+    Validation metrics should be reliably available in logged_metrics.
     
     Parameters
     ----------
     trainer : Lightning trainer
         Trained Lightning trainer with logged metrics
     logger : BaseLogger
-        Logger for recording any extraction warnings
+        Logger for recording extraction details
         
     Returns
     -------
     Dict[str, float]
-        Dictionary with final metrics: final_train_loss, final_val_acc, final_val_loss
+        Dictionary with validation metrics: final_val_acc, final_val_loss
+        
+    Raises
+    ------
+    ValueError
+        If validation metrics cannot be extracted
     """
-    final_metrics = {}
+    # Fail immediately if trainer doesn't have logged metrics
+    if not hasattr(trainer, 'logged_metrics'):
+        raise ValueError("Lightning trainer has no 'logged_metrics' attribute - training may have failed")
     
-    # Access Lightning's logged metrics if available
-    if hasattr(trainer, 'logged_metrics'):
-        logged_metrics = trainer.logged_metrics
-        # Extract key metrics with careful handling of tensor/scalar values
-        try:
-            train_loss = logged_metrics.get("train_loss", logged_metrics.get("train_loss_epoch", None))
-            val_acc = logged_metrics.get("val_acc", logged_metrics.get("val_acc_epoch", None))
-            val_loss = logged_metrics.get("val_loss", logged_metrics.get("val_loss_epoch", None))
+    logged_metrics = trainer.logged_metrics
+    if not logged_metrics:
+        raise ValueError("Lightning trainer.logged_metrics is empty - no metrics were recorded during training")
+    
+    available_keys = list(logged_metrics.keys())
+    
+    # Get validation metrics from logged_metrics (these should be reliably available)
+    val_acc = logged_metrics.get("val_acc") or logged_metrics.get("val_acc_epoch") 
+    val_loss = logged_metrics.get("val_loss") or logged_metrics.get("val_loss_epoch")
+    
+    # Fail if any required validation metric is missing  
+    if val_acc is None:
+        raise ValueError(f"Required metric 'val_acc' not found. Available keys: {available_keys}")
+        
+    if val_loss is None:
+        raise ValueError(f"Required metric 'val_loss' not found. Available keys: {available_keys}")
+    
+    # Convert to float and validate values - fail if invalid
+    try:
+        val_acc_float = float(val_acc) 
+        val_loss_float = float(val_loss)
+    except (ValueError, TypeError) as e:
+        raise ValueError(f"Failed to convert validation metrics to float: {e}")
+    
+    # Check for infinite or NaN values - fail if found
+    if not torch.isfinite(torch.tensor(val_acc_float)):
+        raise ValueError(f"val_acc is not finite: {val_acc_float}")
+    if not torch.isfinite(torch.tensor(val_loss_float)):
+        raise ValueError(f"val_loss is not finite: {val_loss_float}")
+    
+    return {
+        "final_val_acc": val_acc_float,
+        "final_val_loss": val_loss_float
+    }
+
+
+class DrExpMetricsTracker:
+    """Custom Lightning module wrapper that ensures training metrics are properly tracked."""
+    
+    def __init__(self, lightning_module):
+        self.lightning_module = lightning_module
+        self.training_losses = []
+        self.training_accs = []
+        self.final_training_metrics = {}
+        
+        # Hook into the training step
+        self._wrap_training_step()
+    
+    def _wrap_training_step(self):
+        """Wrap the training step to capture metrics directly."""
+        original_training_step = self.lightning_module.training_step
+        
+        def wrapped_training_step(batch, batch_idx):
+            # Call original training step
+            result = original_training_step(batch, batch_idx)
             
-            # Convert to float and handle potential None/inf values
-            final_metrics = {
-                "final_train_loss": float(train_loss) if train_loss is not None and torch.isfinite(torch.tensor(train_loss)) else 1.0,
-                "final_val_acc": float(val_acc) if val_acc is not None and torch.isfinite(torch.tensor(val_acc)) else 0.1,
-                "final_val_loss": float(val_loss) if val_loss is not None and torch.isfinite(torch.tensor(val_loss)) else 1.0
-            }
-        except (ValueError, TypeError, ZeroDivisionError) as e:
-            # Handle any conversion errors gracefully
-            logger.log({"metrics_extraction_warning": f"Error extracting metrics: {e}"})
-            final_metrics = {
-                "final_train_loss": 1.0,
-                "final_val_acc": 0.1,
-                "final_val_loss": 1.0
-            }
+            # Extract loss from result or calculate it
+            if isinstance(result, dict) and 'loss' in result:
+                loss = result['loss']
+            else:
+                loss = result  # Assume result is the loss tensor
+            
+            # Calculate accuracy manually from the batch
+            x, y = batch
+            with torch.no_grad():
+                logits = self.lightning_module.model(x)
+                preds = torch.argmax(logits, dim=1)
+                acc = torch.sum(preds == y).float() / len(y)
+            
+            # Store metrics for epoch-end calculation
+            self.training_losses.append(loss.detach())
+            self.training_accs.append(acc.detach())
+            
+            return result
+        
+        self.lightning_module.training_step = wrapped_training_step
     
-    # If no metrics available from trainer, provide reasonable defaults
-    if not final_metrics:
-        final_metrics = {
-            "final_train_loss": 1.0,  # Reasonable default for cross-entropy
-            "final_val_acc": 0.1,     # Conservative default for CIFAR-10
-            "final_val_loss": 1.0
-        }
-    
-    return final_metrics
+    def on_train_epoch_end(self):
+        """Calculate final training metrics for the epoch."""
+        if self.training_losses:
+            final_train_loss = torch.stack(self.training_losses).mean().item()
+            final_train_acc = torch.stack(self.training_accs).mean().item()
+            
+            self.final_training_metrics = {
+                'final_train_loss': final_train_loss,
+                'final_train_acc': final_train_acc
+            }
+            
+            # Clear for next epoch
+            self.training_losses.clear()
+            self.training_accs.clear()
+        
+    def get_final_training_metrics(self):
+        """Get the final training metrics calculated manually."""
+        return self.final_training_metrics
 
 
 class DrExpLoggerAdapter:
@@ -189,7 +260,10 @@ def train_with_decon(cfg: Any, logger: Optional[BaseLogger] = None) -> TrainingR
         # 3. Create deconCNN training components
         model, data_module, trainer = deconcnn.create_cifar10_training_components(decon_cfg)
         
-        # 4. Setup logging adapter
+        # 4. Setup custom metrics tracker to ensure training metrics are captured
+        metrics_tracker = DrExpMetricsTracker(model)
+        
+        # 5. Setup logging adapter
         logging_adapter = DrExpLoggerAdapter(logger)
         
         # 5. Log initial configuration
@@ -204,16 +278,25 @@ def train_with_decon(cfg: Any, logger: Optional[BaseLogger] = None) -> TrainingR
         })
         
         # 6. Run training with deconCNN
-        # Note: We'll capture metrics by monitoring the trainer's progress
         initial_time = time.time()
         
         # Train the model using deconCNN's training function
         deconcnn.train_model(trainer, model, data_module, decon_cfg)
         
+        # Finalize metrics tracking
+        metrics_tracker.on_train_epoch_end()
+        
         training_time = time.time() - initial_time
         
-        # 7. Extract final metrics from the trained model
-        final_metrics = extract_final_metrics_from_trainer(trainer, logger)
+        # 7. Extract final metrics - use our custom tracker for training metrics
+        validation_metrics = extract_validation_metrics_from_trainer(trainer, logger)
+        training_metrics = metrics_tracker.get_final_training_metrics()
+        
+        # Combine training and validation metrics
+        final_metrics = {
+            **training_metrics,
+            **validation_metrics
+        }
         
         # 8. Log final summary metrics
         summary_metrics = {
