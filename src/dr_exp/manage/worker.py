@@ -171,10 +171,8 @@ class JobExecutor:
                 wlog.write(f"Training failed with error: {e}\n")
                 wlog.write(stack)
 
-                # Record failure in database
-                self.client.record_failure(self.job_id, type(e).__name__, str(e), stack)
-
                 # Return failure result as TrainingResult
+                # finalize_job() will handle all failure recording as single source of truth
                 from dr_exp.training.result import create_failure_result
 
                 return create_failure_result(
@@ -218,11 +216,15 @@ class JobExecutor:
             "final_train_loss": result.final_train_loss,
             "num_epochs": result.num_epochs,
             "train_status": train_status,
-            "metrics_storage_path": metrics_upload.get("storage_path"),
-            "bundle_storage_path": bundle_upload.get("storage_path"),
+            "metrics_storage_path": metrics_upload["storage_path"] if metrics_upload["success"] else None,
+            "bundle_storage_path": bundle_upload["storage_path"] if bundle_upload["success"] else None,
             "upload_complete_at": datetime.now(UTC).isoformat() + "Z",
-            "finalize_success": logger_meta.get("finalize_success", False),
+            "finalize_success": logger_meta["finalize_success"],
         }
+        
+        # Add error details for failed jobs - single source of truth for failure recording
+        if final_status == "failed" and result.error:
+            metadata["error_message"] = result.error
 
         self.client.finalize_job(self.job_id, final_status, metadata)
 
