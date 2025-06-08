@@ -201,11 +201,15 @@ def train_with_decon(
     # 2. Setup logger - if this fails, we can't log anything
     if logger is None:
         try:
-            log_dir = (
-                cfg.get("log_dir", "./logs")
-                if isinstance(cfg, dict)
-                else getattr(cfg, "log_dir", "./logs")
-            )
+            # Validate configuration has required log_dir field
+            if isinstance(cfg, dict):
+                if "log_dir" not in cfg:
+                    return create_failure_result(error="Configuration must include 'log_dir' field")
+                log_dir = cfg["log_dir"]
+            else:
+                if not hasattr(cfg, "log_dir"):
+                    return create_failure_result(error="Configuration must include 'log_dir' attribute")
+                log_dir = cfg.log_dir
             logger = StructuredLogger(log_dir)
         except Exception as e:
             # No logger available, return basic failure info

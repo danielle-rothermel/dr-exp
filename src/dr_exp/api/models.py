@@ -54,11 +54,9 @@ class JobModel(BaseModel):
     id: str = Field(..., description="Unique job identifier")
     status: str = Field(..., description="Current job status")
     priority: int = Field(100, ge=0, le=1000, description="Job priority (0-1000)")
-    retry_index: Optional[int] = Field(None, description="Number of retry attempts")
-    assigned_worker: Optional[str] = Field(
-        None, description="Worker assigned to this job"
-    )
-    created_at: Optional[str] = Field(None, description="Job creation timestamp")
+    retry_index: int = Field(0, ge=0, description="Number of retry attempts")
+    assigned_worker: Optional[str] = Field(None, description="Worker assigned to this job")
+    created_at: str = Field(..., description="Job creation timestamp")
     started_at: Optional[str] = Field(None, description="Job start timestamp")
     end_time: Optional[str] = Field(None, description="Job completion timestamp")
     heartbeat: Optional[str] = Field(None, description="Last worker heartbeat")

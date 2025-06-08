@@ -104,6 +104,8 @@ class SupabaseJobDB(BaseJobDB):
         dict[str, Any]
             A dictionary describing the outcome of the update operation.
         """
+        # Validate update data before proceeding
+        self._validate_update_data(data)
         try:
             response = (
                 self.supabase.table("jobs").update(data).eq("id", job_id).execute()
