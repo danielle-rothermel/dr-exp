@@ -1,6 +1,0 @@
-# Cosine annealing scheduler with minimal warmup
-source: timm
-sched_type: cosine_annealing
-lr_min: 0.0
-warmup_epochs: 1  # Minimal warmup for short tests
-warmup_start_lr: 0.001

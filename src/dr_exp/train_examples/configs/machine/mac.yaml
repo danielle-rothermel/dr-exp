@@ -1,4 +1,0 @@
-# Local Mac configuration
-root_dir: /Users/daniellerothermel/drotherm
-device: mps  # Use Apple Silicon GPU
-num_gpus: 1

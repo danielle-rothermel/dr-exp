@@ -1,5 +1,0 @@
-_target_: torch.optim.SGD # Example, assuming PyTorch
-lr: 0.01 # Default learning rate, can be swept
-momentum: 0.9
-weight_decay: 0.00005
-nesterov: True

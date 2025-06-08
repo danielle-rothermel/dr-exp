@@ -1,8 +1,0 @@
-_target_: my_project.models.ViTModel # Placeholder for actual class path
-name: vit_base_patch16_224
-pretrained: True
-num_classes: 10
-image_size: 224
-patch_size: 16
-num_heads: 8
-dropout_rate: 0.1 # Example parameter that can be swept
