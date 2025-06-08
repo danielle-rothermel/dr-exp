@@ -18,7 +18,7 @@ def mock_client(tmp_path):
     config = JobDBConfig(
         base_path=str(tmp_path),
         storage_path=str(tmp_path / "storage"),
-        mode="files_local"
+        mode="files_local",
     )
     client = LocalJobDB(config)
     return client
@@ -44,7 +44,7 @@ def test_client_initialization(tmp_path):
     config = JobDBConfig(
         base_path=str(tmp_path),
         storage_path=str(tmp_path / "storage"),
-        mode="files_local"
+        mode="files_local",
     )
     client = LocalJobDB(config)
     assert os.path.exists(client.storage_dir)
@@ -434,14 +434,18 @@ def test_add_job_with_priority(mock_client, sample_job_config, sample_sweep_conf
     job = mock_client.add_job(sample_job_config, sample_sweep_config_id, priority=500)
     assert job["priority"] == 500
     assert job["priority_boost_count"] == 0
-    
+
     # Test priority validation - should raise ValueError for invalid priorities
     import pytest
-    
-    with pytest.raises(ValueError, match="Priority must be between 0 and 1000, got 1500"):
+
+    with pytest.raises(
+        ValueError, match="Priority must be between 0 and 1000, got 1500"
+    ):
         mock_client.add_job(sample_job_config, sample_sweep_config_id, priority=1500)
-    
-    with pytest.raises(ValueError, match="Priority must be between 0 and 1000, got -50"):
+
+    with pytest.raises(
+        ValueError, match="Priority must be between 0 and 1000, got -50"
+    ):
         mock_client.add_job(sample_job_config, sample_sweep_config_id, priority=-50)
 
 
@@ -449,19 +453,19 @@ def test_update_job_priority(mock_client, sample_job_config, sample_sweep_config
     """Test updating job priority."""
     job = mock_client.add_job(sample_job_config, sample_sweep_config_id, priority=100)
     job_id = job["id"]
-    
+
     # Update priority
     result = mock_client.update_job_priority(job_id, 300, reason="Urgent experiment")
     assert result["success"] is True
     assert result["old_priority"] == 100
     assert result["new_priority"] == 300
-    
+
     # Verify change was persisted
     updated_job = mock_client.get_job_details(job_id)
     assert updated_job["priority"] == 300
     assert len(updated_job["priority_changes"]) == 1
     assert updated_job["priority_changes"][0]["reason"] == "Urgent experiment"
-    
+
     # Test updating non-existent job
     result = mock_client.update_job_priority("nonexistent", 500)
     assert result["success"] is False
@@ -471,19 +475,19 @@ def test_boost_job_priority(mock_client, sample_job_config, sample_sweep_config_
     """Test boosting job priority."""
     job = mock_client.add_job(sample_job_config, sample_sweep_config_id, priority=200)
     job_id = job["id"]
-    
+
     # Boost priority
     result = mock_client.boost_job_priority(job_id, boost_amount=150)
     assert result["success"] is True
     assert result["old_priority"] == 200
     assert result["new_priority"] == 350
     assert result["boost_amount"] == 150
-    
+
     # Verify boost count increased
     boosted_job = mock_client.get_job_details(job_id)
     assert boosted_job["priority"] == 350
     assert boosted_job["priority_boost_count"] == 1
-    
+
     # Test boost with validation - should return failure for out-of-range result
     result = mock_client.boost_job_priority(job_id, boost_amount=800)
     assert result["success"] is False
@@ -496,8 +500,10 @@ def test_list_jobs_by_priority(mock_client, sample_job_config, sample_sweep_conf
     job1 = mock_client.add_job(sample_job_config, sample_sweep_config_id, priority=100)
     job2 = mock_client.add_job(sample_job_config, sample_sweep_config_id, priority=500)
     job3 = mock_client.add_job(sample_job_config, sample_sweep_config_id, priority=200)
-    job4 = mock_client.add_job(sample_job_config, sample_sweep_config_id, status="running", priority=300)
-    
+    job4 = mock_client.add_job(
+        sample_job_config, sample_sweep_config_id, status="running", priority=300
+    )
+
     # List all jobs by priority
     all_jobs = mock_client.list_jobs_by_priority()
     assert len(all_jobs) == 4
@@ -506,12 +512,12 @@ def test_list_jobs_by_priority(mock_client, sample_job_config, sample_sweep_conf
     assert all_jobs[1]["id"] == job4["id"]  # priority 300
     assert all_jobs[2]["id"] == job3["id"]  # priority 200
     assert all_jobs[3]["id"] == job1["id"]  # priority 100
-    
+
     # Filter by status
     queued_jobs = mock_client.list_jobs_by_priority(status_filter=["queued"])
     assert len(queued_jobs) == 3
     assert queued_jobs[0]["id"] == job2["id"]  # Highest priority queued job
-    
+
     # Test limit
     limited_jobs = mock_client.list_jobs_by_priority(limit=2)
     assert len(limited_jobs) == 2
@@ -519,21 +525,23 @@ def test_list_jobs_by_priority(mock_client, sample_job_config, sample_sweep_conf
     assert limited_jobs[1]["id"] == job4["id"]
 
 
-def test_claim_job_respects_priority(mock_client, sample_job_config, sample_sweep_config_id):
+def test_claim_job_respects_priority(
+    mock_client, sample_job_config, sample_sweep_config_id
+):
     """Test that claim_job respects priority order."""
     # Add jobs with different priorities
     job1 = mock_client.add_job(sample_job_config, sample_sweep_config_id, priority=100)
     job2 = mock_client.add_job(sample_job_config, sample_sweep_config_id, priority=500)
     job3 = mock_client.add_job(sample_job_config, sample_sweep_config_id, priority=200)
-    
+
     # Should claim highest priority job first
     claimed = mock_client.claim_job()
     assert claimed["id"] == job2["id"]  # priority 500
-    
+
     # Next claim should get second highest
     claimed = mock_client.claim_job()
     assert claimed["id"] == job3["id"]  # priority 200
-    
+
     # Last claim should get lowest
     claimed = mock_client.claim_job()
     assert claimed["id"] == job1["id"]  # priority 100
@@ -546,51 +554,55 @@ def test_add_reserved_job(mock_client, sample_job_config, sample_sweep_config_id
         sweep_config_id=sample_sweep_config_id,
         reserved_for_worker="worker_123",
         reservation_timeout=600,
-        priority=800
+        priority=800,
     )
-    
+
     assert reserved_job["reserved_for_worker"] == "worker_123"
     assert reserved_job["priority"] == 800
     assert "reservation_expires_at" in reserved_job
-    
+
     # Test reservation without timeout
     reserved_job_no_timeout = mock_client.add_reserved_job(
         job_config=sample_job_config,
         sweep_config_id=sample_sweep_config_id,
         reserved_for_worker="worker_456",
         reservation_timeout=None,
-        priority=700
+        priority=700,
     )
-    
+
     assert "reservation_expires_at" not in reserved_job_no_timeout
 
 
-def test_claim_job_respects_reservations(mock_client, sample_job_config, sample_sweep_config_id):
+def test_claim_job_respects_reservations(
+    mock_client, sample_job_config, sample_sweep_config_id
+):
     """Test that claim_job respects job reservations."""
     # Add regular job and reserved job
-    regular_job = mock_client.add_job(sample_job_config, sample_sweep_config_id, priority=500)
+    regular_job = mock_client.add_job(
+        sample_job_config, sample_sweep_config_id, priority=500
+    )
     reserved_job = mock_client.add_reserved_job(
         job_config=sample_job_config,
         sweep_config_id=sample_sweep_config_id,
         reserved_for_worker="worker_123",
-        priority=800  # Higher priority but reserved
+        priority=800,  # Higher priority but reserved
     )
-    
+
     # Wrong worker should not be able to claim reserved job
     claimed = mock_client.claim_job(worker_id="worker_456", respect_reservations=True)
     assert claimed["id"] == regular_job["id"]  # Gets regular job instead
-    
+
     # Correct worker should be able to claim reserved job
     claimed = mock_client.claim_job(worker_id="worker_123", respect_reservations=True)
     assert claimed["id"] == reserved_job["id"]
-    
+
     # Test without respecting reservations
     reserved_job2 = mock_client.add_reserved_job(
         job_config=sample_job_config,
         sweep_config_id=sample_sweep_config_id,
         reserved_for_worker="worker_999",
-        priority=900
+        priority=900,
     )
-    
+
     claimed = mock_client.claim_job(worker_id="worker_456", respect_reservations=False)
     assert claimed["id"] == reserved_job2["id"]  # Can claim despite reservation

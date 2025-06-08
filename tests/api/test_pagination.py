@@ -9,10 +9,10 @@ def test_pagination_basic(client, db_client):
     jobs = []
     for i in range(25):
         job = create_test_job(
-            db_client, 
-            job_config={"index": i}, 
+            db_client,
+            job_config={"index": i},
             sweep_config_id=f"sweep{i}",
-            priority=100 + i  # Varying priorities for sorting
+            priority=100 + i,  # Varying priorities for sorting
         )
         jobs.append(job)
 
@@ -27,7 +27,7 @@ def test_pagination_basic(client, db_client):
     resp = client.get("/jobs?paginated=true&page=1&per_page=10")
     assert resp.status_code == 200
     data = resp.json()
-    
+
     # Check pagination metadata
     assert data["total"] == 25
     assert data["page"] == 1
@@ -91,11 +91,15 @@ def test_pagination_with_filtering(client, db_client):
     """Test pagination combined with filtering."""
     # Create jobs with different statuses
     _queued_jobs = [
-        create_test_job(db_client, status=JobStatus.QUEUED, sweep_config_id=f"queued{i}")
+        create_test_job(
+            db_client, status=JobStatus.QUEUED, sweep_config_id=f"queued{i}"
+        )
         for i in range(15)
     ]
     _running_jobs = [
-        create_test_job(db_client, status=JobStatus.RUNNING, sweep_config_id=f"running{i}")
+        create_test_job(
+            db_client, status=JobStatus.RUNNING, sweep_config_id=f"running{i}"
+        )
         for i in range(10)
     ]
 
@@ -103,9 +107,9 @@ def test_pagination_with_filtering(client, db_client):
     resp = client.get("/jobs?paginated=true&job_status=queued&page=1&per_page=10")
     assert resp.status_code == 200
     data = resp.json()
-    
+
     assert data["total"] == 15  # Only queued jobs
-    assert data["pages"] == 2   # 15 jobs / 10 per page = 2 pages
+    assert data["pages"] == 2  # 15 jobs / 10 per page = 2 pages
     assert len(data["jobs"]) == 10
     assert all(job["status"] == JobStatus.QUEUED for job in data["jobs"])
 
@@ -128,25 +132,29 @@ def test_pagination_with_sorting(client, db_client):
             db_client,
             priority=priority,
             sweep_config_id=f"job{i}",
-            job_config={"priority_value": priority}
+            job_config={"priority_value": priority},
         )
         jobs.append(job)
 
     # Test pagination with sorting by priority (descending)
-    resp = client.get("/jobs?paginated=true&sort_by=priority&sort_order=desc&page=1&per_page=2")
+    resp = client.get(
+        "/jobs?paginated=true&sort_by=priority&sort_order=desc&page=1&per_page=2"
+    )
     assert resp.status_code == 200
     data = resp.json()
-    
+
     assert data["total"] == 4
     assert data["pages"] == 2
     assert len(data["jobs"]) == 2
-    
+
     # Should be highest priorities first
     priorities_returned = [job["priority"] for job in data["jobs"]]
     assert priorities_returned == [Priority.URGENT, Priority.HIGH]
 
     # Test second page
-    resp = client.get("/jobs?paginated=true&sort_by=priority&sort_order=desc&page=2&per_page=2")
+    resp = client.get(
+        "/jobs?paginated=true&sort_by=priority&sort_order=desc&page=2&per_page=2"
+    )
     assert resp.status_code == 200
     data = resp.json()
     assert len(data["jobs"]) == 2
@@ -165,13 +173,9 @@ def test_pagination_with_complex_filtering(client, db_client):
         {"priority": Priority.HIGH, "status": JobStatus.RUNNING},
         {"priority": Priority.URGENT, "status": JobStatus.COMPLETED},
     ]
-    
+
     for i, job_params in enumerate(test_jobs):
-        create_test_job(
-            db_client,
-            sweep_config_id=f"complex{i}",
-            **job_params
-        )
+        create_test_job(db_client, sweep_config_id=f"complex{i}", **job_params)
 
     # Test filtering by status and priority range with pagination
     resp = client.get(
@@ -184,16 +188,16 @@ def test_pagination_with_complex_filtering(client, db_client):
     )
     assert resp.status_code == 200
     data = resp.json()
-    
+
     # Should find 2 queued jobs with priority >= 200 (NORMAL and HIGH)
     assert data["total"] == 2
     assert data["pages"] == 1
     assert len(data["jobs"]) == 2
-    
+
     for job in data["jobs"]:
         assert job["status"] == JobStatus.QUEUED
         assert job["priority"] >= 200
-    
+
     # Should be sorted by priority descending
     priorities = [job["priority"] for job in data["jobs"]]
     assert priorities == [Priority.HIGH, Priority.NORMAL]
@@ -209,7 +213,7 @@ def test_empty_pagination_results(client, db_client):
     resp = client.get("/jobs?paginated=true&job_status=completed")
     assert resp.status_code == 200
     data = resp.json()
-    
+
     assert data["total"] == 0
     assert data["pages"] == 0
     assert len(data["jobs"]) == 0

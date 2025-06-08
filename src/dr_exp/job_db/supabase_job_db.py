@@ -16,7 +16,7 @@ logger = logging.getLogger(__name__)
 
 class SupabaseJobDB(BaseJobDB):
     """Supabase-backed job database implementation.
-    
+
     This class provides a production-ready job database implementation using
     Supabase as the backend for job storage, configuration management, and
     artifact storage.
@@ -39,11 +39,13 @@ class SupabaseJobDB(BaseJobDB):
         # Initialize base class first
         super().__init__(config.base_path, config.storage_path)
         self.config = config
-        
+
         if not config.supabase_url or not config.supabase_key:
             raise ValueError("Supabase URL and Key must be provided in config.")
         try:
-            self.supabase: Client = create_client(config.supabase_url, config.supabase_key)
+            self.supabase: Client = create_client(
+                config.supabase_url, config.supabase_key
+            )
             logger.info("Successfully connected to Supabase.")
         except Exception as e:
             logger.error(f"Failed to connect to Supabase: {e}")
@@ -69,7 +71,7 @@ class SupabaseJobDB(BaseJobDB):
         """
         # Handle None worker_id by providing default
         effective_worker_id = worker_id or "unassigned_worker"
-        
+
         try:
             # Assumes a PostgreSQL function `claim_next_job(worker_id_input TEXT)` exists
             response = self.supabase.rpc(
@@ -325,7 +327,9 @@ class SupabaseJobDB(BaseJobDB):
                     )
             return {"success": True, "storage_path": remote_full_path}
         except Exception as e:
-            logger.error(f"Error uploading artifact '{local_path}' for job {job_id}: {e}")
+            logger.error(
+                f"Error uploading artifact '{local_path}' for job {job_id}: {e}"
+            )
             return {"success": False, "message": str(e)}
 
     # --- Methods primarily for Config Generator ---
@@ -447,7 +451,7 @@ class SupabaseJobDB(BaseJobDB):
         try:
             # Validate priority is in valid range
             priority = self._validate_priority(priority)
-            
+
             data = {
                 "config_id": config_id,
                 "status": status,
@@ -472,7 +476,7 @@ class SupabaseJobDB(BaseJobDB):
         reason: Optional[str] = None,
     ) -> Dict[str, Any]:
         """Update the priority of a job.
-        
+
         Parameters
         ----------
         job_id : str
@@ -481,7 +485,7 @@ class SupabaseJobDB(BaseJobDB):
             New priority value (0-1000). Higher values indicate higher priority.
         reason : str, optional
             Optional reason for the priority change, for audit purposes.
-            
+
         Returns
         -------
         dict[str, Any]
@@ -489,7 +493,7 @@ class SupabaseJobDB(BaseJobDB):
         """
         # Validate priority is in valid range
         new_priority = self._validate_priority(new_priority)
-        
+
         try:
             # Update job priority
             update_data = {"priority": new_priority}
@@ -499,16 +503,16 @@ class SupabaseJobDB(BaseJobDB):
                 .eq("id", job_id)
                 .execute()
             )
-            
+
             if response.data:
                 return {
                     "success": True,
                     "new_priority": new_priority,
-                    "message": f"Priority updated to {new_priority}"
+                    "message": f"Priority updated to {new_priority}",
                 }
             else:
                 return {"success": False, "message": "Job not found or update failed"}
-                
+
         except Exception as e:
             logger.error(f"Error updating job priority for {job_id}: {e}")
             return {"success": False, "message": str(e)}
@@ -519,7 +523,7 @@ class SupabaseJobDB(BaseJobDB):
         boost_amount: int = 100,
     ) -> Dict[str, Any]:
         """Boost the priority of a job by a specified amount.
-        
+
         Parameters
         ----------
         job_id : str
@@ -527,7 +531,7 @@ class SupabaseJobDB(BaseJobDB):
         boost_amount : int, optional
             Amount to add to the current priority, by default 100.
             Final priority will be clamped to valid range (0-1000).
-            
+
         Returns
         -------
         dict[str, Any]
@@ -542,13 +546,13 @@ class SupabaseJobDB(BaseJobDB):
                 .single()
                 .execute()
             )
-            
+
             if not response.data:
                 return {"success": False, "message": "Job not found"}
-                
+
             old_priority = response.data.get("priority", 100)
             new_priority = self._validate_priority(old_priority + boost_amount)
-            
+
             # Update priority
             update_response = (
                 self.supabase.table("jobs")
@@ -556,18 +560,18 @@ class SupabaseJobDB(BaseJobDB):
                 .eq("id", job_id)
                 .execute()
             )
-            
+
             if update_response.data:
                 return {
                     "success": True,
                     "old_priority": old_priority,
                     "new_priority": new_priority,
                     "boost_amount": boost_amount,
-                    "message": f"Priority boosted from {old_priority} to {new_priority}"
+                    "message": f"Priority boosted from {old_priority} to {new_priority}",
                 }
             else:
                 return {"success": False, "message": "Priority boost failed"}
-                
+
         except Exception as e:
             logger.error(f"Error boosting job priority for {job_id}: {e}")
             return {"success": False, "message": str(e)}
@@ -578,7 +582,7 @@ class SupabaseJobDB(BaseJobDB):
         limit: Optional[int] = None,
     ) -> List[Dict[str, Any]]:
         """List jobs ordered by priority (highest first).
-        
+
         Parameters
         ----------
         status_filter : list[str], optional
@@ -586,7 +590,7 @@ class SupabaseJobDB(BaseJobDB):
             If None, all jobs are returned.
         limit : int, optional
             Maximum number of jobs to return. If None, all matching jobs.
-            
+
         Returns
         -------
         list[dict[str, Any]]
@@ -595,21 +599,21 @@ class SupabaseJobDB(BaseJobDB):
         """
         try:
             query = self.supabase.table("jobs").select("*")
-            
+
             # Apply status filter
             if status_filter:
                 query = query.in_("status", status_filter)
-            
+
             # Order by priority (descending), then by created_at (ascending)
             query = query.order("priority", desc=True).order("created_at", desc=False)
-            
+
             # Apply limit
             if limit is not None:
                 query = query.limit(limit)
-                
+
             response = query.execute()
             return response.data if response.data else []
-            
+
         except Exception as e:
             logger.error(f"Error listing jobs by priority: {e}")
             return []
@@ -626,7 +630,7 @@ class SupabaseJobDB(BaseJobDB):
         status: str = "queued",
     ) -> Dict[str, Any]:
         """Add a new job entry reserved for a specific worker.
-        
+
         Parameters
         ----------
         job_config : dict[str, Any]
@@ -642,7 +646,7 @@ class SupabaseJobDB(BaseJobDB):
             Job priority for queue ordering (0-1000), by default 100.
         status : str, optional
             Initial job status, by default "queued".
-            
+
         Returns
         -------
         dict[str, Any]
@@ -650,7 +654,7 @@ class SupabaseJobDB(BaseJobDB):
         """
         # Validate priority is in valid range
         priority = self._validate_priority(priority)
-        
+
         data = {
             "config_id": sweep_config_id,
             "status": status,
@@ -659,19 +663,23 @@ class SupabaseJobDB(BaseJobDB):
             "reserved_for_worker": reserved_for_worker,
             # created_at is handled by DB default
         }
-        
+
         # Add expiration time if timeout is specified
         if reservation_timeout is not None:
-            expires_at = datetime.now(timezone.utc) + timedelta(seconds=reservation_timeout)
+            expires_at = datetime.now(timezone.utc) + timedelta(
+                seconds=reservation_timeout
+            )
             data["reservation_expires_at"] = expires_at.isoformat()
-        
+
         try:
             response = self.supabase.table("jobs").insert(data).execute()
             if response.data:
                 job_record = response.data[0]
                 # Add the config_json to the response for consistency with LocalJobDB
                 job_record["config_json"] = job_config
-                logger.info(f"Added reserved job {job_record['id']} for worker {reserved_for_worker}")
+                logger.info(
+                    f"Added reserved job {job_record['id']} for worker {reserved_for_worker}"
+                )
                 return job_record
             else:
                 raise Exception("No data returned from insert")
@@ -701,8 +709,10 @@ class SupabaseJobDB(BaseJobDB):
         """Find jobs with heartbeats older than max_age_seconds."""
         try:
             # Calculate cutoff time
-            cutoff_time = datetime.now(timezone.utc) - timedelta(seconds=max_age_seconds)
-            
+            cutoff_time = datetime.now(timezone.utc) - timedelta(
+                seconds=max_age_seconds
+            )
+
             response = (
                 self.supabase.table("jobs")
                 .select("id, assigned_worker, heartbeat")
@@ -712,81 +722,91 @@ class SupabaseJobDB(BaseJobDB):
                 .lt("heartbeat", cutoff_time.isoformat())
                 .execute()
             )
-            
+
             stale_jobs = []
             now = datetime.now(timezone.utc)
-            
+
             for job in response.data or []:
                 try:
                     heartbeat_str = job.get("heartbeat")
                     if heartbeat_str:
-                        heartbeat_time = datetime.fromisoformat(heartbeat_str.replace("Z", ""))
+                        heartbeat_time = datetime.fromisoformat(
+                            heartbeat_str.replace("Z", "")
+                        )
                         if heartbeat_time.tzinfo is None:
                             heartbeat_time = heartbeat_time.replace(tzinfo=timezone.utc)
-                        
+
                         age_seconds = int((now - heartbeat_time).total_seconds())
-                        
-                        stale_jobs.append(StaleJobInfo(
-                            job_id=job["id"],
-                            assigned_worker=job["assigned_worker"],
-                            last_heartbeat=heartbeat_time,
-                            age_seconds=age_seconds
-                        ))
+
+                        stale_jobs.append(
+                            StaleJobInfo(
+                                job_id=job["id"],
+                                assigned_worker=job["assigned_worker"],
+                                last_heartbeat=heartbeat_time,
+                                age_seconds=age_seconds,
+                            )
+                        )
                 except (ValueError, TypeError) as e:
-                    logger.error(f"Error parsing heartbeat for job {job.get('id')}: {e}")
+                    logger.error(
+                        f"Error parsing heartbeat for job {job.get('id')}: {e}"
+                    )
                     continue
-            
+
             return stale_jobs
-            
+
         except Exception as e:
             logger.error(f"Error getting stale jobs: {e}")
             return []
 
     def mark_jobs_failed(
-        self, 
-        job_ids: List[str], 
-        reason: str = "worker_lost"
+        self, job_ids: List[str], reason: str = "worker_lost"
     ) -> Dict[str, bool]:
         """Mark multiple jobs as failed efficiently."""
         if not job_ids:
             return {}
-        
+
         results = {}
         current_time = datetime.now(timezone.utc).isoformat()
-        
+
         try:
             # Batch update using Supabase
             response = (
                 self.supabase.table("jobs")
-                .update({
-                    "status": "failed",
-                    "status_reason": reason,
-                    "end_time": current_time
-                })
+                .update(
+                    {
+                        "status": "failed",
+                        "status_reason": reason,
+                        "end_time": current_time,
+                    }
+                )
                 .in_("id", job_ids)
                 .execute()
             )
-            
+
             # Mark all as successful if the batch update worked
             updated_jobs = response.data or []
             updated_job_ids = {job["id"] for job in updated_jobs}
-            
+
             for job_id in job_ids:
                 results[job_id] = job_id in updated_job_ids
-                
+
         except Exception as e:
-            logger.warning(f"Error in batch update, falling back to individual updates: {e}")
-            
+            logger.warning(
+                f"Error in batch update, falling back to individual updates: {e}"
+            )
+
             # Fallback: individual updates
             for job_id in job_ids:
                 try:
                     response = (
                         self.supabase.table("jobs")
-                        .update({
-                            "status": "failed",
-                            "status_reason": reason,
-                            "end_time": current_time
-                        })
+                        .update(
+                            {
+                                "status": "failed",
+                                "status_reason": reason,
+                                "end_time": current_time,
+                            }
+                        )
                         .eq("id", job_id)
                         .execute()
                     )
@@ -794,7 +814,7 @@ class SupabaseJobDB(BaseJobDB):
                 except Exception as e:
                     logger.error(f"Error marking job {job_id} as failed: {e}")
                     results[job_id] = False
-        
+
         return results
 
     def has_queued_jobs(self) -> bool:
@@ -824,19 +844,21 @@ class SupabaseJobDB(BaseJobDB):
                 .limit(limit)
                 .execute()
             )
-            
+
             return response.data or []
-            
+
         except Exception as e:
             logger.error(f"Error getting queue summary: {e}")
             return []
 
-    def get_metrics(self, run_id: str, limit: Optional[int] = 500) -> List[Dict[str, Any]]:
+    def get_metrics(
+        self, run_id: str, limit: Optional[int] = 500
+    ) -> List[Dict[str, Any]]:
         """Get metrics for a specific run.
-        
+
         For Supabase, this first checks local storage for faster access,
         then downloads from Supabase storage bucket with retry logic.
-        
+
         Parameters
         ----------
         run_id : str
@@ -844,12 +866,12 @@ class SupabaseJobDB(BaseJobDB):
         limit : int, optional
             Maximum number of recent metrics to return, by default 500.
             If None, returns all metrics.
-            
+
         Returns
         -------
         List[Dict[str, Any]]
             List of metrics records for the run.
-            
+
         Raises
         ------
         FileNotFoundError
@@ -857,63 +879,81 @@ class SupabaseJobDB(BaseJobDB):
         """
         import json
         import os
-        
+
         # Try local storage first (faster)
-        local_metrics_path = os.path.join(self.storage_dir, f"run_{run_id}", "metrics.jsonl")
-        
+        local_metrics_path = os.path.join(
+            self.storage_dir, f"run_{run_id}", "metrics.jsonl"
+        )
+
         if os.path.exists(local_metrics_path):
             metrics = []
             with open(local_metrics_path, "r") as f:
                 for line in f:
                     if line.strip():
                         metrics.append(json.loads(line))
-            
+
             # Apply limit if specified
             if limit is not None and len(metrics) > limit:
                 metrics = metrics[-limit:]
-                
+
             return metrics
-        
+
         # Implement Supabase storage download with retry logic
         storage_path = f"run_{run_id}/metrics.jsonl"
         max_retries = 3
-        
+
         for attempt in range(max_retries):
             try:
                 # Download from Supabase storage bucket
-                response = self.supabase.storage.from_("experiment-artifacts").download(storage_path)
-                
+                response = self.supabase.storage.from_("experiment-artifacts").download(
+                    storage_path
+                )
+
                 if response:
                     metrics = []
                     # Parse the downloaded content line by line
-                    content = response.decode('utf-8')
-                    for line in content.strip().split('\n'):
+                    content = response.decode("utf-8")
+                    for line in content.strip().split("\n"):
                         if line.strip():
                             try:
                                 metrics.append(json.loads(line))
                             except json.JSONDecodeError as e:
-                                logger.warning(f"Failed to parse metrics line: {line[:100]}... Error: {e}")
+                                logger.warning(
+                                    f"Failed to parse metrics line: {line[:100]}... Error: {e}"
+                                )
                                 continue
-                    
+
                     # Apply limit if specified
                     if limit is not None and len(metrics) > limit:
                         metrics = metrics[-limit:]
-                        
-                    logger.info(f"Successfully downloaded {len(metrics)} metrics from Supabase storage for run {run_id}")
+
+                    logger.info(
+                        f"Successfully downloaded {len(metrics)} metrics from Supabase storage for run {run_id}"
+                    )
                     return metrics
                 else:
-                    raise FileNotFoundError(f"Metrics file not found in Supabase storage for run {run_id}")
-                    
+                    raise FileNotFoundError(
+                        f"Metrics file not found in Supabase storage for run {run_id}"
+                    )
+
             except Exception as e:
                 if attempt == max_retries - 1:
                     # Last attempt failed
-                    logger.error(f"Error downloading metrics from Supabase storage for run {run_id} after {max_retries} attempts: {e}")
-                    raise FileNotFoundError(f"Could not retrieve metrics from storage: {e}")
+                    logger.error(
+                        f"Error downloading metrics from Supabase storage for run {run_id} after {max_retries} attempts: {e}"
+                    )
+                    raise FileNotFoundError(
+                        f"Could not retrieve metrics from storage: {e}"
+                    )
                 else:
-                    logger.warning(f"Retry {attempt + 1}/{max_retries} for downloading metrics from Supabase storage for run {run_id}: {e}")
+                    logger.warning(
+                        f"Retry {attempt + 1}/{max_retries} for downloading metrics from Supabase storage for run {run_id}: {e}"
+                    )
                     continue
 
-    def finalize_job(self, job_id: str, final_status: str, metadata: Dict[str, Any]) -> Dict[str, Any]:
+    def finalize_job(
+        self, job_id: str, final_status: str, metadata: Dict[str, Any]
+    ) -> Dict[str, Any]:
         """Finalize a job with the given status and metadata."""
         return self._default_finalize_job_logic(job_id, final_status, metadata)
 

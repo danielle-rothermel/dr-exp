@@ -10,20 +10,20 @@ def reset_job_db() -> None:
     """Remove all local database and storage files then recreate empty dirs."""
     # Get config to find correct paths
     config = JobDBConfig.from_env()
-    
+
     if config.mode != "files_local":
         raise ValueError("Can only reset database in files_local mode")
-    
+
     # Get paths from config
     jobs_dir = os.path.join(config.base_path, "job_data")
     storage_dir = config.storage_path
-    
+
     # Remove directories if they exist
     for path in (jobs_dir, storage_dir):
         if os.path.exists(path):
             print(f"Removing {path}")
             shutil.rmtree(path)
-    
+
     # Create a new client to reinitialize directories
     get_job_db_client(config)
     print("JobDB reset complete")

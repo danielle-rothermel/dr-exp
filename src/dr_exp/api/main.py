@@ -12,7 +12,15 @@ from enum import Enum
 from dotenv import load_dotenv
 
 from cachetools import LRUCache
-from fastapi import Depends, FastAPI, HTTPException, status, Security, WebSocket, WebSocketDisconnect
+from fastapi import (
+    Depends,
+    FastAPI,
+    HTTPException,
+    status,
+    Security,
+    WebSocket,
+    WebSocketDisconnect,
+)
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
 
@@ -42,6 +50,7 @@ API_STARTUP_TIME = time.time()
 
 class UserRole(str, Enum):
     """User roles for API access control."""
+
     ADMIN = "admin"
     READER = "reader"
 
@@ -52,21 +61,25 @@ security = HTTPBearer()
 
 class ConnectionManager:
     """WebSocket connection manager for real-time updates."""
-    
+
     def __init__(self):
         self.active_connections: Set[WebSocket] = set()
-    
+
     async def connect(self, websocket: WebSocket):
         """Accept a new WebSocket connection."""
         await websocket.accept()
         self.active_connections.add(websocket)
-        logger.info(f"WebSocket connected. Total connections: {len(self.active_connections)}")
-    
+        logger.info(
+            f"WebSocket connected. Total connections: {len(self.active_connections)}"
+        )
+
     def disconnect(self, websocket: WebSocket):
         """Remove a WebSocket connection."""
         self.active_connections.discard(websocket)
-        logger.info(f"WebSocket disconnected. Total connections: {len(self.active_connections)}")
-    
+        logger.info(
+            f"WebSocket disconnected. Total connections: {len(self.active_connections)}"
+        )
+
     async def send_personal_message(self, message: str, websocket: WebSocket):
         """Send a message to a specific WebSocket connection."""
         try:
@@ -74,22 +87,22 @@ class ConnectionManager:
         except Exception as e:
             logger.error(f"Error sending personal message: {e}")
             self.disconnect(websocket)
-    
+
     async def broadcast(self, message: dict):
         """Broadcast a message to all connected clients."""
         if not self.active_connections:
             return
-        
+
         message_text = json.dumps(message)
         disconnected = set()
-        
+
         for connection in self.active_connections:
             try:
                 await connection.send_text(message_text)
             except Exception as e:
                 logger.error(f"Error broadcasting to connection: {e}")
                 disconnected.add(connection)
-        
+
         # Remove disconnected clients
         for connection in disconnected:
             self.disconnect(connection)
@@ -119,34 +132,36 @@ def get_reader_key() -> str:
     return os.getenv("READER_API_KEY", "readkey")
 
 
-def authenticate_user(credentials: HTTPAuthorizationCredentials = Security(security)) -> UserRole:
+def authenticate_user(
+    credentials: HTTPAuthorizationCredentials = Security(security),
+) -> UserRole:
     """Authenticate a user and return their role.
-    
+
     Parameters
     ----------
     credentials : HTTPAuthorizationCredentials
         Bearer token credentials from the Authorization header.
-        
+
     Returns
     -------
     UserRole
         The authenticated user's role.
-        
+
     Raises
     ------
     HTTPException
         If the token is invalid or missing.
     """
     token = credentials.credentials
-    
+
     # Check for admin access
     if token == get_admin_key():
         return UserRole.ADMIN
-    
+
     # Check for reader access
     if token == get_reader_key():
         return UserRole.READER
-    
+
     # Invalid token
     raise HTTPException(
         status_code=status.HTTP_401_UNAUTHORIZED,
@@ -157,17 +172,17 @@ def authenticate_user(credentials: HTTPAuthorizationCredentials = Security(secur
 
 def require_admin(user_role: UserRole = Depends(authenticate_user)) -> UserRole:
     """Dependency that requires admin role.
-    
+
     Parameters
     ----------
     user_role : UserRole
         The authenticated user's role.
-        
+
     Returns
     -------
     UserRole
         The user's role if they are an admin.
-        
+
     Raises
     ------
     HTTPException
@@ -175,25 +190,26 @@ def require_admin(user_role: UserRole = Depends(authenticate_user)) -> UserRole:
     """
     if user_role != UserRole.ADMIN:
         raise HTTPException(
-            status_code=status.HTTP_403_FORBIDDEN,
-            detail="Admin access required"
+            status_code=status.HTTP_403_FORBIDDEN, detail="Admin access required"
         )
     return user_role
 
 
-def require_reader_or_admin(user_role: UserRole = Depends(authenticate_user)) -> UserRole:
+def require_reader_or_admin(
+    user_role: UserRole = Depends(authenticate_user),
+) -> UserRole:
     """Dependency that requires reader or admin role.
-    
+
     Parameters
     ----------
     user_role : UserRole
         The authenticated user's role.
-        
+
     Returns
     -------
     UserRole
         The user's role if they have read access.
-        
+
     Raises
     ------
     HTTPException
@@ -205,12 +221,12 @@ def require_reader_or_admin(user_role: UserRole = Depends(authenticate_user)) ->
 
 def get_job_statistics(client: BaseJobDB) -> Dict[str, int]:
     """Get job statistics by status.
-    
+
     Parameters
     ----------
     client : BaseJobDB
         Database client to query jobs from.
-        
+
     Returns
     -------
     Dict[str, int]
@@ -219,12 +235,12 @@ def get_job_statistics(client: BaseJobDB) -> Dict[str, int]:
     try:
         jobs = client.list_jobs()
         status_counts = Counter(job.get("status", "unknown") for job in jobs)
-        
+
         # Ensure all standard statuses are represented
         for status in ["queued", "running", "completed", "failed", "killed"]:
             if status not in status_counts:
                 status_counts[status] = 0
-                
+
         return dict(status_counts)
     except Exception as e:
         logger.error(f"Error collecting job statistics: {e}")
@@ -233,12 +249,12 @@ def get_job_statistics(client: BaseJobDB) -> Dict[str, int]:
 
 def check_database_health(client: BaseJobDB) -> str:
     """Check if database is accessible.
-    
+
     Parameters
     ----------
     client : BaseJobDB
         Database client to test.
-        
+
     Returns
     -------
     str
@@ -255,31 +271,30 @@ def check_database_health(client: BaseJobDB) -> str:
 
 def raise_job_not_found(job_id: str) -> None:
     """Raise a standardized job not found error.
-    
+
     Parameters
     ----------
     job_id : str
         The job ID that was not found.
-        
+
     Raises
     ------
     HTTPException
         404 error with standardized message.
     """
     raise HTTPException(
-        status_code=status.HTTP_404_NOT_FOUND,
-        detail=f"Job {job_id} not found"
+        status_code=status.HTTP_404_NOT_FOUND, detail=f"Job {job_id} not found"
     )
 
 
 def raise_config_not_found(job_id: str) -> None:
     """Raise a standardized config not found error.
-    
+
     Parameters
     ----------
     job_id : str
         The job ID whose config was not found.
-        
+
     Raises
     ------
     HTTPException
@@ -287,18 +302,18 @@ def raise_config_not_found(job_id: str) -> None:
     """
     raise HTTPException(
         status_code=status.HTTP_404_NOT_FOUND,
-        detail=f"Configuration for job {job_id} not found"
+        detail=f"Configuration for job {job_id} not found",
     )
 
 
 def raise_metrics_not_found(run_id: str) -> None:
     """Raise a standardized metrics not found error.
-    
+
     Parameters
     ----------
     run_id : str
         The run ID whose metrics were not found.
-        
+
     Raises
     ------
     HTTPException
@@ -306,20 +321,20 @@ def raise_metrics_not_found(run_id: str) -> None:
     """
     raise HTTPException(
         status_code=status.HTTP_404_NOT_FOUND,
-        detail=f"Metrics for run {run_id} not found"
+        detail=f"Metrics for run {run_id} not found",
     )
 
 
 def filter_and_sort_jobs(
-    jobs: List[Dict[str, Any]], 
+    jobs: List[Dict[str, Any]],
     status: Optional[str] = None,
     priority_min: Optional[int] = None,
     priority_max: Optional[int] = None,
     sort_by: str = "created_at",
-    sort_order: str = "desc"
+    sort_order: str = "desc",
 ) -> List[Dict[str, Any]]:
     """Filter and sort a list of jobs.
-    
+
     Parameters
     ----------
     jobs : List[Dict[str, Any]]
@@ -335,51 +350,63 @@ def filter_and_sort_jobs(
         Valid values: created_at, priority, status, retry_index
     sort_order : str, optional
         Sort order, by default "desc". Valid values: asc, desc
-        
+
     Returns
     -------
     List[Dict[str, Any]]
         Filtered and sorted list of jobs.
     """
     filtered_jobs = jobs.copy()
-    
+
     # Apply status filter
     if status:
         filtered_jobs = [job for job in filtered_jobs if job.get("status") == status]
-    
+
     # Apply priority filters
     if priority_min is not None:
-        filtered_jobs = [job for job in filtered_jobs if job.get("priority", 100) >= priority_min]
-    
+        filtered_jobs = [
+            job for job in filtered_jobs if job.get("priority", 100) >= priority_min
+        ]
+
     if priority_max is not None:
-        filtered_jobs = [job for job in filtered_jobs if job.get("priority", 100) <= priority_max]
-    
+        filtered_jobs = [
+            job for job in filtered_jobs if job.get("priority", 100) <= priority_max
+        ]
+
     # Apply sorting
     valid_sort_fields = {"created_at", "priority", "status", "retry_index"}
     if sort_by not in valid_sort_fields:
         sort_by = "created_at"
-    
+
     reverse = sort_order.lower() == "desc"
-    
+
     try:
         if sort_by == "priority":
-            filtered_jobs.sort(key=lambda job: job.get("priority", 100), reverse=reverse)
+            filtered_jobs.sort(
+                key=lambda job: job.get("priority", 100), reverse=reverse
+            )
         elif sort_by == "retry_index":
-            filtered_jobs.sort(key=lambda job: job.get("retry_index", 0), reverse=reverse)
+            filtered_jobs.sort(
+                key=lambda job: job.get("retry_index", 0), reverse=reverse
+            )
         elif sort_by == "status":
             filtered_jobs.sort(key=lambda job: job.get("status", ""), reverse=reverse)
         else:  # created_at
-            filtered_jobs.sort(key=lambda job: job.get("created_at", ""), reverse=reverse)
+            filtered_jobs.sort(
+                key=lambda job: job.get("created_at", ""), reverse=reverse
+            )
     except Exception:
         # If sorting fails, return unsorted list
         pass
-    
+
     return filtered_jobs
 
 
-def paginate_jobs(jobs: List[Dict[str, Any]], page: int, per_page: int) -> PaginatedJobsResponse:
+def paginate_jobs(
+    jobs: List[Dict[str, Any]], page: int, per_page: int
+) -> PaginatedJobsResponse:
     """Paginate a list of jobs.
-    
+
     Parameters
     ----------
     jobs : List[Dict[str, Any]]
@@ -388,24 +415,24 @@ def paginate_jobs(jobs: List[Dict[str, Any]], page: int, per_page: int) -> Pagin
         Page number (1-based).
     per_page : int
         Number of jobs per page.
-        
+
     Returns
     -------
     PaginatedJobsResponse
         Paginated response with metadata.
     """
     import math
-    
+
     total = len(jobs)
     pages = math.ceil(total / per_page) if per_page > 0 else 0
-    
+
     # Calculate offset
     start = (page - 1) * per_page
     end = start + per_page
-    
+
     # Slice the jobs list
     paginated_jobs = jobs[start:end]
-    
+
     return PaginatedJobsResponse(
         jobs=[JobModel.model_validate(job) for job in paginated_jobs],
         total=total,
@@ -413,16 +440,14 @@ def paginate_jobs(jobs: List[Dict[str, Any]], page: int, per_page: int) -> Pagin
         per_page=per_page,
         pages=pages,
         has_next=page < pages,
-        has_prev=page > 1
+        has_prev=page > 1,
     )
 
 
 class MetricsLoader:
     """Load and cache run metrics from storage."""
 
-    def __init__(
-        self, client: BaseJobDB, maxsize: int = 32
-    ) -> None:
+    def __init__(self, client: BaseJobDB, maxsize: int = 32) -> None:
         """Create a loader instance.
 
         Parameters
@@ -460,7 +485,7 @@ class MetricsLoader:
         cache_key = f"{run_id}:{limit}"
         if cache_key in self.cache:
             return self.cache[cache_key]
-        
+
         # Use the abstract interface method instead of direct file access
         metrics = self.client.get_metrics(run_id, limit=limit)
         self.cache[cache_key] = metrics
@@ -523,23 +548,14 @@ def create_app(base_path: str = ".") -> FastAPI:
             "name": "MIT",
         },
         openapi_tags=[
+            {"name": "jobs", "description": "Job management and querying operations"},
             {
-                "name": "jobs",
-                "description": "Job management and querying operations"
+                "name": "admin",
+                "description": "Administrative operations requiring elevated permissions",
             },
-            {
-                "name": "admin", 
-                "description": "Administrative operations requiring elevated permissions"
-            },
-            {
-                "name": "monitoring",
-                "description": "Health checks and system metrics"
-            },
-            {
-                "name": "websocket",
-                "description": "Real-time communication endpoints"
-            }
-        ]
+            {"name": "monitoring", "description": "Health checks and system metrics"},
+            {"name": "websocket", "description": "Real-time communication endpoints"},
+        ],
     )
 
     # Add CORS middleware
@@ -550,7 +566,7 @@ def create_app(base_path: str = ".") -> FastAPI:
         allow_methods=["*"],
         allow_headers=["*"],
     )
-    
+
     # Add security headers middleware
     @app.middleware("http")
     async def add_security_headers(request, call_next):
@@ -560,30 +576,32 @@ def create_app(base_path: str = ".") -> FastAPI:
         response.headers["X-XSS-Protection"] = "1; mode=block"
         response.headers["Referrer-Policy"] = "strict-origin-when-cross-origin"
         return response
-    
+
     # Add request logging middleware
     @app.middleware("http")
     async def request_logging_middleware(request, call_next):
         start_time = time.time()
-        
+
         # Log request
         client_ip = request.client.host if request.client else "unknown"
-        logger.info(f"Request started: {request.method} {request.url.path} from {client_ip}")
-        
+        logger.info(
+            f"Request started: {request.method} {request.url.path} from {client_ip}"
+        )
+
         try:
             response = await call_next(request)
             process_time = time.time() - start_time
-            
+
             # Log response
             logger.info(
                 f"Request completed: {request.method} {request.url.path} "
                 f"-> {response.status_code} in {process_time:.3f}s"
             )
-            
+
             # Add timing header
             response.headers["X-Process-Time"] = str(process_time)
             return response
-            
+
         except Exception as e:
             process_time = time.time() - start_time
             logger.error(
@@ -608,15 +626,11 @@ def create_app(base_path: str = ".") -> FastAPI:
             "name": "DR Experiment Manager API",
             "version": "1.0.0",
             "versions": {
-                "v1": {
-                    "status": "stable",
-                    "prefix": "/api/v1",
-                    "docs": "/docs"
-                }
+                "v1": {"status": "stable", "prefix": "/api/v1", "docs": "/docs"}
             },
             "health_check": "/health",
             "metrics": "/metrics",
-            "websocket": "/ws"
+            "websocket": "/ws",
         }
 
     @app.websocket("/ws")
@@ -634,17 +648,17 @@ def create_app(base_path: str = ".") -> FastAPI:
 
     @app.get("/jobs", tags=["jobs"])
     async def list_jobs(
-        page: int = 1, 
+        page: int = 1,
         per_page: int = 20,
         paginated: bool = False,
         job_status: Optional[str] = None,
         priority_min: Optional[int] = None,
         priority_max: Optional[int] = None,
         sort_by: str = "created_at",
-        sort_order: str = "desc"
+        sort_order: str = "desc",
     ):
         """Return a list of available jobs with optional pagination, filtering, and sorting.
-        
+
         Parameters
         ----------
         page : int, optional
@@ -667,69 +681,73 @@ def create_app(base_path: str = ".") -> FastAPI:
             Sort order, by default "desc". Valid values: asc, desc
         """
         jobs = client.list_jobs()
-        
+
         # Apply filtering and sorting
         jobs = filter_and_sort_jobs(
-            jobs, 
+            jobs,
             status=job_status,
             priority_min=priority_min,
             priority_max=priority_max,
             sort_by=sort_by,
-            sort_order=sort_order
+            sort_order=sort_order,
         )
-        
+
         if paginated:
             # Validate pagination parameters
             if page < 1:
                 raise HTTPException(
                     status_code=status.HTTP_400_BAD_REQUEST,
-                    detail="Page number must be >= 1"
+                    detail="Page number must be >= 1",
                 )
             if per_page < 1 or per_page > 100:
                 raise HTTPException(
                     status_code=status.HTTP_400_BAD_REQUEST,
-                    detail="per_page must be between 1 and 100"
+                    detail="per_page must be between 1 and 100",
                 )
-            
+
             # Validate filter parameters
             valid_statuses = {"queued", "running", "completed", "failed", "killed"}
             if job_status and job_status not in valid_statuses:
                 raise HTTPException(
                     status_code=status.HTTP_400_BAD_REQUEST,
-                    detail=f"Invalid status. Valid values: {', '.join(valid_statuses)}"
+                    detail=f"Invalid status. Valid values: {', '.join(valid_statuses)}",
                 )
-            
+
             if priority_min is not None and (priority_min < 0 or priority_min > 1000):
                 raise HTTPException(
                     status_code=status.HTTP_400_BAD_REQUEST,
-                    detail="priority_min must be between 0 and 1000"
+                    detail="priority_min must be between 0 and 1000",
                 )
-            
+
             if priority_max is not None and (priority_max < 0 or priority_max > 1000):
                 raise HTTPException(
                     status_code=status.HTTP_400_BAD_REQUEST,
-                    detail="priority_max must be between 0 and 1000"
+                    detail="priority_max must be between 0 and 1000",
                 )
-            
-            if priority_min is not None and priority_max is not None and priority_min > priority_max:
+
+            if (
+                priority_min is not None
+                and priority_max is not None
+                and priority_min > priority_max
+            ):
                 raise HTTPException(
                     status_code=status.HTTP_400_BAD_REQUEST,
-                    detail="priority_min cannot be greater than priority_max"
+                    detail="priority_min cannot be greater than priority_max",
                 )
-            
+
             valid_sort_fields = {"created_at", "priority", "status", "retry_index"}
             if sort_by not in valid_sort_fields:
                 raise HTTPException(
                     status_code=status.HTTP_400_BAD_REQUEST,
-                    detail=f"Invalid sort_by. Valid values: {', '.join(valid_sort_fields)}"
+                    detail=f"Invalid sort_by. Valid values: {', '.join(valid_sort_fields)}",
                 )
-            
+
             if sort_order.lower() not in {"asc", "desc"}:
                 raise HTTPException(
                     status_code=status.HTTP_400_BAD_REQUEST,
-                    detail="sort_order must be 'asc' or 'desc'"
+                    detail="sort_order must be 'asc' or 'desc'",
                 )
-            
+
             return paginate_jobs(jobs, page, per_page)
         else:
             # Return simple list (with filters/sorting still applied)
@@ -754,7 +772,7 @@ def create_app(base_path: str = ".") -> FastAPI:
     @app.get("/metrics/{run_id}", response_model=MetricsResponse, tags=["jobs"])
     async def get_metrics(run_id: str, limit: Optional[int] = 500) -> MetricsResponse:
         """Fetch metrics for the given run.
-        
+
         Parameters
         ----------
         limit : int, optional
@@ -767,142 +785,178 @@ def create_app(base_path: str = ".") -> FastAPI:
             raise_metrics_not_found(run_id)
         return MetricsResponse(metrics=metrics, count=len(metrics))
 
-    @app.post("/job/kill", dependencies=[Depends(require_admin)], response_model=SuccessResponse, tags=["admin"])
+    @app.post(
+        "/job/kill",
+        dependencies=[Depends(require_admin)],
+        response_model=SuccessResponse,
+        tags=["admin"],
+    )
     async def kill_job(req: KillRequest) -> SuccessResponse:
         """Mark ``job_id`` as killed."""
         job = client.get_job_details(req.job_id)
         if job is None:
             raise_job_not_found(req.job_id)
-        
+
         logger.info("Kill requested for job %s", req.job_id)
         result = client.update_job(req.job_id, {"kill_requested": True})
-        
+
         if not result.get("success", True):
             raise HTTPException(
                 status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-                detail=f"Failed to kill job {req.job_id}: {result.get('error', 'Unknown error')}"
+                detail=f"Failed to kill job {req.job_id}: {result.get('error', 'Unknown error')}",
             )
-        
+
         # Broadcast job update via WebSocket
-        await manager.broadcast({
-            "type": "job_update",
-            "job_id": req.job_id,
-            "action": "kill_requested",
-            "message": f"Job {req.job_id} marked for termination"
-        })
-        
-        return SuccessResponse(
-            message=f"Job {req.job_id} marked for termination",
-            job_id=req.job_id
+        await manager.broadcast(
+            {
+                "type": "job_update",
+                "job_id": req.job_id,
+                "action": "kill_requested",
+                "message": f"Job {req.job_id} marked for termination",
+            }
         )
 
-    @app.post("/job/requeue", dependencies=[Depends(require_admin)], response_model=SuccessResponse, tags=["admin"])
+        return SuccessResponse(
+            message=f"Job {req.job_id} marked for termination", job_id=req.job_id
+        )
+
+    @app.post(
+        "/job/requeue",
+        dependencies=[Depends(require_admin)],
+        response_model=SuccessResponse,
+        tags=["admin"],
+    )
     async def requeue_job(req: RequeueRequest) -> SuccessResponse:
         """Requeue ``job_id`` for another attempt."""
         job = client.get_job_details(req.job_id)
         if job is None:
             raise_job_not_found(req.job_id)
-        
+
         retry = job.get("retry_index", 0) + 1
         logger.info("Requeue requested for job %s", req.job_id)
-        result = client.update_job(req.job_id, {"status": "queued", "retry_index": retry})
-        
+        result = client.update_job(
+            req.job_id, {"status": "queued", "retry_index": retry}
+        )
+
         if not result.get("success", True):
             raise HTTPException(
                 status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-                detail=f"Failed to requeue job {req.job_id}: {result.get('error', 'Unknown error')}"
+                detail=f"Failed to requeue job {req.job_id}: {result.get('error', 'Unknown error')}",
             )
-        
+
         # Broadcast job update via WebSocket
-        await manager.broadcast({
-            "type": "job_update",
-            "job_id": req.job_id,
-            "action": "requeued",
-            "retry_index": retry,
-            "message": f"Job {req.job_id} requeued for retry (attempt {retry})"
-        })
-        
-        return SuccessResponse(
-            message=f"Job {req.job_id} requeued for retry (attempt {retry})",
-            job_id=req.job_id
+        await manager.broadcast(
+            {
+                "type": "job_update",
+                "job_id": req.job_id,
+                "action": "requeued",
+                "retry_index": retry,
+                "message": f"Job {req.job_id} requeued for retry (attempt {retry})",
+            }
         )
 
-    @app.post("/job/boost-priority", dependencies=[Depends(require_admin)], response_model=PriorityResponse, tags=["admin"])
+        return SuccessResponse(
+            message=f"Job {req.job_id} requeued for retry (attempt {retry})",
+            job_id=req.job_id,
+        )
+
+    @app.post(
+        "/job/boost-priority",
+        dependencies=[Depends(require_admin)],
+        response_model=PriorityResponse,
+        tags=["admin"],
+    )
     async def boost_priority(req: BoostPriorityRequest) -> PriorityResponse:
         """Boost the priority of a job by the specified amount."""
         job = client.get_job_details(req.job_id)
         if job is None:
             raise_job_not_found(req.job_id)
-        
+
         old_priority = job.get("priority", 100)
-        logger.info("Priority boost requested for job %s: +%d", req.job_id, req.boost_amount)
-        
+        logger.info(
+            "Priority boost requested for job %s: +%d", req.job_id, req.boost_amount
+        )
+
         try:
             result = client.boost_job_priority(req.job_id, req.boost_amount)
             new_priority = result.get("new_priority", old_priority)
-            
+
             # Broadcast priority update via WebSocket
-            await manager.broadcast({
-                "type": "job_update",
-                "job_id": req.job_id,
-                "action": "priority_boosted",
-                "old_priority": old_priority,
-                "new_priority": new_priority,
-                "boost_amount": req.boost_amount,
-                "message": f"Job {req.job_id} priority boosted by {req.boost_amount}"
-            })
-            
+            await manager.broadcast(
+                {
+                    "type": "job_update",
+                    "job_id": req.job_id,
+                    "action": "priority_boosted",
+                    "old_priority": old_priority,
+                    "new_priority": new_priority,
+                    "boost_amount": req.boost_amount,
+                    "message": f"Job {req.job_id} priority boosted by {req.boost_amount}",
+                }
+            )
+
             return PriorityResponse(
                 job_id=req.job_id,
                 old_priority=old_priority,
                 new_priority=new_priority,
                 success=result.get("success", False),
-                message=result.get("message", "Priority boosted successfully")
+                message=result.get("message", "Priority boosted successfully"),
             )
         except Exception as e:
             logger.error("Error boosting priority for job %s: %s", req.job_id, e)
             raise HTTPException(
                 status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-                detail=f"Failed to boost priority for job {req.job_id}: {str(e)}"
+                detail=f"Failed to boost priority for job {req.job_id}: {str(e)}",
             )
 
-    @app.post("/job/set-priority", dependencies=[Depends(require_admin)], response_model=PriorityResponse, tags=["admin"])
+    @app.post(
+        "/job/set-priority",
+        dependencies=[Depends(require_admin)],
+        response_model=PriorityResponse,
+        tags=["admin"],
+    )
     async def set_priority(req: SetPriorityRequest) -> PriorityResponse:
         """Set the absolute priority of a job."""
         job = client.get_job_details(req.job_id)
         if job is None:
             raise_job_not_found(req.job_id)
-        
+
         old_priority = job.get("priority", 100)
-        logger.info("Priority set requested for job %s: %d (reason: %s)", req.job_id, req.priority, req.reason)
-        
+        logger.info(
+            "Priority set requested for job %s: %d (reason: %s)",
+            req.job_id,
+            req.priority,
+            req.reason,
+        )
+
         try:
             result = client.update_job_priority(req.job_id, req.priority, req.reason)
             new_priority = result.get("new_priority", req.priority)
-            
+
             # Broadcast priority update via WebSocket
-            await manager.broadcast({
-                "type": "job_update",
-                "job_id": req.job_id,
-                "action": "priority_set",
-                "old_priority": old_priority,
-                "new_priority": new_priority,
-                "reason": req.reason,
-                "message": f"Job {req.job_id} priority set to {req.priority}"
-            })
-            
+            await manager.broadcast(
+                {
+                    "type": "job_update",
+                    "job_id": req.job_id,
+                    "action": "priority_set",
+                    "old_priority": old_priority,
+                    "new_priority": new_priority,
+                    "reason": req.reason,
+                    "message": f"Job {req.job_id} priority set to {req.priority}",
+                }
+            )
+
             return PriorityResponse(
                 job_id=req.job_id,
                 old_priority=old_priority,
                 new_priority=new_priority,
                 success=result.get("success", False),
-                message=result.get("message", "Priority set successfully")
+                message=result.get("message", "Priority set successfully"),
             )
         except Exception as e:
             logger.error("Error setting priority for job %s: %s", req.job_id, e)
             raise HTTPException(
                 status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-                detail=f"Failed to set priority for job {req.job_id}: {str(e)}"
+                detail=f"Failed to set priority for job {req.job_id}: {str(e)}",
             )
 
     @app.get("/health", response_model=HealthResponse, tags=["monitoring"])
@@ -910,23 +964,27 @@ def create_app(base_path: str = ".") -> FastAPI:
         """Check API health status and basic system information."""
         current_time = datetime.now(timezone.utc)
         uptime = time.time() - API_STARTUP_TIME
-        
+
         # Check database health
         db_status = check_database_health(client)
-        
+
         # Get job statistics
         job_stats = get_job_statistics(client)
-        
+
         # Determine overall health status
-        overall_status = "healthy" if db_status == "healthy" and "error" not in job_stats else "unhealthy"
-        
+        overall_status = (
+            "healthy"
+            if db_status == "healthy" and "error" not in job_stats
+            else "unhealthy"
+        )
+
         return HealthResponse(
             status=overall_status,
             timestamp=current_time.isoformat(),
             uptime_seconds=uptime,
             version="1.0.0",
             database_status=db_status,
-            job_stats=job_stats
+            job_stats=job_stats,
         )
 
     @app.get("/metrics", response_model=SystemMetricsResponse, tags=["monitoring"])
@@ -934,16 +992,16 @@ def create_app(base_path: str = ".") -> FastAPI:
         """Get detailed system metrics for monitoring and observability."""
         current_time = datetime.now(timezone.utc)
         uptime = time.time() - API_STARTUP_TIME
-        
+
         # Get job statistics
         job_stats = get_job_statistics(client)
         total_jobs = sum(job_stats.values()) if "error" not in job_stats else 0
         queue_depth = job_stats.get("queued", 0)
         running_jobs = job_stats.get("running", 0)
-        
+
         # Get active WebSocket connections count
         active_connections = len(manager.active_connections)
-        
+
         return SystemMetricsResponse(
             timestamp=current_time.isoformat(),
             uptime_seconds=uptime,
@@ -951,23 +1009,34 @@ def create_app(base_path: str = ".") -> FastAPI:
             job_stats=job_stats,
             total_jobs=total_jobs,
             queue_depth=queue_depth,
-            running_jobs=running_jobs
+            running_jobs=running_jobs,
         )
 
     # Add version deprecation headers middleware
     @app.middleware("http")
     async def add_version_headers(request, call_next):
         response = await call_next(request)
-        
+
         # Add version headers to all responses
         response.headers["X-API-Version"] = "1.0.0"
-        
+
         # Add deprecation notice for non-versioned endpoints (except health/metrics/ws)
         path = request.url.path
-        if not path.startswith("/api/") and path not in ["/health", "/metrics", "/ws", "/docs", "/openapi.json", "/redoc"]:
-            response.headers["X-API-Deprecation-Notice"] = "Unversioned endpoints are deprecated. Use /api/v1 prefix."
-            response.headers["X-API-Migration-Guide"] = "Replace /jobs with /api/v1/jobs, etc."
-        
+        if not path.startswith("/api/") and path not in [
+            "/health",
+            "/metrics",
+            "/ws",
+            "/docs",
+            "/openapi.json",
+            "/redoc",
+        ]:
+            response.headers["X-API-Deprecation-Notice"] = (
+                "Unversioned endpoints are deprecated. Use /api/v1 prefix."
+            )
+            response.headers["X-API-Migration-Guide"] = (
+                "Replace /jobs with /api/v1/jobs, etc."
+            )
+
         return response
 
     return app

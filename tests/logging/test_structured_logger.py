@@ -43,7 +43,7 @@ def _worker(log_dir, count):
 
 def test_logger_concurrent(tmp_path):
     log_dir = str(tmp_path / "logs")
-    
+
     procs = [Process(target=_worker, args=(log_dir, 10)) for _ in range(4)]
     for p in procs:
         p.start()

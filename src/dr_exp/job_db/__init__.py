@@ -6,7 +6,7 @@ from .config import JobDBConfig
 __all__ = [
     "BaseJobDB",
     "StaleJobInfo",
-    "LocalJobDB", 
+    "LocalJobDB",
     "SupabaseJobDB",
     "JobDBConfig",
 ]

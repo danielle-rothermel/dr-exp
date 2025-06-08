@@ -7,7 +7,7 @@ from ..train_examples.dummy_trainer import train as default_train
 
 __all__ = [
     "Manager",
-    "ProcessManager", 
+    "ProcessManager",
     "run_worker",
     "run_worker_main",
     "default_train",

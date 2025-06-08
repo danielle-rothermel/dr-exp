@@ -31,19 +31,29 @@ def train(cfg: Any, logger: Optional[BaseLogger] = None) -> TrainingResult:
         # Check nested train config (for direct test calls and backwards compatibility)
         train_cfg = cfg.get("train", {})
         if "num_epochs" in train_cfg:
-            num_epochs = train_cfg["num_epochs"]  # Override with nested value if present
+            num_epochs = train_cfg[
+                "num_epochs"
+            ]  # Override with nested value if present
     else:
         # Handle object-style configs
         num_epochs = getattr(cfg, "max_epochs", getattr(cfg, "epochs", num_epochs))
         # Check nested train attribute
-        if hasattr(cfg, "train") and isinstance(cfg.train, dict) and "num_epochs" in cfg.train:
+        if (
+            hasattr(cfg, "train")
+            and isinstance(cfg.train, dict)
+            and "num_epochs" in cfg.train
+        ):
             num_epochs = cfg.train["num_epochs"]
-    
+
     num_epochs = int(num_epochs)
 
     if logger is None:
         # Get log_dir from config if available, otherwise use default
-        log_dir = cfg.get("log_dir", "./logs") if isinstance(cfg, dict) else getattr(cfg, "log_dir", "./logs")
+        log_dir = (
+            cfg.get("log_dir", "./logs")
+            if isinstance(cfg, dict)
+            else getattr(cfg, "log_dir", "./logs")
+        )
         logger = StructuredLogger(log_dir)
 
     final_train_loss = 0.0
@@ -70,13 +80,13 @@ def train(cfg: Any, logger: Optional[BaseLogger] = None) -> TrainingResult:
     final_metrics = {
         "final_val_acc": final_val_acc,
         "final_train_loss": final_train_loss,
-        "final_val_loss": final_train_loss  # Use train loss as val loss for dummy
+        "final_val_loss": final_train_loss,  # Use train loss as val loss for dummy
     }
-    
+
     return create_success_result(
         final_metrics=final_metrics,
         epochs=num_epochs,
         logger_meta=logger_meta,
         artifacts_path=logger.paths.artifact_dir,
-        training_time=0.1  # Dummy training time
+        training_time=0.1,  # Dummy training time
     )

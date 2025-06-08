@@ -10,7 +10,7 @@ def test_websocket_connection_basic(client):
     with client.websocket_connect("/ws") as websocket:
         # Send a test message
         websocket.send_text("test message")
-        
+
         # Receive the echo
         data = websocket.receive_text()
         assert "Echo: test message" in data
@@ -23,10 +23,10 @@ def test_websocket_connection_lifecycle(client):
         with client.websocket_connect("/ws") as ws2:
             ws1.send_text("message1")
             ws2.send_text("message2")
-            
+
             response1 = ws1.receive_text()
             response2 = ws2.receive_text()
-            
+
             assert "message1" in response1
             assert "message2" in response2
 
@@ -36,7 +36,7 @@ def test_websocket_invalid_json(client):
     with client.websocket_connect("/ws") as websocket:
         # Send invalid JSON
         websocket.send_text("invalid json {")
-        
+
         # Should still echo the message
         data = websocket.receive_text()
         assert "invalid json" in data
@@ -46,7 +46,7 @@ def test_websocket_empty_message(client):
     """Test WebSocket handling of empty messages."""
     with client.websocket_connect("/ws") as websocket:
         websocket.send_text("")
-        
+
         data = websocket.receive_text()
         assert "Echo:" in data
 
@@ -56,7 +56,7 @@ def test_websocket_large_message(client):
     with client.websocket_connect("/ws") as websocket:
         large_message = "x" * 10000  # 10KB message
         websocket.send_text(large_message)
-        
+
         data = websocket.receive_text()
         assert large_message in data
 
@@ -66,7 +66,7 @@ def test_websocket_json_message(client):
     with client.websocket_connect("/ws") as websocket:
         test_data = {"type": "test", "data": {"key": "value"}}
         websocket.send_text(json.dumps(test_data))
-        
+
         response = websocket.receive_text()
         assert json.dumps(test_data) in response
 
@@ -74,23 +74,23 @@ def test_websocket_json_message(client):
 def test_websocket_concurrent_connections(client):
     """Test multiple concurrent WebSocket connections."""
     connections = []
-    
+
     try:
         # Establish multiple connections
         for i in range(5):
             ws = client.websocket_connect("/ws")
             connection = ws.__enter__()
             connections.append((ws, connection))
-        
+
         # Send messages from each connection
         for i, (_, connection) in enumerate(connections):
             connection.send_text(f"message from connection {i}")
-        
+
         # Verify each gets their own echo
         for i, (_, connection) in enumerate(connections):
             response = connection.receive_text()
             assert f"message from connection {i}" in response
-            
+
     finally:
         # Clean up all connections
         for ws, _ in connections:
@@ -104,27 +104,27 @@ def test_websocket_connection_manager_state(client):
     """Test that WebSocket connection manager tracks connections properly."""
     # This is more of an integration test to ensure the ConnectionManager
     # is working correctly under the hood
-    
+
     # Start with no connections (we can't directly access the manager,
     # but we can test behavior that depends on it)
-    
+
     with client.websocket_connect("/ws") as ws1:
         # Connection should be tracked
         ws1.send_text("test")
         response = ws1.receive_text()
         assert "test" in response
-        
+
         with client.websocket_connect("/ws") as ws2:
             # Both connections should work independently
             ws2.send_text("test2")
             response2 = ws2.receive_text()
             assert "test2" in response2
-            
+
             # First connection should still work
             ws1.send_text("test3")
             response3 = ws1.receive_text()
             assert "test3" in response3
-    
+
     # After context managers exit, connections should be cleaned up
     # (We can't directly test this without exposing the connection manager)
 
@@ -141,7 +141,7 @@ def test_websocket_message_format_validation(client):
             "",  # Empty message
             "a" * 1000,  # Long message
         ]
-        
+
         for msg in test_messages:
             websocket.send_text(msg)
             response = websocket.receive_text()
@@ -152,22 +152,22 @@ def test_websocket_connection_limits(client):
     """Test WebSocket connection limits and resource management."""
     max_connections = 10
     connections = []
-    
+
     try:
         # Establish multiple connections
         for i in range(max_connections):
             ws_context = client.websocket_connect("/ws")
             connection = ws_context.__enter__()
             connections.append((ws_context, connection))
-            
+
             # Test each connection works
             connection.send_text(f"test_{i}")
             response = connection.receive_text()
             assert f"test_{i}" in response
-        
+
         # All connections should be active
         assert len(connections) == max_connections
-        
+
     finally:
         # Clean up all connections
         for ws_context, _ in connections:
@@ -184,14 +184,14 @@ def test_websocket_error_handling(client):
         websocket.send_text("normal message")
         response = websocket.receive_text()
         assert "normal message" in response
-        
+
         # Test sending various edge case messages
         edge_cases = [
             '{"incomplete": json',  # Invalid JSON
             None,  # This would be handled by the test client
             '{"very": {"deeply": {"nested": {"object": {"with": {"many": "levels"}}}}}}',
         ]
-        
+
         for case in edge_cases:
             if case is not None:
                 websocket.send_text(case)
@@ -208,13 +208,13 @@ def test_websocket_connection_lifecycle_events(client):
         websocket.send_text("connection_test")
         response = websocket.receive_text()
         assert "connection_test" in response
-        
+
         # Test that connection stays alive for multiple messages
         for i in range(5):
             websocket.send_text(f"message_{i}")
             response = websocket.receive_text()
             assert f"message_{i}" in response
-    
+
     # After context manager, connection should be closed
     # Attempting to establish a new connection should work
     with client.websocket_connect("/ws") as new_websocket:
@@ -226,11 +226,11 @@ def test_websocket_connection_lifecycle_events(client):
 def test_websocket_concurrent_message_handling(client):
     """Test handling of concurrent messages from single connection."""
     import threading
-    
+
     with client.websocket_connect("/ws") as websocket:
         responses = []
         errors = []
-        
+
         def send_message(msg_id):
             try:
                 message = f"concurrent_msg_{msg_id}"
@@ -239,25 +239,25 @@ def test_websocket_concurrent_message_handling(client):
                 responses.append((msg_id, response))
             except Exception as e:
                 errors.append((msg_id, str(e)))
-        
+
         # Send multiple messages rapidly
         threads = []
         for i in range(5):
             thread = threading.Thread(target=send_message, args=(i,))
             threads.append(thread)
-        
+
         # Start all threads
         for thread in threads:
             thread.start()
-        
+
         # Wait for all to complete
         for thread in threads:
             thread.join(timeout=5)
-        
+
         # All messages should be handled (though order may vary)
         assert len(errors) == 0, f"Errors occurred: {errors}"
         assert len(responses) == 5
-        
+
         # Each response should be an echo of some message (order may vary)
         expected_messages = {f"concurrent_msg_{i}" for i in range(5)}
         actual_messages = {response.replace("Echo: ", "") for _, response in responses}
@@ -269,7 +269,7 @@ def test_websocket_message_size_limits(client):
     with client.websocket_connect("/ws") as websocket:
         # Test progressively larger messages
         sizes = [100, 1000, 10000, 50000]  # Up to 50KB
-        
+
         for size in sizes:
             large_message = "x" * size
             websocket.send_text(large_message)
@@ -279,22 +279,24 @@ def test_websocket_message_size_limits(client):
             assert len(response) >= size
 
 
-@pytest.mark.skip(reason="Broadcasting not implemented - requires real WebSocket integration")
+@pytest.mark.skip(
+    reason="Broadcasting not implemented - requires real WebSocket integration"
+)
 def test_websocket_broadcast_integration(client, db_client, admin_headers):
     """Test integration with actual API operations for broadcasting."""
     # This would test real broadcasting when it's implemented
     job = create_test_job(db_client, priority=Priority.NORMAL)
     job_id = job["id"]
-    
+
     with client.websocket_connect("/ws") as _websocket:
         # Make API call that should trigger broadcast
         resp = client.post(
             "/job/boost-priority",
             json={"job_id": job_id, "boost_amount": 100},
-            headers=admin_headers
+            headers=admin_headers,
         )
         assert resp.status_code == 200
-        
+
         # In a real implementation, this would receive a broadcast message
         # For now, this test is skipped until broadcasting is implemented
 
@@ -305,10 +307,10 @@ def test_websocket_connection_close_handling(client):
         websocket.send_text("test before close")
         response = websocket.receive_text()
         assert "test before close" in response
-        
+
         # WebSocket will be closed when exiting context manager
         # The connection manager should handle this gracefully
-    
+
     # Verify we can establish a new connection after the previous one closed
     with client.websocket_connect("/ws") as websocket:
         websocket.send_text("test after reconnect")

@@ -11,11 +11,9 @@ from .base_logger import BaseLogger
 from .logger_paths import LoggerPathConfig, LoggerPathManager
 
 
-
-
 class StructuredLogger(BaseLogger):
     """Local filesystem-based structured logger implementation.
-    
+
     This class provides a concrete implementation of the BaseLogger interface
     using local files for metrics storage, checkpoint saving, and artifact
     tracking. Ideal for development, testing, and local training runs."""
@@ -25,12 +23,12 @@ class StructuredLogger(BaseLogger):
         log_dir: Union[str, LoggerPathConfig],
         run_id: Optional[str] = None,
         compress_checkpoints: bool = False,
-        debug: bool = False
+        debug: bool = False,
     ) -> None:
         """Initialize the structured logger.
 
         Creates necessary directories and opens the metrics file for writing.
-        
+
         Parameters
         ----------
         log_dir : str or LoggerPathConfig
@@ -66,11 +64,11 @@ class StructuredLogger(BaseLogger):
 
     def log(self, metrics: Dict[str, Any]) -> None:
         """Log metrics data to the metrics file.
-        
+
         Writes metrics as a JSON line to the configured output file with
         file locking for thread safety. Automatically adds run_id and
         timestamp if not present.
-        
+
         Parameters
         ----------
         metrics : dict[str, Any]
@@ -130,10 +128,10 @@ class StructuredLogger(BaseLogger):
 
     def log_artifact(self, path: str) -> None:
         """Register an artifact file for tracking and potential upload.
-        
+
         Adds the absolute path to the internal artifact list if the file exists.
         Artifact paths are included in the finalization summary.
-        
+
         Parameters
         ----------
         path : str
@@ -158,11 +156,11 @@ class StructuredLogger(BaseLogger):
 
     def finalize(self) -> Dict[str, Any]:
         """Finalize logging and return summary metadata.
-        
+
         Closes the metrics file and returns comprehensive metadata about
         the logging session. This method is idempotent and can be called
         multiple times safely.
-        
+
         Returns
         -------
         dict[str, Any]
