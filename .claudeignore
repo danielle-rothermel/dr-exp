@@ -1,0 +1,8 @@
+.git/
+__pycache__/
+.github/
+.pytest_cache/
+.ruff_cache/
+.venv/
+.vscode/
+docs/
