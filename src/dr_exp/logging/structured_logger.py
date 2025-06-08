@@ -86,6 +86,9 @@ class StructuredLogger(BaseLogger):
         except Exception as e:  # pragma: no cover - debug path
             if self.debug:
                 raise
+            # Fail fast principle: make logging errors visible
+            import warnings
+            warnings.warn(f"CRITICAL: Logging failure - metrics may be lost: {e}", stacklevel=2)
             self._write_error(f"log error: {e}")
         finally:
             try:
@@ -123,6 +126,9 @@ class StructuredLogger(BaseLogger):
         except Exception as e:  # pragma: no cover - debug path
             if self.debug:
                 raise
+            # Fail fast principle: make checkpoint errors visible
+            import warnings
+            warnings.warn(f"CRITICAL: Checkpoint save failure: {e}", stacklevel=2)
             self._write_error(f"checkpoint error: {e}")
         return path
 
@@ -142,6 +148,9 @@ class StructuredLogger(BaseLogger):
         else:  # pragma: no cover - debug path
             if self.debug:
                 raise FileNotFoundError(path)
+            # Fail fast principle: make artifact errors visible
+            import warnings
+            warnings.warn(f"CRITICAL: Artifact not found - training may be incomplete: {path}", stacklevel=2)
             self._write_error(f"artifact not found: {path}")
 
     def _summary(self, success: bool) -> Dict[str, Any]:
@@ -181,6 +190,9 @@ class StructuredLogger(BaseLogger):
             finalize_success = False
             if self.debug:
                 raise
+            # Fail fast principle: make finalization errors visible
+            import warnings
+            warnings.warn(f"CRITICAL: Logger finalization failure - data may be lost: {e}", stacklevel=2)
             self._write_error(f"finalize error: {e}")
         self._finalized = True
         return self._summary(finalize_success)

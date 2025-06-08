@@ -93,45 +93,42 @@ except Exception as e:
 
 **Impact:** ✅ **RESOLVED** - Priority system now fails immediately on missing data instead of masking corruption with defaults.
 
-### 5. API Layer Error Masking
+### 5. API Layer Error Masking ✅ **FIXED**
 
 **File:** `src/dr_exp/api/main.py`
 
-#### Silent Sorting Failures (Lines 398-400)
-```python
-except Exception:
-    # If sorting fails, return unsorted list
-    pass
-```
+#### Silent Sorting Failures ✅ **FIXED**
+- ✅ **Lines 398-400**: Removed exception swallowing that returned unsorted data
+- ✅ **Sorting operations**: Now fail fast on missing required fields (retry_index, status, created_at)
+- ✅ **Error propagation**: Sorting errors now immediately raise KeyError for debugging
 
-#### Database Operation Masking (Lines 803, 841)
-```python
-if not result.get("success", True):  # Defaults to success!
-```
+#### Database Operation Masking ✅ **FIXED**
+- ✅ **Lines 803, 841**: Replaced .get("success", True) with strict ["success"] access
+- ✅ **Error messages**: Removed .get("error", "Unknown error") patterns
+- ✅ **Kill/requeue operations**: Now fail fast on missing database response fields
 
-#### WebSocket Silent Disconnects (Lines 87-89, 102-108)
-```python
-except Exception as e:
-    logger.error(f"Error sending personal message: {e}")
-    self.disconnect(websocket)  # Silent disconnect
-```
+#### WebSocket Silent Disconnects ✅ **FIXED**
+- ✅ **Lines 87-89**: Personal message failures now raise RuntimeError
+- ✅ **Lines 102-108**: Broadcast failures properly tracked and logged
+- ✅ **Error propagation**: WebSocket failures no longer silently disconnect clients
 
-#### Insecure Authentication Defaults (Lines 120, 132)
-```python
-return os.getenv("ADMIN_API_KEY", "testkey")
-return os.getenv("READER_API_KEY", "readkey")
-```
+#### Insecure Authentication Defaults ✅ **FIXED**
+- ✅ **Lines 120, 132**: Removed testkey/readkey defaults
+- ✅ **Environment requirements**: ADMIN_API_KEY and READER_API_KEY now required
+- ✅ **Security**: No fallback authentication tokens allowed
 
-### 6. CLI Command Result Masking
+**Impact:** ✅ **RESOLVED** - API layer now fails fast on all critical operations, preventing silent failures and security issues.
+
+### 6. CLI Command Result Masking ✅ **FIXED**
 
 **Files:** `src/dr_exp/cli/commands/set_priority.py`, `src/dr_exp/cli/commands/boost_priority.py`
 
-#### Silent Operation Failures (Lines 42, 49)
-```python
-if result.get("success"):  # None treated as False
-    # ...
-result.get('message', 'Unknown error')  # Masks missing message
-```
+#### Silent Operation Failures ✅ **FIXED**
+- ✅ **Lines 42, 49**: Replaced result.get("success") with result["success"]
+- ✅ **Error messages**: Replaced result.get("message", "Unknown error") with result["message"]
+- ✅ **Priority commands**: Now fail fast on missing response fields
+
+**Impact:** ✅ **RESOLVED** - CLI commands now fail immediately on missing operation results instead of masking failures.
 
 ## Medium Priority Violations
 
@@ -233,26 +230,40 @@ started_at: Optional[str] = Field(None, ...)
 4. ✅ **Priority system** uses strict validation (commit cb18df8)
 5. ✅ **Process manager** requires environment variables (commit f635af9)
 
-### 🔄 PHASE 2 IN PROGRESS: Remaining Violations
+### ✅ PHASE 2 COMPLETED: High Priority API/CLI Violations
+**All 6 major violation categories fixed and committed:**
 
-**Next agent should continue with remaining medium priority violations:**
+6. ✅ **API layer error masking** fixed (commit 1a7fd75)
+   - Silent sorting failures eliminated
+   - WebSocket disconnects now raise exceptions  
+   - Authentication defaults removed (security fix)
+   - Database operation masking eliminated
 
-#### 🎯 IMMEDIATE NEXT STEPS:
-1. **Fix API layer masking errors** (lines 398-400, 87-89, 120, 132, 803, 841 in `src/dr_exp/api/main.py`)
-2. **Fix CLI command result masking** (lines 42, 49 in CLI commands)
-3. **Update failing tests** to handle new strict requirements (13 tests failing)
+7. ✅ **CLI command result masking** fixed (commit 1a7fd75)
+   - Priority commands use strict field access
+   - Operation failures no longer masked with defaults
 
-#### 📋 REMAINING VIOLATIONS TO FIX:
-- **API silent sorting failures** - return unsorted data instead of failing
-- **WebSocket silent disconnects** - clients don't know connection failed  
-- **CLI .get() patterns** - mask operation failures with defaults
-- **Authentication defaults** - fallback to "testkey"/"readkey"
-- **Test suite** - needs environment variable fixes for new strict requirements
+8. ✅ **Test infrastructure updated** (commit 1a7fd75)
+   - 13 failing tests fixed for new strict requirements
+   - Process manager interface updated for exception-based errors
+   - Environment variable requirements properly mocked
+
+### 🔄 PHASE 3 IN PROGRESS: Medium Priority Violations
+
+**Remaining violations to address:**
+
+#### 📋 NEXT VIOLATIONS TO FIX:
+- **Configuration/Training loose interfaces** - Dict[str, Any] instead of strict types
+- **Logging system silent failures** - Exception swallowing in production mode
+- **Priority validation** - Returns None instead of raising exceptions
+- **Job database interface** - Loose update validation
+- **File system operations** - Silent failures in local database
+- **API model fields** - Optional fields for required data
 
 ### 🧪 CURRENT TEST STATUS:
 - ✅ **321 tests passing** (with `-m "not supabase"`)
-- ❌ **13 tests failing** due to new strict environment variable requirements
-- 📍 **Key failing test files**: `test_process_manager.py`, `test_factory.py`, `test_manager.py`
+- ✅ **All environment variable fixes complete**
+- ✅ **Zero test failures** from strict requirements
 
 ### 📝 COMPLETION CRITERIA:
 - All violations in document marked as ✅ FIXED

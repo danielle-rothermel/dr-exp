@@ -56,7 +56,7 @@ class PriorityClass(Enum):
         return self.min_priority <= priority <= self.max_priority
 
     @classmethod
-    def from_priority(cls, priority: int) -> Optional["PriorityClass"]:
+    def from_priority(cls, priority: int) -> "PriorityClass":
         """Get the priority class that contains the given priority value.
 
         Parameters
@@ -66,13 +66,18 @@ class PriorityClass(Enum):
 
         Returns
         -------
-        PriorityClass | None
-            The priority class containing this value, or None if invalid.
+        PriorityClass
+            The priority class containing this value.
+            
+        Raises
+        ------
+        ValueError
+            If priority is not within any valid priority class range.
         """
         for priority_class in cls:
             if priority_class.contains(priority):
                 return priority_class
-        return None
+        raise ValueError(f"Invalid priority {priority}: must be between {cls.LOW.min_priority} and {cls.SYSTEM.max_priority}")
 
 
 def validate_priority(priority: int) -> int:
@@ -122,11 +127,7 @@ def get_priority_description(priority: int) -> str:
     """
     validated_priority = validate_priority(priority)
     priority_class = PriorityClass.from_priority(validated_priority)
-
-    if priority_class:
-        return f"{validated_priority} ({priority_class.name.lower()})"
-    else:
-        return f"{validated_priority} (invalid)"
+    return f"{validated_priority} ({priority_class.name.lower()})"
 
 
 def calculate_age_boost(job: Dict[str, Any], max_boost: int = 200) -> int:
