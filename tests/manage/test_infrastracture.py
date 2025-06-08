@@ -7,7 +7,7 @@ These tests serve as both validation of the infrastructure and examples for futu
 import threading
 
 from dr_exp.manage.worker import run_worker
-from dr_exp.training.result import create_success_result
+from dr_exp.training import create_success_result
 from tests.conftest import make_wrapped_config
 
 

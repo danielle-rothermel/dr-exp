@@ -17,8 +17,8 @@ from dr_exp.logging.base_logger import BaseLogger
 from dr_exp.logging.structured_logger import StructuredLogger
 from dr_exp.utils.jobdb_factory import get_job_db_client
 from dr_exp.job_db.base_job_db import BaseJobDB
-from dr_exp.train_examples.dummy_trainer import train as default_train
-from dr_exp.training.result import TrainingResult
+from dr_exp.training.dummy_trainer import train as default_train
+from dr_exp.training import TrainingResult
 
 
 class HeartbeatManager:
@@ -219,7 +219,7 @@ class JobExecutor:
 
                 # Return failure result as TrainingResult
                 # finalize_job() will handle all failure recording as single source of truth
-                from dr_exp.training.result import create_failure_result
+                from dr_exp.training import create_failure_result
 
                 return create_failure_result(
                     error=f"{type(e).__name__}: {str(e)}", epochs=0

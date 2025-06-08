@@ -1,7 +1,7 @@
 import json
 import os
 
-from dr_exp.train_examples.dummy_trainer import train
+from dr_exp.training.dummy_trainer import train
 from dr_exp.logging.structured_logger import StructuredLogger
 
 
