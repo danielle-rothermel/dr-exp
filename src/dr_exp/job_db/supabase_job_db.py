@@ -4,9 +4,10 @@ import logging
 import os
 import shutil
 import tempfile
+import uuid
 from supabase import create_client, Client
 from typing import Optional, Dict, Any, List
-from datetime import datetime, timezone, timedelta
+from datetime import datetime, timezone, timedelta, UTC
 
 from .base_job_db import BaseJobDB, StaleJobInfo
 from .config import JobDBConfig
@@ -539,6 +540,92 @@ class SupabaseJobDB(BaseJobDB):
             raise
         except Exception as e:
             logger.error(f"Critical database error adding job entry: {e}")
+            raise RuntimeError(f"Failed to create job: {e}") from e
+
+    def add_job(
+        self,
+        job_config: Dict[str, Any],
+        sweep_config_id: str,
+        status: str = "queued",
+        priority: int = 100,
+    ) -> Dict[str, Any]:
+        """Add a new job entry to the database.
+
+        Parameters
+        ----------
+        job_config : dict[str, Any]
+            The job configuration.
+        sweep_config_id : str
+            Identifier for the sweep configuration.
+        status : str, optional
+            Initial job status, by default "queued".
+        priority : int, optional
+            Job priority for queue ordering (0-1000), by default 100.
+            Higher values indicate higher priority.
+
+        Returns
+        -------
+        dict[str, Any]
+            The created job record with generated job ID.
+        """
+        try:
+            # Validate priority is in valid range
+            priority = self._validate_priority(priority)
+            
+            job_id = str(uuid.uuid4())
+            now = datetime.now(UTC).isoformat()
+            
+            # For Supabase workflow: sweep_config_id might be a hash, not a UUID
+            # We need to find or create the sweep config entry first
+            config_uuid = None
+            
+            if len(sweep_config_id) == 64:  # Likely a SHA256 hash
+                # Look up existing sweep config by hash
+                config_response = self.supabase.table("sweep_configs").select("id").eq("config_hash", sweep_config_id).execute()
+                if config_response.data:
+                    config_uuid = config_response.data[0]["id"]
+                else:
+                    # Create new sweep config entry
+                    # First create a cluster if needed
+                    cluster_result = self.add_sweep_config_cluster("default_cluster", "Auto-created cluster")
+                    cluster_id = cluster_result["id"]
+                    
+                    # Then create the sweep config
+                    sweep_result = self.add_sweep_config(cluster_id, job_config, sweep_config_id)
+                    config_uuid = sweep_result["id"]
+            else:
+                # Assume it's already a UUID
+                config_uuid = sweep_config_id
+            
+            # Create the job entry
+            job_data = {
+                "id": job_id,
+                "config_id": config_uuid,
+                "status": status,
+                "retry_index": 0,
+                "priority": priority,
+                "assigned_worker": "unassigned",
+                "heartbeat": None,
+                "metrics_path": "",
+                "artifacts_path": "",
+                "start_time": now,
+                "created_at": now,
+            }
+
+            response = self.supabase.table("jobs").insert(job_data).execute()
+
+            if not response.data:
+                raise RuntimeError("Failed to create job entry: no data returned")
+
+            created_job = response.data[0]
+            
+            # Add the config_json for compatibility with LocalJobDB interface
+            created_job["config_json"] = job_config
+            
+            return created_job
+
+        except Exception as e:
+            logger.error(f"Critical database error adding job: {e}")
             raise RuntimeError(f"Failed to create job: {e}") from e
 
     # Priority management methods
