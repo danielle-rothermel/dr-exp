@@ -33,10 +33,10 @@ def isolated_supabase_client(
     client = SupabaseJobDB(config)
 
     # Track created test data for cleanup
-    client._test_namespace = test_namespace
-    client._test_clusters = []
-    client._test_configs = []
-    client._test_jobs = []
+    client._test_namespace = test_namespace  # type: ignore[attr-defined]
+    client._test_clusters = []  # type: ignore[attr-defined]
+    client._test_configs = []  # type: ignore[attr-defined]
+    client._test_jobs = []  # type: ignore[attr-defined]
 
     # Override methods to track created data
     original_add_cluster = client.add_sweep_config_cluster
@@ -50,7 +50,7 @@ def isolated_supabase_client(
         test_name = f"{test_namespace}-{name}"
         result = original_add_cluster(test_name, description)
         if result:
-            client._test_clusters.append(result["id"])
+            client._test_clusters.append(result["id"])  # type: ignore[attr-defined]
         return result
 
     def tracked_add_config(
@@ -65,32 +65,32 @@ def isolated_supabase_client(
             cluster_id, config_json, test_hash, interface_version
         )
         if result:
-            client._test_configs.append(result["id"])
+            client._test_configs.append(result["id"])  # type: ignore[attr-defined]
         return result
 
     def tracked_add_job(config_id: str, **kwargs: Any) -> Optional[Dict[str, Any]]:
         result = original_add_job(config_id, **kwargs)
         if result:
-            client._test_jobs.append(result["id"])
+            client._test_jobs.append(result["id"])  # type: ignore[attr-defined]
         return result
 
-    client.add_sweep_config_cluster = tracked_add_cluster
-    client.add_sweep_config = tracked_add_config
-    client.add_job_entry = tracked_add_job
+    client.add_sweep_config_cluster = tracked_add_cluster  # type: ignore[assignment]
+    client.add_sweep_config = tracked_add_config  # type: ignore[assignment]
+    client.add_job_entry = tracked_add_job  # type: ignore[assignment]
 
     yield client
 
     # Cleanup: Delete all test data
     try:
         # Delete jobs first (foreign key constraints)
-        for job_id in client._test_jobs:
+        for job_id in client._test_jobs:  # type: ignore[attr-defined]
             try:
                 client.supabase.table("jobs").delete().eq("id", job_id).execute()
             except Exception:
                 pass  # Job might have been deleted by cascade
 
         # Delete configs
-        for config_id in client._test_configs:
+        for config_id in client._test_configs:  # type: ignore[attr-defined]
             try:
                 client.supabase.table("sweep_configs").delete().eq(
                     "id", config_id
@@ -99,7 +99,7 @@ def isolated_supabase_client(
                 pass
 
         # Delete clusters
-        for cluster_id in client._test_clusters:
+        for cluster_id in client._test_clusters:  # type: ignore[attr-defined]
             try:
                 client.supabase.table("sweep_config_clusters").delete().eq(
                     "id", cluster_id
@@ -126,12 +126,13 @@ class TestSupabaseIsolated:
         job = client.add_job_entry(config["id"], priority=300)
 
         # Verify creation
-        assert cluster["name"].startswith(client._test_namespace)
-        assert config["config_hash"].startswith(client._test_namespace)
+        assert cluster["name"].startswith(client._test_namespace)  # type: ignore[attr-defined]
+        assert config["config_hash"].startswith(client._test_namespace)  # type: ignore[attr-defined]
         assert job["priority"] == 300
 
         # Test job claiming
         claimed = client.claim_job("test-worker")
+        assert claimed is not None
         assert claimed["id"] == job["id"]
         assert claimed["status"] == "running"
 
@@ -158,6 +159,9 @@ class TestSupabaseIsolated:
         claimed3 = client.claim_job("worker-3")
 
         # Each worker should get a different job
+        assert claimed1 is not None
+        assert claimed2 is not None
+        assert claimed3 is not None
         claimed_ids = {claimed1["id"], claimed2["id"], claimed3["id"]}
         job_ids = {job["id"] for job in jobs}
         assert claimed_ids == job_ids

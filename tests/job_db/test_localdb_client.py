@@ -113,6 +113,7 @@ def test_claim_job_success(
 
     # Verify the job file reflects the change
     job_details = mock_client.get_job_details(claimed_job["id"])
+    assert job_details is not None
     assert job_details["status"] == "running"
 
 
@@ -180,6 +181,7 @@ def test_update_job(
     assert result["success"] is True
 
     updated_job_details = mock_client.get_job_details(job_id)
+    assert updated_job_details is not None
     assert updated_job_details["status"] == "running"
     assert updated_job_details["num_epochs"] == 5
     assert updated_job_details["heartbeat"] == update_data["heartbeat"]
@@ -384,6 +386,7 @@ def test_finalize_job(
     assert result["success"] is True
 
     finalized_job_details = mock_client.get_job_details(job_id)
+    assert finalized_job_details is not None
     assert finalized_job_details["status"] == "completed"
     assert "end_time" in finalized_job_details
     assert finalized_job_details["final_val_acc"] == 0.95
@@ -429,6 +432,7 @@ def test_multiple_operations_on_same_job(
         job_id, {"heartbeat": datetime.now(timezone.utc).isoformat()}
     )
     details_after_update = mock_client.get_job_details(job_id)
+    assert details_after_update is not None
     assert details_after_update["status"] == "running"  # Should still be running
 
     # 5. Log more metrics
@@ -452,6 +456,7 @@ def test_multiple_operations_on_same_job(
 
     # Verify final state
     final_details = mock_client.get_job_details(job_id)
+    assert final_details is not None
     assert final_details["status"] == "completed"
     assert final_details["final_val_acc"] == 0.9
 
@@ -513,6 +518,7 @@ def test_update_job_priority(
 
     # Verify change was persisted
     updated_job = mock_client.get_job_details(job_id)
+    assert updated_job is not None
     assert updated_job["priority"] == 300
     assert len(updated_job["priority_changes"]) == 1
     assert updated_job["priority_changes"][0]["reason"] == "Urgent experiment"
@@ -540,6 +546,7 @@ def test_boost_job_priority(
 
     # Verify boost count increased
     boosted_job = mock_client.get_job_details(job_id)
+    assert boosted_job is not None
     assert boosted_job["priority"] == 350
     assert boosted_job["priority_boost_count"] == 1
 
@@ -1112,16 +1119,19 @@ def test_get_stale_jobs_integration(
     import os
 
     job1_data = mock_client.get_job_details(job1["id"])
+    assert job1_data is not None
     job1_data["heartbeat"] = recent_heartbeat
     job1_file_path = os.path.join(mock_client.jobs_dir, f"{job1['id']}.json")
     mock_client._atomic_write(job1_file_path, json.dumps(job1_data, indent=4))
 
     job2_data = mock_client.get_job_details(job2["id"])
+    assert job2_data is not None
     job2_data["heartbeat"] = old_heartbeat
     job2_file_path = os.path.join(mock_client.jobs_dir, f"{job2['id']}.json")
     mock_client._atomic_write(job2_file_path, json.dumps(job2_data, indent=4))
 
     job3_data = mock_client.get_job_details(job3["id"])
+    assert job3_data is not None
     job3_data["heartbeat"] = old_heartbeat
     job3_file_path = os.path.join(mock_client.jobs_dir, f"{job3['id']}.json")
     mock_client._atomic_write(job3_file_path, json.dumps(job3_data, indent=4))

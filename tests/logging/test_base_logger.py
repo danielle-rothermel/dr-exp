@@ -11,7 +11,7 @@ from dr_exp.logging.structured_logger import StructuredLogger
 def test_base_logger_is_abstract() -> None:
     """Test that BaseLogger cannot be instantiated directly."""
     with pytest.raises(TypeError):
-        BaseLogger()
+        BaseLogger()  # type: ignore[abstract]
 
 
 def test_base_logger_inheritance() -> None:
@@ -33,7 +33,7 @@ def test_base_logger_enforces_abstract_methods() -> None:
         pass
 
     with pytest.raises(TypeError):
-        IncompleteLogger()
+        IncompleteLogger()  # type: ignore[abstract]
 
 
 def test_minimal_logger_implementation() -> None:
@@ -169,7 +169,7 @@ def test_abc_inheritance() -> None:
 def test_logger_factory_compatibility() -> None:
     """Test that logger instances work with factory patterns."""
 
-    def create_logger(logger_cls: type, log_dir: str) -> BaseLogger:
+    def create_logger(logger_cls: type[BaseLogger], log_dir: str) -> BaseLogger:
         """Simple factory function."""
         return logger_cls(log_dir)
 
