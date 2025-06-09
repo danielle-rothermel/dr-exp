@@ -877,3 +877,173 @@ def test_discover_claimable_jobs_excludes_non_queued(
     # Should only include queued job
     assert len(available_jobs) == 1
     assert available_jobs[0][1]["status"] == "queued"
+
+
+# --- Stale Jobs Tests ---
+
+
+def test_parse_heartbeat_timestamp_valid(mock_client):
+    """Test _parse_heartbeat_timestamp with valid timestamps."""
+    from datetime import timezone
+
+    # Test with Z suffix
+    result = mock_client._parse_heartbeat_timestamp("2023-06-08T10:30:45Z")
+    assert result.tzinfo == timezone.utc
+    assert result.year == 2023
+    assert result.month == 6
+    assert result.day == 8
+
+    # Test without timezone (should add UTC)
+    result = mock_client._parse_heartbeat_timestamp("2023-06-08T10:30:45")
+    assert result.tzinfo == timezone.utc
+
+    # Test with explicit timezone
+    result = mock_client._parse_heartbeat_timestamp("2023-06-08T10:30:45+00:00")
+    assert result.tzinfo == timezone.utc
+
+
+def test_parse_heartbeat_timestamp_invalid(mock_client):
+    """Test _parse_heartbeat_timestamp with invalid timestamps."""
+    from dr_exp.job_db.local_job_db import HeartbeatParseError
+
+    # Test invalid format
+    with pytest.raises(HeartbeatParseError, match="Invalid heartbeat timestamp"):
+        mock_client._parse_heartbeat_timestamp("invalid-date")
+
+    # Test empty string
+    with pytest.raises(HeartbeatParseError, match="Invalid heartbeat timestamp"):
+        mock_client._parse_heartbeat_timestamp("")
+
+    # Test None (should raise TypeError)
+    with pytest.raises(HeartbeatParseError, match="Invalid heartbeat timestamp"):
+        mock_client._parse_heartbeat_timestamp(None)
+
+
+def test_process_job_for_staleness_missing_fields(mock_client):
+    """Test _process_job_for_staleness with missing required fields."""
+    from dr_exp.job_db.local_job_db import JobValidationError
+    from datetime import datetime, timezone
+
+    now = datetime.now(timezone.utc)
+    max_age = 3600
+
+    # Test missing job_id
+    with pytest.raises(JobValidationError, match="Missing job_id"):
+        mock_client._process_job_for_staleness({}, now, max_age)
+
+    # Test missing assigned_worker
+    with pytest.raises(JobValidationError, match="missing assigned_worker"):
+        mock_client._process_job_for_staleness({"id": "test_job"}, now, max_age)
+
+    # Test missing heartbeat (should return None, not raise)
+    result = mock_client._process_job_for_staleness(
+        {"id": "test_job", "assigned_worker": "worker1"}, now, max_age
+    )
+    assert result is None
+
+
+def test_process_job_for_staleness_valid_job_not_stale(mock_client):
+    """Test _process_job_for_staleness with valid job that is not stale."""
+    from datetime import datetime, timezone, timedelta
+
+    now = datetime.now(timezone.utc)
+    recent_heartbeat = (now - timedelta(seconds=30)).isoformat() + "Z"
+    max_age = 3600  # 1 hour
+
+    job = {
+        "id": "test_job",
+        "assigned_worker": "worker1",
+        "heartbeat": recent_heartbeat,
+    }
+
+    result = mock_client._process_job_for_staleness(job, now, max_age)
+    assert result is None
+
+
+def test_process_job_for_staleness_valid_job_is_stale(mock_client):
+    """Test _process_job_for_staleness with valid job that is stale."""
+    from datetime import datetime, timezone, timedelta
+    from dr_exp.job_db.base_job_db import StaleJobInfo
+
+    now = datetime.now(timezone.utc)
+    old_heartbeat = (now - timedelta(seconds=7200)).isoformat() + "Z"  # 2 hours ago
+    max_age = 3600  # 1 hour
+
+    job = {"id": "test_job", "assigned_worker": "worker1", "heartbeat": old_heartbeat}
+
+    result = mock_client._process_job_for_staleness(job, now, max_age)
+    assert result is not None
+    assert isinstance(result, StaleJobInfo)
+    assert result.job_id == "test_job"
+    assert result.assigned_worker == "worker1"
+    assert result.age_seconds > max_age
+
+
+def test_process_job_for_staleness_invalid_heartbeat(mock_client):
+    """Test _process_job_for_staleness with invalid heartbeat."""
+    from dr_exp.job_db.local_job_db import HeartbeatParseError
+    from datetime import datetime, timezone
+
+    now = datetime.now(timezone.utc)
+    max_age = 3600
+
+    job = {
+        "id": "test_job",
+        "assigned_worker": "worker1",
+        "heartbeat": "invalid-timestamp",
+    }
+
+    with pytest.raises(HeartbeatParseError, match="Invalid heartbeat timestamp"):
+        mock_client._process_job_for_staleness(job, now, max_age)
+
+
+def test_get_stale_jobs_integration(
+    mock_client, sample_job_config, sample_sweep_config_id
+):
+    """Test get_stale_jobs integration with real job data."""
+    from datetime import datetime, timezone, timedelta
+
+    # Create jobs with different heartbeat ages
+    job1 = mock_client.add_job(sample_job_config, sample_sweep_config_id)
+    job2 = mock_client.add_job(sample_job_config, sample_sweep_config_id)
+    job3 = mock_client.add_job(sample_job_config, sample_sweep_config_id)
+
+    # Claim jobs to make them running
+    mock_client.claim_job("worker1")  # Claims job1
+    mock_client.claim_job("worker2")  # Claims job2
+    mock_client.claim_job("worker3")  # Claims job3
+
+    # Set up heartbeats manually
+    now = datetime.now(timezone.utc)
+    recent_heartbeat = (now - timedelta(seconds=30)).isoformat() + "Z"  # Fresh
+    old_heartbeat = (now - timedelta(seconds=7200)).isoformat() + "Z"  # 2 hours old
+
+    # Update job files directly to set heartbeats
+    import json
+    import os
+    
+    job1_data = mock_client.get_job_details(job1["id"])
+    job1_data["heartbeat"] = recent_heartbeat
+    job1_file_path = os.path.join(mock_client.jobs_dir, f"{job1['id']}.json")
+    mock_client._atomic_write(job1_file_path, json.dumps(job1_data, indent=4))
+
+    job2_data = mock_client.get_job_details(job2["id"])
+    job2_data["heartbeat"] = old_heartbeat
+    job2_file_path = os.path.join(mock_client.jobs_dir, f"{job2['id']}.json")
+    mock_client._atomic_write(job2_file_path, json.dumps(job2_data, indent=4))
+
+    job3_data = mock_client.get_job_details(job3["id"])
+    job3_data["heartbeat"] = old_heartbeat
+    job3_file_path = os.path.join(mock_client.jobs_dir, f"{job3['id']}.json")
+    mock_client._atomic_write(job3_file_path, json.dumps(job3_data, indent=4))
+
+    # Test get_stale_jobs
+    max_age = 3600  # 1 hour
+    stale_jobs = mock_client.get_stale_jobs(max_age)
+
+    # Should find 2 stale jobs (job2 and job3)
+    assert len(stale_jobs) == 2
+    stale_job_ids = {job.job_id for job in stale_jobs}
+    assert job2["id"] in stale_job_ids
+    assert job3["id"] in stale_job_ids
+    assert job1["id"] not in stale_job_ids
