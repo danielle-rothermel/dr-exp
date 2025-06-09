@@ -169,11 +169,13 @@ class TestHelperFunctions:
     """Test helper functions."""
 
     @patch("dr_exp.manage.process_manager.run_worker")
-    def test_run_worker_main_custom_path(self, mock_run_worker: Any, tmp_path: Any) -> None:
+    def test_run_worker_main_custom_path(
+        self, mock_run_worker: Any, tmp_path: Any
+    ) -> None:
         """Test run_worker_main with explicit configuration."""
         custom_path = str(tmp_path / "custom")
         work_dir = str(tmp_path / "work")
-        
+
         run_worker_main("worker1", work_dir, custom_path, "files_local")
 
         # Should call run_worker with client, base_path, work_dir, worker_id
@@ -185,11 +187,13 @@ class TestHelperFunctions:
         assert "client" in call_args.kwargs
 
     @patch("dr_exp.manage.process_manager.run_worker")
-    def test_run_worker_main_with_explicit_args(self, mock_run_worker: Any, tmp_path: Any) -> None:
+    def test_run_worker_main_with_explicit_args(
+        self, mock_run_worker: Any, tmp_path: Any
+    ) -> None:
         """Test run_worker_main with explicit arguments."""
         test_path = str(tmp_path / "test")
         work_dir = str(tmp_path / "work")
-        
+
         run_worker_main("worker1", work_dir, test_path, "files_local")
 
         # Should call run_worker with proper arguments
@@ -202,11 +206,13 @@ class TestHelperFunctions:
 
     @patch("os.makedirs")
     @patch("dr_exp.manage.process_manager.run_worker_main")
-    def test_worker_target(self, mock_run_worker_main: Any, mock_makedirs: Any, tmp_path: Any) -> None:
+    def test_worker_target(
+        self, mock_run_worker_main: Any, mock_makedirs: Any, tmp_path: Any
+    ) -> None:
         """Test _worker_target function."""
         base_path = str(tmp_path / "base")
         worker_dir = str(tmp_path / "worker")
-        
+
         _worker_target(base_path, "worker1", "0", worker_dir, "files_local")
 
         # Should set environment variables
@@ -217,5 +223,8 @@ class TestHelperFunctions:
 
         # Should call run_worker_main with all required arguments
         mock_run_worker_main.assert_called_once_with(
-            worker_id="worker1", work_dir=worker_dir, base_path=base_path, mode="files_local"
+            worker_id="worker1",
+            work_dir=worker_dir,
+            base_path=base_path,
+            mode="files_local",
         )

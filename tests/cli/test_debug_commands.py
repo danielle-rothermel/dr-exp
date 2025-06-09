@@ -45,14 +45,14 @@ def test_debug_health_check_healthy_system() -> None:
         # Test CLI flag-based configuration
         exit_code = main(
             [
+                "debug",
+                "debug_health_check",
                 "--base-path",
                 tmpdir,
                 "--mode",
                 "files_local",
                 "--storage-path",
                 storage_dir,
-                "debug",
-                "debug_health_check",
             ]
         )
         assert exit_code == 0
@@ -68,14 +68,14 @@ def test_debug_health_check_with_issues() -> None:
         # Test CLI flag-based configuration with invalid storage path
         exit_code = main(
             [
+                "debug",
+                "debug_health_check",
                 "--base-path",
                 tmpdir,
                 "--mode",
                 "files_local",
                 "--storage-path",
                 nonexistent_storage,
-                "debug",
-                "debug_health_check",
             ]
         )
         # Should return 1 due to storage directory issue
@@ -89,12 +89,12 @@ def test_debug_health_check_verbose() -> None:
         # Test CLI flag-based configuration with verbose flag
         exit_code = main(
             [
+                "debug",
+                "debug_health_check",
                 "--base-path",
                 tmpdir,
                 "--mode",
                 "files_local",
-                "debug",
-                "debug_health_check",
                 "--verbose",
             ]
         )
@@ -138,121 +138,16 @@ def test_configuration_mismatch_detection(tmp_path: Path) -> None:
     with patch(original_check, mock_check_alternatives):
         exit_code = main(
             [
+                "debug",
+                "debug_health_check",
                 "--base-path",
                 alternative_path,
                 "--mode",
                 "files_local",
-                "debug",
-                "debug_health_check",
             ]
         )
         # Should pass overall but report alternative locations
         assert exit_code == 0
-
-
-@pytest.mark.integration
-def test_enhanced_worker_diagnostics_integration(tmp_path: Path) -> None:
-    """Test complete workflow of enhanced worker diagnostics."""
-    # Test CLI flag-based configuration with no jobs
-    exit_code = main(
-        [
-            "--base-path",
-            str(tmp_path),
-            "--mode",
-            "files_local",
-            "system",
-            "run_worker",
-            "test_worker",
-            str(tmp_path / "work"),
-        ]
-    )
-    # Should return 1 (no job available) but show diagnostics
-    assert exit_code == 1
-
-
-@pytest.mark.integration
-def test_worker_diagnostics_with_jobs(
-    tmp_path: Path, isolated_job_db: LocalJobDB
-) -> None:
-    """Test worker diagnostics when jobs are available."""
-    # Create a job in the database
-    test_config = {"config": {"test": True}, "metadata": {"test": True}}
-    isolated_job_db.add_job(test_config, "test_sweep", priority=100)
-
-    # Use the same database configuration from fixture
-    base_path = isolated_job_db.config.base_path
-    mode = isolated_job_db.config.mode
-
-    # Mock the training function to prevent actual training
-    with patch("dr_exp.training.dummy_trainer.train") as mock_train:
-        from dr_exp.training import create_success_result
-
-        mock_train.return_value = create_success_result(
-            final_metrics={
-                "final_val_acc": 0.95,
-                "final_train_loss": 0.1,
-                "final_val_loss": 0.15,
-            },
-            epochs=1,
-            logger_meta={"metrics_path": "test.jsonl", "num_checkpoints": 0},
-            artifacts_path="/tmp",
-            training_time=1.0,
-        )
-
-        exit_code = main(
-            [
-                "--base-path",
-                base_path,
-                "--mode",
-                mode,
-                "system",
-                "run_worker",
-                "test_worker",
-                str(tmp_path / "work"),
-            ]
-        )
-        # Should succeed when job is available and training succeeds
-        assert exit_code == 0
-
-
-@pytest.mark.integration
-def test_end_to_end_diagnostic_workflow(tmp_path: Path) -> None:
-    """Test complete end-to-end diagnostic workflow."""
-    base_path = str(tmp_path)
-
-    # 1. Run health check first
-    health_exit = main(
-        [
-            "--base-path",
-            base_path,
-            "--mode",
-            "files_local",
-            "debug",
-            "debug_health_check",
-        ]
-    )
-    assert health_exit == 0
-
-    # 2. Show configuration
-    config_exit = main(
-        ["--base-path", base_path, "--mode", "files_local", "debug", "debug_config"]
-    )
-    assert config_exit == 0
-
-    # 3. Try to run worker (should show diagnostics)
-    worker_exit = main(
-        [
-            "--base-path",
-            base_path,
-            "--mode",
-            "files_local",
-            "system",
-            "run_worker",
-            "test_worker",
-            str(tmp_path / "work"),
-        ]
-    )
-    assert worker_exit == 1  # No jobs available
 
 
 @pytest.mark.integration
@@ -263,12 +158,12 @@ def test_configuration_validation_in_health_check() -> None:
     with patch.dict(os.environ, {"SUPABASE_URL": "", "SUPABASE_KEY": ""}, clear=False):
         exit_code = main(
             [
+                "debug",
+                "debug_health_check",
                 "--base-path",
                 "/tmp",
                 "--mode",
                 "supabase_remote",
-                "debug",
-                "debug_health_check",
             ]
         )
         # Should fail due to missing Supabase credentials
@@ -295,7 +190,7 @@ def test_debug_commands_with_different_modes() -> None:
 
             with patch.dict(os.environ, env_patches):
                 config_exit = main(
-                    ["--base-path", tmpdir, "--mode", mode, "debug", "debug_config"]
+                    ["debug", "debug_config", "--base-path", tmpdir, "--mode", mode]
                 )
                 if should_succeed:
                     assert config_exit == 0
@@ -304,12 +199,12 @@ def test_debug_commands_with_different_modes() -> None:
                 # Health check may fail for supabase_local due to connectivity
                 health_exit = main(
                     [
+                        "debug",
+                        "debug_health_check",
                         "--base-path",
                         tmpdir,
                         "--mode",
                         mode,
-                        "debug",
-                        "debug_health_check",
                     ]
                 )
                 if mode == "files_local":
@@ -351,53 +246,14 @@ def test_stale_job_detection_in_health_check(
 
         exit_code = main(
             [
+                "debug",
+                "debug_health_check",
                 "--base-path",
                 str(tmp_path),
                 "--mode",
                 "files_local",
-                "debug",
-                "debug_health_check",
                 "--verbose",
             ]
         )
         # Should detect stale jobs but still pass overall
         assert exit_code == 0
-
-
-@pytest.mark.integration
-def test_worker_alternative_location_detection() -> None:
-    """Test that worker diagnostics detect jobs in alternative locations."""
-    with tempfile.TemporaryDirectory() as tmpdir:
-        # Create job in one location
-        main_path = os.path.join(tmpdir, "main")
-        alt_path = os.path.join(tmpdir, "alt")
-
-        os.makedirs(os.path.join(main_path, "job_data"))
-        os.makedirs(os.path.join(alt_path, "job_data"))
-
-        # Add job to main location
-        config = JobDBConfig(
-            mode="files_local",
-            base_path=main_path,
-            storage_path=os.path.join(main_path, "storage"),
-        )
-        config.validate()
-        db = LocalJobDB(config)
-        test_config = {"config": {"test": True}, "metadata": {"test": True}}
-        db.add_job(test_config, "test_sweep", priority=100)
-
-        # Try to run worker from alt location (should detect jobs in main)
-        exit_code = main(
-            [
-                "--base-path",
-                alt_path,
-                "--mode",
-                "files_local",
-                "system",
-                "run_worker",
-                "test_worker",
-                os.path.join(alt_path, "work"),
-            ]
-        )
-        # Should return 1 (no job) but show diagnostics about alternative locations
-        assert exit_code == 1

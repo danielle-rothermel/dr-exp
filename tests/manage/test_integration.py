@@ -508,7 +508,7 @@ class TestFactoryIntegration:
     ) -> None:
         """Test that factory works with explicit configuration."""
         from dr_exp.job_db import JobDBConfig
-        
+
         # Create explicit configuration
         custom_config = SystemConfig(
             job_db_config=JobDBConfig(
@@ -523,7 +523,7 @@ class TestFactoryIntegration:
             max_claim_attempts=3,
             worker_heartbeat_interval=1.0,
         )
-        
+
         # Create factory with explicit config
         factory = create_system(custom_config)
 

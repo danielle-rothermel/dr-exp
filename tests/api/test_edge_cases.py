@@ -25,7 +25,7 @@ def test_malformed_json_requests(
     for payload in malformed_payloads:
         resp = client.post(
             "/job/kill",
-            data=payload,  # Use data instead of json to send raw string
+            content=payload,  # Use content instead of data to send raw string
             headers={**admin_headers, "Content-Type": "application/json"},
         )
         # Should return 422 (Unprocessable Entity) for malformed JSON
@@ -341,7 +341,7 @@ def test_request_without_content_type(
 
     resp = client.post(
         "/job/kill",
-        data='{"job_id": "test-id"}',  # Send as raw data
+        content='{"job_id": "test-id"}',  # Send as raw content
         headers=headers_without_content_type,
     )
     # Should either work or return appropriate error
