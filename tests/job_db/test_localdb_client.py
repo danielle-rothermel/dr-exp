@@ -511,11 +511,10 @@ def test_boost_job_priority(
     assert boosted_job["priority"] == 350
     assert boosted_job["priority_boost_count"] == 1
 
-    # Test boost with validation - should raise AssertionError for out-of-range result
-    with pytest.raises(
-        AssertionError, match="Priority must be between 0 and 1000, got 1150"
-    ):
-        mock_client.boost_job_priority(job_id, boost_amount=800)
+    # Test boost with validation - should return error for out-of-range result
+    result = mock_client.boost_job_priority(job_id, boost_amount=800)
+    assert result["success"] is False
+    assert "Priority must be between 0 and 1000, got 1150" in result["message"]
 
 
 def test_list_jobs_by_priority(

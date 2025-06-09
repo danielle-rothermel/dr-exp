@@ -3,7 +3,6 @@
 import pytest
 
 from dr_exp.utils.cli_validation import (
-    ValidationError,
     validate_priority,
     validate_job_id,
     validate_positive_int,
