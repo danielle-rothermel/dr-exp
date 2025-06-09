@@ -76,7 +76,7 @@ class PriorityClass(Enum):
 
 
 def validate_priority(priority: int) -> int:
-    """Validate and clamp a priority value to the valid range.
+    """Validate a priority value is within the valid range.
     
     Parameters
     ----------
@@ -86,9 +86,18 @@ def validate_priority(priority: int) -> int:
     Returns
     -------
     int
-        Clamped priority value within valid range [0, 1000].
+        The validated priority value.
+        
+    Raises
+    ------
+    ValueError
+        If priority is not an integer or is outside the valid range (0-1000).
     """
-    return max(PRIORITY_MIN, min(PRIORITY_MAX, priority))
+    if not isinstance(priority, int):
+        raise ValueError(f"Priority must be an integer, got {type(priority).__name__}")
+    if not (PRIORITY_MIN <= priority <= PRIORITY_MAX):
+        raise ValueError(f"Priority must be between {PRIORITY_MIN} and {PRIORITY_MAX}, got {priority}")
+    return priority
 
 
 def get_priority_description(priority: int) -> str:
@@ -103,14 +112,19 @@ def get_priority_description(priority: int) -> str:
     -------
     str
         Description string indicating priority level and class.
+        
+    Raises
+    ------
+    ValueError
+        If priority is not an integer or is outside the valid range (0-1000).
     """
-    clamped_priority = validate_priority(priority)
-    priority_class = PriorityClass.from_priority(clamped_priority)
+    validated_priority = validate_priority(priority)
+    priority_class = PriorityClass.from_priority(validated_priority)
     
     if priority_class:
-        return f"{clamped_priority} ({priority_class.name.lower()})"
+        return f"{validated_priority} ({priority_class.name.lower()})"
     else:
-        return f"{clamped_priority} (invalid)"
+        return f"{validated_priority} (invalid)"
 
 
 def calculate_age_boost(job: Dict[str, Any], max_boost: int = 200) -> int:

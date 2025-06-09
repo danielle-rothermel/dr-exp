@@ -445,8 +445,8 @@ class SupabaseJobDB(BaseJobDB):
             Newly created job row or ``None`` on failure.
         """
         try:
-            # Clamp priority to valid range
-            priority = self._clamp_priority(priority)
+            # Validate priority is in valid range
+            priority = self._validate_priority(priority)
             
             data = {
                 "config_id": config_id,
@@ -487,8 +487,8 @@ class SupabaseJobDB(BaseJobDB):
         dict[str, Any]
             Result of the priority update operation.
         """
-        # Clamp priority to valid range
-        new_priority = self._clamp_priority(new_priority)
+        # Validate priority is in valid range
+        new_priority = self._validate_priority(new_priority)
         
         try:
             # Update job priority
@@ -547,7 +547,7 @@ class SupabaseJobDB(BaseJobDB):
                 return {"success": False, "message": "Job not found"}
                 
             old_priority = response.data.get("priority", 100)
-            new_priority = self._clamp_priority(old_priority + boost_amount)
+            new_priority = self._validate_priority(old_priority + boost_amount)
             
             # Update priority
             update_response = (
@@ -648,8 +648,8 @@ class SupabaseJobDB(BaseJobDB):
         dict[str, Any]
             The created job record with reservation information.
         """
-        # Clamp priority to valid range
-        priority = self._clamp_priority(priority)
+        # Validate priority is in valid range
+        priority = self._validate_priority(priority)
         
         data = {
             "config_id": sweep_config_id,
