@@ -4,7 +4,7 @@ import pytest
 import threading
 from unittest.mock import patch
 from pathlib import Path
-from typing import Any, Dict, List, Optional, Callable
+from typing import Any, Dict, List, Optional, Callable, cast
 
 from dr_exp.manage.manager import Manager
 from dr_exp.manage.process_manager import MockProcessManager
@@ -83,7 +83,8 @@ def heartbeat_monitor() -> Any:
             if len(self.heartbeat_updates) >= count:
                 return True
 
-            return self.heartbeat_events["sufficient_heartbeats"].wait(timeout)
+            result = self.heartbeat_events["sufficient_heartbeats"].wait(timeout)
+            return bool(result)
 
         def get_heartbeat_count(self, job_id: Optional[str] = None) -> int:
             """Get heartbeat count for specific job or total."""
@@ -130,7 +131,7 @@ def stale_job_detector(enhanced_mock_time: Any) -> Any:
             )
             job_db.update_job(job["id"], {"heartbeat": stale_timestamp})
 
-            return job
+            return cast(Dict[str, Any], job)
 
         def advance_time_for_stale_detection(self, heartbeat_timeout: int) -> None:
             """Advance time to trigger stale job detection."""

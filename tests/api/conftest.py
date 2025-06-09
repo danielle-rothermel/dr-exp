@@ -2,7 +2,7 @@
 
 import json
 from pathlib import Path
-from typing import Dict, Any, Optional, List, Tuple
+from typing import Dict, Any, Optional, List, Tuple, cast
 
 import pytest
 from fastapi.testclient import TestClient
@@ -33,7 +33,7 @@ def client(isolated_app: FastAPI) -> TestClient:
 @pytest.fixture
 def db_client(isolated_app: FastAPI) -> BaseJobDB:
     """Get database client from isolated app."""
-    return isolated_app.state.client
+    return cast(BaseJobDB, isolated_app.state.client)
 
 
 @pytest.fixture

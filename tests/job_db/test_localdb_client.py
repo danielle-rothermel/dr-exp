@@ -1016,7 +1016,7 @@ def test_parse_heartbeat_timestamp_invalid(mock_client: LocalJobDB) -> None:
 
     # Test None (should raise TypeError)
     with pytest.raises(HeartbeatParseError, match="Invalid heartbeat timestamp"):
-        mock_client._parse_heartbeat_timestamp(None)
+        mock_client._parse_heartbeat_timestamp(None)  # type: ignore[arg-type]
 
 
 def test_process_job_for_staleness_missing_fields(mock_client: LocalJobDB) -> None:

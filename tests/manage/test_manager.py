@@ -518,13 +518,16 @@ class TestManager:
         def mock_restart_worker(worker_id: str) -> None:
             raise RuntimeError("Restart failed")
 
-        mock_process_manager.restart_worker = mock_restart_worker
+        with patch.object(
+            mock_process_manager, "restart_worker", side_effect=mock_restart_worker
+        ):
+            # Should raise WorkerRestartError
+            with pytest.raises(WorkerRestartError) as exc_info:
+                streamlined_manager._restart_single_worker(
+                    "worker_0_0", managed_workers
+                )
 
-        # Should raise WorkerRestartError
-        with pytest.raises(WorkerRestartError) as exc_info:
-            streamlined_manager._restart_single_worker("worker_0_0", managed_workers)
-
-        assert "Failed to restart worker worker_0_0" in str(exc_info.value)
+            assert "Failed to restart worker worker_0_0" in str(exc_info.value)
 
     def test_check_stale_jobs_processing_error_handling(
         self, streamlined_manager: Manager, mock_job_db: MockJobDB

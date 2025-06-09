@@ -676,7 +676,7 @@ class TestResourceConstraints:
         def tracking_mkdtemp(*args: Any, **kwargs: Any) -> str:
             temp_dir = original_mkdtemp(*args, **kwargs)
             created_work_dirs.append(temp_dir)
-            return temp_dir
+            return str(temp_dir)  # tempfile.mkdtemp always returns str
 
         with patch("tempfile.mkdtemp", side_effect=tracking_mkdtemp):
             status = worker_execution_helper.run_worker_with_trainer(
@@ -833,8 +833,8 @@ class TestRecoveryMechanisms:
             return {"final_val_acc": 0.95, "status": "success"}
 
         def run_worker_with_shutdown() -> str:
-            return worker_execution_helper.run_worker_with_trainer(
-                graceful_shutdown_train
+            return str(
+                worker_execution_helper.run_worker_with_trainer(graceful_shutdown_train)
             )
 
         # Start worker in thread
