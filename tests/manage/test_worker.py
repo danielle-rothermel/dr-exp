@@ -244,12 +244,10 @@ class TestStreamlinedWorker:
         job_data = temp_client.get_job_details(job["id"])
         assert job_data["status"] == "failed"
 
-        # Check error was recorded
-        errors_file = os.path.join(temp_client.jobs_dir, "errors.jsonl")
-        with open(errors_file) as f:
-            data = f.read()
-        assert "RuntimeError" in data
-        assert "Training failed" in data
+        # Check error was recorded in job metadata (single source of truth)
+        assert "error_message" in job_data
+        assert "RuntimeError" in job_data["error_message"]
+        assert "Training failed" in job_data["error_message"]
 
     def test_worker_with_target_job(self, tmp_path, temp_client):
         """Test worker with specific target job ID."""

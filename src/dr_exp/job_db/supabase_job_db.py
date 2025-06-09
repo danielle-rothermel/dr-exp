@@ -68,6 +68,11 @@ class SupabaseJobDB(BaseJobDB):
         -------
         dict[str, Any] | None
             The claimed job record or ``None`` if no job is available.
+
+        Raises
+        ------
+        RuntimeError
+            If database connection or RPC call fails.
         """
         # Handle None worker_id by providing default
         effective_worker_id = worker_id or "unassigned_worker"
@@ -79,10 +84,10 @@ class SupabaseJobDB(BaseJobDB):
             ).execute()
             if response.data:
                 return response.data[0]  # RPC might return a list with one item
-            return None
+            return None  # No jobs available - legitimate case
         except Exception as e:
-            logger.error(f"Error claiming job: {e}")
-            return None
+            logger.error(f"Critical database error claiming job: {e}")
+            raise RuntimeError(f"Database claim operation failed: {e}") from e
 
     def update_job(self, job_id: str, data: Dict[str, Any]) -> Dict[str, Any]:
         """Update a job record with new data.
@@ -128,6 +133,11 @@ class SupabaseJobDB(BaseJobDB):
         -------
         dict[str, Any] | None
             The job record if found, otherwise ``None``.
+
+        Raises
+        ------
+        RuntimeError
+            If database connection fails.
         """
         try:
             response = (
@@ -137,10 +147,12 @@ class SupabaseJobDB(BaseJobDB):
                 .maybe_single()
                 .execute()
             )
-            return response.data if response.data else None
+            return response.data if response.data else None  # None = job not found
         except Exception as e:
-            logger.error(f"Error getting job details for {job_id}: {e}")
-            return None
+            logger.error(
+                f"Critical database error getting job details for {job_id}: {e}"
+            )
+            raise RuntimeError(f"Database query failed for job {job_id}: {e}") from e
 
     def get_config_for_job(self, job_id: str) -> Optional[Dict[str, Any]]:
         """Return the configuration associated with ``job_id``.
@@ -154,10 +166,17 @@ class SupabaseJobDB(BaseJobDB):
         -------
         dict[str, Any] | None
             The configuration dictionary or ``None`` if unavailable.
+
+        Raises
+        ------
+        RuntimeError
+            If database connection fails.
         """
         try:
             job_details = self.get_job_details(job_id)
-            if job_details and job_details.get("config_id"):
+            if (
+                job_details and job_details["config_id"]
+            ):  # Fail fast if config_id missing
                 config_id = job_details["config_id"]
                 response = (
                     self.supabase.table("sweep_configs")
@@ -167,11 +186,18 @@ class SupabaseJobDB(BaseJobDB):
                     .execute()
                 )
                 if response.data:
-                    return response.data.get("config_json")
-            return None
+                    return response.data[
+                        "config_json"
+                    ]  # Fail fast if config_json missing
+            return None  # Job not found or no config_id - legitimate cases
+        except RuntimeError:
+            # Re-raise database errors from get_job_details
+            raise
         except Exception as e:
-            logger.error(f"Error getting config for job {job_id}: {e}")
-            return None
+            logger.error(
+                f"Critical database error getting config for job {job_id}: {e}"
+            )
+            raise RuntimeError(f"Config lookup failed for job {job_id}: {e}") from e
 
     def log_metrics_file(
         self,
@@ -336,7 +362,7 @@ class SupabaseJobDB(BaseJobDB):
 
     def add_sweep_config_cluster(
         self, name: str, description: Optional[str] = None
-    ) -> Optional[Dict[str, Any]]:
+    ) -> Dict[str, Any]:
         """Create a sweep configuration cluster entry.
 
         Parameters
@@ -348,8 +374,13 @@ class SupabaseJobDB(BaseJobDB):
 
         Returns
         -------
-        dict[str, Any] | None
-            Newly created record or ``None`` on failure.
+        dict[str, Any]
+            Newly created record.
+
+        Raises
+        ------
+        RuntimeError
+            If database insertion fails.
         """
         try:
             data = {"name": name}
@@ -358,13 +389,31 @@ class SupabaseJobDB(BaseJobDB):
             response = (
                 self.supabase.table("sweep_config_clusters").insert(data).execute()
             )
-            return response.data[0] if response.data else None
+            if not response.data:
+                raise RuntimeError("Database insertion returned no data")
+            return response.data[0]
         except Exception as e:
-            logger.error(f"Error adding sweep config cluster: {e}")
-            return None
+            logger.error(f"Critical database error adding sweep config cluster: {e}")
+            raise RuntimeError(f"Failed to create sweep config cluster: {e}") from e
 
     def check_sweep_config_exists(self, config_hash: str) -> Optional[Dict[str, Any]]:
-        """Check whether a configuration with ``config_hash`` exists."""
+        """Check whether a configuration with ``config_hash`` exists.
+
+        Parameters
+        ----------
+        config_hash : str
+            Hash of the configuration to check.
+
+        Returns
+        -------
+        dict[str, Any] | None
+            Configuration record if found, None if not found.
+
+        Raises
+        ------
+        RuntimeError
+            If database query fails.
+        """
         try:
             response = (
                 self.supabase.table("sweep_configs")
@@ -373,10 +422,14 @@ class SupabaseJobDB(BaseJobDB):
                 .maybe_single()
                 .execute()
             )
-            return response.data if response.data else None
+            return response.data if response.data else None  # None = not found
         except Exception as e:
-            logger.error(f"Error checking sweep config existence: {e}")
-            return None
+            logger.error(
+                f"Critical database error checking sweep config existence: {e}"
+            )
+            raise RuntimeError(
+                f"Database query failed for config hash {config_hash}: {e}"
+            ) from e
 
     def add_sweep_config(
         self,
@@ -384,7 +437,7 @@ class SupabaseJobDB(BaseJobDB):
         config_json: Dict[str, Any],
         config_hash: str,
         interface_version: Optional[str] = None,
-    ) -> Optional[Dict[str, Any]]:
+    ) -> Dict[str, Any]:
         """Insert a new sweep configuration entry.
 
         Parameters
@@ -400,8 +453,13 @@ class SupabaseJobDB(BaseJobDB):
 
         Returns
         -------
-        dict[str, Any] | None
-            The created row or ``None`` if insertion failed.
+        dict[str, Any]
+            The created row.
+
+        Raises
+        ------
+        RuntimeError
+            If database insertion fails.
         """
         try:
             data = {
@@ -411,10 +469,12 @@ class SupabaseJobDB(BaseJobDB):
                 "interface_version": interface_version,
             }
             response = self.supabase.table("sweep_configs").insert(data).execute()
-            return response.data[0] if response.data else None
+            if not response.data:
+                raise RuntimeError("Database insertion returned no data")
+            return response.data[0]
         except Exception as e:
-            logger.error(f"Error adding sweep config: {e}")
-            return None
+            logger.error(f"Critical database error adding sweep config: {e}")
+            raise RuntimeError(f"Failed to create sweep config: {e}") from e
 
     def add_job_entry(
         self,
@@ -424,7 +484,7 @@ class SupabaseJobDB(BaseJobDB):
         priority: int = 100,
         interface_version: Optional[str] = None,
         code_version: Optional[str] = None,
-    ) -> Optional[Dict[str, Any]]:
+    ) -> Dict[str, Any]:
         """Create a new job for the given configuration.
 
         Parameters
@@ -445,11 +505,18 @@ class SupabaseJobDB(BaseJobDB):
 
         Returns
         -------
-        dict[str, Any] | None
-            Newly created job row or ``None`` on failure.
+        dict[str, Any]
+            Newly created job row.
+
+        Raises
+        ------
+        ValueError
+            If priority is invalid.
+        RuntimeError
+            If database insertion fails.
         """
         try:
-            # Validate priority is in valid range
+            # Validate priority is in valid range - this already raises ValueError
             priority = self._validate_priority(priority)
 
             data = {
@@ -462,10 +529,15 @@ class SupabaseJobDB(BaseJobDB):
                 # created_at is handled by DB default
             }
             response = self.supabase.table("jobs").insert(data).execute()
-            return response.data[0] if response.data else None
+            if not response.data:
+                raise RuntimeError("Database insertion returned no data")
+            return response.data[0]
+        except ValueError:
+            # Re-raise validation errors
+            raise
         except Exception as e:
-            logger.error(f"Error adding job entry: {e}")
-            return None
+            logger.error(f"Critical database error adding job entry: {e}")
+            raise RuntimeError(f"Failed to create job: {e}") from e
 
     # Priority management methods
 
@@ -550,7 +622,7 @@ class SupabaseJobDB(BaseJobDB):
             if not response.data:
                 return {"success": False, "message": "Job not found"}
 
-            old_priority = response.data.get("priority", 100)
+            old_priority = response.data["priority"]  # Fail fast if priority missing
             new_priority = self._validate_priority(old_priority + boost_amount)
 
             # Update priority

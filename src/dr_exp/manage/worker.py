@@ -24,11 +24,16 @@ from dr_exp.training.result import TrainingResult
 class HeartbeatManager:
     """Manages heartbeat thread for a job."""
 
-    def __init__(self, client: BaseJobDB, job_id: str, interval: float):
+    def __init__(
+        self, client: BaseJobDB, job_id: str, interval: float, max_failures: int = 3
+    ):
         self.client = client
         self.job_id = job_id
         self.interval = interval
+        self.max_failures = max_failures
+        self.failure_count = 0
         self.stop_event = threading.Event()
+        self.failure_event = threading.Event()  # Signal catastrophic failure
         self.thread: Optional[threading.Thread] = None
 
     def start(self):
@@ -43,6 +48,10 @@ class HeartbeatManager:
             self.stop_event.set()
             self.thread.join(timeout=5)  # Give it time to finish gracefully
 
+    def has_failed(self) -> bool:
+        """Check if heartbeat system has failed catastrophically."""
+        return self.failure_event.is_set()
+
     def _heartbeat_loop(self):
         """Send heartbeats at a fixed interval until stop_event is set."""
         while not self.stop_event.is_set():
@@ -50,9 +59,20 @@ class HeartbeatManager:
                 self.client.update_job(
                     self.job_id, {"heartbeat": datetime.now(UTC).isoformat() + "Z"}
                 )
+                # Reset failure count on successful heartbeat
+                self.failure_count = 0
             except Exception as e:
-                # Don't let heartbeat failures crash the worker
-                logging.warning(f"Heartbeat failed for job {self.job_id}: {e}")
+                self.failure_count += 1
+                logging.error(
+                    f"Heartbeat failed for job {self.job_id} (attempt {self.failure_count}/{self.max_failures}): {e}"
+                )
+
+                if self.failure_count >= self.max_failures:
+                    logging.error(
+                        f"Critical: Heartbeat system failed after {self.max_failures} attempts for job {self.job_id}"
+                    )
+                    self.failure_event.set()  # Signal catastrophic failure
+                    break  # Stop trying
 
             # Use wait instead of sleep for more responsive shutdown
             if self.stop_event.wait(timeout=self.interval):
@@ -120,11 +140,37 @@ class JobExecutor:
         try:
             # Execute training
             result = self._execute_training(cfg, logger, worker_log_path)
-            
+
+            # Check for heartbeat failures after training completes
+            if heartbeat_manager.has_failed():
+                logging.error(
+                    f"Job {self.job_id} failed due to heartbeat system failure"
+                )
+                self.client.record_failure(
+                    self.job_id,
+                    "heartbeat_failure",
+                    "Heartbeat system failed - worker lost connectivity",
+                )
+                self.client.finalize_job(
+                    self.job_id, "failed", {"finalize_success": False}
+                )
+                return "failed"
+
             # Determine train_status based on result status and error
             if result.status == "success":
                 train_status = "success"
-            elif result.error and any(exc in result.error for exc in ["Exception", "Error", "RuntimeError", "ValueError", "MemoryError", "OSError", "IOError"]):
+            elif result.error and any(
+                exc in result.error
+                for exc in [
+                    "Exception",
+                    "Error",
+                    "RuntimeError",
+                    "ValueError",
+                    "MemoryError",
+                    "OSError",
+                    "IOError",
+                ]
+            ):
                 train_status = "crash"  # Training function crashed with exception
             else:
                 train_status = "failed"  # Training function returned failure status
@@ -171,10 +217,8 @@ class JobExecutor:
                 wlog.write(f"Training failed with error: {e}\n")
                 wlog.write(stack)
 
-                # Record failure in database
-                self.client.record_failure(self.job_id, type(e).__name__, str(e), stack)
-
                 # Return failure result as TrainingResult
+                # finalize_job() will handle all failure recording as single source of truth
                 from dr_exp.training.result import create_failure_result
 
                 return create_failure_result(
@@ -193,36 +237,66 @@ class JobExecutor:
         # Finalize logger
         logger_meta = logger.finalize()
 
-        # Upload metrics (handle failures gracefully)
+        # Upload metrics - fail fast if upload fails
         try:
             metrics_upload = self.client.upload_artifact(
                 self.job_id, logger_meta["metrics_path"], "metrics.jsonl"
             )
+            if not metrics_upload["success"]:
+                raise RuntimeError(
+                    f"Metrics upload failed: {metrics_upload.get('error', 'Unknown error')}"
+                )
         except Exception as e:
-            logging.warning(f"Failed to upload metrics for job {self.job_id}: {e}")
-            metrics_upload = {"success": False, "error": str(e)}
+            logging.error(
+                f"Critical: Failed to upload metrics for job {self.job_id}: {e}"
+            )
+            # Record upload failure and fail the job
+            self.client.record_failure(
+                self.job_id, "upload_failure", f"Failed to upload training metrics: {e}"
+            )
+            self.client.finalize_job(self.job_id, "failed", {"finalize_success": False})
+            return
 
-        # Create and upload bundle (handle failures gracefully)
+        # Create and upload bundle - fail fast if upload fails
         try:
             bundle_upload = self._create_and_upload_bundle(
                 logger, work_dir, worker_log_path
             )
+            if not bundle_upload["success"]:
+                raise RuntimeError(
+                    f"Bundle upload failed: {bundle_upload.get('error', 'Unknown error')}"
+                )
         except Exception as e:
-            logging.warning(f"Failed to upload bundle for job {self.job_id}: {e}")
-            bundle_upload = {"success": False, "error": str(e)}
+            logging.error(
+                f"Critical: Failed to upload bundle for job {self.job_id}: {e}"
+            )
+            # Record upload failure and fail the job
+            self.client.record_failure(
+                self.job_id, "upload_failure", f"Failed to upload training bundle: {e}"
+            )
+            self.client.finalize_job(self.job_id, "failed", {"finalize_success": False})
+            return
 
-        # Finalize job with metadata
+        # Finalize job with metadata - uploads guaranteed to be successful at this point
         final_status = "completed" if train_status == "success" else "failed"
         metadata = {
             "final_val_acc": result.final_val_acc,  # Direct access - no .get() silent failures
             "final_train_loss": result.final_train_loss,
             "num_epochs": result.num_epochs,
             "train_status": train_status,
-            "metrics_storage_path": metrics_upload.get("storage_path"),
-            "bundle_storage_path": bundle_upload.get("storage_path"),
+            "metrics_storage_path": metrics_upload[
+                "storage_path"
+            ],  # Guaranteed to exist due to fail-fast
+            "bundle_storage_path": bundle_upload[
+                "storage_path"
+            ],  # Guaranteed to exist due to fail-fast
             "upload_complete_at": datetime.now(UTC).isoformat() + "Z",
-            "finalize_success": logger_meta.get("finalize_success", False),
+            "finalize_success": logger_meta["finalize_success"],
         }
+
+        # Add error details for failed jobs - single source of truth for failure recording
+        if final_status == "failed" and result.error:
+            metadata["error_message"] = result.error
 
         self.client.finalize_job(self.job_id, final_status, metadata)
 
@@ -261,12 +335,8 @@ class JobExecutor:
             os.path.join(work_dir, "bundle"), "zip", bundle_dir
         )
 
-        # Upload bundle (handle failures gracefully)
-        try:
-            return self.client.upload_artifact(self.job_id, bundle_zip, "bundle.zip")
-        except Exception as e:
-            logging.warning(f"Failed to upload bundle for job {self.job_id}: {e}")
-            return {"success": False, "error": str(e)}
+        # Upload bundle - exceptions will be caught by caller for fail-fast behavior
+        return self.client.upload_artifact(self.job_id, bundle_zip, "bundle.zip")
 
 
 def run_worker(

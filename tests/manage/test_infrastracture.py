@@ -268,12 +268,19 @@ class TestManageSpecificFixtures:
                 execution_started.set()
                 can_complete.wait(timeout=5)
                 return create_success_result(
-                final_metrics={"final_val_acc": 0.95, "final_train_loss": 0.1, "final_val_loss": 0.15},
-                epochs=1,
-                logger_meta={"metrics_path": "test_metrics.jsonl", "num_checkpoints": 0},
-                artifacts_path=logger.paths.artifact_dir,
-                training_time=0.1
-            )
+                    final_metrics={
+                        "final_val_acc": 0.95,
+                        "final_train_loss": 0.1,
+                        "final_val_loss": 0.15,
+                    },
+                    epochs=1,
+                    logger_meta={
+                        "metrics_path": "test_metrics.jsonl",
+                        "num_checkpoints": 0,
+                    },
+                    artifacts_path=logger.paths.artifact_dir,
+                    training_time=0.1,
+                )
 
             # Run worker in thread
             result = []
@@ -354,11 +361,18 @@ class TestManageSpecificFixtures:
             priority_level = config.get("priority_test")
             execution_order.append(priority_level)
             return create_success_result(
-                final_metrics={"final_val_acc": 0.95, "final_train_loss": 0.1, "final_val_loss": 0.15},
+                final_metrics={
+                    "final_val_acc": 0.95,
+                    "final_train_loss": 0.1,
+                    "final_val_loss": 0.15,
+                },
                 epochs=1,
-                logger_meta={"metrics_path": "test_metrics.jsonl", "num_checkpoints": 0},
+                logger_meta={
+                    "metrics_path": "test_metrics.jsonl",
+                    "num_checkpoints": 0,
+                },
                 artifacts_path=logger.paths.artifact_dir,
-                training_time=0.1
+                training_time=0.1,
             )
 
         # Execute all jobs
@@ -415,12 +429,19 @@ class TestInfrastructureIntegration:
                         events["can_complete"].wait(timeout=10)
 
                         return create_success_result(
-                final_metrics={"final_val_acc": 0.95, "final_train_loss": 0.1, "final_val_loss": 0.15},
-                epochs=1,
-                logger_meta={"metrics_path": "test_metrics.jsonl", "num_checkpoints": 0},
-                artifacts_path=logger.paths.artifact_dir,
-                training_time=0.1
-            )
+                            final_metrics={
+                                "final_val_acc": 0.95,
+                                "final_train_loss": 0.1,
+                                "final_val_loss": 0.15,
+                            },
+                            epochs=1,
+                            logger_meta={
+                                "metrics_path": "test_metrics.jsonl",
+                                "num_checkpoints": 0,
+                            },
+                            artifacts_path=logger.paths.artifact_dir,
+                            training_time=0.1,
+                        )
 
                     return enhanced_trainer
 

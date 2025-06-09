@@ -1,7 +1,6 @@
 """Tests for WebSocket real-time communication."""
 
 import json
-import pytest
 from .conftest import create_test_job, Priority
 
 
@@ -283,7 +282,7 @@ def test_websocket_broadcast_integration(client, db_client, admin_headers):
     """Test integration with actual API operations for broadcasting."""
     import json
     import time
-    
+
     job = create_test_job(db_client, priority=Priority.NORMAL)
     job_id = job["id"]
 
@@ -298,13 +297,13 @@ def test_websocket_broadcast_integration(client, db_client, admin_headers):
 
         # Give time for broadcast to be sent
         time.sleep(0.1)
-        
+
         # Try to receive the broadcast message
         try:
             # The WebSocket should receive a broadcast about the priority boost
             data = websocket.receive_text()
             message = json.loads(data)
-            
+
             # Verify this is a job update broadcast
             assert message["type"] == "job_update"
             assert message["job_id"] == job_id

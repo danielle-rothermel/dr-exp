@@ -35,11 +35,18 @@ class TestDatabaseErrorScenarios:
         def successful_train(config, logger):
             logger.log({"test_metric": 0.95})
             return create_success_result(
-                final_metrics={"final_val_acc": 0.95, "final_train_loss": 0.1, "final_val_loss": 0.15},
+                final_metrics={
+                    "final_val_acc": 0.95,
+                    "final_train_loss": 0.1,
+                    "final_val_loss": 0.15,
+                },
                 epochs=1,
-                logger_meta={"metrics_path": "test_metrics.jsonl", "num_checkpoints": 0},
+                logger_meta={
+                    "metrics_path": "test_metrics.jsonl",
+                    "num_checkpoints": 0,
+                },
                 artifacts_path=logger.paths.artifact_dir,
-                training_time=1.0
+                training_time=1.0,
             )
 
         # Mock database update to fail during heartbeat
@@ -107,11 +114,18 @@ class TestDatabaseErrorScenarios:
         def successful_train(config, logger):
             logger.log({"test_metric": 0.95})
             return create_success_result(
-                final_metrics={"final_val_acc": 0.95, "final_train_loss": 0.1, "final_val_loss": 0.15},
+                final_metrics={
+                    "final_val_acc": 0.95,
+                    "final_train_loss": 0.1,
+                    "final_val_loss": 0.15,
+                },
                 epochs=1,
-                logger_meta={"metrics_path": "test_metrics.jsonl", "num_checkpoints": 0},
+                logger_meta={
+                    "metrics_path": "test_metrics.jsonl",
+                    "num_checkpoints": 0,
+                },
                 artifacts_path=logger.paths.artifact_dir,
-                training_time=1.0
+                training_time=1.0,
             )
 
         # Mock upload_artifact to fail
@@ -146,11 +160,18 @@ class TestTrainingFunctionErrors:
             time.sleep(1)  # Reduced from 10s to 1s for faster testing
             logger.log({"test_metric": 0.95})
             return create_success_result(
-                final_metrics={"final_val_acc": 0.95, "final_train_loss": 0.1, "final_val_loss": 0.15},
+                final_metrics={
+                    "final_val_acc": 0.95,
+                    "final_train_loss": 0.1,
+                    "final_val_loss": 0.15,
+                },
                 epochs=1,
-                logger_meta={"metrics_path": "test_metrics.jsonl", "num_checkpoints": 0},
+                logger_meta={
+                    "metrics_path": "test_metrics.jsonl",
+                    "num_checkpoints": 0,
+                },
                 artifacts_path=logger.paths.artifact_dir,
-                training_time=1.0
+                training_time=1.0,
             )
 
         # Use a very short timeout for testing
@@ -253,11 +274,18 @@ class TestConcurrencyAndRaceConditions:
             time.sleep(0.1)
             logger.log({"test_metric": 0.95})
             return create_success_result(
-                final_metrics={"final_val_acc": 0.95, "final_train_loss": 0.1, "final_val_loss": 0.15},
+                final_metrics={
+                    "final_val_acc": 0.95,
+                    "final_train_loss": 0.1,
+                    "final_val_loss": 0.15,
+                },
                 epochs=1,
-                logger_meta={"metrics_path": "test_metrics.jsonl", "num_checkpoints": 0},
+                logger_meta={
+                    "metrics_path": "test_metrics.jsonl",
+                    "num_checkpoints": 0,
+                },
                 artifacts_path=logger.paths.artifact_dir,
-                training_time=0.1
+                training_time=0.1,
             )
 
         # Start multiple workers simultaneously
@@ -324,11 +352,18 @@ class TestConcurrencyAndRaceConditions:
 
             logger.log({"priority_metric": 0.95})
             return create_success_result(
-                final_metrics={"final_val_acc": 0.95, "final_train_loss": 0.1, "final_val_loss": 0.15},
+                final_metrics={
+                    "final_val_acc": 0.95,
+                    "final_train_loss": 0.1,
+                    "final_val_loss": 0.15,
+                },
                 epochs=1,
-                logger_meta={"metrics_path": "test_metrics.jsonl", "num_checkpoints": 0},
+                logger_meta={
+                    "metrics_path": "test_metrics.jsonl",
+                    "num_checkpoints": 0,
+                },
                 artifacts_path=logger.paths.artifact_dir,
-                training_time=0.1
+                training_time=0.1,
             )
 
         # Start multiple workers
@@ -430,11 +465,18 @@ class TestConcurrencyAndRaceConditions:
             time.sleep(0.01 + (config["job_in_batch"] * 0.01))
             logger.log({"batch_id": config["batch_id"], "processed": True})
             return create_success_result(
-                final_metrics={"final_val_acc": 0.95, "final_train_loss": 0.1, "final_val_loss": 0.15},
+                final_metrics={
+                    "final_val_acc": 0.95,
+                    "final_train_loss": 0.1,
+                    "final_val_loss": 0.15,
+                },
                 epochs=1,
-                logger_meta={"metrics_path": "test_metrics.jsonl", "num_checkpoints": 0},
+                logger_meta={
+                    "metrics_path": "test_metrics.jsonl",
+                    "num_checkpoints": 0,
+                },
                 artifacts_path=logger.paths.artifact_dir,
-                training_time=0.01
+                training_time=0.01,
             )
 
         def run_high_frequency_worker(worker_id):
@@ -600,11 +642,18 @@ class TestResourceConstraints:
 
             logger.log({"test_metric": 0.95})
             return create_success_result(
-                final_metrics={"final_val_acc": 0.95, "final_train_loss": 0.1, "final_val_loss": 0.15},
+                final_metrics={
+                    "final_val_acc": 0.95,
+                    "final_train_loss": 0.1,
+                    "final_val_loss": 0.15,
+                },
                 epochs=1,
-                logger_meta={"metrics_path": "test_metrics.jsonl", "num_checkpoints": 0},
+                logger_meta={
+                    "metrics_path": "test_metrics.jsonl",
+                    "num_checkpoints": 0,
+                },
                 artifacts_path=logger.paths.artifact_dir,
-                training_time=0.1
+                training_time=0.1,
             )
 
         # Mock tempfile.mkdtemp to track directory creation
@@ -645,11 +694,18 @@ class TestResourceConstraints:
                 logger.save_checkpoint({"step": i}, f"checkpoint_{i}")
 
             return create_success_result(
-                final_metrics={"final_val_acc": 0.95, "final_train_loss": 0.1, "final_val_loss": 0.15},
+                final_metrics={
+                    "final_val_acc": 0.95,
+                    "final_train_loss": 0.1,
+                    "final_val_loss": 0.15,
+                },
                 epochs=10,
-                logger_meta={"metrics_path": "test_metrics.jsonl", "num_checkpoints": 10},
+                logger_meta={
+                    "metrics_path": "test_metrics.jsonl",
+                    "num_checkpoints": 10,
+                },
                 artifacts_path=logger.paths.artifact_dir,
-                training_time=1.0
+                training_time=1.0,
             )
 
         status = worker_execution_helper.run_worker_with_trainer(
@@ -686,11 +742,18 @@ class TestRecoveryMechanisms:
 
             logger.log({"retry_success": True, "attempt": attempt_count})
             return create_success_result(
-                final_metrics={"final_val_acc": 0.95, "final_train_loss": 0.1, "final_val_loss": 0.15},
+                final_metrics={
+                    "final_val_acc": 0.95,
+                    "final_train_loss": 0.1,
+                    "final_val_loss": 0.15,
+                },
                 epochs=attempt_count,
-                logger_meta={"metrics_path": "test_metrics.jsonl", "num_checkpoints": 1},
+                logger_meta={
+                    "metrics_path": "test_metrics.jsonl",
+                    "num_checkpoints": 1,
+                },
                 artifacts_path=logger.paths.artifact_dir,
-                training_time=1.0
+                training_time=1.0,
             )
 
         # Simulate retry logic by running worker multiple times
