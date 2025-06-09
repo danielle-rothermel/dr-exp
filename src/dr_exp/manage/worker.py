@@ -165,19 +165,36 @@ class JobExecutor:
             # Determine train_status based on result status and error
             if result.status == "success":
                 train_status = "success"
-            elif result.error and any(
-                exc in result.error
-                for exc in [
-                    "Exception",
-                    "Error",
-                    "RuntimeError",
-                    "ValueError",
-                    "MemoryError",
-                    "OSError",
-                    "IOError",
-                ]
+            elif result.error and (
+                # Check for exception class names (actual crashes)
+                any(
+                    exc in result.error
+                    for exc in [
+                        "Exception",
+                        "Error",
+                        "RuntimeError",
+                        "ValueError",
+                        "MemoryError",
+                        "OSError",
+                        "IOError",
+                    ]
+                )
+                or
+                # Check for crash-like error patterns
+                any(
+                    pattern in result.error.lower()
+                    for pattern in [
+                        "out of memory",
+                        "memory error",
+                        "no space left",
+                        "disk space",
+                        "interrupted",
+                        "corrupt",
+                        "corrupted data",
+                    ]
+                )
             ):
-                train_status = "crash"  # Training function crashed with exception
+                train_status = "crash"  # Training function crashed with exception or crash-like error
             else:
                 train_status = "failed"  # Training function returned failure status
 
