@@ -1,7 +1,7 @@
 from .base_job_db import BaseJobDB, StaleJobInfo
 from .local_job_db import LocalJobDB
 from .supabase_job_db import SupabaseJobDB
-from .config import JobDBConfig
+from .jobdb_config import JobDBConfig
 
 __all__ = [
     "BaseJobDB",
