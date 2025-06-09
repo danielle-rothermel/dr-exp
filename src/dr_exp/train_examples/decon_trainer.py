@@ -75,56 +75,136 @@ def validate_and_extract_decon_config(dr_exp_cfg: Any) -> OmegaConf:
     return decon_cfg
 
 
-def extract_final_metrics_from_trainer(trainer, logger: BaseLogger) -> Dict[str, float]:
-    """Extract final training metrics from Lightning trainer.
+def extract_validation_metrics_from_trainer(trainer, logger: BaseLogger) -> Dict[str, float]:
+    """Extract validation metrics from Lightning trainer.
+    
+    Validation metrics should be reliably available in logged_metrics.
     
     Parameters
     ----------
     trainer : Lightning trainer
         Trained Lightning trainer with logged metrics
     logger : BaseLogger
-        Logger for recording any extraction warnings
+        Logger for recording extraction details
         
     Returns
     -------
     Dict[str, float]
-        Dictionary with final metrics: final_train_loss, final_val_acc, final_val_loss
+        Dictionary with validation metrics: final_val_acc, final_val_loss
+        
+    Raises
+    ------
+    ValueError
+        If validation metrics cannot be extracted
     """
-    final_metrics = {}
+    # Fail immediately if trainer doesn't have logged metrics
+    if not hasattr(trainer, 'logged_metrics'):
+        raise ValueError("Lightning trainer has no 'logged_metrics' attribute - training may have failed")
     
-    # Access Lightning's logged metrics if available
-    if hasattr(trainer, 'logged_metrics'):
-        logged_metrics = trainer.logged_metrics
-        # Extract key metrics with careful handling of tensor/scalar values
-        try:
-            train_loss = logged_metrics.get("train_loss", logged_metrics.get("train_loss_epoch", None))
-            val_acc = logged_metrics.get("val_acc", logged_metrics.get("val_acc_epoch", None))
-            val_loss = logged_metrics.get("val_loss", logged_metrics.get("val_loss_epoch", None))
-            
-            # Convert to float and handle potential None/inf values
-            final_metrics = {
-                "final_train_loss": float(train_loss) if train_loss is not None and torch.isfinite(torch.tensor(train_loss)) else 1.0,
-                "final_val_acc": float(val_acc) if val_acc is not None and torch.isfinite(torch.tensor(val_acc)) else 0.1,
-                "final_val_loss": float(val_loss) if val_loss is not None and torch.isfinite(torch.tensor(val_loss)) else 1.0
-            }
-        except (ValueError, TypeError, ZeroDivisionError) as e:
-            # Handle any conversion errors gracefully
-            logger.log({"metrics_extraction_warning": f"Error extracting metrics: {e}"})
-            final_metrics = {
-                "final_train_loss": 1.0,
-                "final_val_acc": 0.1,
-                "final_val_loss": 1.0
-            }
+    logged_metrics = trainer.logged_metrics
+    if not logged_metrics:
+        raise ValueError("Lightning trainer.logged_metrics is empty - no metrics were recorded during training")
     
-    # If no metrics available from trainer, provide reasonable defaults
-    if not final_metrics:
-        final_metrics = {
-            "final_train_loss": 1.0,  # Reasonable default for cross-entropy
-            "final_val_acc": 0.1,     # Conservative default for CIFAR-10
-            "final_val_loss": 1.0
+    available_keys = list(logged_metrics.keys())
+    
+    # Get validation metrics from logged_metrics (these should be reliably available)
+    val_acc = logged_metrics.get("val_acc") or logged_metrics.get("val_acc_epoch") 
+    val_loss = logged_metrics.get("val_loss") or logged_metrics.get("val_loss_epoch")
+    
+    # Fail if any required validation metric is missing  
+    if val_acc is None:
+        raise ValueError(f"Required metric 'val_acc' not found. Available keys: {available_keys}")
+        
+    if val_loss is None:
+        raise ValueError(f"Required metric 'val_loss' not found. Available keys: {available_keys}")
+    
+    # Convert to float and validate values - fail if invalid
+    try:
+        val_acc_float = float(val_acc) 
+        val_loss_float = float(val_loss)
+    except (ValueError, TypeError) as e:
+        raise ValueError(f"Failed to convert validation metrics to float: {e}")
+    
+    # Check for infinite or NaN values - fail if found
+    if not torch.isfinite(torch.tensor(val_acc_float)):
+        raise ValueError(f"val_acc is not finite: {val_acc_float}")
+    if not torch.isfinite(torch.tensor(val_loss_float)):
+        raise ValueError(f"val_loss is not finite: {val_loss_float}")
+    
+    return {
+        "final_val_acc": val_acc_float,
+        "final_val_loss": val_loss_float
+    }
+
+
+def extract_training_metrics_from_csv(trainer, logger: BaseLogger) -> Dict[str, float]:
+    """Extract training metrics from Lightning's automatically logged CSV file.
+    
+    This is more efficient than recalculating metrics on every batch.
+    Lightning automatically logs training metrics to metrics.csv in real-time.
+    
+    Parameters
+    ----------
+    trainer : Lightning trainer
+        Trained Lightning trainer
+    logger : BaseLogger
+        Logger for recording extraction details
+        
+    Returns
+    -------
+    Dict[str, float]
+        Dictionary with training metrics: final_train_loss, final_train_acc
+        
+    Raises
+    ------
+    ValueError
+        If CSV file cannot be found or training metrics are missing
+    """
+    import pandas as pd
+    import os
+    
+    # Find the Lightning CSV metrics file
+    # Lightning saves to {default_root_dir}/lightning_logs/version_0/metrics.csv
+    if hasattr(trainer, 'log_dir') and trainer.log_dir:
+        csv_path = os.path.join(trainer.log_dir, "metrics.csv")
+    else:
+        # Fallback: check if trainer has default_root_dir
+        if hasattr(trainer, 'default_root_dir') and trainer.default_root_dir:
+            csv_path = os.path.join(trainer.default_root_dir, "lightning_logs", "version_0", "metrics.csv")
+        else:
+            raise ValueError("Cannot determine Lightning CSV metrics file location")
+    
+    if not os.path.exists(csv_path):
+        raise ValueError(f"Lightning metrics CSV file not found at: {csv_path}")
+    
+    try:
+        # Read the CSV file
+        df = pd.read_csv(csv_path)
+        
+        # Filter to rows that have training metrics (train_loss and train_acc are not NaN)
+        train_rows = df.dropna(subset=['train_loss', 'train_acc'])
+        
+        if train_rows.empty:
+            raise ValueError("No training metrics found in Lightning CSV file")
+        
+        # Get the final (last) training metrics
+        final_row = train_rows.iloc[-1]
+        final_train_loss = float(final_row['train_loss'])
+        final_train_acc = float(final_row['train_acc'])
+        
+        # Validate the metrics
+        if not torch.isfinite(torch.tensor(final_train_loss)):
+            raise ValueError(f"final_train_loss is not finite: {final_train_loss}")
+        if not torch.isfinite(torch.tensor(final_train_acc)):
+            raise ValueError(f"final_train_acc is not finite: {final_train_acc}")
+        
+        return {
+            "final_train_loss": final_train_loss,
+            "final_train_acc": final_train_acc
         }
-    
-    return final_metrics
+        
+    except Exception as e:
+        raise ValueError(f"Failed to extract training metrics from CSV {csv_path}: {str(e)}")
 
 
 class DrExpLoggerAdapter:
@@ -204,7 +284,6 @@ def train_with_decon(cfg: Any, logger: Optional[BaseLogger] = None) -> TrainingR
         })
         
         # 6. Run training with deconCNN
-        # Note: We'll capture metrics by monitoring the trainer's progress
         initial_time = time.time()
         
         # Train the model using deconCNN's training function
@@ -212,8 +291,15 @@ def train_with_decon(cfg: Any, logger: Optional[BaseLogger] = None) -> TrainingR
         
         training_time = time.time() - initial_time
         
-        # 7. Extract final metrics from the trained model
-        final_metrics = extract_final_metrics_from_trainer(trainer, logger)
+        # 7. Extract final metrics - use Lightning's CSV file for training metrics
+        validation_metrics = extract_validation_metrics_from_trainer(trainer, logger)
+        training_metrics = extract_training_metrics_from_csv(trainer, logger)
+        
+        # Combine training and validation metrics
+        final_metrics = {
+            **training_metrics,
+            **validation_metrics
+        }
         
         # 8. Log final summary metrics
         summary_metrics = {
@@ -233,22 +319,10 @@ def train_with_decon(cfg: Any, logger: Optional[BaseLogger] = None) -> TrainingR
                 "final_metrics": final_metrics
             }, tag="final_model")
         
-        # 10. Create artifact summary
-        artifact_path = os.path.join(logger.paths.artifact_dir, "training_summary.txt")
-        with open(artifact_path, "w") as f:
-            f.write(f"deconCNN Training Summary\n")
-            f.write(f"========================\n")
-            f.write(f"Model: {decon_cfg.model.name}\n")
-            f.write(f"Epochs: {decon_cfg.epochs}\n")
-            f.write(f"Final Val Accuracy: {final_metrics.get('final_val_acc', 'N/A'):.4f}\n")
-            f.write(f"Final Train Loss: {final_metrics.get('final_train_loss', 'N/A'):.4f}\n")
-            f.write(f"Training Time: {training_time:.2f}s\n")
-        logger.log_artifact(artifact_path)
-        
-        # 11. Finalize logger
+        # 10. Finalize logger
         logger_meta = logger.finalize()
         
-        # 12. Return standardized results
+        # 11. Return standardized results
         return create_success_result(
             final_metrics=final_metrics,
             epochs=decon_cfg.epochs,
