@@ -61,7 +61,6 @@ def create_test_job(
     sweep_config_id: str = "test_sweep",
     status: str = "queued",
     priority: int = 100,
-    **kwargs: Any,
 ) -> Dict[str, Any]:
     """Create a test job with sensible defaults."""
     if job_config is None:
@@ -72,7 +71,6 @@ def create_test_job(
         sweep_config_id=sweep_config_id,
         status=status,
         priority=priority,
-        **kwargs,
     )
 
 

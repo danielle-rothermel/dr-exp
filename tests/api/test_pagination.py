@@ -1,6 +1,6 @@
 """Tests for job listing pagination and filtering."""
 
-from typing import Any
+from typing import Any, Dict, List
 
 from .conftest import create_test_job, Priority, JobStatus
 
@@ -167,7 +167,7 @@ def test_pagination_with_sorting(client: Any, db_client: Any) -> None:
 def test_pagination_with_complex_filtering(client: Any, db_client: Any) -> None:
     """Test pagination with multiple filters."""
     # Create jobs with varying priorities and statuses
-    test_jobs = [
+    test_jobs: List[Dict[str, Any]] = [
         {"priority": Priority.LOW, "status": JobStatus.QUEUED},
         {"priority": Priority.NORMAL, "status": JobStatus.QUEUED},
         {"priority": Priority.HIGH, "status": JobStatus.QUEUED},
@@ -177,7 +177,12 @@ def test_pagination_with_complex_filtering(client: Any, db_client: Any) -> None:
     ]
 
     for i, job_params in enumerate(test_jobs):
-        create_test_job(db_client, sweep_config_id=f"complex{i}", **job_params)
+        create_test_job(
+            db_client,
+            sweep_config_id=f"complex{i}",
+            priority=job_params["priority"],
+            status=job_params["status"],
+        )
 
     # Test filtering by status and priority range with pagination
     resp = client.get(
