@@ -16,6 +16,18 @@ from .config import JobDBConfig
 logger = logging.getLogger(__name__)
 
 
+class JobValidationError(Exception):
+    """Raised when job data fails validation checks."""
+
+    pass
+
+
+class HeartbeatParseError(Exception):
+    """Raised when heartbeat timestamp cannot be parsed."""
+
+    pass
+
+
 class LocalJobDB(BaseJobDB):
     """Local filesystem-backed job database implementation.
 
@@ -896,44 +908,111 @@ class LocalJobDB(BaseJobDB):
         """Find jobs with heartbeats older than max_age_seconds."""
         stale_jobs = []
         now = datetime.now(UTC)
-
         running_jobs = self.list_running_jobs()
 
         for job in running_jobs:
-            heartbeat_str = job.get(
-                "heartbeat"
-            )  # Optional field - legitimate use of .get()
-            assigned_worker = job["assigned_worker"]  # Required field
-            job_id = job["id"]  # Required field
-
-            if not heartbeat_str or not assigned_worker or not job_id:
-                continue
-
             try:
-                # Parse heartbeat timestamp
-                heartbeat_time = datetime.fromisoformat(heartbeat_str.replace("Z", ""))
-                if heartbeat_time.tzinfo is None:
-                    heartbeat_time = heartbeat_time.replace(tzinfo=UTC)
+                # Fail fast - validate required fields immediately
+                stale_job = self._process_job_for_staleness(job, now, max_age_seconds)
+                if stale_job:
+                    stale_jobs.append(stale_job)
 
-                # Calculate age
-                age = now - heartbeat_time
-                age_seconds = int(age.total_seconds())
-
-                if age_seconds > max_age_seconds:
-                    stale_jobs.append(
-                        StaleJobInfo(
-                            job_id=job_id,
-                            assigned_worker=assigned_worker,
-                            last_heartbeat=heartbeat_time,
-                            age_seconds=age_seconds,
-                        )
-                    )
-
-            except (ValueError, TypeError) as e:
-                logger.error(f"Error parsing heartbeat for job {job_id}: {e}")
+            except JobValidationError as e:
+                logger.warning(f"Skipping invalid job data: {e}")
+                continue
+            except HeartbeatParseError as e:
+                logger.error(
+                    f"Error parsing heartbeat for job {job.get('id', 'unknown')}: {e}"
+                )
                 continue
 
         return stale_jobs
+
+    def _process_job_for_staleness(
+        self, job: Dict[str, Any], now: datetime, max_age_seconds: int
+    ) -> Optional[StaleJobInfo]:
+        """Process a single job to determine if it's stale.
+
+        Parameters
+        ----------
+        job : Dict[str, Any]
+            Job record to check for staleness
+        now : datetime
+            Current timestamp
+        max_age_seconds : int
+            Maximum age in seconds before job is considered stale
+
+        Returns
+        -------
+        Optional[StaleJobInfo]
+            StaleJobInfo if job is stale, None otherwise
+
+        Raises
+        ------
+        JobValidationError
+            If required fields are missing
+        HeartbeatParseError
+            If heartbeat timestamp is invalid
+        """
+        # Fail fast - validate required fields
+        job_id = job.get("id")
+        assigned_worker = job.get("assigned_worker")
+        heartbeat_str = job.get("heartbeat")
+
+        if not job_id:
+            raise JobValidationError("Missing job_id")
+        if not assigned_worker:
+            raise JobValidationError(f"Job {job_id} missing assigned_worker")
+        if not heartbeat_str:
+            # This is legitimate - job might not have heartbeat yet
+            return None
+
+        # Parse heartbeat timestamp
+        heartbeat_time = self._parse_heartbeat_timestamp(heartbeat_str)
+
+        # Calculate staleness
+        age = now - heartbeat_time
+        age_seconds = int(age.total_seconds())
+
+        if age_seconds > max_age_seconds:
+            return StaleJobInfo(
+                job_id=job_id,
+                assigned_worker=assigned_worker,
+                last_heartbeat=heartbeat_time,
+                age_seconds=age_seconds,
+            )
+
+        return None
+
+    def _parse_heartbeat_timestamp(self, heartbeat_str: str) -> datetime:
+        """Parse heartbeat timestamp string.
+
+        Parameters
+        ----------
+        heartbeat_str : str
+            ISO format timestamp string
+
+        Returns
+        -------
+        datetime
+            Parsed datetime with UTC timezone
+
+        Raises
+        ------
+        HeartbeatParseError
+            If timestamp cannot be parsed
+        """
+        try:
+            if heartbeat_str is None:
+                raise ValueError("Heartbeat string is None")
+            heartbeat_time = datetime.fromisoformat(heartbeat_str.replace("Z", ""))
+            if heartbeat_time.tzinfo is None:
+                heartbeat_time = heartbeat_time.replace(tzinfo=UTC)
+            return heartbeat_time
+        except (ValueError, TypeError, AttributeError) as e:
+            raise HeartbeatParseError(
+                f"Invalid heartbeat timestamp '{heartbeat_str}': {e}"
+            )
 
     def mark_jobs_failed(
         self, job_ids: List[str], reason: str = "worker_lost"
