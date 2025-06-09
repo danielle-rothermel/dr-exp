@@ -381,6 +381,7 @@ class TestStreamlinedWorker:
 
         # Check job was updated properly
         job_data = temp_client.get_job_details(job["id"])
+        assert job_data is not None
         assert job_data["status"] == "completed"
         assert job_data["assigned_worker"] == "w0"
         assert "upload_complete_at" in job_data
@@ -436,6 +437,7 @@ class TestStreamlinedWorker:
 
         # Check job was marked as failed
         job_data = temp_client.get_job_details(job["id"])
+        assert job_data is not None
         assert job_data["status"] == "failed"
 
         # Check error was recorded in job metadata (single source of truth)
@@ -461,6 +463,7 @@ class TestStreamlinedWorker:
 
         # Check the specific job was executed
         job_data = temp_client.get_job_details(job["id"])
+        assert job_data is not None
         assert job_data["status"] == "completed"
         assert job_data["assigned_worker"] == "w0"
 
@@ -498,4 +501,5 @@ class TestStreamlinedWorker:
 
         # Check job was marked as failed
         job_data = temp_client.get_job_details(job["id"])
+        assert job_data is not None
         assert job_data["status"] == "failed"
