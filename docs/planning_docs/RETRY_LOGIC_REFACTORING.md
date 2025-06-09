@@ -103,9 +103,9 @@ raise FinalError(f"Unexpected fallthrough after {max_retries} attempts")
 
 #### LOW PRIORITY (Minor cleanup opportunities)
 
-**main.py:94-113** - `ConnectionManager.broadcast()`
-- Loop with exception handling that continues processing
-- Cleanup logic after loop completion
+**main.py:94-113** - `ConnectionManager.broadcast()` ✅ **COMPLETED**
+- ~~Loop with exception handling that continues processing~~
+- ~~Cleanup logic after loop completion~~
 
 **job_reaper.py:37-52** - `reap_stale_jobs()`
 - Multiple continue statements for different conditions
@@ -304,3 +304,52 @@ except StaleJobProcessingError as e:
 - `_mark_stale_jobs_failed()` - Batch job failure marking with specific error handling
 - `_restart_affected_workers()` - Coordinated worker restart operations with failure collection
 - `_restart_single_worker()` - Atomic worker restart with proper error handling
+
+**2025-06-08**: Refactored `main.py:94-113` - `ConnectionManager.broadcast()` function
+- ✅ Enhanced error handling with improved observability and logging
+- ✅ Added connection tracking with success/failure counts 
+- ✅ Implemented debug logging for successful broadcasts to all connections
+- ✅ Added warning logging for partial failures with detailed connection counts
+- ✅ Maintained existing void return API while improving internal error tracking
+- ✅ Added comprehensive unit tests covering all broadcast scenarios
+- ✅ Configured pytest-asyncio for async test support
+- ✅ Verified with all existing WebSocket tests passing - no regressions introduced
+
+**Changes Made:**
+```python
+# Before: Silent partial failures with minimal logging
+for connection in self.active_connections:
+    try:
+        await connection.send_text(message_text)
+    except Exception as e:
+        logger.error(f"Critical WebSocket failure during broadcast: {e}")
+        disconnected.add(connection)
+        # Continue with other connections but track failures
+
+# After: Enhanced observability with success/failure tracking
+total_connections = len(self.active_connections)
+
+for connection in self.active_connections:
+    try:
+        await connection.send_text(message_text)
+    except Exception as e:
+        logger.error(f"Critical WebSocket failure during broadcast: {e}")
+        disconnected.add(connection)
+
+# Remove disconnected clients and log results
+for connection in disconnected:
+    self.disconnect(connection)
+
+if disconnected:
+    successful = total_connections - len(disconnected)
+    logger.warning(f"Broadcast partial success: {successful}/{total_connections} connections")
+else:
+    logger.debug(f"Broadcast successful to all {total_connections} connections")
+```
+
+**Testing Coverage Added:**
+- Successful broadcast to all connections with debug logging verification
+- Partial failure scenarios with proper connection cleanup and warning logging
+- Complete failure scenarios with error isolation and logging
+- Empty connection set handling (no unnecessary logging)
+- Complex JSON serialization with nested structures and unicode
