@@ -179,3 +179,47 @@ Worker completed with status: no_job
 - ✅ Backward compatibility maintained for existing workflows
 
 **Achievement**: Users can now self-diagnose configuration issues instead of manual investigation
+
+### Session 5: CLI Logging Fix (Critical Enhancement)
+
+#### Issue Identified
+The enhanced diagnostics were only visible when logging was explicitly configured, but the CLI didn't set up logging by default. Users couldn't see the helpful diagnostic information.
+
+#### Solution Implemented
+- ✅ **Added logging setup to CLI**: Configured `logging.basicConfig()` in main CLI entry point
+- ✅ **Targeted dr_exp module logging**: Only show INFO+ messages from dr_exp modules  
+- ✅ **Suppressed noisy third-party loggers**: Reduced clutter from urllib3, requests, etc.
+- ✅ **Tested complete diagnostic flow**: Verified all scenarios show proper diagnostics
+
+#### Enhanced User Experience
+
+**Before Logging Fix:**
+```bash
+$ uv run python scripts/manager_cli.py system run_worker test_worker ./work
+Worker completed with status: no_job
+ℹ️  No jobs available - check log output above for diagnostics
+# (No diagnostic logs visible)
+```
+
+**After Logging Fix:**
+```bash
+$ uv run python scripts/manager_cli.py system run_worker test_worker ./work
+INFO: === Worker Job Claiming Diagnostics ===
+INFO: Configuration: EXPMGR_MODE=files_local, DR_EXP_BASE_PATH=./logs/wrong_path
+INFO: Queued jobs in database: 0
+INFO: Running jobs: 0
+INFO: File system: Jobs directory: ./logs/wrong_path/job_data (exists: True, job files: 0)
+Alternative locations with jobs: ['./logs/job_data (5 jobs)']
+INFO: === End Diagnostics ===
+
+Worker completed with status: no_job
+ℹ️  No jobs available - check log output above for diagnostics
+```
+
+#### Technical Implementation
+- Added `setup_logging()` function to `cli/main.py`
+- Configured logging format: `%(levelname)s: %(message)s`
+- Output to stderr to avoid interfering with normal command output
+- Automatic logging setup on CLI startup
+
+**Final Achievement**: Complete end-to-end diagnostic experience - users now get full visibility into configuration issues without any additional setup required.
