@@ -255,7 +255,7 @@ class JobExecutor:
                 self.job_id, "upload_failure", f"Failed to upload training metrics: {e}"
             )
             self.client.finalize_job(self.job_id, "failed", {"finalize_success": False})
-            return
+            return {"finalize_success": False, "error": str(e)}
 
         # Create and upload bundle - fail fast if upload fails
         try:
@@ -275,7 +275,7 @@ class JobExecutor:
                 self.job_id, "upload_failure", f"Failed to upload training bundle: {e}"
             )
             self.client.finalize_job(self.job_id, "failed", {"finalize_success": False})
-            return
+            return {"finalize_success": False, "error": str(e)}
 
         # Finalize job with metadata - uploads guaranteed to be successful at this point
         final_status = "completed" if train_status == "success" else "failed"
@@ -299,6 +299,7 @@ class JobExecutor:
             metadata["error_message"] = result.error
 
         self.client.finalize_job(self.job_id, final_status, metadata)
+        return {"finalize_success": True, "metadata": metadata}
 
     def _create_and_upload_bundle(
         self, logger: BaseLogger, work_dir: str, worker_log_path: str

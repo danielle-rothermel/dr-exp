@@ -54,7 +54,7 @@ def generate_configs(
             cfg = hydra.compose(config_name=config_name, overrides=overrides)
             container = OmegaConf.to_container(cfg, resolve=True, throw_on_missing=True)
             assert isinstance(container, dict), f"Expected dict, got {type(container)}"
-            yield container
+            yield container  # type: ignore[misc]
 
 
 def config_hash(cfg: Dict[str, Any]) -> str:
