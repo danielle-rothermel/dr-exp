@@ -6,7 +6,7 @@ import tempfile
 import uuid
 from datetime import datetime, UTC, timedelta
 from pathlib import Path
-from typing import Optional, List, Dict, Any
+from typing import Optional, List, Dict, Any, Tuple
 
 import portalocker
 
@@ -106,102 +106,242 @@ class LocalJobDB(BaseJobDB):
         worker_id : str, optional
             Identifier of the worker claiming the job. If not provided,
             a mock worker ID will be generated.
+        respect_reservations : bool, optional
+            Whether to respect job reservations, by default True.
 
         Returns
         -------
         dict[str, Any] | None
             The claimed job record or None if no job is available.
         """
-        # Collect all queued jobs with shared locks
-        queued_jobs = []
+        # Phase 1: Discover available jobs
+        available_jobs = self._discover_claimable_jobs(worker_id, respect_reservations)
+        if not available_jobs:
+            return None
+
+        # Phase 2: Try to claim jobs in priority order
+        for job_file_path, job_data in available_jobs:
+            claimed_job = self._attempt_claim_job(job_file_path, worker_id)
+            if claimed_job is not None:
+                return claimed_job
+
+        return None
+
+    def _discover_claimable_jobs(
+        self, worker_id: Optional[str], respect_reservations: bool
+    ) -> List[Tuple[str, Dict[str, Any]]]:
+        """Discover all jobs that could potentially be claimed.
+
+        Parameters
+        ----------
+        worker_id : str, optional
+            Identifier of the worker claiming jobs.
+        respect_reservations : bool
+            Whether to respect job reservations.
+
+        Returns
+        -------
+        List[Tuple[str, Dict[str, Any]]]
+            List of (job_file_path, job_data) tuples sorted by priority and age.
+        """
+        available_jobs = []
+
         for job_file_name in os.listdir(self.jobs_dir):
             if not job_file_name.endswith(".json"):
                 continue
 
             job_file_path = os.path.join(self.jobs_dir, job_file_name)
-            try:
-                with portalocker.Lock(
-                    job_file_path, mode="r", flags=portalocker.LOCK_SH
-                ):
-                    with open(job_file_path, "r") as f:
-                        job_data = json.load(f)
-                    if job_data["status"] == "queued":  # Fail fast if status missing
-                        # Check reservations if respect_reservations is True
-                        if respect_reservations and job_data.get("reserved_for_worker"):
-                            # Check if reservation has expired
-                            if self._is_reservation_expired(job_data):
-                                # Clear expired reservation
-                                job_data.pop("reserved_for_worker", None)
-                                job_data.pop("reservation_expires_at", None)
-                                # Update the job file to clear reservation
-                                try:
-                                    with portalocker.Lock(
-                                        job_file_path,
-                                        mode="r+b",
-                                        flags=portalocker.LOCK_EX,
-                                    ):
-                                        self._atomic_write(
-                                            job_file_path,
-                                            json.dumps(job_data, indent=4),
-                                        )
-                                except Exception as e:
-                                    # Fail fast: log error with full context, not masked job_id
-                                    logger.warning(
-                                        f"Failed to clear expired reservation for job {job_data['job_id']}: {e}"
-                                    )
-                                    # Continue even if cleanup fails
-                            elif job_data["reserved_for_worker"] != worker_id:
-                                # Skip jobs reserved for other workers
-                                continue
+            job_data = self._safe_read_job(job_file_path)
 
-                        queued_jobs.append((job_file_path, job_data))
-            except Exception as e:
-                logger.error(f"Error reading job file {job_file_path}: {e}")
+            if job_data is None:  # Skip unreadable jobs
                 continue
 
-        if not queued_jobs:
-            return None
+            if not self._is_job_claimable(
+                job_data, worker_id, respect_reservations, job_file_path
+            ):
+                continue
+
+            available_jobs.append((job_file_path, job_data))
 
         # Sort by priority (higher first), then by age (older first)
-        queued_jobs.sort(
+        available_jobs.sort(
             key=lambda item: (
                 -item[1]["priority"],  # Fail fast if priority missing
                 item[1]["created_at"],  # Fail fast if created_at missing
             )
         )
+        return available_jobs
 
-        # Try to claim jobs in priority order
-        for job_file_path, job_data in queued_jobs:
-            try:
-                with portalocker.Lock(
-                    job_file_path, mode="r+b", flags=portalocker.LOCK_EX
-                ):
-                    # Re-read under exclusive lock to ensure status hasn't changed
-                    with open(job_file_path, "r") as f:
-                        current_job_data: dict[str, Any] = json.load(f)
+    def _safe_read_job(self, job_file_path: str) -> Optional[Dict[str, Any]]:
+        """Safely read a job file with proper error handling.
 
-                    if current_job_data.get("status") == "queued":
-                        # Claim the job
-                        current_job_data["status"] = "running"
-                        current_job_data["assigned_worker"] = worker_id or (
-                            f"mock_worker_{uuid.uuid4().hex[:6]}"
-                        )
-                        current_job_data["heartbeat"] = (
-                            datetime.now(UTC).isoformat() + "Z"
-                        )
-                        current_job_data["started_at"] = (
-                            datetime.now(UTC).isoformat() + "Z"
-                        )
+        Parameters
+        ----------
+        job_file_path : str
+            Path to the job file to read.
 
-                        self._atomic_write(
-                            job_file_path, json.dumps(current_job_data, indent=4)
-                        )
-                        return current_job_data
-            except Exception as e:
-                logger.error(f"Error claiming job file {job_file_path}: {e}")
-                continue
+        Returns
+        -------
+        Dict[str, Any] | None
+            Job data if successfully read, None if unreadable.
+        """
+        try:
+            with portalocker.Lock(job_file_path, mode="r", flags=portalocker.LOCK_SH):
+                with open(job_file_path, "r") as f:
+                    return json.load(f)
+        except (OSError, json.JSONDecodeError, PermissionError) as e:
+            logger.warning(f"Could not read job file {job_file_path}: {e}")
+            return None
+        except Exception as e:
+            logger.error(f"Unexpected error reading job file {job_file_path}: {e}")
+            return None
 
-        return None
+    def _is_job_claimable(
+        self,
+        job_data: Dict[str, Any],
+        worker_id: Optional[str],
+        respect_reservations: bool,
+        job_file_path: str,
+    ) -> bool:
+        """Check if a job can be claimed by this worker.
+
+        Parameters
+        ----------
+        job_data : Dict[str, Any]
+            The job data to check.
+        worker_id : str, optional
+            Identifier of the worker trying to claim.
+        respect_reservations : bool
+            Whether to respect job reservations.
+        job_file_path : str
+            Path to the job file (for reservation clearing).
+
+        Returns
+        -------
+        bool
+            True if job can be claimed, False otherwise.
+        """
+        if job_data.get("status") != "queued":
+            return False
+
+        if not respect_reservations:
+            return True
+
+        return self._handle_job_reservation(job_data, worker_id, job_file_path)
+
+    def _handle_job_reservation(
+        self, job_data: Dict[str, Any], worker_id: Optional[str], job_file_path: str
+    ) -> bool:
+        """Handle job reservation logic for claimability check.
+
+        Parameters
+        ----------
+        job_data : Dict[str, Any]
+            The job data to check.
+        worker_id : str, optional
+            Identifier of the worker trying to claim.
+        job_file_path : str
+            Path to the job file (for reservation clearing).
+
+        Returns
+        -------
+        bool
+            True if job can be claimed, False if reserved for another worker.
+        """
+        reserved_worker = job_data.get("reserved_for_worker")
+        if not reserved_worker:
+            return True  # No reservation, job is claimable
+
+        # Check if reservation has expired
+        if self._is_reservation_expired(job_data):
+            self._clear_expired_reservation(job_data, job_file_path)
+            return True  # Reservation cleared, job is now claimable
+
+        # Job is reserved for another worker
+        if reserved_worker != worker_id:
+            return False
+
+        return True  # Job is reserved for this worker
+
+    def _clear_expired_reservation(
+        self, job_data: Dict[str, Any], job_file_path: str
+    ) -> None:
+        """Clear an expired reservation from a job.
+
+        Parameters
+        ----------
+        job_data : Dict[str, Any]
+            The job data to modify (cleared in-place).
+        job_file_path : str
+            Path to the job file to update.
+        """
+        # Clear reservation from in-memory data
+        job_data.pop("reserved_for_worker", None)
+        job_data.pop("reservation_expires_at", None)
+
+        # Update the job file to clear reservation
+        try:
+            with portalocker.Lock(job_file_path, mode="r+b", flags=portalocker.LOCK_EX):
+                self._atomic_write(job_file_path, json.dumps(job_data, indent=4))
+        except (OSError, PermissionError) as e:
+            logger.warning(
+                f"Failed to clear expired reservation for job {job_data.get('job_id', 'unknown')}: {e}"
+            )
+            # Continue even if cleanup fails - reservation is cleared in memory
+        except Exception as e:
+            logger.error(
+                f"Unexpected error clearing reservation for job {job_data.get('job_id', 'unknown')}: {e}"
+            )
+
+    def _attempt_claim_job(
+        self, job_file_path: str, worker_id: Optional[str]
+    ) -> Optional[Dict[str, Any]]:
+        """Attempt to atomically claim a specific job.
+
+        Parameters
+        ----------
+        job_file_path : str
+            Path to the job file to claim.
+        worker_id : str, optional
+            Identifier of the worker claiming the job.
+
+        Returns
+        -------
+        Dict[str, Any] | None
+            The claimed job data if successful, None if job could not be claimed.
+        """
+        try:
+            with portalocker.Lock(job_file_path, mode="r+b", flags=portalocker.LOCK_EX):
+                # Re-read under exclusive lock to ensure status hasn't changed
+                with open(job_file_path, "r") as f:
+                    current_job_data = json.load(f)
+
+                # Double-check status hasn't changed
+                if current_job_data.get("status") != "queued":
+                    return None
+
+                # Claim the job
+                current_job_data.update(
+                    {
+                        "status": "running",
+                        "assigned_worker": worker_id
+                        or f"mock_worker_{uuid.uuid4().hex[:6]}",
+                        "heartbeat": datetime.now(UTC).isoformat() + "Z",
+                        "started_at": datetime.now(UTC).isoformat() + "Z",
+                    }
+                )
+
+                self._atomic_write(
+                    job_file_path, json.dumps(current_job_data, indent=4)
+                )
+                return current_job_data
+
+        except (OSError, json.JSONDecodeError, PermissionError) as e:
+            logger.warning(f"Could not claim job {job_file_path}: {e}")
+            return None
+        except Exception as e:
+            logger.error(f"Unexpected error claiming job {job_file_path}: {e}")
+            return None
 
     def update_job(self, job_id: str, data: Dict[str, Any]) -> Dict[str, Any]:
         """Update a job record with new data.
