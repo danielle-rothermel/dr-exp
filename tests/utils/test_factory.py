@@ -127,7 +127,8 @@ class TestSystemConfig:
         temp_config.worker_heartbeat_interval = 0.05
 
         with pytest.raises(
-            AssertionError, match="worker_heartbeat_interval must be at least 0.1 seconds"
+            AssertionError,
+            match="worker_heartbeat_interval must be at least 0.1 seconds",
         ):
             temp_config.validate()
 

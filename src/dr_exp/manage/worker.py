@@ -226,10 +226,9 @@ class JobExecutor:
                 result = self.trainer_fn(training_config, logger)
 
                 # Enforce TrainingResult type - fail immediately if wrong type
-                if not isinstance(result, TrainingResult):
-                    raise TypeError(
-                        f"Training function must return TrainingResult, got {type(result).__name__}"
-                    )
+                assert isinstance(result, TrainingResult), (
+                    f"Training function must return TrainingResult, got {type(result).__name__}"
+                )
 
                 wlog.write("Training completed successfully\n")
                 return result
@@ -282,10 +281,9 @@ class JobExecutor:
             metrics_upload = self.client.upload_artifact(
                 self.job_id, logger_meta["metrics_path"], "metrics.jsonl"
             )
-            if not metrics_upload["success"]:
-                raise UploadError(
-                    f"Metrics upload failed: {metrics_upload.get('error', 'Unknown error')}"
-                )
+            assert metrics_upload["success"], (
+                f"Metrics upload failed: {metrics_upload.get('error', 'Unknown error')}"
+            )
             return metrics_upload
         except Exception as e:
             raise UploadError(f"Failed to upload training metrics: {e}")
@@ -298,10 +296,9 @@ class JobExecutor:
             bundle_upload = self._create_and_upload_bundle(
                 logger, work_dir, worker_log_path
             )
-            if not bundle_upload["success"]:
-                raise UploadError(
-                    f"Bundle upload failed: {bundle_upload.get('error', 'Unknown error')}"
-                )
+            assert bundle_upload["success"], (
+                f"Bundle upload failed: {bundle_upload.get('error', 'Unknown error')}"
+            )
             return bundle_upload
         except Exception as e:
             raise UploadError(f"Failed to upload training bundle: {e}")
