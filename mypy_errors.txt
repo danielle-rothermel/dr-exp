@@ -1,11 +1,13 @@
-MyPy Type Errors Found - Total: 53 errors in 5 files (UPDATED)
+MyPy Type Errors Found - Total: 31 errors in 2 files (UPDATED)
 
-PROGRESS: Reduced from 74 to 53 errors (28% improvement)
-✅ FIXED: 9 complete files with all errors resolved
-❌ REMAINING: 5 files with complex type issues
+PROGRESS: Reduced from 74 to 31 errors (58% improvement)
+✅ FIXED: 12 complete files with all errors resolved
+❌ REMAINING: 2 files with complex type issues
 
-=== src/dr_exp/utils/config_upload.py ===
-Line 57: error: Incompatible types in "yield" (actual type "dict[str | bytes | int | Enum | float | bool, Any] | dict[Any, Any]", expected type "dict[str, Any]") [misc]
+✅ RECENTLY FIXED:
+- src/dr_exp/utils/config_upload.py - Fixed yield type compatibility issue
+- src/dr_exp/manage/worker.py - Fixed missing return statements
+- src/dr_exp/api/main.py - Fixed all 17 FastAPI type annotation issues
 
 === src/dr_exp/job_db/supabase_job_db.py ===
 Line 87: error: Returning Any from function declared to return "dict[str, Any] | None" [no-any-return]
@@ -19,31 +21,6 @@ Line 634: error: Returning Any from function declared to return "dict[str, Any]"
 Line 853: error: Returning Any from function declared to return "dict[str, Any]" [no-any-return]
 Line 1024: error: Missing return statement [return]
 
-=== src/dr_exp/manage/worker.py ===
-Line 228: error: Missing return statement [return]
-Line 258: error: Return value expected [return-value]
-Line 278: error: Return value expected [return-value]
-
-=== src/dr_exp/api/main.py ===
-Line 65: error: Function is missing a return type annotation [no-untyped-def]
-Line 65: note: Use "-> None" if function does not return a value
-Line 68: error: Function is missing a return type annotation [no-untyped-def]
-Line 76: error: Function is missing a return type annotation [no-untyped-def]
-Line 83: error: Function is missing a return type annotation [no-untyped-def]
-Line 92: error: Function is missing a return type annotation [no-untyped-def]
-Line 585: error: Function is missing a type annotation [no-untyped-def]
-Line 595: error: Function is missing a type annotation [no-untyped-def]
-Line 636: error: Function is missing a return type annotation [no-untyped-def]
-Line 650: error: Function is missing a return type annotation [no-untyped-def]
-Line 663: error: Function is missing a return type annotation [no-untyped-def]
-Line 783: error: Argument "config" to "ConfigResponse" has incompatible type "dict[str, Any] | None"; expected "dict[str, Any]" [arg-type]
-Line 832: error: Missing named argument "success" for "SuccessResponse" [call-arg]
-Line 848: error: Value of type "dict[str, Any] | None" is not indexable [index]
-Line 871: error: Missing named argument "success" for "SuccessResponse" [call-arg]
-Line 888: error: Value of type "dict[str, Any] | None" is not indexable [index]
-Line 938: error: Value of type "dict[str, Any] | None" is not indexable [index]
-Line 1034: error: Function is missing a type annotation [no-untyped-def]
-Line 1067: error: Incompatible types in assignment (expression has type "None", variable has type "FastAPI") [assignment]
 
 === src/dr_exp/training/decon_trainer.py ===
 Line 61: error: Argument 1 to "validate_model_config" has incompatible type "dict[str | bytes | int | Enum | float | bool, Any] | list[Any] | str | Any | None"; expected "dict[str, Any]" [arg-type]
@@ -55,9 +32,7 @@ Line 84: error: Function is missing a type annotation for one or more arguments 
 Line 87: error: Need type annotation for "final_metrics" (hint: "final_metrics: dict[<type>, <type>] = ...") [var-annotated]
 Line 88: error: Need type annotation for "logged_epochs" (hint: "logged_epochs: set[<type>] = ...") [var-annotated]
 Line 93: error: Function is missing a return type annotation [no-untyped-def]
-Line 93: note: Use "-> None" if function does not return a value
 Line 97: error: Function is missing a return type annotation [no-untyped-def]
-Line 97: note: Use "-> None" if function does not return a value
 Line 229: error: Argument 1 to "create_cifar10_training_components" has incompatible type "OmegaConf"; expected "DictConfig" [arg-type]
 Line 236: error: "OmegaConf" has no attribute "model" [attr-defined]
 Line 237: error: "OmegaConf" has no attribute "model" [attr-defined]
@@ -71,7 +46,7 @@ Line 267: error: "OmegaConf" has no attribute "model" [attr-defined]
 Line 278: error: "OmegaConf" has no attribute "epochs" [attr-defined]
 
 ===============================================================================
-COMPLETED FIXES (21 errors fixed in 9 files):
+COMPLETED FIXES (43 errors fixed in 12 files):
 
 ✅ src/dr_exp/training/training_result.py - Added missing return type annotation
 ✅ src/dr_exp/logging/logger_paths.py - Added missing return type annotation  
@@ -83,20 +58,15 @@ COMPLETED FIXES (21 errors fixed in 9 files):
 ✅ src/dr_exp/cli/registry.py - Added missing return type annotation + type ignore for abstract class
 ✅ src/dr_exp/manage/process_manager.py - Fixed BaseContext.Process issues with type ignore
 ✅ src/dr_exp/utils/factory.py - Fixed Manager argument type compatibility
-✅ src/dr_exp/manage/worker.py - Fixed 6 type annotation issues including return types
+✅ src/dr_exp/utils/config_upload.py - Fixed yield type compatibility issue (1 error)
+✅ src/dr_exp/manage/worker.py - Fixed missing return statements in _finalize_and_upload function (3 errors)
+✅ src/dr_exp/api/main.py - Fixed all 17 FastAPI type annotation issues including return types, middleware parameters, response models, and global app assignment
 
 ===============================================================================
 REMAINING ISSUES BY COMPLEXITY:
 
 HIGH COMPLEXITY (require extensive refactoring):
-- decon_trainer.py: OmegaConf/DictConfig type system conflicts (17 errors)
-- supabase_job_db.py: Third-party Supabase API type stubs issues (11 errors)
-
-MEDIUM COMPLEXITY (straightforward but numerous):
-- api/main.py: FastAPI function annotations and response model integration (17 errors)
-
-LOW COMPLEXITY (simple fixes):
-- worker.py: 3 missing return statements in _finalize_and_upload function
-- config_upload.py: 1 runtime assertion not satisfying mypy type checker
+- decon_trainer.py: OmegaConf/DictConfig type system conflicts (21 errors)
+- supabase_job_db.py: Third-party Supabase API type stubs issues (10 errors)
 
 ===============================================================================

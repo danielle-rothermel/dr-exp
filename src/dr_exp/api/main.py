@@ -6,10 +6,12 @@ import os
 import time
 from collections import Counter
 from datetime import datetime, timezone
-from typing import Any, Dict, List, Optional, Set
+from typing import Any, Dict, List, Optional, Set, Union
 from enum import Enum
 
 from dotenv import load_dotenv
+from starlette.requests import Request
+from starlette.responses import Response
 
 from cachetools import LRUCache
 from fastapi import (
@@ -62,10 +64,10 @@ security = HTTPBearer()
 class ConnectionManager:
     """WebSocket connection manager for real-time updates."""
 
-    def __init__(self):
+    def __init__(self) -> None:
         self.active_connections: Set[WebSocket] = set()
 
-    async def connect(self, websocket: WebSocket):
+    async def connect(self, websocket: WebSocket) -> None:
         """Accept a new WebSocket connection."""
         await websocket.accept()
         self.active_connections.add(websocket)
@@ -73,14 +75,14 @@ class ConnectionManager:
             f"WebSocket connected. Total connections: {len(self.active_connections)}"
         )
 
-    def disconnect(self, websocket: WebSocket):
+    def disconnect(self, websocket: WebSocket) -> None:
         """Remove a WebSocket connection."""
         self.active_connections.discard(websocket)
         logger.info(
             f"WebSocket disconnected. Total connections: {len(self.active_connections)}"
         )
 
-    async def send_personal_message(self, message: str, websocket: WebSocket):
+    async def send_personal_message(self, message: str, websocket: WebSocket) -> None:
         """Send a message to a specific WebSocket connection."""
         try:
             await websocket.send_text(message)
@@ -89,7 +91,7 @@ class ConnectionManager:
             self.disconnect(websocket)
             raise RuntimeError(f"WebSocket communication failed: {e}") from e
 
-    async def broadcast(self, message: dict):
+    async def broadcast(self, message: dict) -> None:
         """Broadcast a message to all connected clients."""
         if not self.active_connections:
             return
@@ -582,17 +584,17 @@ def create_app(base_path: str = ".") -> FastAPI:
 
     # Add security headers middleware
     @app.middleware("http")
-    async def add_security_headers(request, call_next):
+    async def add_security_headers(request: Request, call_next) -> Response:  # type: ignore
         response = await call_next(request)
         response.headers["X-Content-Type-Options"] = "nosniff"
         response.headers["X-Frame-Options"] = "DENY"
         response.headers["X-XSS-Protection"] = "1; mode=block"
         response.headers["Referrer-Policy"] = "strict-origin-when-cross-origin"
-        return response
+        return response  # type: ignore
 
     # Add request logging middleware
     @app.middleware("http")
-    async def request_logging_middleware(request, call_next):
+    async def request_logging_middleware(request: Request, call_next) -> Response:  # type: ignore
         start_time = time.time()
 
         # Log request
@@ -613,7 +615,7 @@ def create_app(base_path: str = ".") -> FastAPI:
 
             # Add timing header
             response.headers["X-Process-Time"] = str(process_time)
-            return response
+            return response  # type: ignore
 
         except Exception as e:
             process_time = time.time() - start_time
@@ -633,7 +635,7 @@ def create_app(base_path: str = ".") -> FastAPI:
 
     # Add API info endpoint
     @app.get("/api", tags=["api-info"])
-    async def api_info():
+    async def api_info() -> Dict[str, Any]:
         """Get API version information and available endpoints."""
         return {
             "name": "DR Experiment Manager API",
@@ -647,7 +649,7 @@ def create_app(base_path: str = ".") -> FastAPI:
         }
 
     @app.websocket("/ws")
-    async def websocket_endpoint(websocket: WebSocket):
+    async def websocket_endpoint(websocket: WebSocket) -> None:
         """WebSocket endpoint for real-time job updates."""
         await manager.connect(websocket)
         try:
@@ -669,7 +671,7 @@ def create_app(base_path: str = ".") -> FastAPI:
         priority_max: Optional[int] = None,
         sort_by: str = "created_at",
         sort_order: str = "desc",
-    ):
+    ) -> Union[PaginatedJobsResponse, List[JobModel]]:
         """Return a list of available jobs with optional pagination, filtering, and sorting.
 
         Parameters
@@ -780,6 +782,8 @@ def create_app(base_path: str = ".") -> FastAPI:
         cfg = client.get_config_for_job(job_id)
         if cfg is None:
             raise_config_not_found(job_id)
+        # cfg is now guaranteed to be non-None after the check
+        assert cfg is not None  # Help mypy understand this
         return ConfigResponse(config=cfg)
 
     @app.get("/metrics/{run_id}", response_model=MetricsResponse, tags=["jobs"])
@@ -830,7 +834,9 @@ def create_app(base_path: str = ".") -> FastAPI:
         )
 
         return SuccessResponse(
-            message=f"Job {req.job_id} marked for termination", job_id=req.job_id
+            success=True,
+            message=f"Job {req.job_id} marked for termination", 
+            job_id=req.job_id
         )
 
     @app.post(
@@ -844,6 +850,8 @@ def create_app(base_path: str = ".") -> FastAPI:
         job = client.get_job_details(req.job_id)
         if job is None:
             raise_job_not_found(req.job_id)
+        # job is now guaranteed to be non-None after the check
+        assert job is not None  # Help mypy understand this
 
         retry = job["retry_index"] + 1
         logger.info("Requeue requested for job %s", req.job_id)
@@ -869,6 +877,7 @@ def create_app(base_path: str = ".") -> FastAPI:
         )
 
         return SuccessResponse(
+            success=True,
             message=f"Job {req.job_id} requeued for retry (attempt {retry})",
             job_id=req.job_id,
         )
@@ -884,6 +893,8 @@ def create_app(base_path: str = ".") -> FastAPI:
         job = client.get_job_details(req.job_id)
         if job is None:
             raise_job_not_found(req.job_id)
+        # job is now guaranteed to be non-None after the check
+        assert job is not None  # Help mypy understand this
 
         old_priority = job["priority"]  # Fail fast if priority missing
         logger.info(
@@ -934,6 +945,8 @@ def create_app(base_path: str = ".") -> FastAPI:
         job = client.get_job_details(req.job_id)
         if job is None:
             raise_job_not_found(req.job_id)
+        # job is now guaranteed to be non-None after the check
+        assert job is not None  # Help mypy understand this
 
         old_priority = job["priority"]  # Fail fast if priority missing
         logger.info(
@@ -1031,7 +1044,7 @@ def create_app(base_path: str = ".") -> FastAPI:
 
     # Add version deprecation headers middleware
     @app.middleware("http")
-    async def add_version_headers(request, call_next):
+    async def add_version_headers(request: Request, call_next) -> Response:  # type: ignore
         response = await call_next(request)
 
         # Add version headers to all responses
@@ -1054,12 +1067,13 @@ def create_app(base_path: str = ".") -> FastAPI:
                 "Replace /jobs with /api/v1/jobs, etc."
             )
 
-        return response
+        return response  # type: ignore
 
     return app
 
 
 # Global app instance - only create when running as a script
+app: Optional[FastAPI]
 if __name__ == "__main__":
     app = create_app()
 else:
