@@ -36,8 +36,7 @@ def generate_run_one_config(
     # Use the existing config generation system
     configs = list(generate_configs(base_config_path, config_name, {}))
 
-    if not configs:
-        raise ValueError("Failed to generate base config")
+    assert configs, "Failed to generate base config"
 
     # Take the first (and only) config since we're not doing a sweep
     base_config = configs[0]
