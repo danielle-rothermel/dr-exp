@@ -8,8 +8,20 @@ from datetime import datetime, timedelta, UTC
 from typing import List, Optional
 
 from dr_exp.utils.jobdb_factory import get_job_db_client
-from dr_exp.job_db.base_job_db import BaseJobDB
+from dr_exp.job_db.base_job_db import BaseJobDB, StaleJobInfo
 from .process_manager import ProcessManager, BaseProcessManager
+
+
+class StaleJobProcessingError(Exception):
+    """Raised when stale job processing fails."""
+
+    pass
+
+
+class WorkerRestartError(Exception):
+    """Raised when worker restart fails."""
+
+    pass
 
 
 class Manager:
@@ -89,18 +101,27 @@ class Manager:
     def check_stale_jobs(self) -> None:
         """Check for stale worker heartbeats and handle failed jobs.
 
-        This method uses the streamlined interface to:
+        Uses streamlined interface with fail-fast error handling to:
         1. Find jobs with stale heartbeats
         2. Mark them as failed
         3. Restart affected workers
         """
-        # Use streamlined interface to get stale jobs
+        try:
+            stale_jobs = self._get_and_log_stale_jobs()
+            if not stale_jobs:
+                return
+
+            self._mark_stale_jobs_failed(stale_jobs)
+            self._restart_affected_workers(stale_jobs)
+
+        except StaleJobProcessingError as e:
+            logging.error(f"Failed to process stale jobs: {e}")
+            # Don't re-raise - allow manager to continue with next check cycle
+
+    def _get_and_log_stale_jobs(self) -> List[StaleJobInfo]:
+        """Get stale jobs and log findings."""
         stale_jobs = self.job_db.get_stale_jobs(self.heartbeat_timeout * 2)
 
-        if not stale_jobs:
-            return
-
-        # Log stale jobs found
         for stale_job in stale_jobs:
             logging.warning(
                 "Stale heartbeat for job %s (worker: %s, age: %ds)",
@@ -108,49 +129,54 @@ class Manager:
                 stale_job.assigned_worker,
                 stale_job.age_seconds,
             )
+        return stale_jobs
 
-        # Mark all stale jobs as failed in batch
+    def _mark_stale_jobs_failed(self, stale_jobs: List[StaleJobInfo]) -> None:
+        """Mark all stale jobs as failed in batch."""
         job_ids = [job.job_id for job in stale_jobs]
         results = self.job_db.mark_jobs_failed(job_ids, "worker_lost")
 
-        # Log results
-        successful_failures = [job_id for job_id, success in results.items() if success]
-        failed_failures = [job_id for job_id, success in results.items() if not success]
+        successful = [job_id for job_id, success in results.items() if success]
+        failed = [job_id for job_id, success in results.items() if not success]
 
-        if successful_failures:
-            logging.info(
-                "Marked %d jobs as failed: %s",
-                len(successful_failures),
-                successful_failures,
-            )
-        if failed_failures:
-            logging.error(
-                "Failed to mark %d jobs as failed: %s",
-                len(failed_failures),
-                failed_failures,
+        if successful:
+            logging.info("Marked %d jobs as failed: %s", len(successful), successful)
+        if failed:
+            raise StaleJobProcessingError(
+                f"Failed to mark {len(failed)} jobs as failed: {failed}"
             )
 
-        # Restart affected workers - fail fast if infrastructure is compromised
+    def _restart_affected_workers(self, stale_jobs: List[StaleJobInfo]) -> None:
+        """Restart workers affected by stale jobs."""
         affected_workers = {job.assigned_worker for job in stale_jobs}
         managed_workers = set(self.process_manager.get_worker_status().keys())
 
-        for worker_id in affected_workers:
-            if worker_id not in managed_workers:
-                # Worker not managed by process manager - likely external worker, log and continue
-                logging.warning(
-                    f"Cannot restart worker {worker_id}: not managed by process manager"
-                )
-                continue
+        restart_failures = []
 
+        for worker_id in affected_workers:
             try:
-                self.process_manager.restart_worker(worker_id)
-                logging.info("Restarted worker %s", worker_id)
-            except RuntimeError as e:
-                logging.error(f"Critical: Worker restart failed for {worker_id}: {e}")
-                # Re-raise to fail fast - infrastructure problems should not be masked
-                raise RuntimeError(
-                    f"Manager cannot continue with failing worker infrastructure: {e}"
-                ) from e
+                self._restart_single_worker(worker_id, managed_workers)
+            except WorkerRestartError as e:
+                restart_failures.append(str(e))
+
+        if restart_failures:
+            raise StaleJobProcessingError(
+                f"Worker restart failures: {restart_failures}"
+            )
+
+    def _restart_single_worker(self, worker_id: str, managed_workers: set) -> None:
+        """Restart a single worker with proper error handling."""
+        if worker_id not in managed_workers:
+            logging.warning(
+                f"Cannot restart worker {worker_id}: not managed by process manager"
+            )
+            return
+
+        try:
+            self.process_manager.restart_worker(worker_id)
+            logging.info("Restarted worker %s", worker_id)
+        except RuntimeError as e:
+            raise WorkerRestartError(f"Failed to restart worker {worker_id}: {e}")
 
     def check_idle_timeout(self) -> None:
         """Shutdown manager if idle for longer than idle_timeout.

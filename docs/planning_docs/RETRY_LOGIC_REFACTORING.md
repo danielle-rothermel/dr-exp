@@ -93,9 +93,9 @@ raise FinalError(f"Unexpected fallthrough after {max_retries} attempts")
 - ~~Loop with continue in exception handler masking errors~~
 - ~~Multiple validation checks causing early continues~~
 
-**worker.py:228-302** - `_finalize_and_upload()`
-- Multiple try/except blocks with early returns
-- Similar error handling paths with subtle differences
+**worker.py:228-302** - `_finalize_and_upload()` ✅ **COMPLETED**
+- ~~Multiple try/except blocks with early returns~~
+- ~~Similar error handling paths with subtle differences~~
 
 **manager.py:89-154** - `check_stale_jobs()`
 - Loop with complex exception handling and early continue
@@ -213,3 +213,51 @@ for job in running_jobs:
 **Helper Methods Extracted:**
 - `_process_job_for_staleness()` - Main staleness logic with fail-fast validation
 - `_parse_heartbeat_timestamp()` - Robust timestamp parsing with proper error handling
+
+**2025-06-08**: Refactored `worker.py:228-302` - `_finalize_and_upload()` function
+- ✅ Eliminated duplicate try/except blocks with identical error handling logic
+- ✅ Created custom UploadError exception for cleaner error hierarchy
+- ✅ Extracted helper methods to consolidate upload logic
+- ✅ Implemented single source of truth for upload failure handling  
+- ✅ Added comprehensive unit tests for all new helper methods
+- ✅ Verified with mypy and all tests passing - no regressions introduced
+- ✅ Reduced code duplication by 30+ lines while improving maintainability
+
+**Changes Made:**
+```python
+# Before: Duplicate error handling blocks
+try:
+    metrics_upload = self.client.upload_artifact(...)
+    if not metrics_upload["success"]:
+        raise RuntimeError(f"Metrics upload failed: {metrics_upload.get('error', 'Unknown error')}")
+except Exception as e:
+    logging.error(f"Critical: Failed to upload metrics for job {self.job_id}: {e}")
+    self.client.record_failure(self.job_id, "upload_failure", f"Failed to upload training metrics: {e}")
+    self.client.finalize_job(self.job_id, "failed", {"finalize_success": False})
+    return {"finalize_success": False, "error": str(e)}
+
+try:
+    bundle_upload = self._create_and_upload_bundle(...)
+    if not bundle_upload["success"]:
+        raise RuntimeError(f"Bundle upload failed: {bundle_upload.get('error', 'Unknown error')}")
+except Exception as e:
+    logging.error(f"Critical: Failed to upload bundle for job {self.job_id}: {e}")
+    self.client.record_failure(self.job_id, "upload_failure", f"Failed to upload training bundle: {e}")
+    self.client.finalize_job(self.job_id, "failed", {"finalize_success": False})
+    return {"finalize_success": False, "error": str(e)}
+
+# After: Clean separation with single error handling path
+try:
+    logger_meta = logger.finalize()
+    metrics_upload = self._upload_metrics_with_retry(logger_meta)
+    bundle_upload = self._upload_bundle_with_retry(logger, work_dir, worker_log_path)
+    return self._create_success_metadata(result, train_status, metrics_upload, bundle_upload, logger_meta)
+except UploadError as e:
+    return self._handle_upload_failure(e)
+```
+
+**Helper Methods Extracted:**
+- `_upload_metrics_with_retry()` - Metrics upload with proper error handling
+- `_upload_bundle_with_retry()` - Bundle upload with proper error handling  
+- `_create_success_metadata()` - Success path metadata creation
+- `_handle_upload_failure()` - Single source of truth for upload failure handling
