@@ -93,11 +93,5 @@ def get_default_config_path() -> str:
     str
         Path to config directory
     """
-    # Use the same logic as upload_configs.py
-    return str(
-        Path(__file__).resolve().parents[2]
-        / "src"
-        / "dr_exp"
-        / "train_examples"
-        / "configs"
-    )
+    # Configs are in the repo root
+    return str(Path(__file__).resolve().parents[3] / "configs")

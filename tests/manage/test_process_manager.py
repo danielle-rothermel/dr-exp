@@ -106,7 +106,7 @@ class TestMockProcessManager:
 
         # restart_worker now raises exception for nonexistent workers
         with pytest.raises(
-            RuntimeError, match="Cannot restart worker nonexistent: worker not found"
+            AssertionError, match="Cannot restart worker nonexistent: worker not found"
         ):
             manager.restart_worker("nonexistent")
 
@@ -184,7 +184,7 @@ class TestHelperFunctions:
         """Test run_worker_main requires DR_EXP_BASE_PATH environment variable."""
         # Should raise exception when DR_EXP_BASE_PATH is not set
         with pytest.raises(
-            RuntimeError,
+            AssertionError,
             match="DR_EXP_BASE_PATH environment variable is required but not set",
         ):
             run_worker_main("worker1", "/work/dir")

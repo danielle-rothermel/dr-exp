@@ -135,7 +135,8 @@ class JobExecutor:
 
         # Setup logging
         worker_log_path = os.path.join(work_dir, "worker.log")
-        logger = self.logger_cls(work_dir, run_id=cfg.get("run_id"))  # type: ignore[call-arg]
+        debug_mode = os.getenv("DEBUG", "False").lower() in ("true", "1", "yes")
+        logger = self.logger_cls(work_dir, run_id=cfg.get("run_id"), debug=debug_mode)  # type: ignore[call-arg]
 
         # Start heartbeat manager
         heartbeat_manager = HeartbeatManager(

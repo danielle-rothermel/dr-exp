@@ -39,11 +39,9 @@ class LocalJobDB(BaseJobDB):
         self.config = config
 
         # Local-specific directories and files
-        self.metrics_dir = os.path.join(self.jobs_dir, "metrics")
-        self.errors_file = os.path.join(self.jobs_dir, "errors.jsonl")
+        self.errors_file = os.path.join(self.jobs_dir, "job_database_errors.jsonl")
 
-        # Ensure local-specific directories exist
-        os.makedirs(self.metrics_dir, exist_ok=True)
+        # Ensure error file exists
         Path(self.errors_file).touch(exist_ok=True)
 
     def _atomic_write(self, target_file_path: str, data: str) -> None:
@@ -384,34 +382,6 @@ class LocalJobDB(BaseJobDB):
         except Exception as e:
             logger.error(f"Error updating job {job_id}: {e}")
             return {"success": False, "message": str(e)}
-
-    def log_metrics(self, job_id: str, metrics_list: List[Dict[str, Any]]) -> None:
-        """Log metrics for a job by appending to its metrics file.
-
-        Parameters
-        ----------
-        job_id : str
-            Job identifier.
-        metrics_list : list[dict[str, Any]]
-            List of metrics dictionaries to log. Each metric will be
-            written as a JSON line in the job's metrics file.
-        """
-        metric_file_path = os.path.join(self.metrics_dir, f"{job_id}.jsonl")
-        try:
-            with portalocker.Lock(
-                metric_file_path, mode="a", flags=portalocker.LOCK_EX
-            ) as f:
-                for metrics in metrics_list:
-                    metrics_to_log = metrics.copy()
-                    if "timestamp" not in metrics_to_log:
-                        metrics_to_log["timestamp"] = (
-                            datetime.now(UTC).isoformat() + "Z"
-                        )
-                    f.write(json.dumps(metrics_to_log) + "\n")
-                f.flush()
-                os.fsync(f.fileno())
-        except Exception as e:
-            logger.error(f"Error logging metrics for job {job_id}: {e}")
 
     def record_failure(
         self,

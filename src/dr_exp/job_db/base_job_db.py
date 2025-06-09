@@ -397,23 +397,6 @@ class BaseJobDB(ABC):
         """
         raise NotImplementedError("add_job not implemented for this client type")
 
-    def log_metrics(self, job_id: str, metrics_list: List[Dict[str, Any]]) -> None:
-        """Log metrics for a job.
-
-        Parameters
-        ----------
-        job_id : str
-            Job identifier.
-        metrics_list : list[dict[str, Any]]
-            List of metrics to log.
-
-        Raises
-        ------
-        NotImplementedError
-            If this method is not implemented by the subclass.
-        """
-        raise NotImplementedError("log_metrics not implemented for this client type")
-
     # Priority management methods
 
     @abstractmethod

@@ -135,9 +135,6 @@ def test_base_job_db_optional_methods_raise_not_implemented() -> None:
     with pytest.raises(NotImplementedError, match="add_job not implemented"):
         db.add_job({}, "test_sweep")
 
-    with pytest.raises(NotImplementedError, match="log_metrics not implemented"):
-        db.log_metrics("job1", [])
-
 
 def test_local_job_db_implements_optional_methods() -> None:
     """Test that LocalJobDB properly implements optional methods."""
@@ -150,7 +147,7 @@ def test_local_job_db_implements_optional_methods() -> None:
     jobs = db.list_jobs()
     assert isinstance(jobs, list)
 
-    # Note: We don't test add_job and log_metrics here as they require actual file operations
+    # Note: We don't test add_job here as it requires actual file operations
 
 
 def test_interface_consistency() -> None:

@@ -52,7 +52,6 @@ def test_client_initialization(tmp_path: Path) -> None:
     client = LocalJobDB(config)
     assert os.path.exists(client.storage_dir)
     assert os.path.exists(client.jobs_dir)
-    assert os.path.exists(client.metrics_dir)
     assert os.path.exists(client.errors_file)
     with open(client.errors_file, "r") as f:
         assert f.read() == ""  # Should be empty
@@ -194,37 +193,6 @@ def test_update_non_existent_job(mock_client: LocalJobDB) -> None:
     assert "not found" in result["message"].lower()
 
 
-def test_log_metrics(
-    mock_client: LocalJobDB,
-    sample_job_config: Dict[str, Any],
-    sample_sweep_config_id: str,
-) -> None:
-    """Tests logging metrics for a job."""
-    added_job = mock_client.add_job(sample_job_config, sample_sweep_config_id)
-    job_id = added_job["id"]
-
-    metrics_to_log = [
-        {"epoch": 1, "loss": 0.5, "accuracy": 0.8},
-        {"epoch": 2, "loss": 0.4, "accuracy": 0.85},
-    ]
-    mock_client.log_metrics(job_id, metrics_to_log)
-
-    metric_file_path = os.path.join(mock_client.metrics_dir, f"{job_id}.jsonl")
-    assert os.path.exists(metric_file_path)
-
-    logged_lines = []
-    with open(metric_file_path, "r") as f:
-        for line in f:
-            logged_lines.append(json.loads(line))
-
-    assert len(logged_lines) == 2
-    assert logged_lines[0]["epoch"] == 1
-    assert logged_lines[0]["loss"] == 0.5
-    assert "timestamp" in logged_lines[0]  # Check if timestamp was added
-    assert logged_lines[1]["epoch"] == 2
-    assert logged_lines[1]["accuracy"] == 0.85
-
-
 def test_record_failure(
     mock_client: LocalJobDB,
     sample_job_config: Dict[str, Any],
@@ -253,7 +221,7 @@ def test_record_failure(
                 assert "timestamp" in error_entry
                 failure_recorded = True
                 break
-    assert failure_recorded, "Failure was not recorded in errors.jsonl"
+    assert failure_recorded, "Failure was not recorded in job_database_errors.jsonl"
 
 
 def test_upload_artifact_file(
@@ -423,9 +391,7 @@ def test_multiple_operations_on_same_job(
     assert claimed_job is not None and claimed_job["id"] == job_id
     assert claimed_job["status"] == "running"
 
-    # 3. Log metrics
-    metrics1 = [{"epoch": 1, "loss": 0.7}]
-    mock_client.log_metrics(job_id, metrics1)
+    # 3. Log metrics (removed - no longer supported)
 
     # 4. Update job (e.g., heartbeat)
     mock_client.update_job(
@@ -435,9 +401,7 @@ def test_multiple_operations_on_same_job(
     assert details_after_update is not None
     assert details_after_update["status"] == "running"  # Should still be running
 
-    # 5. Log more metrics
-    metrics2 = [{"epoch": 2, "loss": 0.6}]
-    mock_client.log_metrics(job_id, metrics2)
+    # 5. Log more metrics (removed - no longer supported)
 
     # 6. Upload artifact
     local_artifact_file = tmp_path / "final_model.pt"
@@ -460,10 +424,7 @@ def test_multiple_operations_on_same_job(
     assert final_details["status"] == "completed"
     assert final_details["final_val_acc"] == 0.9
 
-    metric_file_path = os.path.join(mock_client.metrics_dir, f"{job_id}.jsonl")
-    with open(metric_file_path, "r") as f:
-        lines = f.readlines()
-        assert len(lines) == 2  # metrics1 and metrics2
+    # Metrics logging no longer supported - removed legacy test code
 
     artifact_path = os.path.join(
         mock_client.storage_dir,
@@ -550,11 +511,10 @@ def test_boost_job_priority(
     assert boosted_job["priority"] == 350
     assert boosted_job["priority_boost_count"] == 1
 
-    # Test boost with validation - should raise AssertionError for out-of-range result
-    with pytest.raises(
-        AssertionError, match="Priority must be between 0 and 1000, got 1150"
-    ):
-        mock_client.boost_job_priority(job_id, boost_amount=800)
+    # Test boost with validation - should return error for out-of-range result
+    result = mock_client.boost_job_priority(job_id, boost_amount=800)
+    assert result["success"] is False
+    assert "Priority must be between 0 and 1000, got 1150" in result["message"]
 
 
 def test_list_jobs_by_priority(

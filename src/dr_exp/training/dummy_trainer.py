@@ -78,7 +78,8 @@ def train(cfg: Any, logger: Optional[BaseLogger] = None) -> TrainingResult:
                 "No log_dir configuration found - using default './logs'", stacklevel=2
             )
 
-        logger = StructuredLogger(log_dir)
+        debug_mode = os.getenv("DEBUG", "False").lower() in ("true", "1", "yes")
+        logger = StructuredLogger(log_dir, debug=debug_mode)
 
     final_train_loss = 0.0
     final_val_acc = 0.0
