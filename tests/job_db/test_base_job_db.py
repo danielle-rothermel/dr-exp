@@ -9,7 +9,7 @@ from dr_exp.job_db import BaseJobDB, LocalJobDB, SupabaseJobDB, JobDBConfig
 def test_base_job_db_is_abstract() -> None:
     """Test that BaseJobDB cannot be instantiated directly."""
     with pytest.raises(TypeError):
-        BaseJobDB()
+        BaseJobDB()  # type: ignore[abstract]
 
 
 def test_base_job_db_inheritance() -> None:
@@ -33,7 +33,7 @@ def test_base_job_db_enforces_abstract_methods() -> None:
         pass
 
     with pytest.raises(TypeError):
-        IncompleteJobDB()
+        IncompleteJobDB()  # type: ignore[abstract]
 
 
 def test_base_job_db_optional_methods_raise_not_implemented() -> None:

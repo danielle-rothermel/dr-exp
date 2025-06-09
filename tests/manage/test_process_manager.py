@@ -28,7 +28,7 @@ class TestBaseProcessManager:
     def test_cannot_instantiate_abstract_class(self) -> None:
         """Test that BaseProcessManager cannot be instantiated directly."""
         with pytest.raises(TypeError):
-            BaseProcessManager()
+            BaseProcessManager()  # type: ignore[abstract]
 
     def test_abstract_methods_required(self) -> None:
         """Test that concrete implementations must implement all abstract methods."""
@@ -38,7 +38,7 @@ class TestBaseProcessManager:
             pass
 
         with pytest.raises(TypeError):
-            IncompleteManager()
+            IncompleteManager()  # type: ignore[abstract]
 
 
 class TestMockProcessManager:
