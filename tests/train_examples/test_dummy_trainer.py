@@ -45,7 +45,7 @@ def test_train_runs_and_logs(tmp_path: Path) -> None:
 
 
 class ObjCfg:
-    def __init__(self, tmp_path, num_epochs: int) -> None:
+    def __init__(self, tmp_path: Any, num_epochs: int) -> None:
         self.train = {"num_epochs": num_epochs}
         self.log_dir = str(tmp_path / "logs")
 

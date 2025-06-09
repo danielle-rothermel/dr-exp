@@ -27,7 +27,7 @@ def test_validate_priority() -> None:
         validate_priority(1001)
 
     with pytest.raises(ValidationError, match="Priority must be an integer"):
-        validate_priority("invalid")
+        validate_priority("invalid")  # type: ignore[arg-type]
 
 
 def test_validate_job_id() -> None:
@@ -47,7 +47,7 @@ def test_validate_job_id() -> None:
         validate_job_id("short")
 
     with pytest.raises(ValidationError, match="Job ID must be a string"):
-        validate_job_id(123)
+        validate_job_id(123)  # type: ignore[arg-type]
 
 
 def test_validate_positive_int() -> None:
@@ -64,7 +64,7 @@ def test_validate_positive_int() -> None:
         validate_positive_int(-1, "test")
 
     with pytest.raises(ValidationError, match="test must be an integer"):
-        validate_positive_int("invalid", "test")
+        validate_positive_int("invalid", "test")  # type: ignore[arg-type]
 
 
 def test_validate_job_statuses() -> None:

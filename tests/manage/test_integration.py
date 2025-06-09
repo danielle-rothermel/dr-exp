@@ -168,6 +168,7 @@ class TestManagerWorkerIntegration:
 
         # Check that the higher priority job was processed
         job_details = factory.job_db.get_job_details(job2["id"])
+        assert job_details is not None
         assert job_details["status"] == "completed"
 
         # Process second job
@@ -183,6 +184,7 @@ class TestManagerWorkerIntegration:
 
         # Check that the lower priority job was also processed
         job_details = factory.job_db.get_job_details(job1["id"])
+        assert job_details is not None
         assert job_details["status"] == "completed"
 
     def test_manager_coordinates_multiple_workers(
@@ -280,6 +282,7 @@ class TestManagerWorkerIntegration:
 
         # Verify job was marked as failed
         job_details = factory.job_db.get_job_details(job["id"])
+        assert job_details is not None
         assert job_details["status"] == "failed"
         assert "worker_lost" in job_details.get("status_reason", "")
 
@@ -576,10 +579,12 @@ class TestFactoryIntegration:
 
         # Verify target job was processed
         target_details = factory.job_db.get_job_details(target_job["id"])
+        assert target_details is not None
         assert target_details["status"] == "completed"
 
         # Verify decoy job was not processed
         decoy_details = factory.job_db.get_job_details(decoy_job["id"])
+        assert decoy_details is not None
         assert decoy_details["status"] == "queued"
 
 
@@ -665,6 +670,7 @@ class TestFullSystemIntegration:
         # Verify all jobs completed successfully
         for job in experiment_jobs:
             job_details = factory.job_db.get_job_details(job["id"])
+            assert job_details is not None
             assert job_details["status"] == "completed"
 
         # Verify expected results structure
@@ -736,6 +742,7 @@ class TestFullSystemIntegration:
 
         # Verify job marked as failed (training failed)
         job_details = factory.job_db.get_job_details(failing_job["id"])
+        assert job_details is not None
         assert job_details["status"] == "failed"
 
         # Manually requeue the job (simulating retry logic)
@@ -757,5 +764,6 @@ class TestFullSystemIntegration:
 
         # Verify job completed successfully on retry
         final_details = factory.job_db.get_job_details(failing_job["id"])
+        assert final_details is not None
         assert final_details["status"] == "completed"
         assert final_details["retry_index"] == 1

@@ -337,6 +337,7 @@ class TestSupabaseStreamlined:
 
             # Verify job was marked as failed
             updated_job = supabase_client.get_job_details(running_job["id"])
+            assert updated_job is not None
             assert updated_job["status"] == "failed"
             assert updated_job["status_reason"] == "test_failure"
             assert "end_time" in updated_job
@@ -377,10 +378,13 @@ class TestSupabaseStreamlined:
             updated_job2 = supabase_client.get_job_details(job2["id"])
             unchanged_job3 = supabase_client.get_job_details(job3["id"])
 
+            assert updated_job1 is not None
             assert updated_job1["status"] == "failed"
             assert updated_job1["status_reason"] == "batch_test"
+            assert updated_job2 is not None
             assert updated_job2["status"] == "failed"
             assert updated_job2["status_reason"] == "batch_test"
+            assert unchanged_job3 is not None
             assert unchanged_job3["status"] == "queued"
 
         finally:
@@ -420,4 +424,5 @@ def test_factory_integration() -> None:
     client = get_job_db_client()
     assert isinstance(client, SupabaseJobDB)
     assert client.config.mode == "supabase_local"
+    assert client.config.supabase_url is not None
     assert "127.0.0.1:54321" in client.config.supabase_url
