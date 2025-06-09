@@ -13,7 +13,7 @@ def test_logger_path_config_defaults() -> None:
     assert config.metrics_filename == "metrics.jsonl"
     assert config.checkpoint_dir == "checkpoints"
     assert config.artifact_dir == "artifacts"
-    assert config.error_filename == "errors.log"
+    assert config.error_filename == "training_execution_errors.log"
 
 
 def test_logger_path_config_custom() -> None:
@@ -41,7 +41,9 @@ def test_logger_path_manager_from_string(tmp_path: Path) -> None:
     assert manager.metrics_path == os.path.join(log_dir, "metrics.jsonl")
     assert manager.checkpoint_dir == os.path.join(log_dir, "checkpoints")
     assert manager.artifact_dir == os.path.join(log_dir, "artifacts")
-    assert manager.error_log_path == os.path.join(log_dir, "errors.log")
+    assert manager.error_log_path == os.path.join(
+        log_dir, "training_execution_errors.log"
+    )
 
 
 def test_logger_path_manager_from_config(tmp_path: Path) -> None:

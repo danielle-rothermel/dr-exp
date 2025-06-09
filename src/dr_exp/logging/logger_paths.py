@@ -13,7 +13,7 @@ class LoggerPathConfig:
     metrics_filename: str = "metrics.jsonl"
     checkpoint_dir: str = "checkpoints"
     artifact_dir: str = "artifacts"
-    error_filename: str = "errors.log"
+    error_filename: str = "training_execution_errors.log"
 
 
 class LoggerPathManager:

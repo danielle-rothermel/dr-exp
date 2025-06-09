@@ -75,7 +75,7 @@ def test_error_log_non_debug(tmp_path: Path) -> None:
     logger.log({"bad": object()})
     summary = logger.finalize()
     assert summary["num_metrics"] == 0
-    error_log = tmp_path / "logs" / "errors.log"
+    error_log = tmp_path / "logs" / "training_execution_errors.log"
     assert error_log.exists()
     log_text = error_log.read_text()
     assert "artifact not found" in log_text
