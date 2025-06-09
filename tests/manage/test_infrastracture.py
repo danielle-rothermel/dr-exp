@@ -7,6 +7,7 @@ These tests serve as both validation of the infrastructure and examples for futu
 import threading
 
 from dr_exp.manage.worker import run_worker
+from dr_exp.training.result import create_success_result
 from tests.conftest import make_wrapped_config
 
 
@@ -266,7 +267,13 @@ class TestManageSpecificFixtures:
             def mock_train_with_heartbeat(config, logger, *args, **kwargs):
                 execution_started.set()
                 can_complete.wait(timeout=5)
-                return {"final_val_acc": 0.95, "status": "success"}
+                return create_success_result(
+                final_metrics={"final_val_acc": 0.95, "final_train_loss": 0.1, "final_val_loss": 0.15},
+                epochs=1,
+                logger_meta={"metrics_path": "test_metrics.jsonl", "num_checkpoints": 0},
+                artifacts_path=logger.paths.artifact_dir,
+                training_time=0.1
+            )
 
             # Run worker in thread
             result = []
@@ -346,7 +353,13 @@ class TestManageSpecificFixtures:
         def priority_tracking_trainer(config, logger, *args, **kwargs):
             priority_level = config.get("priority_test")
             execution_order.append(priority_level)
-            return {"final_val_acc": 0.95, "status": "success"}
+            return create_success_result(
+                final_metrics={"final_val_acc": 0.95, "final_train_loss": 0.1, "final_val_loss": 0.15},
+                epochs=1,
+                logger_meta={"metrics_path": "test_metrics.jsonl", "num_checkpoints": 0},
+                artifacts_path=logger.paths.artifact_dir,
+                training_time=0.1
+            )
 
         # Execute all jobs
         for _ in range(3):
@@ -401,7 +414,13 @@ class TestInfrastructureIntegration:
                         events["start"].set()
                         events["can_complete"].wait(timeout=10)
 
-                        return {"final_val_acc": 0.95, "status": "success"}
+                        return create_success_result(
+                final_metrics={"final_val_acc": 0.95, "final_train_loss": 0.1, "final_val_loss": 0.15},
+                epochs=1,
+                logger_meta={"metrics_path": "test_metrics.jsonl", "num_checkpoints": 0},
+                artifacts_path=logger.paths.artifact_dir,
+                training_time=0.1
+            )
 
                     return enhanced_trainer
 

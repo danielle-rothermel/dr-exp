@@ -120,7 +120,14 @@ class JobExecutor:
         try:
             # Execute training
             result = self._execute_training(cfg, logger, worker_log_path)
-            train_status = result.status  # Direct access - guaranteed to exist
+            
+            # Determine train_status based on result status and error
+            if result.status == "success":
+                train_status = "success"
+            elif result.error and any(exc in result.error for exc in ["Exception", "Error", "RuntimeError", "ValueError", "MemoryError", "OSError", "IOError"]):
+                train_status = "crash"  # Training function crashed with exception
+            else:
+                train_status = "failed"  # Training function returned failure status
 
             # Finalize logger and upload artifacts
             self._finalize_and_upload(
@@ -186,15 +193,23 @@ class JobExecutor:
         # Finalize logger
         logger_meta = logger.finalize()
 
-        # Upload metrics
-        metrics_upload = self.client.upload_artifact(
-            self.job_id, logger_meta["metrics_path"], "metrics.jsonl"
-        )
+        # Upload metrics (handle failures gracefully)
+        try:
+            metrics_upload = self.client.upload_artifact(
+                self.job_id, logger_meta["metrics_path"], "metrics.jsonl"
+            )
+        except Exception as e:
+            logging.warning(f"Failed to upload metrics for job {self.job_id}: {e}")
+            metrics_upload = {"success": False, "error": str(e)}
 
-        # Create and upload bundle
-        bundle_upload = self._create_and_upload_bundle(
-            logger, work_dir, worker_log_path
-        )
+        # Create and upload bundle (handle failures gracefully)
+        try:
+            bundle_upload = self._create_and_upload_bundle(
+                logger, work_dir, worker_log_path
+            )
+        except Exception as e:
+            logging.warning(f"Failed to upload bundle for job {self.job_id}: {e}")
+            bundle_upload = {"success": False, "error": str(e)}
 
         # Finalize job with metadata
         final_status = "completed" if train_status == "success" else "failed"
@@ -246,8 +261,12 @@ class JobExecutor:
             os.path.join(work_dir, "bundle"), "zip", bundle_dir
         )
 
-        # Upload bundle
-        return self.client.upload_artifact(self.job_id, bundle_zip, "bundle.zip")
+        # Upload bundle (handle failures gracefully)
+        try:
+            return self.client.upload_artifact(self.job_id, bundle_zip, "bundle.zip")
+        except Exception as e:
+            logging.warning(f"Failed to upload bundle for job {self.job_id}: {e}")
+            return {"success": False, "error": str(e)}
 
 
 def run_worker(

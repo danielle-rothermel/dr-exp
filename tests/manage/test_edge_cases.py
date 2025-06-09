@@ -15,6 +15,7 @@ from pathlib import Path
 from dr_exp.manage.worker import run_worker
 from dr_exp.manage.manager import Manager
 from dr_exp.manage.process_manager import MockProcessManager
+from dr_exp.training.result import create_success_result
 from tests.conftest import make_wrapped_config
 
 
@@ -33,7 +34,13 @@ class TestDatabaseErrorScenarios:
         # Mock training function that succeeds
         def successful_train(config, logger):
             logger.log({"test_metric": 0.95})
-            return {"final_val_acc": 0.95, "status": "success"}
+            return create_success_result(
+                final_metrics={"final_val_acc": 0.95, "final_train_loss": 0.1, "final_val_loss": 0.15},
+                epochs=1,
+                logger_meta={"metrics_path": "test_metrics.jsonl", "num_checkpoints": 0},
+                artifacts_path=logger.paths.artifact_dir,
+                training_time=1.0
+            )
 
         # Mock database update to fail during heartbeat
         original_update = isolated_job_db.update_job
@@ -99,7 +106,13 @@ class TestDatabaseErrorScenarios:
 
         def successful_train(config, logger):
             logger.log({"test_metric": 0.95})
-            return {"final_val_acc": 0.95, "status": "success"}
+            return create_success_result(
+                final_metrics={"final_val_acc": 0.95, "final_train_loss": 0.1, "final_val_loss": 0.15},
+                epochs=1,
+                logger_meta={"metrics_path": "test_metrics.jsonl", "num_checkpoints": 0},
+                artifacts_path=logger.paths.artifact_dir,
+                training_time=1.0
+            )
 
         # Mock upload_artifact to fail
         def failing_upload(job_id, file_path, remote_name):
@@ -131,7 +144,14 @@ class TestTrainingFunctionErrors:
         # Training function that simulates hanging (optimized for faster testing)
         def hanging_train(config, logger):
             time.sleep(1)  # Reduced from 10s to 1s for faster testing
-            return {"final_val_acc": 0.95, "status": "success"}
+            logger.log({"test_metric": 0.95})
+            return create_success_result(
+                final_metrics={"final_val_acc": 0.95, "final_train_loss": 0.1, "final_val_loss": 0.15},
+                epochs=1,
+                logger_meta={"metrics_path": "test_metrics.jsonl", "num_checkpoints": 0},
+                artifacts_path=logger.paths.artifact_dir,
+                training_time=1.0
+            )
 
         # Use a very short timeout for testing
         with patch("signal.alarm"):
@@ -161,7 +181,7 @@ class TestTrainingFunctionErrors:
         # Training should be marked as crashed due to exception
         assert job_details["train_status"] == "crash"
         # Metrics should show failure
-        assert job_details["final_val_acc"] is None
+        assert job_details["final_val_acc"] == 0.0
         assert job_details["num_epochs"] == 0
 
     @pytest.mark.edge_case
@@ -232,7 +252,13 @@ class TestConcurrencyAndRaceConditions:
             # Signal that training started and wait briefly
             time.sleep(0.1)
             logger.log({"test_metric": 0.95})
-            return {"final_val_acc": 0.95, "status": "success"}
+            return create_success_result(
+                final_metrics={"final_val_acc": 0.95, "final_train_loss": 0.1, "final_val_loss": 0.15},
+                epochs=1,
+                logger_meta={"metrics_path": "test_metrics.jsonl", "num_checkpoints": 0},
+                artifacts_path=logger.paths.artifact_dir,
+                training_time=0.1
+            )
 
         # Start multiple workers simultaneously
         worker_threads = []
@@ -297,7 +323,13 @@ class TestConcurrencyAndRaceConditions:
                 execution_order.append(priority_level)
 
             logger.log({"priority_metric": 0.95})
-            return {"final_val_acc": 0.95, "status": "success"}
+            return create_success_result(
+                final_metrics={"final_val_acc": 0.95, "final_train_loss": 0.1, "final_val_loss": 0.15},
+                epochs=1,
+                logger_meta={"metrics_path": "test_metrics.jsonl", "num_checkpoints": 0},
+                artifacts_path=logger.paths.artifact_dir,
+                training_time=0.1
+            )
 
         # Start multiple workers
         worker_threads = []
@@ -397,7 +429,13 @@ class TestConcurrencyAndRaceConditions:
             # Simulate quick processing with some variability
             time.sleep(0.01 + (config["job_in_batch"] * 0.01))
             logger.log({"batch_id": config["batch_id"], "processed": True})
-            return {"final_val_acc": 0.95, "status": "success"}
+            return create_success_result(
+                final_metrics={"final_val_acc": 0.95, "final_train_loss": 0.1, "final_val_loss": 0.15},
+                epochs=1,
+                logger_meta={"metrics_path": "test_metrics.jsonl", "num_checkpoints": 0},
+                artifacts_path=logger.paths.artifact_dir,
+                training_time=0.01
+            )
 
         def run_high_frequency_worker(worker_id):
             completed_count = 0
@@ -561,7 +599,13 @@ class TestResourceConstraints:
             created_temp_dirs.append(temp_file)
 
             logger.log({"test_metric": 0.95})
-            return {"final_val_acc": 0.95, "status": "success"}
+            return create_success_result(
+                final_metrics={"final_val_acc": 0.95, "final_train_loss": 0.1, "final_val_loss": 0.15},
+                epochs=1,
+                logger_meta={"metrics_path": "test_metrics.jsonl", "num_checkpoints": 0},
+                artifacts_path=logger.paths.artifact_dir,
+                training_time=0.1
+            )
 
         # Mock tempfile.mkdtemp to track directory creation
         original_mkdtemp = tempfile.mkdtemp
@@ -600,7 +644,13 @@ class TestResourceConstraints:
             for i in range(10):
                 logger.save_checkpoint({"step": i}, f"checkpoint_{i}")
 
-            return {"final_val_acc": 0.95, "status": "success"}
+            return create_success_result(
+                final_metrics={"final_val_acc": 0.95, "final_train_loss": 0.1, "final_val_loss": 0.15},
+                epochs=10,
+                logger_meta={"metrics_path": "test_metrics.jsonl", "num_checkpoints": 10},
+                artifacts_path=logger.paths.artifact_dir,
+                training_time=1.0
+            )
 
         status = worker_execution_helper.run_worker_with_trainer(
             resource_intensive_train
@@ -635,7 +685,13 @@ class TestRecoveryMechanisms:
                 raise RuntimeError(f"Simulated failure attempt {attempt_count}")
 
             logger.log({"retry_success": True, "attempt": attempt_count})
-            return {"final_val_acc": 0.95, "status": "success"}
+            return create_success_result(
+                final_metrics={"final_val_acc": 0.95, "final_train_loss": 0.1, "final_val_loss": 0.15},
+                epochs=attempt_count,
+                logger_meta={"metrics_path": "test_metrics.jsonl", "num_checkpoints": 1},
+                artifacts_path=logger.paths.artifact_dir,
+                training_time=1.0
+            )
 
         # Simulate retry logic by running worker multiple times
         status1 = worker_execution_helper.run_worker_with_trainer(retry_train)

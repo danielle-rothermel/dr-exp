@@ -12,6 +12,7 @@ from unittest.mock import patch
 
 from dr_exp.job_db import JobDBConfig, LocalJobDB, SupabaseJobDB
 from dr_exp.utils.factory import create_system, SystemConfig
+from dr_exp.training.result import create_success_result
 
 
 def make_wrapped_config(config_dict, metadata=None):
@@ -99,7 +100,12 @@ def pytest_configure(config):
         "markers", "supabase: mark test as requiring local Supabase"
     )
     config.addinivalue_line("markers", "slow: mark test as slow running")
+    config.addinivalue_line("markers", "fast: mark test as fast running")
+    config.addinivalue_line("markers", "concurrency: mark test as testing concurrent behavior")
     config.addinivalue_line("markers", "integration: mark test as integration test")
+    config.addinivalue_line("markers", "unit: mark test as unit test")
+    config.addinivalue_line("markers", "edge_case: mark test for edge case scenarios")
+    config.addinivalue_line("markers", "timeout: mark test as including timeouts (very slow)")
 
 
 # Enhanced test infrastructure fixtures for Phase 2
@@ -325,7 +331,13 @@ def event_driven_training(
             completion_event.set()
 
         # Return configured result
-        default_result = {"final_val_acc": 0.95, "status": "success"}
+        default_result = create_success_result(
+            final_metrics={"final_val_acc": 0.95, "final_train_loss": 0.1, "final_val_loss": 0.15},
+            epochs=1,
+            logger_meta={"metrics_path": "test_metrics.jsonl", "num_checkpoints": 0},
+            artifacts_path=logger.paths.artifact_dir,
+            training_time=0.1
+        )
         return results.get(job_key, default_result)
 
     with patch(
@@ -399,7 +411,13 @@ def worker_coordination():
                 events["can_complete"].wait(timeout=10)
 
                 # Do work and signal completion
-                result = {"final_val_acc": 0.95, "status": "success"}
+                result = create_success_result(
+                    final_metrics={"final_val_acc": 0.95, "final_train_loss": 0.1, "final_val_loss": 0.15},
+                    epochs=1,
+                    logger_meta={"metrics_path": "test_metrics.jsonl", "num_checkpoints": 0},
+                    artifacts_path=logger.paths.artifact_dir,
+                    training_time=0.1
+                )
                 events["completed"].set()
 
                 return result
