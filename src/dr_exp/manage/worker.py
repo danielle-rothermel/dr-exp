@@ -21,6 +21,12 @@ from dr_exp.training.dummy_trainer import train as default_train
 from dr_exp.training import TrainingResult
 
 
+class UploadError(Exception):
+    """Exception raised when artifact upload operations fail."""
+
+    pass
+
+
 class HeartbeatManager:
     """Manages heartbeat thread for a job."""
 
@@ -234,50 +240,64 @@ class JobExecutor:
         train_status: str,
     ) -> Dict[str, Any]:
         """Finalize logger and upload all artifacts."""
-        # Finalize logger
-        logger_meta = logger.finalize()
+        try:
+            # Finalize logger first
+            logger_meta = logger.finalize()
 
-        # Upload metrics - fail fast if upload fails
+            # Upload artifacts with fail-fast pattern
+            metrics_upload = self._upload_metrics_with_retry(logger_meta)
+            bundle_upload = self._upload_bundle_with_retry(
+                logger, work_dir, worker_log_path
+            )
+
+            # Success path - create final metadata
+            return self._create_success_metadata(
+                result, train_status, metrics_upload, bundle_upload, logger_meta
+            )
+
+        except UploadError as e:
+            # Single error handling path for all upload failures
+            return self._handle_upload_failure(e)
+
+    def _upload_metrics_with_retry(self, logger_meta: dict) -> dict:
+        """Upload metrics with proper error handling."""
         try:
             metrics_upload = self.client.upload_artifact(
                 self.job_id, logger_meta["metrics_path"], "metrics.jsonl"
             )
             if not metrics_upload["success"]:
-                raise RuntimeError(
+                raise UploadError(
                     f"Metrics upload failed: {metrics_upload.get('error', 'Unknown error')}"
                 )
+            return metrics_upload
         except Exception as e:
-            logging.error(
-                f"Critical: Failed to upload metrics for job {self.job_id}: {e}"
-            )
-            # Record upload failure and fail the job
-            self.client.record_failure(
-                self.job_id, "upload_failure", f"Failed to upload training metrics: {e}"
-            )
-            self.client.finalize_job(self.job_id, "failed", {"finalize_success": False})
-            return {"finalize_success": False, "error": str(e)}
+            raise UploadError(f"Failed to upload training metrics: {e}")
 
-        # Create and upload bundle - fail fast if upload fails
+    def _upload_bundle_with_retry(
+        self, logger: BaseLogger, work_dir: str, worker_log_path: str
+    ) -> dict:
+        """Upload bundle with proper error handling."""
         try:
             bundle_upload = self._create_and_upload_bundle(
                 logger, work_dir, worker_log_path
             )
             if not bundle_upload["success"]:
-                raise RuntimeError(
+                raise UploadError(
                     f"Bundle upload failed: {bundle_upload.get('error', 'Unknown error')}"
                 )
+            return bundle_upload
         except Exception as e:
-            logging.error(
-                f"Critical: Failed to upload bundle for job {self.job_id}: {e}"
-            )
-            # Record upload failure and fail the job
-            self.client.record_failure(
-                self.job_id, "upload_failure", f"Failed to upload training bundle: {e}"
-            )
-            self.client.finalize_job(self.job_id, "failed", {"finalize_success": False})
-            return {"finalize_success": False, "error": str(e)}
+            raise UploadError(f"Failed to upload training bundle: {e}")
 
-        # Finalize job with metadata - uploads guaranteed to be successful at this point
+    def _create_success_metadata(
+        self,
+        result: TrainingResult,
+        train_status: str,
+        metrics_upload: dict,
+        bundle_upload: dict,
+        logger_meta: dict,
+    ) -> Dict[str, Any]:
+        """Create final metadata for successful job completion."""
         final_status = "completed" if train_status == "success" else "failed"
         metadata = {
             "final_val_acc": result.final_val_acc,  # Direct access - no .get() silent failures
@@ -300,6 +320,13 @@ class JobExecutor:
 
         self.client.finalize_job(self.job_id, final_status, metadata)
         return {"finalize_success": True, "metadata": metadata}
+
+    def _handle_upload_failure(self, error: UploadError) -> Dict[str, Any]:
+        """Single source of truth for upload failure handling."""
+        logging.error(f"Critical: Upload failed for job {self.job_id}: {error}")
+        self.client.record_failure(self.job_id, "upload_failure", str(error))
+        self.client.finalize_job(self.job_id, "failed", {"finalize_success": False})
+        return {"finalize_success": False, "error": str(error)}
 
     def _create_and_upload_bundle(
         self, logger: BaseLogger, work_dir: str, worker_log_path: str

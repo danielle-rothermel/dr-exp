@@ -1021,7 +1021,7 @@ def test_get_stale_jobs_integration(
     # Update job files directly to set heartbeats
     import json
     import os
-    
+
     job1_data = mock_client.get_job_details(job1["id"])
     job1_data["heartbeat"] = recent_heartbeat
     job1_file_path = os.path.join(mock_client.jobs_dir, f"{job1['id']}.json")

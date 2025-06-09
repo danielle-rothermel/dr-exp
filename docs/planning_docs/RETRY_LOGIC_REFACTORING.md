@@ -89,9 +89,9 @@ raise FinalError(f"Unexpected fallthrough after {max_retries} attempts")
 - ~~Multiple continue statements in exception handlers~~
 - ~~Multiple return paths scattered throughout function~~
 
-**local_job_db.py:754-795** - `get_stale_jobs()`
-- Loop with continue in exception handler masking errors
-- Multiple validation checks causing early continues
+**local_job_db.py:895-936** - `get_stale_jobs()` ✅ **COMPLETED**
+- ~~Loop with continue in exception handler masking errors~~
+- ~~Multiple validation checks causing early continues~~
 
 **worker.py:228-302** - `_finalize_and_upload()`
 - Multiple try/except blocks with early returns
@@ -176,3 +176,40 @@ return metrics
 - `_handle_job_reservation()` - Reservation expiration handling
 - `_clear_expired_reservation()` - Atomic reservation cleanup
 - `_attempt_claim_job()` - Atomic job claiming with proper error handling
+
+**2025-06-08**: Refactored `local_job_db.py:895-936` - `get_stale_jobs()` function
+- ✅ Extracted helper methods `_process_job_for_staleness()` and `_parse_heartbeat_timestamp()`
+- ✅ Added custom exception types `JobValidationError` and `HeartbeatParseError`
+- ✅ Eliminated continue statements masking errors in exception handlers
+- ✅ Implemented fail-fast validation with linear control flow
+- ✅ Added comprehensive unit tests covering all edge cases and error conditions
+- ✅ Fixed None handling in heartbeat timestamp parsing
+- ✅ Verified with mypy - no new type errors introduced
+
+**Changes Made:**
+```python
+# Before: Complex loop with continue statements masking errors
+for job in running_jobs:
+    if not heartbeat_str or not assigned_worker or not job_id:
+        continue
+    try:
+        # complex parsing and validation
+    except (ValueError, TypeError) as e:
+        logger.error(f"Error parsing heartbeat for job {job_id}: {e}")
+        continue
+
+# After: Clean separation of concerns with specific exception handling
+for job in running_jobs:
+    try:
+        stale_job = self._process_job_for_staleness(job, now, max_age_seconds)
+        if stale_job:
+            stale_jobs.append(stale_job)
+    except JobValidationError as e:
+        logger.warning(f"Skipping invalid job data: {e}")
+    except HeartbeatParseError as e:
+        logger.error(f"Error parsing heartbeat for job {job.get('id', 'unknown')}: {e}")
+```
+
+**Helper Methods Extracted:**
+- `_process_job_for_staleness()` - Main staleness logic with fail-fast validation
+- `_parse_heartbeat_timestamp()` - Robust timestamp parsing with proper error handling
