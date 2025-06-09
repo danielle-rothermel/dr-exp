@@ -487,16 +487,16 @@ def test_add_job_with_priority(
     assert job["priority"] == 500
     assert job["priority_boost_count"] == 0
 
-    # Test priority validation - should raise ValueError for invalid priorities
+    # Test priority validation - should raise AssertionError for invalid priorities
     import pytest
 
     with pytest.raises(
-        ValueError, match="Priority must be between 0 and 1000, got 1500"
+        AssertionError, match="Priority must be between 0 and 1000, got 1500"
     ):
         mock_client.add_job(sample_job_config, sample_sweep_config_id, priority=1500)
 
     with pytest.raises(
-        ValueError, match="Priority must be between 0 and 1000, got -50"
+        AssertionError, match="Priority must be between 0 and 1000, got -50"
     ):
         mock_client.add_job(sample_job_config, sample_sweep_config_id, priority=-50)
 
@@ -550,10 +550,11 @@ def test_boost_job_priority(
     assert boosted_job["priority"] == 350
     assert boosted_job["priority_boost_count"] == 1
 
-    # Test boost with validation - should return failure for out-of-range result
-    result = mock_client.boost_job_priority(job_id, boost_amount=800)
-    assert result["success"] is False
-    assert "Priority must be between 0 and 1000, got 1150" in result["message"]
+    # Test boost with validation - should raise AssertionError for out-of-range result
+    with pytest.raises(
+        AssertionError, match="Priority must be between 0 and 1000, got 1150"
+    ):
+        mock_client.boost_job_priority(job_id, boost_amount=800)
 
 
 def test_list_jobs_by_priority(
@@ -1004,35 +1005,33 @@ def test_parse_heartbeat_timestamp_valid(mock_client: LocalJobDB) -> None:
 
 def test_parse_heartbeat_timestamp_invalid(mock_client: LocalJobDB) -> None:
     """Test _parse_heartbeat_timestamp with invalid timestamps."""
-    from dr_exp.job_db.local_job_db import HeartbeatParseError
 
     # Test invalid format
-    with pytest.raises(HeartbeatParseError, match="Invalid heartbeat timestamp"):
+    with pytest.raises(AssertionError, match="Invalid heartbeat timestamp"):
         mock_client._parse_heartbeat_timestamp("invalid-date")
 
     # Test empty string
-    with pytest.raises(HeartbeatParseError, match="Invalid heartbeat timestamp"):
+    with pytest.raises(AssertionError, match="Invalid heartbeat timestamp"):
         mock_client._parse_heartbeat_timestamp("")
 
-    # Test None (should raise TypeError)
-    with pytest.raises(HeartbeatParseError, match="Invalid heartbeat timestamp"):
+    # Test None (should raise AssertionError)
+    with pytest.raises(AssertionError, match="Heartbeat string cannot be None"):
         mock_client._parse_heartbeat_timestamp(None)  # type: ignore[arg-type]
 
 
 def test_process_job_for_staleness_missing_fields(mock_client: LocalJobDB) -> None:
     """Test _process_job_for_staleness with missing required fields."""
-    from dr_exp.job_db.local_job_db import JobValidationError
     from datetime import datetime, timezone
 
     now = datetime.now(timezone.utc)
     max_age = 3600
 
     # Test missing job_id
-    with pytest.raises(JobValidationError, match="Missing job_id"):
+    with pytest.raises(AssertionError, match="Missing job_id"):
         mock_client._process_job_for_staleness({}, now, max_age)
 
     # Test missing assigned_worker
-    with pytest.raises(JobValidationError, match="missing assigned_worker"):
+    with pytest.raises(AssertionError, match="missing assigned_worker"):
         mock_client._process_job_for_staleness({"id": "test_job"}, now, max_age)
 
     # Test missing heartbeat (should return None, not raise)
@@ -1081,7 +1080,6 @@ def test_process_job_for_staleness_valid_job_is_stale(mock_client: LocalJobDB) -
 
 def test_process_job_for_staleness_invalid_heartbeat(mock_client: LocalJobDB) -> None:
     """Test _process_job_for_staleness with invalid heartbeat."""
-    from dr_exp.job_db.local_job_db import HeartbeatParseError
     from datetime import datetime, timezone
 
     now = datetime.now(timezone.utc)
@@ -1093,7 +1091,7 @@ def test_process_job_for_staleness_invalid_heartbeat(mock_client: LocalJobDB) ->
         "heartbeat": "invalid-timestamp",
     }
 
-    with pytest.raises(HeartbeatParseError, match="Invalid heartbeat timestamp"):
+    with pytest.raises(AssertionError, match="Invalid heartbeat timestamp"):
         mock_client._process_job_for_staleness(job, now, max_age)
 
 

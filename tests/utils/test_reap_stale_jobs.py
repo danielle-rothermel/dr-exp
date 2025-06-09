@@ -10,8 +10,6 @@ from dr_exp.utils.job_reaper import (
     _get_jobs_list,
     _should_mark_job_stale,
     _mark_job_stale,
-    JobValidationError,
-    HeartbeatParseError,
 )
 
 
@@ -127,8 +125,8 @@ class TestGetJobsList:
 class TestShouldMarkJobStale:
     """Test _should_mark_job_stale helper function."""
 
-    def test_non_running_job_raises_validation_error(self) -> None:
-        """Test that non-running jobs raise JobValidationError."""
+    def test_non_running_job_raises_assertion_error(self) -> None:
+        """Test that non-running jobs raise AssertionError."""
         job: Dict[str, Any] = {
             "status": "completed",
             "heartbeat": "2024-01-01T00:00:00Z",
@@ -136,35 +134,35 @@ class TestShouldMarkJobStale:
         now = datetime.now(UTC)
         cutoff = timedelta(minutes=5)
 
-        with pytest.raises(JobValidationError, match="Job is not in running status"):
+        with pytest.raises(AssertionError, match="Job is not in running status"):
             _should_mark_job_stale(job, now, cutoff)
 
-    def test_missing_heartbeat_raises_validation_error(self) -> None:
-        """Test that missing heartbeat raises JobValidationError."""
+    def test_missing_heartbeat_raises_assertion_error(self) -> None:
+        """Test that missing heartbeat raises AssertionError."""
         job: Dict[str, Any] = {"status": "running"}
         now = datetime.now(UTC)
         cutoff = timedelta(minutes=5)
 
-        with pytest.raises(JobValidationError, match="Job missing heartbeat timestamp"):
+        with pytest.raises(AssertionError, match="Job missing heartbeat timestamp"):
             _should_mark_job_stale(job, now, cutoff)
 
-    def test_empty_heartbeat_raises_validation_error(self) -> None:
-        """Test that empty heartbeat raises JobValidationError."""
+    def test_empty_heartbeat_raises_assertion_error(self) -> None:
+        """Test that empty heartbeat raises AssertionError."""
         job: Dict[str, Any] = {"status": "running", "heartbeat": ""}
         now = datetime.now(UTC)
         cutoff = timedelta(minutes=5)
 
-        with pytest.raises(JobValidationError, match="Job missing heartbeat timestamp"):
+        with pytest.raises(AssertionError, match="Job missing heartbeat timestamp"):
             _should_mark_job_stale(job, now, cutoff)
 
-    def test_invalid_heartbeat_format_raises_parse_error(self) -> None:
-        """Test that invalid heartbeat format raises HeartbeatParseError."""
+    def test_invalid_heartbeat_format_raises_assertion_error(self) -> None:
+        """Test that invalid heartbeat format raises AssertionError."""
         job: Dict[str, Any] = {"status": "running", "heartbeat": "invalid-format"}
         now = datetime.now(UTC)
         cutoff = timedelta(minutes=5)
 
         with pytest.raises(
-            HeartbeatParseError, match="Invalid timestamp format 'invalid-format'"
+            AssertionError, match="Invalid timestamp format 'invalid-format'"
         ):
             _should_mark_job_stale(job, now, cutoff)
 

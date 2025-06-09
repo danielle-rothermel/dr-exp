@@ -16,18 +16,6 @@ from .config import JobDBConfig
 logger = logging.getLogger(__name__)
 
 
-class JobValidationError(Exception):
-    """Raised when job data fails validation checks."""
-
-    pass
-
-
-class HeartbeatParseError(Exception):
-    """Raised when heartbeat timestamp cannot be parsed."""
-
-    pass
-
-
 class LocalJobDB(BaseJobDB):
     """Local filesystem-backed job database implementation.
 
@@ -911,20 +899,9 @@ class LocalJobDB(BaseJobDB):
         running_jobs = self.list_running_jobs()
 
         for job in running_jobs:
-            try:
-                # Fail fast - validate required fields immediately
-                stale_job = self._process_job_for_staleness(job, now, max_age_seconds)
-                if stale_job:
-                    stale_jobs.append(stale_job)
-
-            except JobValidationError as e:
-                logger.warning(f"Skipping invalid job data: {e}")
-                continue
-            except HeartbeatParseError as e:
-                logger.error(
-                    f"Error parsing heartbeat for job {job.get('id', 'unknown')}: {e}"
-                )
-                continue
+            stale_job = self._process_job_for_staleness(job, now, max_age_seconds)
+            if stale_job:
+                stale_jobs.append(stale_job)
 
         return stale_jobs
 
@@ -946,23 +923,15 @@ class LocalJobDB(BaseJobDB):
         -------
         Optional[StaleJobInfo]
             StaleJobInfo if job is stale, None otherwise
-
-        Raises
-        ------
-        JobValidationError
-            If required fields are missing
-        HeartbeatParseError
-            If heartbeat timestamp is invalid
         """
         # Fail fast - validate required fields
         job_id = job.get("id")
         assigned_worker = job.get("assigned_worker")
         heartbeat_str = job.get("heartbeat")
 
-        if not job_id:
-            raise JobValidationError("Missing job_id")
-        if not assigned_worker:
-            raise JobValidationError(f"Job {job_id} missing assigned_worker")
+        assert job_id, "Missing job_id in job record"
+        assert assigned_worker, f"Job {job_id} missing assigned_worker"
+
         if not heartbeat_str:
             # This is legitimate - job might not have heartbeat yet
             return None
@@ -996,23 +965,15 @@ class LocalJobDB(BaseJobDB):
         -------
         datetime
             Parsed datetime with UTC timezone
-
-        Raises
-        ------
-        HeartbeatParseError
-            If timestamp cannot be parsed
         """
+        assert heartbeat_str is not None, "Heartbeat string cannot be None"
         try:
-            if heartbeat_str is None:
-                raise ValueError("Heartbeat string is None")
             heartbeat_time = datetime.fromisoformat(heartbeat_str.replace("Z", ""))
             if heartbeat_time.tzinfo is None:
                 heartbeat_time = heartbeat_time.replace(tzinfo=UTC)
             return heartbeat_time
         except (ValueError, TypeError, AttributeError) as e:
-            raise HeartbeatParseError(
-                f"Invalid heartbeat timestamp '{heartbeat_str}': {e}"
-            )
+            assert False, f"Invalid heartbeat timestamp '{heartbeat_str}': {e}"
 
     def mark_jobs_failed(
         self, job_ids: List[str], reason: str = "worker_lost"

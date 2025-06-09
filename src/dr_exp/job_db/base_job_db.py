@@ -74,35 +74,33 @@ class BaseJobDB(ABC):
         ----------
         data : dict[str, Any]
             Fields to update on the job record.
-
-        Raises
-        ------
-        ValueError
-            If update data contains dangerous or invalid operations.
         """
         # Validate status transitions
         if "status" in data:
             valid_statuses = {"queued", "running", "completed", "failed", "killed"}
-            if data["status"] not in valid_statuses:
-                raise ValueError(
-                    f"Invalid status '{data['status']}'. Must be one of: {valid_statuses}"
-                )
+            assert data["status"] in valid_statuses, (
+                f"Invalid status '{data['status']}'. Must be one of: {valid_statuses}"
+            )
 
         # Validate priority range
         if "priority" in data:
             priority = data["priority"]
-            if not isinstance(priority, int) or priority < 0 or priority > 1000:
-                raise ValueError(
-                    f"Invalid priority {priority}. Must be integer between 0 and 1000"
-                )
+            assert isinstance(priority, int), (
+                f"Priority must be integer, got {type(priority).__name__}"
+            )
+            assert 0 <= priority <= 1000, (
+                f"Priority must be between 0 and 1000, got {priority}"
+            )
 
         # Validate retry_index is non-negative
         if "retry_index" in data:
             retry_index = data["retry_index"]
-            if not isinstance(retry_index, int) or retry_index < 0:
-                raise ValueError(
-                    f"Invalid retry_index {retry_index}. Must be non-negative integer"
-                )
+            assert isinstance(retry_index, int), (
+                f"retry_index must be integer, got {type(retry_index).__name__}"
+            )
+            assert retry_index >= 0, (
+                f"retry_index must be non-negative, got {retry_index}"
+            )
 
     @abstractmethod
     def update_job(self, job_id: str, data: Dict[str, Any]) -> Dict[str, Any]:
@@ -590,18 +588,13 @@ class BaseJobDB(ABC):
         -------
         int
             The validated priority value.
-
-        Raises
-        ------
-        ValueError
-            If priority is not an integer or is outside the valid range (0-1000).
         """
-        if not isinstance(priority, int):
-            raise ValueError(
-                f"Priority must be an integer, got {type(priority).__name__}"
-            )
-        if not (0 <= priority <= 1000):
-            raise ValueError(f"Priority must be between 0 and 1000, got {priority}")
+        assert isinstance(priority, int), (
+            f"Priority must be an integer, got {type(priority).__name__}"
+        )
+        assert 0 <= priority <= 1000, (
+            f"Priority must be between 0 and 1000, got {priority}"
+        )
         return priority
 
 
