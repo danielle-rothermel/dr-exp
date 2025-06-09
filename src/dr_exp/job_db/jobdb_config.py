@@ -4,6 +4,7 @@ import os
 from dataclasses import dataclass
 from typing import Optional
 
+MODES = ["files_local", "supabase_local", "supabase_remote"]
 
 @dataclass
 class JobDBConfig:
@@ -18,7 +19,7 @@ class JobDBConfig:
     mode: str  # "files_local", "supabase_local", or "supabase_remote"
 
     # Optional settings with defaults
-    storage_path: str = "./storage"
+    storage_path: Optional[str] = None
     supabase_url: Optional[str] = None
     supabase_key: Optional[str] = None
 
@@ -31,38 +32,23 @@ class JobDBConfig:
 
         Raises
         ------
-        ValueError
+        AssertionError
             If configuration is invalid (e.g., missing Supabase credentials
             for supabase_remote mode, invalid URL format).
         """
         # Validate mode
-        valid_modes = ["files_local", "supabase_local", "supabase_remote"]
-        if self.mode not in valid_modes:
-            raise ValueError(
-                f"Invalid mode '{self.mode}'. Must be one of: {valid_modes}"
-            )
+        assert self.mode in MODES, f"Mode '{self.mode}' not in: {MODES}"
 
         # Read Supabase credentials from environment variables
-        if self.mode in ["supabase_remote", "supabase_local"]:
+        if self.is_supabase_mode():
             if not self.supabase_url:
                 self.supabase_url = os.getenv("SUPABASE_URL")
             if not self.supabase_key:
-                self.supabase_key = os.getenv("SUPABASE_SERVICE_ROLE_KEY") or os.getenv(
-                    "SUPABASE_KEY"
-                )
-
-        # Validate Supabase configuration
-        if self.mode in ["supabase_remote", "supabase_local"]:
-            if not self.supabase_url or not self.supabase_key:
-                raise ValueError(
-                    f"Supabase URL and Key required for {self.mode} mode. "
-                    f"Set SUPABASE_URL and SUPABASE_KEY environment variables."
-                )
-            if not self.supabase_url.startswith(("http://", "https://")):
-                raise ValueError("Invalid Supabase URL format")
+                self.supabase_key = os.getenv("SUPABASE_KEY")
+            self._validate_supabase()
 
         # Set default storage path if not provided
-        if self.storage_path == "./storage":
+        if self.storage_path is None:
             self.storage_path = os.path.join(self.base_path, "storage")
 
         # Ensure paths are absolute for consistency
@@ -75,8 +61,14 @@ class JobDBConfig:
         Returns
         -------
         bool
-            True if mode is "supabase_remote" or "supabase_local" and Supabase credentials are available.
+            True if mode is "supabase_remote" or "supabase_local" 
         """
-        return self.mode in ["supabase_remote", "supabase_local"] and bool(
-            self.supabase_url and self.supabase_key
-        )
+        return self.mode in ["supabase_remote", "supabase_local"]
+
+    def _validate_supabase(self) -> None:
+        assert self.supabase_url is not None, "Set SUPABASE_URL env var"
+        assert self.supabase_url.startswith(
+            ("http://", "https://")
+        ), f"Bad Supabase Url: {self.supabase_url}"
+        assert self.supabase_key is not None, "Set SUPABASE_KEY env var"
+        
