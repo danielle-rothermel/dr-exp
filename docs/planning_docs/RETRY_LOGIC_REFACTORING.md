@@ -78,16 +78,16 @@ raise FinalError(f"Unexpected fallthrough after {max_retries} attempts")
 
 #### HIGH PRIORITY (Can cause runtime errors)
 
-**supabase_job_db.py:1024** - `get_metrics()`
-- Missing return statement after retry loop
-- Can fall through without returning if all retries fail silently
+**supabase_job_db.py:1024** - `get_metrics()` ✅ **COMPLETED**
+- ~~Missing return statement after retry loop~~
+- ~~Can fall through without returning if all retries fail silently~~
 
 #### MEDIUM PRIORITY (Complex control flow)
 
-**local_job_db.py:95-204** - `claim_job()`
-- Multiple nested loops with complex exception handling
-- Multiple continue statements in exception handlers
-- Multiple return paths scattered throughout function
+**local_job_db.py:95-204** - `claim_job()` ✅ **COMPLETED**
+- ~~Multiple nested loops with complex exception handling~~
+- ~~Multiple continue statements in exception handlers~~
+- ~~Multiple return paths scattered throughout function~~
 
 **local_job_db.py:754-795** - `get_stale_jobs()`
 - Loop with continue in exception handler masking errors
@@ -143,6 +143,15 @@ raise FinalError(f"Unexpected fallthrough after {max_retries} attempts")
 - ✅ Verified with mypy - error count reduced from 31 to 30
 - ✅ Clean linear control flow now ensures each attempt returns or raises
 
+**2025-06-08**: Refactored `local_job_db.py:95-204` - `claim_job()` function
+- ✅ Extracted 6 helper methods from 110-line monolithic function
+- ✅ Eliminated nested loops with complex exception handling
+- ✅ Removed continue statements masking errors in exception handlers  
+- ✅ Separated concerns: job discovery vs reservation handling vs claiming
+- ✅ Improved error handling with specific exception types and proper logging levels
+- ✅ Made code testable with single-responsibility helper methods
+- ✅ Verified with mypy - only 2 additional cosmetic errors (returning Any)
+
 **Changes Made:**
 ```python
 # Before: Complex nested if/else in try/except with potential fallthrough
@@ -159,3 +168,11 @@ if not response:
 return metrics
 # + safety net at end
 ```
+
+**Helper Methods Extracted:**
+- `_discover_claimable_jobs()` - Job discovery with error handling
+- `_safe_read_job()` - File reading with specific exception types
+- `_is_job_claimable()` - Reservation checking logic
+- `_handle_job_reservation()` - Reservation expiration handling
+- `_clear_expired_reservation()` - Atomic reservation cleanup
+- `_attempt_claim_job()` - Atomic job claiming with proper error handling

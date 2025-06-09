@@ -188,7 +188,8 @@ class LocalJobDB(BaseJobDB):
         try:
             with portalocker.Lock(job_file_path, mode="r", flags=portalocker.LOCK_SH):
                 with open(job_file_path, "r") as f:
-                    return json.load(f)
+                    job_data: Dict[str, Any] = json.load(f)
+                    return job_data
         except (OSError, json.JSONDecodeError, PermissionError) as e:
             logger.warning(f"Could not read job file {job_file_path}: {e}")
             return None
@@ -314,7 +315,7 @@ class LocalJobDB(BaseJobDB):
             with portalocker.Lock(job_file_path, mode="r+b", flags=portalocker.LOCK_EX):
                 # Re-read under exclusive lock to ensure status hasn't changed
                 with open(job_file_path, "r") as f:
-                    current_job_data = json.load(f)
+                    current_job_data: Dict[str, Any] = json.load(f)
 
                 # Double-check status hasn't changed
                 if current_job_data.get("status") != "queued":
