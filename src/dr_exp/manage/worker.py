@@ -10,7 +10,7 @@ import time
 import traceback
 import logging
 from datetime import datetime, UTC
-from typing import Any, Callable, Optional
+from typing import Any, Callable, Optional, Iterator, Dict
 from contextlib import contextmanager
 
 from dr_exp.logging.base_logger import BaseLogger
@@ -36,13 +36,13 @@ class HeartbeatManager:
         self.failure_event = threading.Event()  # Signal catastrophic failure
         self.thread: Optional[threading.Thread] = None
 
-    def start(self):
+    def start(self) -> None:
         """Start the heartbeat thread."""
         if self.thread is None:
             self.thread = threading.Thread(target=self._heartbeat_loop, daemon=True)
             self.thread.start()
 
-    def stop(self):
+    def stop(self) -> None:
         """Stop the heartbeat thread and wait for it to finish."""
         if self.thread is not None:
             self.stop_event.set()
@@ -52,7 +52,7 @@ class HeartbeatManager:
         """Check if heartbeat system has failed catastrophically."""
         return self.failure_event.is_set()
 
-    def _heartbeat_loop(self):
+    def _heartbeat_loop(self) -> None:
         """Send heartbeats at a fixed interval until stop_event is set."""
         while not self.stop_event.is_set():
             try:
@@ -80,7 +80,7 @@ class HeartbeatManager:
 
 
 @contextmanager
-def managed_work_directory(work_dir: Optional[str], job_id: str):
+def managed_work_directory(work_dir: Optional[str], job_id: str) -> Iterator[str]:
     """Context manager for work directory creation and cleanup."""
     if work_dir is None:
         work_dir = tempfile.mkdtemp(prefix=f"worker_{job_id}_")
@@ -129,7 +129,7 @@ class JobExecutor:
 
         # Setup logging
         worker_log_path = os.path.join(work_dir, "worker.log")
-        logger = self.logger_cls(work_dir, run_id=cfg.get("run_id"))
+        logger = self.logger_cls(work_dir, run_id=cfg.get("run_id"))  # type: ignore[call-arg]
 
         # Start heartbeat manager
         heartbeat_manager = HeartbeatManager(
@@ -232,7 +232,7 @@ class JobExecutor:
         worker_log_path: str,
         result: TrainingResult,
         train_status: str,
-    ):
+    ) -> Dict[str, Any]:
         """Finalize logger and upload all artifacts."""
         # Finalize logger
         logger_meta = logger.finalize()
@@ -414,7 +414,7 @@ def _claim_job(
     target_job_id: Optional[str],
     max_claim_attempts: int,
     respect_reservations: bool,
-) -> dict | str:
+) -> Dict[str, Any] | str:
     """Claim a job, returning the job dict or an error status string."""
 
     # Handle target job ID for "run one" functionality
@@ -436,7 +436,10 @@ def _claim_job(
                 },
             )
             # Return the updated job details
-            return client.get_job_details(target_job_id)
+            job_details = client.get_job_details(target_job_id)
+            if job_details is None:
+                return "job_claim_failed"
+            return job_details
         except Exception:
             return "target_job_claim_failed"
 

@@ -9,7 +9,7 @@ from typing import List, Optional
 
 from dr_exp.utils.jobdb_factory import get_job_db_client
 from dr_exp.job_db.base_job_db import BaseJobDB
-from .process_manager import ProcessManager
+from .process_manager import ProcessManager, BaseProcessManager
 
 
 class Manager:
@@ -28,7 +28,7 @@ class Manager:
         idle_timeout_mins: int,
         base_dir: str,
         client: Optional[BaseJobDB] = None,
-        process_manager: Optional[ProcessManager] = None,
+        process_manager: Optional[BaseProcessManager] = None,
     ) -> None:
         """Create a new Manager.
 

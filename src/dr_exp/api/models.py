@@ -42,7 +42,7 @@ class MetricsResponse(BaseModel):
     metrics: List[Dict[str, Any]] = Field(..., description="List of metric records")
     count: int = Field(..., description="Number of metrics returned")
 
-    def __init__(self, **data):
+    def __init__(self, **data: Any) -> None:
         if "metrics" in data and "count" not in data:
             data["count"] = len(data["metrics"])
         super().__init__(**data)
@@ -69,7 +69,7 @@ class JobModel(BaseModel):
 
     @field_validator("status")
     @classmethod
-    def validate_status(cls, v):
+    def validate_status(cls, v: str) -> str:
         valid_statuses = {"queued", "running", "completed", "failed", "killed"}
         if v not in valid_statuses:
             raise ValueError(f"Status must be one of: {valid_statuses}")

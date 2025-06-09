@@ -30,7 +30,7 @@ class LoggerPathManager:
         self.config = config
         self._setup_directories()
 
-    def _setup_directories(self):
+    def _setup_directories(self) -> None:
         """Create all necessary directories."""
         # Create base directory
         os.makedirs(self.config.base_dir, exist_ok=True)

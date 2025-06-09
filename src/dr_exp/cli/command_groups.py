@@ -21,7 +21,7 @@ class CommandGroup:
 class CommandGroupRegistry:
     """Registry for managing command groups."""
 
-    def __init__(self):
+    def __init__(self) -> None:
         self.groups: Dict[str, CommandGroup] = {}
         self._setup_default_groups()
 

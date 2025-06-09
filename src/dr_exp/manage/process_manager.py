@@ -124,7 +124,7 @@ class ProcessManager(BaseProcessManager):
         """Launch a worker process."""
         try:
             worker_dir = os.path.join(base_dir, worker_id)
-            proc = self.ctx.Process(
+            proc = self.ctx.Process(  # type: ignore[attr-defined]
                 target=_worker_target,
                 args=(self.base_path, worker_id, gpu_id, worker_dir),
             )
@@ -176,7 +176,7 @@ class ProcessManager(BaseProcessManager):
                     proc.join(timeout=2)
 
             # Launch new process
-            new_proc = self.ctx.Process(
+            new_proc = self.ctx.Process(  # type: ignore[attr-defined]
                 target=_worker_target,
                 args=(self.base_path, worker_id, gpu_id, worker_dir),
             )
