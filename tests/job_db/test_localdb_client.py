@@ -604,14 +604,17 @@ def test_claim_job_respects_priority(
 
     # Should claim highest priority job first
     claimed = mock_client.claim_job()
+    assert claimed is not None
     assert claimed["id"] == job2["id"]  # priority 500
 
     # Next claim should get second highest
     claimed = mock_client.claim_job()
+    assert claimed is not None
     assert claimed["id"] == job3["id"]  # priority 200
 
     # Last claim should get lowest
     claimed = mock_client.claim_job()
+    assert claimed is not None
     assert claimed["id"] == job1["id"]  # priority 100
 
 
@@ -664,10 +667,12 @@ def test_claim_job_respects_reservations(
 
     # Wrong worker should not be able to claim reserved job
     claimed = mock_client.claim_job(worker_id="worker_456", respect_reservations=True)
+    assert claimed is not None
     assert claimed["id"] == regular_job["id"]  # Gets regular job instead
 
     # Correct worker should be able to claim reserved job
     claimed = mock_client.claim_job(worker_id="worker_123", respect_reservations=True)
+    assert claimed is not None
     assert claimed["id"] == reserved_job["id"]
 
     # Test without respecting reservations
@@ -679,6 +684,7 @@ def test_claim_job_respects_reservations(
     )
 
     claimed = mock_client.claim_job(worker_id="worker_456", respect_reservations=False)
+    assert claimed is not None
     assert claimed["id"] == reserved_job2["id"]  # Can claim despite reservation
 
 

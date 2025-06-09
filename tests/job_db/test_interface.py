@@ -122,13 +122,16 @@ class TestStreamlinedInterface:
         updated_job2 = temp_local_db.get_job_details(job2["id"])
         unchanged_job3 = temp_local_db.get_job_details(job3["id"])
 
+        assert updated_job1 is not None
         assert updated_job1["status"] == "failed"
         assert updated_job1["status_reason"] == "test_reason"
         assert "end_time" in updated_job1
 
+        assert updated_job2 is not None
         assert updated_job2["status"] == "failed"
         assert updated_job2["status_reason"] == "test_reason"
 
+        assert unchanged_job3 is not None
         assert unchanged_job3["status"] == "queued"
         assert "status_reason" not in unchanged_job3
 

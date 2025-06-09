@@ -256,6 +256,7 @@ def isolated_job_db(tmp_path: Path) -> Any:
             """Verify specific job statuses by job ID."""
             for job_id, expected_status in expected_statuses.items():
                 job_details = self.db.get_job_details(job_id)
+                assert job_details is not None
                 actual_status = job_details["status"]
                 assert actual_status == expected_status, (
                     f"Job {job_id} has status {actual_status}, expected {expected_status}"
