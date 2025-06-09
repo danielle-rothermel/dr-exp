@@ -5,10 +5,12 @@ These tests serve as both validation of the infrastructure and examples for futu
 """
 
 import threading
-from typing import Any, Dict, Callable
+from typing import Any, Callable
 
 from dr_exp.manage.worker import run_worker
 from dr_exp.training import create_success_result
+from dr_exp.training.training_result import TrainingResult
+from dr_exp.logging.base_logger import BaseLogger
 from tests.conftest import make_wrapped_config
 
 
@@ -274,8 +276,8 @@ class TestManageSpecificFixtures:
             can_complete = threading.Event()
 
             def mock_train_with_heartbeat(
-                config: Dict[str, Any], logger: Any, *args: Any, **kwargs: Any
-            ) -> Dict[str, Any]:
+                config: Any, logger: BaseLogger, *args: Any, **kwargs: Any
+            ) -> TrainingResult:
                 execution_started.set()
                 can_complete.wait(timeout=5)
                 return create_success_result(
@@ -373,8 +375,8 @@ class TestManageSpecificFixtures:
         execution_order = []
 
         def priority_tracking_trainer(
-            config: Dict[str, Any], logger: Any, *args: Any, **kwargs: Any
-        ) -> Dict[str, Any]:
+            config: Any, logger: BaseLogger, *args: Any, **kwargs: Any
+        ) -> TrainingResult:
             priority_level = config.get("priority_test")
             execution_order.append(priority_level)
             return create_success_result(
@@ -436,10 +438,10 @@ class TestInfrastructureIntegration:
 
                 def create_enhanced_trainer(
                     wid: str,
-                ) -> Callable[[Dict[str, Any], Any], Dict[str, Any]]:
+                ) -> Callable[[Any, BaseLogger], TrainingResult]:
                     def enhanced_trainer(
-                        config: Dict[str, Any], logger: Any, *args: Any, **kwargs: Any
-                    ) -> Dict[str, Any]:
+                        config: Any, logger: BaseLogger, *args: Any, **kwargs: Any
+                    ) -> TrainingResult:
                         # Track execution
                         job_key = config.get("job_number", "unknown")
                         execution_order.append(f"{wid}_job_{job_key}")

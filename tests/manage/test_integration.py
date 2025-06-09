@@ -14,6 +14,8 @@ from dr_exp.manage.manager import Manager
 from dr_exp.manage.worker import run_worker
 from dr_exp.manage.process_manager import MockProcessManager
 from dr_exp.training import create_success_result
+from dr_exp.training.training_result import TrainingResult, create_failure_result
+from dr_exp.logging.base_logger import BaseLogger
 from tests.conftest import make_wrapped_config
 
 
@@ -75,8 +77,8 @@ def event_driven_mock_train(
     results = results or {}
 
     def mock_train(
-        config: Dict[str, Any], logger: Any, *args: Any, **kwargs: Any
-    ) -> Dict[str, Any]:
+        config: Any, logger: BaseLogger, *args: Any, **kwargs: Any
+    ) -> TrainingResult:
         job_key = (
             config.get("test_param")
             or config.get("priority_test")
@@ -101,7 +103,7 @@ def event_driven_mock_train(
             artifacts_path=logger.paths.artifact_dir,
             training_time=0.1,
         )
-        return results.get(job_key, default_result)
+        return results.get(job_key) or default_result
 
     with patch("dr_exp.train_examples.dummy_trainer.train", side_effect=mock_train):
         yield execution_order
@@ -131,8 +133,8 @@ class TestManagerWorkerIntegration:
 
         # Mock the actual training function to avoid real execution
         def mock_train(
-            config: Dict[str, Any], logger: Any, *args: Any, **kwargs: Any
-        ) -> Dict[str, Any]:
+            config: Any, logger: BaseLogger, *args: Any, **kwargs: Any
+        ) -> TrainingResult:
             """Mock training function that simulates work."""
             logger.log({"test_metric": 0.95})
             return create_success_result(
@@ -311,8 +313,8 @@ class TestManagerWorkerIntegration:
         execution_order = []
 
         def mock_train(
-            config: Dict[str, Any], logger: Any, *args: Any, **kwargs: Any
-        ) -> Dict[str, Any]:
+            config: Any, logger: BaseLogger, *args: Any, **kwargs: Any
+        ) -> TrainingResult:
             priority_level = config.get("priority_test")
             execution_order.append(priority_level)
             return create_success_result(
@@ -364,8 +366,8 @@ class TestManagerWorkerIntegration:
         training_can_complete = threading.Event()
 
         def mock_train(
-            config: Dict[str, Any], logger: Any, *args: Any, **kwargs: Any
-        ) -> Dict[str, Any]:
+            config: Any, logger: BaseLogger, *args: Any, **kwargs: Any
+        ) -> TrainingResult:
             # Signal training started
             training_started.set()
             # Wait for test to verify heartbeats before completing
@@ -540,8 +542,8 @@ class TestFactoryIntegration:
         )
 
         def mock_train(
-            config: Dict[str, Any], logger: Any, *args: Any, **kwargs: Any
-        ) -> Dict[str, Any]:
+            config: Any, logger: BaseLogger, *args: Any, **kwargs: Any
+        ) -> TrainingResult:
             return create_success_result(
                 final_metrics={
                     "final_val_acc": 0.95,
@@ -609,8 +611,8 @@ class TestFullSystemIntegration:
         results = []
 
         def mock_train(
-            config: Dict[str, Any], logger: Any, *args: Any, **kwargs: Any
-        ) -> Dict[str, Any]:
+            config: Any, logger: BaseLogger, *args: Any, **kwargs: Any
+        ) -> TrainingResult:
             # Simulate training with different results based on config
             if config["model"] == "vit":
                 final_accuracy = 0.95
@@ -694,14 +696,14 @@ class TestFullSystemIntegration:
         call_count = 0
 
         def mock_train_with_failure(
-            config: Dict[str, Any], logger: Any, *args: Any, **kwargs: Any
-        ) -> Dict[str, Any]:
+            config: Any, logger: BaseLogger, *args: Any, **kwargs: Any
+        ) -> TrainingResult:
             nonlocal call_count
             call_count += 1
 
             # Fail on first attempt, succeed on retry
             if call_count == 1:
-                raise RuntimeError("Simulated training failure")
+                return create_failure_result("Simulated training failure")
             else:
                 logger.log({"recovery_metric": 0.85})
                 return create_success_result(

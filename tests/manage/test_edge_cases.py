@@ -17,6 +17,8 @@ from dr_exp.manage.worker import run_worker
 from dr_exp.manage.manager import Manager
 from dr_exp.manage.process_manager import MockProcessManager
 from dr_exp.training import create_success_result
+from dr_exp.training.training_result import TrainingResult, create_failure_result
+from dr_exp.logging.base_logger import BaseLogger
 from tests.conftest import make_wrapped_config
 
 
@@ -33,7 +35,7 @@ class TestDatabaseErrorScenarios:
         job = isolated_job_db.add_test_job({"test": "db_failure"})
 
         # Mock training function that succeeds
-        def successful_train(config: Dict[str, Any], logger: Any) -> Dict[str, Any]:
+        def successful_train(config: Any, logger: BaseLogger) -> TrainingResult:
             logger.log({"test_metric": 0.95})
             return create_success_result(
                 final_metrics={
@@ -91,7 +93,9 @@ class TestDatabaseErrorScenarios:
                 base_path=integration_system.config.job_db_config.base_path,
                 max_claim_attempts=integration_system.config.max_claim_attempts,
                 heartbeat_interval=integration_system.config.worker_heartbeat_interval,
-                trainer_fn=lambda cfg, logger: {},
+                trainer_fn=lambda cfg, logger: create_failure_result(
+                    "Config failure test"
+                ),
                 client=integration_system.job_db,
                 worker_id="config_failure_worker",
             )
@@ -112,7 +116,7 @@ class TestDatabaseErrorScenarios:
         # Create a job
         job = isolated_job_db.add_test_job({"test": "upload_failure"})
 
-        def successful_train(config: Dict[str, Any], logger: Any) -> Dict[str, Any]:
+        def successful_train(config: Any, logger: BaseLogger) -> TrainingResult:
             logger.log({"test_metric": 0.95})
             return create_success_result(
                 final_metrics={
@@ -159,7 +163,7 @@ class TestTrainingFunctionErrors:
         _job = isolated_job_db.add_test_job({"test": "timeout"})
 
         # Training function that simulates hanging (optimized for faster testing)
-        def hanging_train(config: Dict[str, Any], logger: Any) -> Dict[str, Any]:
+        def hanging_train(config: Any, logger: BaseLogger) -> TrainingResult:
             time.sleep(1)  # Reduced from 10s to 1s for faster testing
             logger.log({"test_metric": 0.95})
             return create_success_result(
@@ -193,8 +197,8 @@ class TestTrainingFunctionErrors:
         # Create a job
         job = isolated_job_db.add_test_job({"test": "memory_error"})
 
-        def memory_error_train(config: Dict[str, Any], logger: Any) -> None:
-            raise MemoryError("Out of memory during training")
+        def memory_error_train(config: Any, logger: BaseLogger) -> TrainingResult:
+            return create_failure_result("Out of memory during training")
 
         status = worker_execution_helper.run_worker_with_trainer(memory_error_train)
         assert status == "failed"
@@ -217,9 +221,9 @@ class TestTrainingFunctionErrors:
         # Create a job
         job = isolated_job_db.add_test_job({"test": "user_interrupt"})
 
-        def interrupted_train(config: Dict[str, Any], logger: Any) -> None:
+        def interrupted_train(config: Any, logger: BaseLogger) -> TrainingResult:
             # Use a custom exception to simulate interruption without actually interrupting the test
-            raise RuntimeError("User interrupted training (simulated)")
+            return create_failure_result("User interrupted training (simulated)")
 
         status = worker_execution_helper.run_worker_with_trainer(interrupted_train)
         assert status == "failed"
@@ -238,8 +242,8 @@ class TestTrainingFunctionErrors:
         # Create a job
         job = isolated_job_db.add_test_job({"test": "corrupted_data"})
 
-        def corrupted_data_train(config: Dict[str, Any], logger: Any) -> None:
-            raise ValueError("Corrupted data detected in batch 15")
+        def corrupted_data_train(config: Any, logger: BaseLogger) -> TrainingResult:
+            return create_failure_result("Corrupted data detected in batch 15")
 
         status = worker_execution_helper.run_worker_with_trainer(corrupted_data_train)
         assert status == "failed"
@@ -272,7 +276,7 @@ class TestConcurrencyAndRaceConditions:
             completion_events[worker_id] = threading.Event()
 
         # Mock training function that coordinates execution
-        def coordinated_train(config: Dict[str, Any], logger: Any) -> Dict[str, Any]:
+        def coordinated_train(config: Any, logger: BaseLogger) -> TrainingResult:
             # Signal that training started and wait briefly
             time.sleep(0.1)
             logger.log({"test_metric": 0.95})
@@ -348,9 +352,7 @@ class TestConcurrencyAndRaceConditions:
         execution_order = []
         order_lock = threading.Lock()
 
-        def priority_tracking_train(
-            config: Dict[str, Any], logger: Any
-        ) -> Dict[str, Any]:
+        def priority_tracking_train(config: Any, logger: BaseLogger) -> TrainingResult:
             with order_lock:
                 priority_level = config.get("priority_test", "unknown")
                 execution_order.append(priority_level)
@@ -469,7 +471,7 @@ class TestConcurrencyAndRaceConditions:
         worker_threads = []
         worker_results = {}
 
-        def high_frequency_train(config: Dict[str, Any], logger: Any) -> Dict[str, Any]:
+        def high_frequency_train(config: Any, logger: BaseLogger) -> TrainingResult:
             # Simulate quick processing with some variability
             time.sleep(0.01 + (config["job_in_batch"] * 0.01))
             logger.log({"batch_id": config["batch_id"], "processed": True})
@@ -621,11 +623,11 @@ class TestResourceConstraints:
         # Create a job
         job = isolated_job_db.add_test_job({"test": "disk_space"})
 
-        def disk_space_train(config: Dict[str, Any], logger: Any) -> None:
+        def disk_space_train(config: Any, logger: BaseLogger) -> TrainingResult:
             # Simulate disk space error during checkpoint saving
             logger.log({"epoch": 1, "loss": 0.5})
             # This would normally save a checkpoint and fail due to disk space
-            raise OSError("No space left on device")
+            return create_failure_result("No space left on device")
 
         status = worker_execution_helper.run_worker_with_trainer(disk_space_train)
         assert status == "failed"
@@ -646,7 +648,7 @@ class TestResourceConstraints:
 
         created_temp_dirs = []
 
-        def temp_tracking_train(config: Dict[str, Any], logger: Any) -> Dict[str, Any]:
+        def temp_tracking_train(config: Any, logger: BaseLogger) -> TrainingResult:
             # Create some temporary files to test cleanup
             temp_file = tempfile.mktemp()
             created_temp_dirs.append(temp_file)
@@ -697,9 +699,7 @@ class TestResourceConstraints:
         # Create a job
         job = isolated_job_db.add_test_job({"test": "logger_limits"})
 
-        def resource_intensive_train(
-            config: Dict[str, Any], logger: Any
-        ) -> Dict[str, Any]:
+        def resource_intensive_train(config: Any, logger: BaseLogger) -> TrainingResult:
             # Log many metrics to test resource limits
             for i in range(1000):
                 logger.log({"step": i, "metric": 0.95 + i * 0.001})
@@ -747,13 +747,15 @@ class TestRecoveryMechanisms:
 
         attempt_count = 0
 
-        def retry_train(config: Dict[str, Any], logger: Any) -> Dict[str, Any]:
+        def retry_train(config: Any, logger: BaseLogger) -> TrainingResult:
             nonlocal attempt_count
             attempt_count += 1
 
             # Fail on first two attempts, succeed on third
             if attempt_count <= 2:
-                raise RuntimeError(f"Simulated failure attempt {attempt_count}")
+                return create_failure_result(
+                    f"Simulated failure attempt {attempt_count}"
+                )
 
             logger.log({"retry_success": True, "attempt": attempt_count})
             return create_success_result(

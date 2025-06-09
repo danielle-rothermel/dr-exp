@@ -15,6 +15,8 @@ from dr_exp.manage.worker import (
     _claim_job,
     UploadError,
 )
+from dr_exp.training.training_result import TrainingResult, create_failure_result
+from dr_exp.logging.base_logger import BaseLogger
 
 
 def make_config() -> Dict[str, Any]:
@@ -275,8 +277,6 @@ class TestJobExecutor:
         temp_client.finalize_job = Mock()
 
         # Create mock result and uploads
-        from dr_exp.training import TrainingResult
-
         result = TrainingResult(
             status="success",
             final_val_acc=0.95,
@@ -419,8 +419,8 @@ class TestStreamlinedWorker:
         """Test worker when training function fails."""
         job = temp_client.add_job(make_config(), "sweep1", status="queued")
 
-        def failing_train(cfg: Dict[str, Any], logger: Any) -> None:
-            raise RuntimeError("Training failed")
+        def failing_train(cfg: Any, logger: BaseLogger) -> TrainingResult:
+            return create_failure_result("Training failed")
 
         work_dir = tmp_path / "work"
         status = run_worker(
