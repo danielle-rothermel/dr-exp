@@ -223,3 +223,110 @@ Worker completed with status: no_job
 - Automatic logging setup on CLI startup
 
 **Final Achievement**: Complete end-to-end diagnostic experience - users now get full visibility into configuration issues without any additional setup required.
+
+### Session 6: Debug Commands (Phase 3 Implementation)
+
+#### Phase 3 Completed
+- ✅ **Debug Config Command**: Shows comprehensive system configuration details
+- ✅ **Debug Health Check Command**: Performs multi-faceted system validation  
+- ✅ **CLI Integration**: Added new debug command group with proper registration
+- ✅ **Documentation Updates**: Enhanced troubleshooting guidance with debug commands
+
+#### New Debug Commands
+
+1. **Configuration Visibility** (`debug debug_config`)
+   - Shows all environment variables and computed paths
+   - Displays database configuration and job file counts
+   - Reports system factory settings and GPU configuration
+   - Shows environment detection (local vs SLURM)
+
+2. **System Health Check** (`debug debug_health_check`)
+   - Validates configuration and directory accessibility
+   - Tests database connectivity and job queue status
+   - Checks for stale jobs and worker capacity
+   - Detects alternative job locations (configuration mismatch indicator)
+   - Optional verbose mode for detailed diagnostics
+
+#### Enhanced Troubleshooting Workflow
+
+**New recommended debug process:**
+1. `uv run python scripts/manager_cli.py debug debug_health_check --verbose`
+2. `uv run python scripts/manager_cli.py debug debug_config`
+3. Manual fixes based on specific issues identified
+
+#### Example Output
+
+**Debug Config:**
+```
+🔧 System Configuration
+📋 Environment Variables:
+  EXPMGR_MODE: files_local
+  DR_EXP_BASE_PATH: ./logs
+📁 Computed Paths:
+  Jobs directory: ./logs/job_data
+  Jobs directory exists: True
+⚙️  System Factory:
+  GPUs: ['0']
+  Total worker capacity: 1
+```
+
+**Health Check:**
+```
+🏥 System Health Check
+✅ Configuration is valid
+✅ Database connectivity (files_local)
+⚠️  Found jobs in alternative locations
+📊 Overall: 5/6 checks passed
+```
+
+#### Impact
+- **One-command diagnostics**: Users can diagnose issues with single command
+- **Comprehensive validation**: All aspects of system state checked systematically
+- **Clear guidance**: Health check pinpoints specific problems and suggests fixes
+- **Alternative location detection**: Automatically finds configuration mismatches
+
+**Phase 3 Achievement**: Self-service debugging with professional-grade diagnostic tools
+
+### Session 7: Integration Tests (Quality Assurance)
+
+#### Integration Test Suite Completed
+- ✅ **Comprehensive Test Coverage**: 12 integration tests covering all diagnostic workflows
+- ✅ **Debug Commands Testing**: Both config and health-check commands thoroughly tested
+- ✅ **End-to-End Workflows**: Complete diagnostic workflows validated
+- ✅ **Edge Case Validation**: Configuration mismatches, stale jobs, and error scenarios tested
+
+#### Test Coverage Areas
+
+1. **Debug Command Functionality**
+   - `test_debug_config_command`: Configuration display accuracy
+   - `test_debug_health_check_*`: Health check functionality in various scenarios
+   - `test_debug_health_check_verbose`: Detailed diagnostic output verification
+
+2. **Configuration Mismatch Detection**
+   - `test_configuration_mismatch_detection`: Alternative job location detection
+   - `test_worker_alternative_location_detection`: Worker diagnostic alternative location finding
+   - `test_configuration_validation_in_health_check`: Invalid configuration handling
+
+3. **Enhanced Worker Diagnostics**
+   - `test_enhanced_worker_diagnostics_integration`: Worker diagnostic output verification
+   - `test_worker_diagnostics_with_jobs`: Worker behavior with available jobs
+   - `test_end_to_end_diagnostic_workflow`: Complete troubleshooting workflow
+
+4. **System State Validation**
+   - `test_stale_job_detection_in_health_check`: Stale job identification
+   - `test_debug_commands_with_different_modes`: Multi-database mode support
+   - `test_debug_health_check_with_issues`: Error detection and reporting
+
+#### Test Results
+- **12/12 tests passing** - 100% success rate
+- **Fast execution** - Core tests run in milliseconds
+- **Robust mocking** - Isolated from external dependencies
+- **Comprehensive scenarios** - Healthy systems, error conditions, and edge cases
+
+#### Quality Assurance Benefits
+- **Regression prevention**: Changes to diagnostic features automatically tested
+- **Confidence in deployments**: Known working state for all diagnostic scenarios
+- **Documentation validation**: Tests verify documented workflows actually work
+- **Maintenance support**: Clear test cases make future enhancements easier
+
+**Integration Test Achievement**: Professional-grade test coverage ensuring reliable diagnostic functionality

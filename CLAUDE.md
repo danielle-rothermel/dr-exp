@@ -116,6 +116,18 @@ uvrp scripts/manager_cli.py job boost_priority <job_id> --amount 200
 uvrp scripts/manager_cli.py job run_one --overrides "model=resnet,lr=0.001"
 ```
 
+### Debug and Diagnostics
+```bash
+# Show detailed system configuration
+uv run python scripts/manager_cli.py debug debug_config
+
+# Perform comprehensive health check
+uv run python scripts/manager_cli.py debug debug_health_check
+
+# Health check with verbose details
+uv run python scripts/manager_cli.py debug debug_health_check --verbose
+```
+
 ## 🔍 KEY FILES & THEIR ROLES
 
 ### Database Layer (`src/dr_exp/job_db/`)
@@ -161,22 +173,26 @@ uvrp scripts/manager_cli.py job run_one --overrides "model=resnet,lr=0.001"
 **Cause:** Configuration mismatch between job upload and worker execution.
 
 **Debug Steps:**
-1. Check environment variables are consistent:
+1. **Run system health check** (recommended first step):
+   ```bash
+   uv run python scripts/manager_cli.py debug debug_health_check --verbose
+   ```
+
+2. **Check configuration details**:
+   ```bash
+   uv run python scripts/manager_cli.py debug debug_config
+   ```
+
+3. **Manual verification** (if needed):
    ```bash
    echo "EXPMGR_MODE: $EXPMGR_MODE"
    echo "DR_EXP_BASE_PATH: $DR_EXP_BASE_PATH"
-   ```
-
-2. Verify job storage location:
-   ```bash
+   
    # For files_local mode, check if jobs exist in expected location
    ls -la ./logs/job_data/
-   
-   # If jobs are elsewhere, find them:
-   find . -name "*.json" -path "*/job_data/*" 2>/dev/null
    ```
 
-3. **Fix:** Use consistent environment variables:
+4. **Fix:** Use consistent environment variables:
    ```bash
    export EXPMGR_MODE=files_local
    export DR_EXP_BASE_PATH="./logs"

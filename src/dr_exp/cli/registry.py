@@ -14,6 +14,8 @@ from dr_exp.cli.commands.reap_stale_jobs import ReapStaleJobsCommand
 from dr_exp.cli.commands.cleanup_run_data import CleanupRunDataCommand
 from dr_exp.cli.commands.upload_configs import UploadConfigsCommand
 from dr_exp.cli.commands.status import StatusCommand
+from dr_exp.cli.commands.debug_config import DebugConfigCommand
+from dr_exp.cli.commands.debug_health_check import DebugHealthCheckCommand
 
 
 class CommandRegistry:
@@ -37,6 +39,8 @@ class CommandRegistry:
             CleanupRunDataCommand,
             UploadConfigsCommand,
             StatusCommand,
+            DebugConfigCommand,
+            DebugHealthCheckCommand,
         ]
 
         for command_class in commands:
