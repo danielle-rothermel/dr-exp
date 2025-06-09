@@ -17,11 +17,17 @@ def build_arg_parser() -> argparse.ArgumentParser:
     return parser
 
 
+# TODO: add force arg to skip interactive approval
 def main(argv: Optional[list[str]] = None) -> None:
     build_arg_parser().parse_args(argv)
+    # TODO: Fix broken call, this now requires a job config
     client = get_job_db_client()
-    count = cleanup_uploaded_runs(client)
-    print(f"Removed {count} run directory(s)")
+    # TODO: Verify this works
+    all_storage = find_all_storage(client)
+    # TODO: Get user approval for removal and then remove all
+    assert False, "Unimplemented, fix todos!"
+
+
 
 
 if __name__ == "__main__":
