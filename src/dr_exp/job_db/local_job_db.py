@@ -125,7 +125,7 @@ class LocalJobDB(BaseJobDB):
                 ):
                     with open(job_file_path, "r") as f:
                         job_data = json.load(f)
-                    if job_data.get("status") == "queued":
+                    if job_data["status"] == "queued":  # Fail fast if status missing
                         # Check reservations if respect_reservations is True
                         if respect_reservations and job_data.get("reserved_for_worker"):
                             # Check if reservation has expired
@@ -145,8 +145,9 @@ class LocalJobDB(BaseJobDB):
                                             json.dumps(job_data, indent=4),
                                         )
                                 except Exception as e:
+                                    # Fail fast: log error with full context, not masked job_id
                                     logger.warning(
-                                        f"Failed to clear expired reservation for job {job_data.get('job_id', 'unknown')}: {e}"
+                                        f"Failed to clear expired reservation for job {job_data['job_id']}: {e}"
                                     )
                                     # Continue even if cleanup fails
                             elif job_data["reserved_for_worker"] != worker_id:
@@ -217,6 +218,8 @@ class LocalJobDB(BaseJobDB):
         dict[str, Any]
             A dictionary describing the outcome of the update operation.
         """
+        # Validate update data before proceeding
+        self._validate_update_data(data)
         job_file_path = os.path.join(self.jobs_dir, f"{job_id}.json")
         if not os.path.exists(job_file_path):
             # logger.debug(f"Job file not found for update: {job_file_path}")
@@ -611,13 +614,13 @@ class LocalJobDB(BaseJobDB):
 
         # Apply status filter
         if status_filter:
-            jobs = [job for job in jobs if job.get("status") in status_filter]
+            jobs = [job for job in jobs if job["status"] in status_filter]
 
         # Sort by priority (highest first), then by age (oldest first)
         jobs.sort(
             key=lambda job: (
                 -job["priority"],  # Fail fast if priority missing
-                job.get("created_at", ""),  # Older jobs first at same priority
+                job["created_at"],  # Older jobs first at same priority - fail fast if missing
             )
         )
 
@@ -731,7 +734,7 @@ class LocalJobDB(BaseJobDB):
                     with open(job_file_path, "r") as f:
                         job_data = json.load(f)
 
-                    if job_data.get("status") == "running":
+                    if job_data["status"] == "running":  # Fail fast if status missing
                         running_jobs.append(job_data)
 
                 except (json.JSONDecodeError, KeyError) as e:
@@ -752,9 +755,9 @@ class LocalJobDB(BaseJobDB):
         running_jobs = self.list_running_jobs()
 
         for job in running_jobs:
-            heartbeat_str = job.get("heartbeat")
-            assigned_worker = job.get("assigned_worker")
-            job_id = job.get("id")
+            heartbeat_str = job.get("heartbeat")  # Optional field - legitimate use of .get()
+            assigned_worker = job["assigned_worker"]  # Required field
+            job_id = job["id"]  # Required field
 
             if not heartbeat_str or not assigned_worker or not job_id:
                 continue
@@ -838,7 +841,7 @@ class LocalJobDB(BaseJobDB):
                     with open(job_file_path, "r") as f:
                         job_data = json.load(f)
 
-                    if job_data.get("status") == "queued":
+                    if job_data["status"] == "queued":  # Fail fast if status missing
                         return True
 
                 except (json.JSONDecodeError, KeyError):
@@ -864,14 +867,14 @@ class LocalJobDB(BaseJobDB):
                     with open(job_file_path, "r") as f:
                         job_data = json.load(f)
 
-                    if job_data.get("status") == "queued":
+                    if job_data["status"] == "queued":  # Fail fast if status missing
                         queued_jobs.append(
                             {
-                                "id": job_data.get("id"),
+                                "id": job_data["id"],  # Required field
                                 "priority": job_data[
                                     "priority"
                                 ],  # Fail fast if priority missing
-                                "created_at": job_data.get("created_at", ""),
+                                "created_at": job_data["created_at"],  # Required field
                             }
                         )
 

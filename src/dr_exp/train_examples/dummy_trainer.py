@@ -24,36 +24,51 @@ def train(cfg: Any, logger: Optional[BaseLogger] = None) -> TrainingResult:
         Summary information about the run.
     """
     # Extract num_epochs from config - check multiple possible locations for compatibility
-    num_epochs = 10  # default
+    num_epochs = 10  # default for robustness, but warn if using fallback
     if isinstance(cfg, dict):
         # Try top-level fields first (for dr_exp wrapped configs)
-        num_epochs = cfg.get("max_epochs", cfg.get("epochs", num_epochs))
+        if "max_epochs" in cfg:
+            num_epochs = cfg["max_epochs"]
+        elif "epochs" in cfg:
+            num_epochs = cfg["epochs"]
         # Check nested train config (for direct test calls and backwards compatibility)
-        train_cfg = cfg.get("train", {})
-        if "num_epochs" in train_cfg:
-            num_epochs = train_cfg[
-                "num_epochs"
-            ]  # Override with nested value if present
+        elif "train" in cfg and "num_epochs" in cfg["train"]:
+            num_epochs = cfg["train"]["num_epochs"]
+        else:
+            import warnings
+            warnings.warn("No epoch configuration found - using default 10 epochs", stacklevel=2)
     else:
         # Handle object-style configs
-        num_epochs = getattr(cfg, "max_epochs", getattr(cfg, "epochs", num_epochs))
+        if hasattr(cfg, "max_epochs"):
+            num_epochs = cfg.max_epochs
+        elif hasattr(cfg, "epochs"):
+            num_epochs = cfg.epochs
         # Check nested train attribute
-        if (
+        elif (
             hasattr(cfg, "train")
             and isinstance(cfg.train, dict)
             and "num_epochs" in cfg.train
         ):
             num_epochs = cfg.train["num_epochs"]
+        else:
+            import warnings
+            warnings.warn("No epoch configuration found - using default 10 epochs", stacklevel=2)
 
     num_epochs = int(num_epochs)
 
     if logger is None:
-        # Get log_dir from config if available, otherwise use default
-        log_dir = (
-            cfg.get("log_dir", "./logs")
-            if isinstance(cfg, dict)
-            else getattr(cfg, "log_dir", "./logs")
-        )
+        # Get log_dir from config - warn if using fallback
+        log_dir = None
+        if isinstance(cfg, dict):
+            log_dir = cfg.get("log_dir")
+        else:
+            log_dir = getattr(cfg, "log_dir", None)
+        
+        if log_dir is None:
+            log_dir = "./logs"
+            import warnings
+            warnings.warn("No log_dir configuration found - using default './logs'", stacklevel=2)
+        
         logger = StructuredLogger(log_dir)
 
     final_train_loss = 0.0
