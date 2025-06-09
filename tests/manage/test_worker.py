@@ -15,7 +15,7 @@ from dr_exp.manage.worker import (
     _claim_job,
     UploadError,
 )
-from dr_exp.training.training_result import TrainingResult, create_failure_result
+from dr_exp.training.training_result import TrainingResult
 from dr_exp.logging.base_logger import BaseLogger
 
 
@@ -419,7 +419,7 @@ class TestStreamlinedWorker:
         job = temp_client.add_job(make_config(), "sweep1", status="queued")
 
         def failing_train(cfg: Any, logger: BaseLogger) -> TrainingResult:
-            return create_failure_result("Training failed")
+            raise RuntimeError("Training failed")
 
         work_dir = tmp_path / "work"
         status = run_worker(
