@@ -30,17 +30,22 @@ def test_parse_sweep_with_spaces():
 
 
 def test_generate_configs(tmp_path):
-    cfg_dir = (
-        Path(__file__).resolve().parents[2]
-        / "src"
-        / "dr_exp"
-        / "train_examples"
-        / "configs"
+    cfg_dir = Path(__file__).resolve().parents[2] / "configs"
+    params = {"model": ["resnet18_cifar", "alexnet_cifar"]}
+    configs = list(
+        config_upload.generate_configs(str(cfg_dir), "decon_config.yaml", params)
     )
-    params = {"model": ["resnet", "vit"]}
-    configs = list(config_upload.generate_configs(str(cfg_dir), "config.yaml", params))
-    names = {cfg["model"]["name"] for cfg in configs}
-    assert names == {"resnet18", "vit_base_patch16_224"}
+
+    # Check what keys exist in model config
+    assert len(configs) == 2
+
+    # For resnet18_cifar, check for architecture
+    resnet_config = next(cfg["model"] for cfg in configs if "resnet18" in str(cfg))
+    assert resnet_config["architecture"] == "resnet18"
+
+    # For alexnet_cifar, check for architecture
+    alexnet_config = next(cfg["model"] for cfg in configs if "alexnet" in str(cfg))
+    assert alexnet_config["architecture"] == "CifarAlexNet"
 
 
 def test_config_hash_deterministic():
