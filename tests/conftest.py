@@ -5,18 +5,24 @@ import pytest
 import tempfile
 import shutil
 import threading
+import subprocess
 from pathlib import Path
 from datetime import datetime, UTC, timedelta
 from contextlib import contextmanager
 from unittest.mock import patch
-from typing import Any, Dict, Optional, List, Union, Generator
+from typing import Any, Dict, Optional, List, Generator, Callable, Tuple, TYPE_CHECKING
+
+if TYPE_CHECKING:
+    pass
 
 from dr_exp.job_db import JobDBConfig, LocalJobDB, SupabaseJobDB
 from dr_exp.utils.factory import create_system, SystemConfig
 from dr_exp.training import create_success_result
 
 
-def make_wrapped_config(config_dict: Dict[str, Any], metadata: Optional[Dict[str, Any]] = None) -> Dict[str, Any]:
+def make_wrapped_config(
+    config_dict: Dict[str, Any], metadata: Optional[Dict[str, Any]] = None
+) -> Dict[str, Any]:
     """
     Create a properly wrapped config for tests that simulate the full upload workflow.
 
@@ -70,8 +76,6 @@ def reset_supabase_db() -> None:
         os.getenv("EXPMGR_MODE") == "supabase_local"
         and os.getenv("RUN_SUPABASE_TESTS") == "1"
     ):
-        import subprocess
-
         try:
             # Reset the database
             subprocess.run(
@@ -95,7 +99,7 @@ def clean_supabase_client() -> SupabaseJobDB:
 
 
 # Pytest markers for organizing tests
-def pytest_configure(config: Any) -> None:
+def pytest_configure(config: pytest.Config) -> None:
     """Configure pytest markers."""
     config.addinivalue_line(
         "markers", "supabase: mark test as requiring local Supabase"
@@ -124,8 +128,12 @@ def enhanced_mock_time() -> Any:
         def __init__(self) -> None:
             self._current_time = datetime(2024, 1, 1, 12, 0, 0, tzinfo=UTC)
             self._time_calls: List[datetime] = []
-            self._milestones: Dict[str, datetime] = {}  # Named time milestones for test coordination
-            self._events: Dict[str, threading.Event] = {}  # Associated events for timing coordination
+            self._milestones: Dict[
+                str, datetime
+            ] = {}  # Named time milestones for test coordination
+            self._events: Dict[
+                str, threading.Event
+            ] = {}  # Associated events for timing coordination
 
         def now(self, tz: Optional[Any] = None) -> datetime:
             self._time_calls.append(self._current_time)
@@ -161,7 +169,9 @@ def enhanced_mock_time() -> Any:
             stale_time = self._current_time - timedelta(seconds=seconds_ago)
             return stale_time.isoformat() + "Z"
 
-        def advance_to_make_stale(self, heartbeat_timeout: int, buffer: int = 5) -> None:
+        def advance_to_make_stale(
+            self, heartbeat_timeout: int, buffer: int = 5
+        ) -> None:
             """Advance time to make jobs with current heartbeat stale."""
             # Stale threshold is typically 2x heartbeat timeout
             stale_threshold = heartbeat_timeout * 2 + buffer
@@ -177,11 +187,11 @@ def enhanced_mock_time() -> Any:
 
 
 @pytest.fixture
-def isolated_job_db(tmp_path: Any) -> Any:
+def isolated_job_db(tmp_path: Path) -> Any:
     """Job database with guaranteed isolation and verification utilities."""
 
     class IsolatedJobDB:
-        def __init__(self, tmp_path: Any) -> None:
+        def __init__(self, tmp_path: Path) -> None:
             self.config = JobDBConfig(
                 base_path=str(tmp_path),
                 storage_path=str(tmp_path / "storage"),
@@ -211,7 +221,12 @@ def isolated_job_db(tmp_path: Any) -> Any:
             )
             return job
 
-        def create_test_jobs(self, count: int = 3, priority_range: tuple[int, int] = (100, 900), status: str = "queued") -> List[Dict[str, Any]]:
+        def create_test_jobs(
+            self,
+            count: int = 3,
+            priority_range: Tuple[int, int] = (100, 900),
+            status: str = "queued",
+        ) -> List[Dict[str, Any]]:
             """Create multiple test jobs with realistic priority distribution."""
             jobs = []
             priority_step = (priority_range[1] - priority_range[0]) // max(1, count - 1)
@@ -275,7 +290,7 @@ def isolated_job_db(tmp_path: Any) -> Any:
 
 
 @pytest.fixture
-def integration_system(tmp_path: Any) -> Any:
+def integration_system(tmp_path: Path) -> Any:
     """Complete integration system with enhanced configuration."""
     job_db_config = JobDBConfig(
         base_path=str(tmp_path),
@@ -298,11 +313,11 @@ def integration_system(tmp_path: Any) -> Any:
 
 @contextmanager
 def event_driven_training(
-    completion_events: Optional[Dict[str, Any]] = None,
+    completion_events: Optional[Dict[str, threading.Event]] = None,
     execution_order: Optional[List[str]] = None,
     results: Optional[Dict[str, Any]] = None,
-    startup_delays: Optional[Dict[str, Any]] = None,
-    heartbeat_events: Optional[Dict[str, Any]] = None,
+    startup_delays: Optional[Dict[str, threading.Event]] = None,
+    heartbeat_events: Optional[Dict[str, threading.Event]] = None,
 ) -> Generator[List[str], None, None]:
     """Enhanced event-driven training context with multiple coordination patterns."""
     completion_events = completion_events or {}
@@ -311,7 +326,9 @@ def event_driven_training(
     startup_delays = startup_delays or {}
     heartbeat_events = heartbeat_events or {}
 
-    def enhanced_mock_train(config: Dict[str, Any], logger: Any, *args: Any, **kwargs: Any) -> Any:
+    def enhanced_mock_train(
+        config: Dict[str, Any], logger: Any, *args: Any, **kwargs: Any
+    ) -> Any:
         job_key = (
             config.get("test_param")
             or config.get("priority_test")
@@ -375,7 +392,9 @@ def worker_coordination() -> Any:
                 }
             return self.worker_events[worker_id]
 
-        def wait_for_workers_to_start(self, worker_ids: List[str], timeout: int = 5) -> bool:
+        def wait_for_workers_to_start(
+            self, worker_ids: List[str], timeout: int = 5
+        ) -> bool:
             """Wait for multiple workers to start."""
             for worker_id in worker_ids:
                 events = self.worker_events.get(worker_id, {})
@@ -395,7 +414,9 @@ def worker_coordination() -> Any:
                 if complete_event:
                     complete_event.set()
 
-        def wait_for_workers_to_complete(self, worker_ids: List[str], timeout: int = 10) -> bool:
+        def wait_for_workers_to_complete(
+            self, worker_ids: List[str], timeout: int = 10
+        ) -> bool:
             """Wait for multiple workers to complete."""
             for worker_id in worker_ids:
                 events = self.worker_events.get(worker_id, {})
@@ -407,10 +428,14 @@ def worker_coordination() -> Any:
                     return False
             return True
 
-        def create_coordinated_trainer(self, worker_id: str) -> Any:
+        def create_coordinated_trainer(
+            self, worker_id: str
+        ) -> Callable[[Dict[str, Any], Any], Any]:
             """Create a trainer function that coordinates with events."""
 
-            def coordinated_trainer(config: Dict[str, Any], logger: Any, *args: Any, **kwargs: Any) -> Any:
+            def coordinated_trainer(
+                config: Dict[str, Any], logger: Any, *args: Any, **kwargs: Any
+            ) -> Any:
                 events = self.create_worker_event(worker_id)
 
                 # Signal worker started
@@ -444,7 +469,9 @@ def worker_coordination() -> Any:
 
 
 # Skip Supabase tests by default unless explicitly enabled
-def pytest_collection_modifyitems(config: Any, items: List[Any]) -> None:
+def pytest_collection_modifyitems(
+    config: pytest.Config, items: List[pytest.Item]
+) -> None:
     """Modify test collection to handle Supabase tests."""
     skip_supabase = pytest.mark.skip(
         reason="Supabase tests require EXPMGR_MODE=supabase_local and RUN_SUPABASE_TESTS=1"
