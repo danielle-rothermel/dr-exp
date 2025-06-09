@@ -26,34 +26,55 @@ src/dr_exp/
 - **Priority-Based Scheduling**: Jobs have priorities 0-1000, highest runs first
 - **Worker-Manager Model**: Manager coordinates, Workers execute training
 
-## 🔧 ENVIRONMENT MODES
+## 🔧 ENVIRONMENT SETUP
 
+### Required Environment Variables
 - `EXPMGR_MODE`: Controls which database stores job data
-- `DR_EXP_BASE_PATH`: Controls where logs are written (always use a path prefixed by  `./logs/`)
+- `DR_EXP_BASE_PATH`: Controls where job data and logs are stored
 
-### Simple Testing
+### Environment Modes
+
+#### Simple Testing (Files Local)
+Use for quick testing without database setup:
 ```bash
-export EXPMGR_MODE=files_local  # JSON files in job_data/
+export EXPMGR_MODE=files_local
+export DR_EXP_BASE_PATH="./logs"
 ```
+- Stores job data in JSON files at `./logs/job_data/`
+- No database services required
+- Good for isolated testing
 
-### Development (Always Use)
+#### Development (Supabase Local) 
+Use for full-featured local development:
 ```bash
 export EXPMGR_MODE=supabase_local
+export DR_EXP_BASE_PATH="./logs"
 supabase start  # Local PostgreSQL with full features
 ```
+- Local PostgreSQL with web UI
+- Real-time features and API
+- Visit: `http://127.0.0.1:54323` for database UI
 
-### Production
+#### Production (Supabase Remote)
 ```bash
-export EXPMGR_MODE=supabase_remote  # Cloud Supabase
+export EXPMGR_MODE=supabase_remote
+export DR_EXP_BASE_PATH="./logs"
+export SUPABASE_URL="your-project-url"
+export SUPABASE_KEY="your-service-role-key"
 ```
+- Cloud Supabase deployment
+- Requires valid Supabase credentials
+
+**⚠️ Important:** Always use consistent environment variables across all commands in a workflow.
 
 ## 📋 COMMON WORKFLOWS
 
-### Quick Dev Cycle
+### Quick Dev Cycle (Supabase Local)
 ```bash
-# 1. Start services
-supabase start
+# 1. Set up environment (run once per session)
 export EXPMGR_MODE=supabase_local
+export DR_EXP_BASE_PATH="./logs"
+supabase start
 
 # 2. Upload test jobs
 uvrp scripts/upload_configs.py \
@@ -63,19 +84,48 @@ uvrp scripts/upload_configs.py \
   --priority 150
 
 # 3. Run worker
-DR_EXP_BASE_PATH="./logs/test0" uv run python scripts/manager_cli.py system run-worker dev_worker ./work
+uv run python scripts/manager_cli.py system run_worker dev_worker ./work
+```
+
+### Simple Testing Cycle (Files Local)
+```bash
+# 1. Set up environment (run once per session)
+export EXPMGR_MODE=files_local
+export DR_EXP_BASE_PATH="./logs"
+
+# 2. Upload test jobs
+uvrp scripts/upload_configs.py \
+  --base-config-path configs \
+  --config-name decon_config \
+  --sweep "limit_train_batches=10 epochs=2" \
+  --priority 150
+
+# 3. Run worker
+uv run python scripts/manager_cli.py system run_worker dev_worker ./work
 ```
 
 ### Priority Management
 ```bash
 # Upload urgent job
-uvrp scripts/manager_cli.py job upload-configs --priority 800 --sweep "..."
+uvrp scripts/manager_cli.py job upload_configs --priority 800 --sweep "..."
 
 # Boost existing job
-uvrp scripts/manager_cli.py job boost-priority <job_id> --amount 200
+uvrp scripts/manager_cli.py job boost_priority <job_id> --amount 200
 
 # Run single job immediately (bypasses queue)
-uvrp scripts/manager_cli.py job run-one --overrides "model=resnet,lr=0.001"
+uvrp scripts/manager_cli.py job run_one --overrides "model=resnet,lr=0.001"
+```
+
+### Debug and Diagnostics
+```bash
+# Show detailed system configuration
+uv run python scripts/manager_cli.py debug debug_config
+
+# Perform comprehensive health check
+uv run python scripts/manager_cli.py debug debug_health_check
+
+# Health check with verbose details
+uv run python scripts/manager_cli.py debug debug_health_check --verbose
 ```
 
 ## 🔍 KEY FILES & THEIR ROLES
@@ -113,16 +163,57 @@ uvrp scripts/manager_cli.py job run-one --overrides "model=resnet,lr=0.001"
 - Use `scripts/slurm_job.sbatch` for cluster submission
 - Manager handles `--gpus-per-node` and `--workers-per-gpu` scaling
 
-## 🚨 COMMON GOTCHAS
+## 🚨 TROUBLESHOOTING
+
+### Configuration Issues
+
+#### Worker Reports "no_job" But Jobs Exist
+**Symptoms:** `uv run python scripts/manager_cli.py job list_jobs` shows queued jobs, but worker completes with "no_job" status.
+
+**Cause:** Configuration mismatch between job upload and worker execution.
+
+**Debug Steps:**
+1. **Run system health check** (recommended first step):
+   ```bash
+   uv run python scripts/manager_cli.py debug debug_health_check --verbose
+   ```
+
+2. **Check configuration details**:
+   ```bash
+   uv run python scripts/manager_cli.py debug debug_config
+   ```
+
+3. **Manual verification** (if needed):
+   ```bash
+   echo "EXPMGR_MODE: $EXPMGR_MODE"
+   echo "DR_EXP_BASE_PATH: $DR_EXP_BASE_PATH"
+   
+   # For files_local mode, check if jobs exist in expected location
+   ls -la ./logs/job_data/
+   ```
+
+4. **Fix:** Use consistent environment variables:
+   ```bash
+   export EXPMGR_MODE=files_local
+   export DR_EXP_BASE_PATH="./logs"
+   # Run both upload and worker commands with same environment
+   ```
+
+#### Jobs Not Being Uploaded
+**Symptoms:** Upload command succeeds but `job list_jobs` shows no jobs.
+
+**Cause:** Different `DR_EXP_BASE_PATH` between upload and list commands.
+
+**Fix:** Ensure same environment for all commands in workflow.
 
 ### Database Issues
 - **"No such table"**: Run `supabase db reset` to apply migrations
-- **Connection failures**: Check `EXPMGR_MODE` environment variable
+- **Connection failures**: Check `EXPMGR_MODE` environment variable matches database state
 - **Stale data**: Use `scripts/reset_local_jobdb.py` for files_local mode
 
 ### Job Execution
-- **Jobs stuck in queue**: Check priorities with `job list-jobs --status queued`
-- **Worker not claiming**: Ensure `job_id` reserved correctly in database
+- **Jobs stuck in queue**: Check priorities with `job list_jobs --status queued`
+- **Worker not claiming**: Verify consistent `DR_EXP_BASE_PATH` between upload and worker
 - **Training failures**: Check `StructuredLogger` setup in worker code
 
 ### Configuration

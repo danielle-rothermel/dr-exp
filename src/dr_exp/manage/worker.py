@@ -499,7 +499,108 @@ def _claim_job(
         backoff = min(backoff * 2, 30)  # Cap backoff at 30 seconds
         attempt += 1
 
+    # No job was claimed - provide detailed diagnostics
+    return _diagnose_no_jobs(client)
+
+
+def _diagnose_no_jobs(client: BaseJobDB) -> str:
+    """Diagnose why no jobs were found and provide detailed status information."""
+    logger = logging.getLogger(__name__)
+    
+    # Get basic job statistics
+    try:
+        has_queued = client.has_queued_jobs()
+        queue_summary = client.get_queue_summary(limit=5) if has_queued else []
+        running_jobs = client.list_running_jobs()
+    except Exception as e:
+        logger.error(f"Failed to query job database: {e}")
+        return "no_job_db_error"
+    
+    # Configuration information
+    from dr_exp.job_db.config import JobDBConfig
+    config = JobDBConfig.from_env()
+    jobs_dir = os.path.join(config.base_path, "job_data")
+    
+    # File system diagnostics for files_local mode
+    fs_diagnostics = ""
+    if config.mode == "files_local":
+        try:
+            if os.path.exists(jobs_dir):
+                job_files = [f for f in os.listdir(jobs_dir) if f.endswith('.json')]
+                fs_diagnostics = f"Jobs directory: {jobs_dir} (exists: True, job files: {len(job_files)})"
+                
+                # Check for jobs in alternative locations
+                alternatives = _check_alternative_job_locations(jobs_dir)
+                if alternatives:
+                    fs_diagnostics += f"\nAlternative locations with jobs: {alternatives}"
+            else:
+                fs_diagnostics = f"Jobs directory: {jobs_dir} (exists: False)"
+                # Look for job_data directories elsewhere
+                alternatives = _find_job_data_directories()
+                if alternatives:
+                    fs_diagnostics += f"\nFound job_data directories elsewhere: {alternatives}"
+        except Exception as e:
+            fs_diagnostics = f"Error checking file system: {e}"
+    
+    # Log detailed diagnostics
+    logger.info("=== Worker Job Claiming Diagnostics ===")
+    logger.info(f"Configuration: EXPMGR_MODE={config.mode}, DR_EXP_BASE_PATH={config.base_path}")
+    logger.info(f"Queued jobs in database: {len(queue_summary)}")
+    logger.info(f"Running jobs: {len(running_jobs)}")
+    if fs_diagnostics:
+        logger.info(f"File system: {fs_diagnostics}")
+    
+    if queue_summary:
+        logger.info("Top queued jobs:")
+        for job in queue_summary[:3]:
+            logger.info(f"  - Job {job['id'][:8]}... Priority: {job['priority']} Status: {job['status']}")
+        
+        # Suggest configuration fix if jobs exist but can't be claimed
+        if config.mode == "files_local" and alternatives:
+            logger.warning("CONFIGURATION MISMATCH DETECTED:")
+            logger.warning("Jobs exist in database but file system shows jobs in different location.")
+            logger.warning("Ensure DR_EXP_BASE_PATH environment variable is consistent between upload and worker commands.")
+            return "no_job_config_mismatch"
+    
+    logger.info("=== End Diagnostics ===")
     return "no_job"
+
+
+def _check_alternative_job_locations(current_jobs_dir: str) -> list[str]:
+    """Check for job files in common alternative locations."""
+    alternatives = []
+    common_paths = ["./job_data", "./logs/job_data", "../job_data", "job_data"]
+    
+    for alt_path in common_paths:
+        if alt_path != current_jobs_dir and os.path.exists(alt_path):
+            try:
+                job_files = [f for f in os.listdir(alt_path) if f.endswith('.json')]
+                if job_files:
+                    alternatives.append(f"{alt_path} ({len(job_files)} jobs)")
+            except (OSError, PermissionError):
+                continue
+    
+    return alternatives
+
+
+def _find_job_data_directories() -> list[str]:
+    """Find job_data directories in current working directory and common locations."""
+    found_dirs = []
+    search_paths = [".", "./logs", "../", "logs"]
+    
+    for search_path in search_paths:
+        if os.path.exists(search_path):
+            try:
+                for item in os.listdir(search_path):
+                    full_path = os.path.join(search_path, item)
+                    if os.path.isdir(full_path) and item == "job_data":
+                        job_files = [f for f in os.listdir(full_path) if f.endswith('.json')]
+                        if job_files:
+                            found_dirs.append(f"{full_path} ({len(job_files)} jobs)")
+            except (OSError, PermissionError):
+                continue
+    
+    return found_dirs
 
 
 __all__ = ["run_worker", "HeartbeatManager", "JobExecutor", "managed_work_directory"]

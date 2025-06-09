@@ -1,6 +1,7 @@
 """Main CLI module using command pattern architecture."""
 
 import sys
+import logging
 from argparse import ArgumentParser
 from typing import Sequence, Optional
 
@@ -10,6 +11,23 @@ from dr_exp.cli.registry import COMMAND_REGISTRY
 from dr_exp.cli.command_groups import COMMAND_GROUP_MAPPING, CommandGroupRegistry
 
 load_dotenv()
+
+
+def setup_logging() -> None:
+    """Set up logging for CLI commands to show diagnostic information."""
+    # Configure logging to show INFO level messages for dr_exp modules
+    logging.basicConfig(
+        level=logging.INFO,
+        format='%(levelname)s: %(message)s',
+        handlers=[logging.StreamHandler(sys.stderr)]
+    )
+    
+    # Only show INFO+ messages from dr_exp modules, suppress others
+    logging.getLogger('dr_exp').setLevel(logging.INFO)
+    
+    # Suppress noisy third-party loggers
+    for logger_name in ['urllib3', 'requests', 'boto3', 'botocore']:
+        logging.getLogger(logger_name).setLevel(logging.WARNING)
 
 
 def build_parser() -> ArgumentParser:
@@ -82,6 +100,9 @@ def main(argv: Optional[Sequence[str]] = None) -> int:
     int
         Exit code
     """
+    # Set up logging to show diagnostic information
+    setup_logging()
+    
     parser = build_parser()
     args = parser.parse_args(argv)
 

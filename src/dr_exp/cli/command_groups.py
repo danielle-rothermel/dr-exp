@@ -54,6 +54,15 @@ class CommandGroupRegistry:
             )
         )
 
+        # Debug commands: debugging and diagnostics
+        self.add_group(
+            CommandGroup(
+                name="debug",
+                help="Debug and diagnostic commands",
+                description="Commands for debugging configuration issues and system diagnostics",
+            )
+        )
+
     def add_group(self, group: CommandGroup) -> None:
         """Add a command group."""
         self.groups[group.name] = group
@@ -75,4 +84,6 @@ COMMAND_GROUP_MAPPING = {
     "job": ["list-jobs", "boost-priority", "set-priority", "run-one", "upload-configs"],
     # Admin commands
     "admin": ["reap-stale-jobs", "cleanup-run-data"],
+    # Debug commands
+    "debug": ["debug-config", "debug-health-check"],
 }
