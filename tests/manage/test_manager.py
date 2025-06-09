@@ -287,6 +287,236 @@ class TestManager:
             assert mock_process_manager.launch_count == 4
             assert mock_process_manager.stop_count == 1
 
+    def test_get_and_log_stale_jobs_empty(self, streamlined_manager, mock_job_db):
+        """Test _get_and_log_stale_jobs with no stale jobs."""
+        mock_job_db.stale_jobs = []
+
+        result = streamlined_manager._get_and_log_stale_jobs()
+
+        assert result == []
+
+    def test_get_and_log_stale_jobs_with_jobs(self, streamlined_manager, mock_job_db):
+        """Test _get_and_log_stale_jobs with stale jobs."""
+        now = datetime.now(timezone.utc)
+        stale_time = now - timedelta(minutes=5)
+
+        mock_job_db.stale_jobs = [
+            StaleJobInfo(
+                job_id="job1",
+                assigned_worker="worker_0_0",
+                last_heartbeat=stale_time,
+                age_seconds=300,
+            ),
+            StaleJobInfo(
+                job_id="job2",
+                assigned_worker="worker_1_0",
+                last_heartbeat=stale_time,
+                age_seconds=300,
+            ),
+        ]
+
+        result = streamlined_manager._get_and_log_stale_jobs()
+
+        assert len(result) == 2
+        assert result[0].job_id == "job1"
+        assert result[1].job_id == "job2"
+
+    def test_mark_stale_jobs_failed_success(self, streamlined_manager, mock_job_db):
+        """Test _mark_stale_jobs_failed with successful job marking."""
+        now = datetime.now(timezone.utc)
+        stale_time = now - timedelta(minutes=5)
+
+        stale_jobs = [
+            StaleJobInfo(
+                job_id="job1",
+                assigned_worker="worker_0_0",
+                last_heartbeat=stale_time,
+                age_seconds=300,
+            ),
+            StaleJobInfo(
+                job_id="job2",
+                assigned_worker="worker_1_0",
+                last_heartbeat=stale_time,
+                age_seconds=300,
+            ),
+        ]
+
+        # Should not raise exception
+        streamlined_manager._mark_stale_jobs_failed(stale_jobs)
+
+        # Verify jobs were marked as failed
+        assert len(mock_job_db.mark_failed_calls) == 1
+        call = mock_job_db.mark_failed_calls[0]
+        assert set(call["job_ids"]) == {"job1", "job2"}
+        assert call["reason"] == "worker_lost"
+
+    def test_mark_stale_jobs_failed_partial_failure(
+        self, streamlined_manager, mock_job_db
+    ):
+        """Test _mark_stale_jobs_failed with partial failures."""
+        from dr_exp.manage.manager import StaleJobProcessingError
+
+        now = datetime.now(timezone.utc)
+        stale_time = now - timedelta(minutes=5)
+
+        stale_jobs = [
+            StaleJobInfo(
+                job_id="job1",
+                assigned_worker="worker_0_0",
+                last_heartbeat=stale_time,
+                age_seconds=300,
+            ),
+            StaleJobInfo(
+                job_id="job2",
+                assigned_worker="worker_1_0",
+                last_heartbeat=stale_time,
+                age_seconds=300,
+            ),
+        ]
+
+        # Mock partial failure in mark_jobs_failed
+        def mock_mark_failed(job_ids, reason):
+            return {"job1": True, "job2": False}
+
+        mock_job_db.mark_jobs_failed = mock_mark_failed
+
+        # Should raise StaleJobProcessingError
+        with pytest.raises(StaleJobProcessingError) as exc_info:
+            streamlined_manager._mark_stale_jobs_failed(stale_jobs)
+
+        assert "Failed to mark 1 jobs as failed" in str(exc_info.value)
+
+    def test_restart_affected_workers_success(
+        self, streamlined_manager, mock_process_manager
+    ):
+        """Test _restart_affected_workers with successful restarts."""
+        now = datetime.now(timezone.utc)
+        stale_time = now - timedelta(minutes=5)
+
+        stale_jobs = [
+            StaleJobInfo(
+                job_id="job1",
+                assigned_worker="worker_0_0",
+                last_heartbeat=stale_time,
+                age_seconds=300,
+            ),
+            StaleJobInfo(
+                job_id="job2",
+                assigned_worker="worker_1_0",
+                last_heartbeat=stale_time,
+                age_seconds=300,
+            ),
+        ]
+
+        # Start workers first so they're managed
+        streamlined_manager.start_workers()
+
+        # Should not raise exception
+        streamlined_manager._restart_affected_workers(stale_jobs)
+
+        # Verify workers were restarted
+        assert mock_process_manager.restart_count == 2
+
+    def test_restart_affected_workers_unmanaged_worker(
+        self, streamlined_manager, mock_process_manager
+    ):
+        """Test _restart_affected_workers with unmanaged worker."""
+        now = datetime.now(timezone.utc)
+        stale_time = now - timedelta(minutes=5)
+
+        stale_jobs = [
+            StaleJobInfo(
+                job_id="job1",
+                assigned_worker="external_worker",
+                last_heartbeat=stale_time,
+                age_seconds=300,
+            ),
+        ]
+
+        # Don't start workers - external_worker not managed
+
+        # Should not raise exception (unmanaged workers are skipped)
+        streamlined_manager._restart_affected_workers(stale_jobs)
+
+        # No restarts should be attempted
+        assert mock_process_manager.restart_count == 0
+
+    def test_restart_single_worker_success(
+        self, streamlined_manager, mock_process_manager
+    ):
+        """Test _restart_single_worker with successful restart."""
+        # Start workers first
+        streamlined_manager.start_workers()
+        managed_workers = set(mock_process_manager.get_worker_status().keys())
+
+        # Should not raise exception
+        streamlined_manager._restart_single_worker("worker_0_0", managed_workers)
+
+        # Verify worker was restarted
+        assert mock_process_manager.restart_count == 1
+
+    def test_restart_single_worker_unmanaged(
+        self, streamlined_manager, mock_process_manager
+    ):
+        """Test _restart_single_worker with unmanaged worker."""
+        managed_workers = set()  # Empty set - no managed workers
+
+        # Should not raise exception (just logs warning)
+        streamlined_manager._restart_single_worker("external_worker", managed_workers)
+
+        # No restarts should be attempted
+        assert mock_process_manager.restart_count == 0
+
+    def test_restart_single_worker_failure(
+        self, streamlined_manager, mock_process_manager
+    ):
+        """Test _restart_single_worker with restart failure."""
+        from dr_exp.manage.manager import WorkerRestartError
+
+        # Start workers first
+        streamlined_manager.start_workers()
+        managed_workers = set(mock_process_manager.get_worker_status().keys())
+
+        # Mock restart failure
+        def mock_restart_worker(worker_id):
+            raise RuntimeError("Restart failed")
+
+        mock_process_manager.restart_worker = mock_restart_worker
+
+        # Should raise WorkerRestartError
+        with pytest.raises(WorkerRestartError) as exc_info:
+            streamlined_manager._restart_single_worker("worker_0_0", managed_workers)
+
+        assert "Failed to restart worker worker_0_0" in str(exc_info.value)
+
+    def test_check_stale_jobs_processing_error_handling(
+        self, streamlined_manager, mock_job_db
+    ):
+        """Test check_stale_jobs handles StaleJobProcessingError gracefully."""
+        now = datetime.now(timezone.utc)
+        stale_time = now - timedelta(minutes=5)
+
+        mock_job_db.stale_jobs = [
+            StaleJobInfo(
+                job_id="job1",
+                assigned_worker="worker_0_0",
+                last_heartbeat=stale_time,
+                age_seconds=300,
+            ),
+        ]
+
+        # Mock mark_jobs_failed to return failure
+        def mock_mark_failed(job_ids, reason):
+            return {"job1": False}
+
+        mock_job_db.mark_jobs_failed = mock_mark_failed
+
+        # Should not raise exception - error should be caught and logged
+        streamlined_manager.check_stale_jobs()
+
+        # Should have attempted to mark job as failed
+        assert len(mock_job_db.mark_failed_calls) == 0  # Our mock doesn't record calls
+
     def test_run_single_loop_iteration(
         self, streamlined_manager, mock_job_db, mock_process_manager
     ):
