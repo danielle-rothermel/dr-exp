@@ -11,7 +11,7 @@ import subprocess
 import time
 
 
-def check_supabase_running():
+def check_supabase_running() -> bool:
     """Check if local Supabase is running."""
     try:
         result = subprocess.run(
@@ -29,7 +29,7 @@ def check_supabase_running():
         return False
 
 
-def start_supabase():
+def start_supabase() -> bool:
     """Start local Supabase if not running."""
     if check_supabase_running():
         print("✅ Supabase is already running")
@@ -61,7 +61,7 @@ def start_supabase():
         return False
 
 
-def run_tests(test_type="isolated", reset_db=False):
+def run_tests(test_type: str = "isolated", reset_db: bool = False) -> bool:
     """Run Supabase integration tests."""
     # Set environment variables
     env = os.environ.copy()
@@ -100,7 +100,7 @@ def run_tests(test_type="isolated", reset_db=False):
         return False
 
 
-def main():
+def main() -> None:
     """Main entry point."""
     import argparse
 

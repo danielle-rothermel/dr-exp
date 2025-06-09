@@ -11,7 +11,7 @@ from dr_exp.training.decon_trainer import train as decon_train
 from dr_exp.logging.structured_logger import StructuredLogger
 
 
-def main():
+def main() -> None:
     """Run the deconCNN worker."""
     parser = argparse.ArgumentParser(
         description="Run experiment worker with deconCNN trainer"
