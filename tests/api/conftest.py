@@ -2,7 +2,7 @@
 
 import json
 from pathlib import Path
-from typing import Dict, Any, Optional, List, Tuple
+from typing import Dict, Any, Optional, List, Tuple, cast
 
 import pytest
 from fastapi.testclient import TestClient
@@ -33,7 +33,7 @@ def client(isolated_app: FastAPI) -> TestClient:
 @pytest.fixture
 def db_client(isolated_app: FastAPI) -> BaseJobDB:
     """Get database client from isolated app."""
-    return isolated_app.state.client
+    return cast(BaseJobDB, isolated_app.state.client)
 
 
 @pytest.fixture
@@ -61,7 +61,6 @@ def create_test_job(
     sweep_config_id: str = "test_sweep",
     status: str = "queued",
     priority: int = 100,
-    **kwargs: Any,
 ) -> Dict[str, Any]:
     """Create a test job with sensible defaults."""
     if job_config is None:
@@ -72,7 +71,6 @@ def create_test_job(
         sweep_config_id=sweep_config_id,
         status=status,
         priority=priority,
-        **kwargs,
     )
 
 

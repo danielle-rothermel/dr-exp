@@ -4,7 +4,7 @@ import pytest
 import threading
 from unittest.mock import patch
 from pathlib import Path
-from typing import Any, Dict, List, Optional, Callable
+from typing import Any, Dict, List, Optional, Callable, cast
 
 from dr_exp.manage.manager import Manager
 from dr_exp.manage.process_manager import MockProcessManager
@@ -34,9 +34,11 @@ def heartbeat_monitor() -> Any:
 
     class HeartbeatMonitor:
         def __init__(self) -> None:
-            self.heartbeat_updates = []
-            self.heartbeat_events = {}
-            self.original_update_method = None
+            self.heartbeat_updates: list[Dict[str, Any]] = []
+            self.heartbeat_events: dict[str, Any] = {}
+            self.original_update_method: Optional[
+                Callable[[str, Dict[str, Any]], Dict[str, Any]]
+            ] = None
 
         def start_monitoring(
             self, job_db: Any, job_id: Optional[str] = None, required_count: int = 2
@@ -64,7 +66,9 @@ def heartbeat_monitor() -> Any:
                             )
                         self.heartbeat_events["sufficient_heartbeats"].set()
 
-                return self.original_update_method(job_id_param, updates)
+                if self.original_update_method is not None:
+                    return self.original_update_method(job_id_param, updates)
+                return {}
 
             return patch.object(
                 job_db, "update_job", side_effect=track_heartbeat_updates
@@ -79,7 +83,8 @@ def heartbeat_monitor() -> Any:
             if len(self.heartbeat_updates) >= count:
                 return True
 
-            return self.heartbeat_events["sufficient_heartbeats"].wait(timeout)
+            result = self.heartbeat_events["sufficient_heartbeats"].wait(timeout)
+            return bool(result)
 
         def get_heartbeat_count(self, job_id: Optional[str] = None) -> int:
             """Get heartbeat count for specific job or total."""
@@ -126,7 +131,7 @@ def stale_job_detector(enhanced_mock_time: Any) -> Any:
             )
             job_db.update_job(job["id"], {"heartbeat": stale_timestamp})
 
-            return job
+            return cast(Dict[str, Any], job)
 
         def advance_time_for_stale_detection(self, heartbeat_timeout: int) -> None:
             """Advance time to trigger stale job detection."""
@@ -157,7 +162,7 @@ def worker_execution_helper(integration_system: Any) -> Any:
     class WorkerExecutionHelper:
         def __init__(self, system: Any) -> None:
             self.system = system
-            self.execution_results = []
+            self.execution_results: list[Dict[str, Any]] = []
 
         def run_worker_with_trainer(
             self, trainer_fn: Callable, worker_id: Optional[str] = None, **kwargs: Any

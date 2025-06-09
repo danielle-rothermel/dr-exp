@@ -405,7 +405,7 @@ def test_error_handling_under_load(client: Any, admin_headers: Dict[str, str]) -
         resp = client.post(
             "/job/kill", json={"job_id": fake_job_id}, headers=admin_headers
         )
-        return resp.status_code
+        return int(resp.status_code)
 
     # Make many failing requests concurrently
     with ThreadPoolExecutor(max_workers=10) as executor:

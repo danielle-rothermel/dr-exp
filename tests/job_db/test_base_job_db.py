@@ -97,7 +97,7 @@ def test_base_job_db_optional_methods_raise_not_implemented() -> None:
             job_config: Dict[str, Any],
             sweep_config_id: str,
             reserved_for_worker: str,
-            reservation_timeout: int = 300,
+            reservation_timeout: Optional[int] = 300,
             priority: int = 100,
             status: str = "queued",
         ) -> Dict[str, Any]:

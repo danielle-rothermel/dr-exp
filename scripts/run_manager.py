@@ -9,7 +9,7 @@ from dr_exp.utils.gpu_discovery import discover_gpus
 from dr_exp.job_db import JobDBConfig
 
 
-def main():
+def main() -> None:
     """Run the manager."""
     parser = argparse.ArgumentParser(description="Run experiment manager")
 

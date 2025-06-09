@@ -115,4 +115,4 @@ def test_metrics_loader(tmp_path: Path) -> None:
             raise NotImplementedError()
 
     with pytest.raises(NotImplementedError):
-        MetricsLoader(Real()).load("x")
+        MetricsLoader(Real()).load("x")  # type: ignore[arg-type]
