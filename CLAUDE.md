@@ -270,9 +270,10 @@ uv run python scripts/manager_cli.py \
 - API: Use FastAPI test client with auth tokens
 
 ### Integration Tests
-- Use `EXPMGR_MODE=files_local` for fast test cycles
+- Use `--mode files_local` for fast test cycles (no environment variables needed)
 - Test complete workflows: upload → claim → execute → complete
 - Verify priority ordering in job queues
+- All tests use explicit `JobDBConfig(base_path=..., mode=...)` construction
 
 ### Development Debugging
 - **API logs**: `uvicorn dr_exp.api.main:app --reload --log-level debug`

@@ -63,19 +63,14 @@ def temp_job_db() -> Generator[LocalJobDB, None, None]:
 @pytest.fixture(scope="session")
 def supabase_test_mode() -> bool:
     """Check if we should run Supabase integration tests."""
-    return (
-        os.getenv("EXPMGR_MODE") == "supabase_local"
-        and os.getenv("RUN_SUPABASE_TESTS") == "1"
-    )
+    # Check if Supabase is available for testing
+    return os.getenv("RUN_SUPABASE_TESTS") == "1"
 
 
 @pytest.fixture
 def reset_supabase_db() -> None:
     """Reset the local Supabase database before test."""
-    if (
-        os.getenv("EXPMGR_MODE") == "supabase_local"
-        and os.getenv("RUN_SUPABASE_TESTS") == "1"
-    ):
+    if os.getenv("RUN_SUPABASE_TESTS") == "1":
         try:
             # Reset the database
             subprocess.run(

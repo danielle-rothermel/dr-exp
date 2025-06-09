@@ -120,7 +120,7 @@ class BaseCommand(ABC):
         Parameters
         ----------
         system_config : SystemConfig, optional
-            System configuration. If None, uses defaults from environment.
+            System configuration. If None, uses factory defaults.
 
         Returns
         -------

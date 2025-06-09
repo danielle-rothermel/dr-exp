@@ -64,9 +64,11 @@ def stub_client(monkeypatch: Any) -> Dict[str, Any]:
 
 def test_directory_is_zipped(tmp_path: Any, stub_client: Dict[str, Any]) -> None:
     config = JobDBConfig(
+        base_path=str(tmp_path),
+        mode="supabase_remote",
+        storage_path=str(tmp_path / "storage"),
         supabase_url="https://test.supabase.co",
         supabase_key="key",
-        mode="supabase_remote",
     )
     client = SupabaseJobDB(config)
     d = tmp_path / "artifacts"
@@ -83,9 +85,11 @@ def test_empty_suffix_zips_to_default(
     tmp_path: Any, stub_client: Dict[str, Any]
 ) -> None:
     config = JobDBConfig(
+        base_path=str(tmp_path),
+        mode="supabase_remote",
+        storage_path=str(tmp_path / "storage"),
         supabase_url="https://test.supabase.co",
         supabase_key="key",
-        mode="supabase_remote",
     )
     client = SupabaseJobDB(config)
     d = tmp_path / "artifacts2"
@@ -100,9 +104,11 @@ def test_empty_suffix_zips_to_default(
 
 def test_insert_helpers(monkeypatch: Any, stub_client: Dict[str, Any]) -> None:
     config = JobDBConfig(
+        base_path="/tmp",
+        mode="supabase_remote",
+        storage_path="/tmp/storage",
         supabase_url="https://test.supabase.co",
         supabase_key="key",
-        mode="supabase_remote",
     )
     client = SupabaseJobDB(config)
 

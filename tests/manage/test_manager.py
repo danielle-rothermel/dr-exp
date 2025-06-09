@@ -596,21 +596,33 @@ class TestManager:
 class TestManagerIntegration:
     """Integration tests for Manager with real components."""
 
-    def test_with_default_factory(self, temp_dir: str) -> None:
-        """Test manager creation with default job database factory."""
+    def test_with_explicit_client(self, temp_dir: str) -> None:
+        """Test manager creation with explicit job database client."""
+        from dr_exp.job_db import JobDBConfig, LocalJobDB
+
+        # Create explicit configuration and client
+        config = JobDBConfig(
+            base_path=temp_dir,
+            mode="files_local",
+            storage_path=os.path.join(temp_dir, "storage"),
+        )
+        config.validate()
+        client = LocalJobDB(config)
+
         # Set required environment variable for ProcessManager
         with patch.dict("os.environ", {"DR_EXP_BASE_PATH": temp_dir}):
-            # This should use the factory to create a real job database
+            # Create manager with explicit client
             manager = Manager(
                 gpus=["0"],
                 workers_per_gpu=1,
                 heartbeat_timeout=30,
                 idle_timeout_mins=5,
                 base_dir=temp_dir,
+                client=client,
             )
 
-            # Should have a real job database client
-            assert manager.job_db is not None
+            # Should have the provided client
+            assert manager.job_db is client
             assert hasattr(manager.job_db, "list_running_jobs")
             assert hasattr(manager.job_db, "get_stale_jobs")
             assert hasattr(manager.job_db, "mark_jobs_failed")

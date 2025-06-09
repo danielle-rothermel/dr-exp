@@ -503,24 +503,33 @@ class TestFactoryIntegration:
             assert manager.workers_per_gpu == integration_config.workers_per_gpu
             assert manager.heartbeat_timeout == integration_config.heartbeat_timeout
 
-    def test_factory_environment_configuration(
+    def test_factory_with_explicit_configuration(
         self, integration_config: SystemConfig, tmp_path: Any
     ) -> None:
-        """Test that factory respects environment configuration."""
-        # Test with environment variables
-        with patch.dict(
-            "os.environ",
-            {
-                "EXPMGR_MODE": "files_local",
-                "DR_EXP_BASE_PATH": str(tmp_path / "env_test"),
-            },
-        ):
-            # Create factory without explicit config (should use environment)
-            factory = create_system()
+        """Test that factory works with explicit configuration."""
+        from dr_exp.job_db import JobDBConfig
+        
+        # Create explicit configuration
+        custom_config = SystemConfig(
+            job_db_config=JobDBConfig(
+                base_path=str(tmp_path / "env_test"),
+                mode="files_local",
+                storage_path=str(tmp_path / "env_test" / "storage"),
+            ),
+            gpus=["0"],
+            workers_per_gpu=1,
+            heartbeat_timeout=30,
+            idle_timeout_mins=5,
+            max_claim_attempts=3,
+            worker_heartbeat_interval=1.0,
+        )
+        
+        # Create factory with explicit config
+        factory = create_system(custom_config)
 
-            # Verify environment configuration was picked up
-            assert factory.config.job_db_config.mode == "files_local"
-            assert str(tmp_path / "env_test") in factory.config.job_db_config.base_path
+        # Verify configuration was used
+        assert factory.config.job_db_config.mode == "files_local"
+        assert str(tmp_path / "env_test") in factory.config.job_db_config.base_path
 
     def test_factory_worker_execution_with_parameters(
         self, integration_config: SystemConfig
