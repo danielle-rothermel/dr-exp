@@ -139,22 +139,17 @@ class SystemConfig:
         """Validate the configuration."""
         self.job_db_config.validate()
 
-        if not self.gpus:
-            raise ValueError("At least one GPU must be specified")
-
-        if self.workers_per_gpu < 1:
-            raise ValueError("workers_per_gpu must be at least 1")
-
-        if self.heartbeat_timeout < 10:
-            raise ValueError("heartbeat_timeout must be at least 10 seconds")
-
-        if self.worker_heartbeat_interval < 0.1:
-            raise ValueError("worker_heartbeat_interval must be at least 0.1 seconds")
-
-        if self.worker_heartbeat_interval >= self.heartbeat_timeout:
-            raise ValueError(
-                "worker_heartbeat_interval must be less than heartbeat_timeout"
-            )
+        assert self.gpus, "At least one GPU must be specified"
+        assert self.workers_per_gpu >= 1, "workers_per_gpu must be at least 1"
+        assert self.heartbeat_timeout >= 10, (
+            "heartbeat_timeout must be at least 10 seconds"
+        )
+        assert self.worker_heartbeat_interval >= 0.1, (
+            "worker_heartbeat_interval must be at least 0.1 seconds"
+        )
+        assert self.worker_heartbeat_interval < self.heartbeat_timeout, (
+            "worker_heartbeat_interval must be less than heartbeat_timeout"
+        )
 
 
 class Factory:

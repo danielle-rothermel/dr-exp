@@ -68,16 +68,11 @@ class PriorityClass(Enum):
         -------
         PriorityClass
             The priority class containing this value.
-
-        Raises
-        ------
-        ValueError
-            If priority is not within any valid priority class range.
         """
         for priority_class in cls:
             if priority_class.contains(priority):
                 return priority_class
-        raise ValueError(
+        assert False, (
             f"Invalid priority {priority}: must be between {cls.LOW.min_priority} and {cls.SYSTEM.max_priority}"
         )
 
@@ -94,18 +89,13 @@ def validate_priority(priority: int) -> int:
     -------
     int
         The validated priority value.
-
-    Raises
-    ------
-    ValueError
-        If priority is not an integer or is outside the valid range (0-1000).
     """
-    if not isinstance(priority, int):
-        raise ValueError(f"Priority must be an integer, got {type(priority).__name__}")
-    if not (PRIORITY_MIN <= priority <= PRIORITY_MAX):
-        raise ValueError(
-            f"Priority must be between {PRIORITY_MIN} and {PRIORITY_MAX}, got {priority}"
-        )
+    assert isinstance(priority, int), (
+        f"Priority must be an integer, got {type(priority).__name__}"
+    )
+    assert PRIORITY_MIN <= priority <= PRIORITY_MAX, (
+        f"Priority must be between {PRIORITY_MIN} and {PRIORITY_MAX}, got {priority}"
+    )
     return priority
 
 
@@ -121,11 +111,6 @@ def get_priority_description(priority: int) -> str:
     -------
     str
         Description string indicating priority level and class.
-
-    Raises
-    ------
-    ValueError
-        If priority is not an integer or is outside the valid range (0-1000).
     """
     validated_priority = validate_priority(priority)
     priority_class = PriorityClass.from_priority(validated_priority)

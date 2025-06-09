@@ -80,7 +80,7 @@ def test_reap_handles_invalid_jobs_gracefully(tmp_path: Path, caplog: Any) -> No
 
     # Check that appropriate warnings/errors were logged
     assert "Skipping invalid job" in caplog.text
-    assert "Invalid heartbeat for job" in caplog.text
+    assert "Invalid timestamp format" in caplog.text
 
     # Verify final states
     data1 = client.get_job_details(job1["id"])

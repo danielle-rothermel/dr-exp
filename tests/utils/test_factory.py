@@ -99,7 +99,7 @@ class TestSystemConfig:
         """Test validation with no GPUs."""
         temp_config.gpus = []
 
-        with pytest.raises(ValueError, match="At least one GPU must be specified"):
+        with pytest.raises(AssertionError, match="At least one GPU must be specified"):
             temp_config.validate()
 
     def test_validation_invalid_workers_per_gpu(
@@ -108,7 +108,7 @@ class TestSystemConfig:
         """Test validation with invalid workers per GPU."""
         temp_config.workers_per_gpu = 0
 
-        with pytest.raises(ValueError, match="workers_per_gpu must be at least 1"):
+        with pytest.raises(AssertionError, match="workers_per_gpu must be at least 1"):
             temp_config.validate()
 
     def test_validation_low_heartbeat_timeout(self, temp_config: SystemConfig) -> None:
@@ -116,7 +116,7 @@ class TestSystemConfig:
         temp_config.heartbeat_timeout = 5
 
         with pytest.raises(
-            ValueError, match="heartbeat_timeout must be at least 10 seconds"
+            AssertionError, match="heartbeat_timeout must be at least 10 seconds"
         ):
             temp_config.validate()
 
@@ -127,7 +127,7 @@ class TestSystemConfig:
         temp_config.worker_heartbeat_interval = 0.05
 
         with pytest.raises(
-            ValueError, match="worker_heartbeat_interval must be at least 0.1 seconds"
+            AssertionError, match="worker_heartbeat_interval must be at least 0.1 seconds"
         ):
             temp_config.validate()
 
@@ -139,7 +139,7 @@ class TestSystemConfig:
         temp_config.heartbeat_timeout = 30
 
         with pytest.raises(
-            ValueError,
+            AssertionError,
             match="worker_heartbeat_interval must be less than heartbeat_timeout",
         ):
             temp_config.validate()

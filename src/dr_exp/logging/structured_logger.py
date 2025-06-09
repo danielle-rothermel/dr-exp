@@ -147,19 +147,8 @@ class StructuredLogger(BaseLogger):
         path : str
             Path to the artifact file or directory to register.
         """
-        if os.path.exists(path):
-            self.artifact_paths.append(os.path.abspath(path))
-        else:  # pragma: no cover - debug path
-            if self.debug:
-                raise FileNotFoundError(path)
-            # Fail fast principle: make artifact errors visible
-            import warnings
-
-            warnings.warn(
-                f"CRITICAL: Artifact not found - training may be incomplete: {path}",
-                stacklevel=2,
-            )
-            self._write_error(f"artifact not found: {path}")
+        assert os.path.exists(path), f"Artifact path does not exist: {path}"
+        self.artifact_paths.append(os.path.abspath(path))
 
     def _summary(self, success: bool) -> Dict[str, Any]:
         """Return a final summary dictionary."""
