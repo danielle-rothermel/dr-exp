@@ -1,9 +1,11 @@
 """Tests for job listing pagination and filtering."""
 
+from typing import Any
+
 from .conftest import create_test_job, Priority, JobStatus
 
 
-def test_pagination_basic(client, db_client):
+def test_pagination_basic(client: Any, db_client: Any) -> None:
     """Test basic pagination functionality."""
     # Create 25 test jobs
     jobs = []
@@ -56,7 +58,7 @@ def test_pagination_basic(client, db_client):
     assert len(data["jobs"]) == 5  # Remaining jobs
 
 
-def test_pagination_edge_cases(client, db_client):
+def test_pagination_edge_cases(client: Any, db_client: Any) -> None:
     """Test pagination edge cases and validation."""
     # Create a few jobs for testing
     for i in range(5):
@@ -87,7 +89,7 @@ def test_pagination_edge_cases(client, db_client):
     assert data["pages"] == 1
 
 
-def test_pagination_with_filtering(client, db_client):
+def test_pagination_with_filtering(client: Any, db_client: Any) -> None:
     """Test pagination combined with filtering."""
     # Create jobs with different statuses
     _queued_jobs = [
@@ -122,7 +124,7 @@ def test_pagination_with_filtering(client, db_client):
     assert all(job["status"] == JobStatus.QUEUED for job in data["jobs"])
 
 
-def test_pagination_with_sorting(client, db_client):
+def test_pagination_with_sorting(client: Any, db_client: Any) -> None:
     """Test pagination combined with sorting."""
     # Create jobs with varying priorities
     priorities = [Priority.LOW, Priority.HIGH, Priority.NORMAL, Priority.URGENT]
@@ -162,7 +164,7 @@ def test_pagination_with_sorting(client, db_client):
     assert priorities_returned == [Priority.NORMAL, Priority.LOW]
 
 
-def test_pagination_with_complex_filtering(client, db_client):
+def test_pagination_with_complex_filtering(client: Any, db_client: Any) -> None:
     """Test pagination with multiple filters."""
     # Create jobs with varying priorities and statuses
     test_jobs = [
@@ -203,7 +205,7 @@ def test_pagination_with_complex_filtering(client, db_client):
     assert priorities == [Priority.HIGH, Priority.NORMAL]
 
 
-def test_empty_pagination_results(client, db_client):
+def test_empty_pagination_results(client: Any, db_client: Any) -> None:
     """Test pagination when filters return no results."""
     # Create a few jobs
     create_test_job(db_client, status=JobStatus.QUEUED)
@@ -221,7 +223,7 @@ def test_empty_pagination_results(client, db_client):
     assert data["has_prev"] is False
 
 
-def test_pagination_per_page_limits(client, db_client):
+def test_pagination_per_page_limits(client: Any, db_client: Any) -> None:
     """Test per_page parameter limits."""
     # Create some jobs
     for i in range(5):

@@ -3,11 +3,12 @@ import os
 import gzip
 from multiprocessing import Process
 import pytest
+from pathlib import Path
 
 from dr_exp.logging.structured_logger import StructuredLogger
 
 
-def test_logger_basic(tmp_path):
+def test_logger_basic(tmp_path: Path) -> None:
     log_dir = str(tmp_path / "logs")
     logger = StructuredLogger(log_dir)
 
@@ -34,14 +35,14 @@ def test_logger_basic(tmp_path):
         assert data.startswith("{") and data.endswith("}")
 
 
-def _worker(log_dir, count):
+def _worker(log_dir: str, count: int) -> None:
     logger = StructuredLogger(log_dir)
     for i in range(count):
         logger.log({"i": i})
     logger.finalize()
 
 
-def test_logger_concurrent(tmp_path):
+def test_logger_concurrent(tmp_path: Path) -> None:
     log_dir = str(tmp_path / "logs")
 
     procs = [Process(target=_worker, args=(log_dir, 10)) for _ in range(4)]
@@ -55,7 +56,7 @@ def test_logger_concurrent(tmp_path):
     assert len(lines) == 40
 
 
-def test_checkpoint_compression(tmp_path):
+def test_checkpoint_compression(tmp_path: Path) -> None:
     log_dir = str(tmp_path / "logs")
     logger = StructuredLogger(log_dir, compress_checkpoints=True)
     state = {"a": 1}
@@ -67,7 +68,7 @@ def test_checkpoint_compression(tmp_path):
     logger.finalize()
 
 
-def test_error_log_non_debug(tmp_path):
+def test_error_log_non_debug(tmp_path: Path) -> None:
     log_dir = str(tmp_path / "logs")
     logger = StructuredLogger(log_dir)
     logger.log_artifact(str(tmp_path / "missing.txt"))
@@ -81,14 +82,14 @@ def test_error_log_non_debug(tmp_path):
     assert "log error" in log_text
 
 
-def test_debug_mode_raises(tmp_path):
+def test_debug_mode_raises(tmp_path: Path) -> None:
     log_dir = str(tmp_path / "logs")
     logger = StructuredLogger(log_dir, debug=True)
     with pytest.raises(FileNotFoundError):
         logger.log_artifact(str(tmp_path / "missing.txt"))
 
 
-def test_finalize_idempotent(tmp_path):
+def test_finalize_idempotent(tmp_path: Path) -> None:
     log_dir = str(tmp_path / "logs")
     logger = StructuredLogger(log_dir)
     logger.log({"a": 1})

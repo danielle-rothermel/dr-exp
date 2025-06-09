@@ -4,6 +4,7 @@ import os
 import tempfile
 import pytest
 from unittest.mock import patch
+from typing import Any
 
 from dr_exp.manage.process_manager import (
     ProcessManager,
@@ -15,7 +16,7 @@ from dr_exp.manage.process_manager import (
 
 
 @pytest.fixture
-def temp_dir():
+def temp_dir() -> Any:
     """Create a temporary directory for testing."""
     with tempfile.TemporaryDirectory() as tmpdir:
         yield tmpdir
@@ -24,12 +25,12 @@ def temp_dir():
 class TestBaseProcessManager:
     """Test the abstract base class."""
 
-    def test_cannot_instantiate_abstract_class(self):
+    def test_cannot_instantiate_abstract_class(self) -> None:
         """Test that BaseProcessManager cannot be instantiated directly."""
         with pytest.raises(TypeError):
             BaseProcessManager()
 
-    def test_abstract_methods_required(self):
+    def test_abstract_methods_required(self) -> None:
         """Test that concrete implementations must implement all abstract methods."""
 
         class IncompleteManager(BaseProcessManager):
@@ -43,7 +44,7 @@ class TestBaseProcessManager:
 class TestMockProcessManager:
     """Test the mock process manager."""
 
-    def test_initialization(self):
+    def test_initialization(self) -> None:
         """Test mock manager initialization."""
         manager = MockProcessManager()
 
@@ -53,7 +54,7 @@ class TestMockProcessManager:
         assert manager.stop_count == 0
         assert manager.get_worker_status() == {}
 
-    def test_launch_worker(self):
+    def test_launch_worker(self) -> None:
         """Test launching workers."""
         manager = MockProcessManager()
 
@@ -71,7 +72,7 @@ class TestMockProcessManager:
         assert status["worker2"]["gpu"] == "1"
         assert status["worker2"]["alive"] is True
 
-    def test_stop_all_workers(self):
+    def test_stop_all_workers(self) -> None:
         """Test stopping all workers."""
         manager = MockProcessManager()
 
@@ -84,7 +85,7 @@ class TestMockProcessManager:
         status = manager.get_worker_status()
         assert all(not info["alive"] for info in status.values())
 
-    def test_restart_worker_existing(self):
+    def test_restart_worker_existing(self) -> None:
         """Test restarting an existing worker."""
         manager = MockProcessManager()
 
@@ -99,7 +100,7 @@ class TestMockProcessManager:
         status = manager.get_worker_status()
         assert status["worker1"]["alive"] is True
 
-    def test_restart_worker_nonexistent(self):
+    def test_restart_worker_nonexistent(self) -> None:
         """Test restarting a nonexistent worker."""
         manager = MockProcessManager()
 
@@ -115,7 +116,7 @@ class TestMockProcessManager:
 class TestProcessManager:
     """Test the real process manager interface."""
 
-    def test_initialization_default(self):
+    def test_initialization_default(self) -> None:
         """Test process manager initialization with defaults."""
         with patch.dict("os.environ", {"DR_EXP_BASE_PATH": "/test/path"}):
             manager = ProcessManager()
@@ -124,19 +125,19 @@ class TestProcessManager:
             assert manager.get_worker_status() == {}
             assert manager.base_path == "/test/path"
 
-    def test_initialization_custom_start_method(self):
+    def test_initialization_custom_start_method(self) -> None:
         """Test process manager initialization with custom start method."""
         # Use 'spawn' as an alternative start method
         manager = ProcessManager(start_method="spawn")
         assert manager.ctx.get_start_method() == "spawn"
 
-    def test_initialization_invalid_start_method(self):
+    def test_initialization_invalid_start_method(self) -> None:
         """Test process manager initialization with invalid start method."""
         # Should fall back to default context
         manager = ProcessManager(start_method="invalid")
         assert manager.ctx is not None
 
-    def test_restart_worker_nonexistent(self):
+    def test_restart_worker_nonexistent(self) -> None:
         """Test restarting a nonexistent worker."""
         manager = ProcessManager()
 
@@ -146,7 +147,7 @@ class TestProcessManager:
         ):
             manager.restart_worker("nonexistent")
 
-    def test_interface_methods_exist(self):
+    def test_interface_methods_exist(self) -> None:
         """Test that ProcessManager implements all required interface methods."""
         manager = ProcessManager()
 
@@ -169,7 +170,7 @@ class TestHelperFunctions:
 
     @patch.dict("os.environ", {"DR_EXP_BASE_PATH": "/custom/path"})
     @patch("dr_exp.manage.process_manager.run_worker")
-    def test_run_worker_main_custom_path(self, mock_run_worker):
+    def test_run_worker_main_custom_path(self, mock_run_worker: Any) -> None:
         """Test run_worker_main with custom base path."""
         run_worker_main("worker1", "/work/dir")
 
@@ -179,7 +180,7 @@ class TestHelperFunctions:
 
     @patch.dict("os.environ", {}, clear=True)
     @patch("dr_exp.manage.process_manager.run_worker")
-    def test_run_worker_main_default_path(self, mock_run_worker):
+    def test_run_worker_main_default_path(self, mock_run_worker: Any) -> None:
         """Test run_worker_main requires DR_EXP_BASE_PATH environment variable."""
         # Should raise exception when DR_EXP_BASE_PATH is not set
         with pytest.raises(
@@ -194,7 +195,7 @@ class TestHelperFunctions:
     @patch("os.makedirs")
     @patch.dict("os.environ", {}, clear=True)
     @patch("dr_exp.manage.process_manager.run_worker_main")
-    def test_worker_target(self, mock_run_worker_main, mock_makedirs):
+    def test_worker_target(self, mock_run_worker_main: Any, mock_makedirs: Any) -> None:
         """Test _worker_target function."""
         _worker_target("/base/path", "worker1", "0", "/worker/dir")
 

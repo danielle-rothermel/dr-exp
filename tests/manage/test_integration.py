@@ -6,6 +6,7 @@ from unittest.mock import patch
 from pathlib import Path
 from datetime import datetime, UTC, timedelta
 from contextlib import contextmanager
+from typing import Any, Dict, List, Optional, Generator
 
 from dr_exp.utils.factory import create_system, SystemConfig
 from dr_exp.job_db import JobDBConfig
@@ -17,7 +18,7 @@ from tests.conftest import make_wrapped_config
 
 
 @pytest.fixture
-def integration_config(tmp_path):
+def integration_config(tmp_path: Any) -> SystemConfig:
     """Create a system configuration for integration testing."""
     job_db_config = JobDBConfig(
         base_path=str(tmp_path),
@@ -37,39 +38,45 @@ def integration_config(tmp_path):
 
 
 @pytest.fixture
-def mock_time():
+def mock_time() -> Any:
     """Fixture providing controlled time for deterministic timing tests."""
 
     class MockTime:
-        def __init__(self):
+        def __init__(self) -> None:
             self._current_time = datetime(2024, 1, 1, 12, 0, 0, tzinfo=UTC)
-            self._time_calls = []
+            self._time_calls: List[datetime] = []
 
-        def now(self, tz=None):
+        def now(self, tz: Optional[Any] = None) -> datetime:
             self._time_calls.append(self._current_time)
             return self._current_time
 
-        def advance(self, seconds):
+        def advance(self, seconds: int) -> None:
             """Advance mock time by specified seconds."""
             self._current_time += timedelta(seconds=seconds)
 
-        def get_calls(self):
+        def get_calls(self) -> List[datetime]:
             return self._time_calls.copy()
 
-        def reset_calls(self):
+        def reset_calls(self) -> None:
             self._time_calls.clear()
 
     return MockTime()
 
 
 @contextmanager
-def event_driven_mock_train(completion_events=None, execution_order=None, results=None):
+def event_driven_mock_train(
+    completion_events: Optional[Dict[str, threading.Event]] = None,
+    execution_order: Optional[List[str]] = None,
+    results: Optional[Dict[str, Any]] = None,
+) -> Generator[List[str], None, None]:
     """Context manager for event-driven mock training with deterministic timing."""
     completion_events = completion_events or {}
     execution_order = execution_order or []
     results = results or {}
 
-    def mock_train(config, logger, *args, **kwargs):
+    def mock_train(
+        config: Dict[str, Any], logger: Any, *args: Any, **kwargs: Any
+    ) -> Dict[str, Any]:
         job_key = (
             config.get("test_param")
             or config.get("priority_test")
@@ -103,7 +110,7 @@ def event_driven_mock_train(completion_events=None, execution_order=None, result
 class TestManagerWorkerIntegration:
     """Test the complete manager-worker integration."""
 
-    def test_end_to_end_job_execution(self, integration_config):
+    def test_end_to_end_job_execution(self, integration_config: SystemConfig) -> None:
         """Test complete end-to-end job execution flow."""
         # Create system factory
         factory = create_system(integration_config)
@@ -123,7 +130,9 @@ class TestManagerWorkerIntegration:
         )
 
         # Mock the actual training function to avoid real execution
-        def mock_train(config, logger, *args, **kwargs):
+        def mock_train(
+            config: Dict[str, Any], logger: Any, *args: Any, **kwargs: Any
+        ) -> Dict[str, Any]:
             """Mock training function that simulates work."""
             logger.log({"test_metric": 0.95})
             return create_success_result(
@@ -174,7 +183,9 @@ class TestManagerWorkerIntegration:
         job_details = factory.job_db.get_job_details(job1["id"])
         assert job_details["status"] == "completed"
 
-    def test_manager_coordinates_multiple_workers(self, integration_config):
+    def test_manager_coordinates_multiple_workers(
+        self, integration_config: SystemConfig
+    ) -> None:
         """Test that manager can coordinate multiple workers."""
         # Create system with mock process manager for testing
         factory = create_system(integration_config)
@@ -217,7 +228,9 @@ class TestManagerWorkerIntegration:
         assert "0" in gpu_assignments
         assert "1" in gpu_assignments
 
-    def test_stale_job_detection_and_recovery(self, integration_config, mock_time):
+    def test_stale_job_detection_and_recovery(
+        self, integration_config: SystemConfig, mock_time: Any
+    ) -> None:
         """Test that stale jobs are detected and marked as failed."""
         factory = create_system(integration_config)
 
@@ -268,7 +281,9 @@ class TestManagerWorkerIntegration:
         assert job_details["status"] == "failed"
         assert "worker_lost" in job_details.get("status_reason", "")
 
-    def test_priority_based_job_scheduling(self, integration_config):
+    def test_priority_based_job_scheduling(
+        self, integration_config: SystemConfig
+    ) -> None:
         """Test that jobs are processed in priority order."""
         factory = create_system(integration_config)
 
@@ -295,7 +310,9 @@ class TestManagerWorkerIntegration:
         # Mock training to track execution order
         execution_order = []
 
-        def mock_train(config, logger, *args, **kwargs):
+        def mock_train(
+            config: Dict[str, Any], logger: Any, *args: Any, **kwargs: Any
+        ) -> Dict[str, Any]:
             priority_level = config.get("priority_test")
             execution_order.append(priority_level)
             return create_success_result(
@@ -330,7 +347,7 @@ class TestManagerWorkerIntegration:
         # Verify jobs were executed in priority order (high to low)
         assert execution_order == ["high", "medium", "low"]
 
-    def test_worker_heartbeat_mechanism(self, integration_config):
+    def test_worker_heartbeat_mechanism(self, integration_config: SystemConfig) -> None:
         """Test that worker heartbeat mechanism works correctly."""
         factory = create_system(integration_config)
 
@@ -346,7 +363,9 @@ class TestManagerWorkerIntegration:
         training_started = threading.Event()
         training_can_complete = threading.Event()
 
-        def mock_train(config, logger, *args, **kwargs):
+        def mock_train(
+            config: Dict[str, Any], logger: Any, *args: Any, **kwargs: Any
+        ) -> Dict[str, Any]:
             # Signal training started
             training_started.set()
             # Wait for test to verify heartbeats before completing
@@ -369,7 +388,7 @@ class TestManagerWorkerIntegration:
         # Monitor heartbeat updates
         original_update = factory.job_db.update_job
 
-        def track_heartbeat_updates(job_id, updates):
+        def track_heartbeat_updates(job_id: str, updates: Dict[str, Any]) -> Any:
             if "heartbeat" in updates:
                 heartbeat_updates.append(updates["heartbeat"])
                 # Allow training to complete after we get some heartbeats
@@ -385,7 +404,7 @@ class TestManagerWorkerIntegration:
 
             result = []
 
-            def run_worker_thread():
+            def run_worker_thread() -> None:
                 status = run_worker(
                     base_path=integration_config.job_db_config.base_path,
                     max_claim_attempts=integration_config.max_claim_attempts,
@@ -412,7 +431,7 @@ class TestManagerWorkerIntegration:
             f"Expected >= 2 heartbeats, got {len(heartbeat_updates)}"
         )
 
-    def test_system_status_reporting(self, integration_config):
+    def test_system_status_reporting(self, integration_config: SystemConfig) -> None:
         """Test that system status reporting works correctly."""
         factory = create_system(integration_config)
 
@@ -459,7 +478,9 @@ class TestManagerWorkerIntegration:
 class TestFactoryIntegration:
     """Test the factory system integration."""
 
-    def test_factory_creates_consistent_components(self, integration_config):
+    def test_factory_creates_consistent_components(
+        self, integration_config: SystemConfig
+    ) -> None:
         """Test that factory creates properly integrated components."""
         # Set required environment variable for ProcessManager
         with patch.dict(
@@ -477,7 +498,9 @@ class TestFactoryIntegration:
             assert manager.workers_per_gpu == integration_config.workers_per_gpu
             assert manager.heartbeat_timeout == integration_config.heartbeat_timeout
 
-    def test_factory_environment_configuration(self, integration_config, tmp_path):
+    def test_factory_environment_configuration(
+        self, integration_config: SystemConfig, tmp_path: Any
+    ) -> None:
         """Test that factory respects environment configuration."""
         # Test with environment variables
         with patch.dict(
@@ -494,7 +517,9 @@ class TestFactoryIntegration:
             assert factory.config.job_db_config.mode == "files_local"
             assert str(tmp_path / "env_test") in factory.config.job_db_config.base_path
 
-    def test_factory_worker_execution_with_parameters(self, integration_config):
+    def test_factory_worker_execution_with_parameters(
+        self, integration_config: SystemConfig
+    ) -> None:
         """Test factory worker execution with various parameters."""
         factory = create_system(integration_config)
 
@@ -514,7 +539,9 @@ class TestFactoryIntegration:
             priority=200,  # Higher priority, but we'll target specific job
         )
 
-        def mock_train(config, logger, *args, **kwargs):
+        def mock_train(
+            config: Dict[str, Any], logger: Any, *args: Any, **kwargs: Any
+        ) -> Dict[str, Any]:
             return create_success_result(
                 final_metrics={
                     "final_val_acc": 0.95,
@@ -558,7 +585,9 @@ class TestFactoryIntegration:
 class TestFullSystemIntegration:
     """Full system integration tests that simulate real usage patterns."""
 
-    def test_complete_experiment_lifecycle(self, integration_config):
+    def test_complete_experiment_lifecycle(
+        self, integration_config: SystemConfig
+    ) -> None:
         """Test complete experiment lifecycle from job creation to completion."""
         factory = create_system(integration_config)
 
@@ -579,7 +608,9 @@ class TestFullSystemIntegration:
         # Phase 2: Process jobs with multiple workers (simulating parallel execution)
         results = []
 
-        def mock_train(config, logger, *args, **kwargs):
+        def mock_train(
+            config: Dict[str, Any], logger: Any, *args: Any, **kwargs: Any
+        ) -> Dict[str, Any]:
             # Simulate training with different results based on config
             if config["model"] == "vit":
                 final_accuracy = 0.95
@@ -648,7 +679,7 @@ class TestFullSystemIntegration:
         )
         assert avg_vit_acc > avg_resnet_acc
 
-    def test_failure_recovery_and_retry(self, integration_config):
+    def test_failure_recovery_and_retry(self, integration_config: SystemConfig) -> None:
         """Test system behavior when jobs fail and need retry."""
         factory = create_system(integration_config)
 
@@ -662,7 +693,9 @@ class TestFullSystemIntegration:
 
         call_count = 0
 
-        def mock_train_with_failure(config, logger, *args, **kwargs):
+        def mock_train_with_failure(
+            config: Dict[str, Any], logger: Any, *args: Any, **kwargs: Any
+        ) -> Dict[str, Any]:
             nonlocal call_count
             call_count += 1
 

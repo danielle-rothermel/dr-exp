@@ -7,7 +7,7 @@ from dr_exp.cli.main import main, build_parser
 from dr_exp.utils.cli_validation import ValidationError
 
 
-def test_build_parser():
+def test_build_parser() -> None:
     """Test that the parser builds correctly."""
     parser = build_parser()
     assert parser is not None
@@ -17,14 +17,14 @@ def test_build_parser():
         parser.parse_args(["--help"])
 
 
-def test_main_with_help():
+def test_main_with_help() -> None:
     """Test main function with help argument."""
     with pytest.raises(SystemExit) as exc_info:
         main(["--help"])
     assert exc_info.value.code == 0
 
 
-def test_main_with_invalid_group():
+def test_main_with_invalid_group() -> None:
     """Test main function with invalid group."""
     # ArgumentParser exits with code 2 for invalid arguments
     with pytest.raises(SystemExit) as exc_info:
@@ -32,7 +32,7 @@ def test_main_with_invalid_group():
     assert exc_info.value.code == 2
 
 
-def test_system_status_command():
+def test_system_status_command() -> None:
     """Test system status command."""
     # Mock the system creation to avoid actual system setup
     with patch("dr_exp.cli.commands.status.StatusCommand.create_system") as mock_create:
@@ -68,7 +68,7 @@ def test_system_status_command():
         mock_system.get_system_status.assert_called_once()
 
 
-def test_system_discover_gpus_command():
+def test_system_discover_gpus_command() -> None:
     """Test system discover-gpus command."""
     with patch("dr_exp.cli.commands.discover_gpus.discover_gpus") as mock_discover:
         mock_discover.return_value = ["0", "1"]
@@ -78,7 +78,7 @@ def test_system_discover_gpus_command():
         mock_discover.assert_called_once()
 
 
-def test_validation_error_handling():
+def test_validation_error_handling() -> None:
     """Test that validation errors are handled properly."""
     with patch(
         "dr_exp.cli.commands.discover_gpus.validate_positive_int"
@@ -89,7 +89,7 @@ def test_validation_error_handling():
         assert exit_code == 1
 
 
-def test_keyboard_interrupt_handling():
+def test_keyboard_interrupt_handling() -> None:
     """Test keyboard interrupt handling."""
     with patch("dr_exp.cli.commands.status.StatusCommand.create_system") as mock_create:
         mock_create.side_effect = KeyboardInterrupt()
@@ -98,7 +98,7 @@ def test_keyboard_interrupt_handling():
         assert exit_code == 1
 
 
-def test_unexpected_error_handling():
+def test_unexpected_error_handling() -> None:
     """Test unexpected error handling."""
     with patch("dr_exp.cli.commands.status.StatusCommand.create_system") as mock_create:
         mock_create.side_effect = RuntimeError("Unexpected error")

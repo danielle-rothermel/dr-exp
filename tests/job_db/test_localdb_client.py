@@ -1,15 +1,18 @@
 # tests/mock/test_localdb_client.py
+from pathlib import Path
+from typing import Dict, Any
+from datetime import datetime, timezone
 import pytest
 import os
 import json
-from datetime import datetime, timezone
+
 from dr_exp.job_db import LocalJobDB, JobDBConfig
 
 # --- Test Fixtures ---
 
 
 @pytest.fixture
-def mock_client(tmp_path):
+def mock_client(tmp_path: Path) -> LocalJobDB:
     """
     Provides a LocalJobDB instance initialized in a temporary directory.
     This ensures each test runs with a clean mock environment.
@@ -25,13 +28,13 @@ def mock_client(tmp_path):
 
 
 @pytest.fixture
-def sample_job_config():
+def sample_job_config() -> Dict[str, Any]:
     """Provides a sample job configuration."""
     return {"learning_rate": 0.001, "epochs": 10, "model_name": "test_model"}
 
 
 @pytest.fixture
-def sample_sweep_config_id():
+def sample_sweep_config_id() -> str:
     """Provides a sample sweep_config_id."""
     return "sweep_cfg_abc123"
 
@@ -39,7 +42,7 @@ def sample_sweep_config_id():
 # --- Test Cases ---
 
 
-def test_client_initialization(tmp_path):
+def test_client_initialization(tmp_path: Path) -> None:
     """Tests if the client initializes its directories correctly."""
     config = JobDBConfig(
         base_path=str(tmp_path),
@@ -56,8 +59,10 @@ def test_client_initialization(tmp_path):
 
 
 def test_add_job_and_get_details(
-    mock_client, sample_job_config, sample_sweep_config_id
-):
+    mock_client: LocalJobDB,
+    sample_job_config: Dict[str, Any],
+    sample_sweep_config_id: str,
+) -> None:
     """Tests adding a new job and retrieving its details and config."""
     added_job = mock_client.add_job(
         sample_job_config, sample_sweep_config_id, status="queued"
@@ -90,7 +95,11 @@ def test_add_job_and_get_details(
     assert retrieved_config == sample_job_config
 
 
-def test_claim_job_success(mock_client, sample_job_config, sample_sweep_config_id):
+def test_claim_job_success(
+    mock_client: LocalJobDB,
+    sample_job_config: Dict[str, Any],
+    sample_sweep_config_id: str,
+) -> None:
     """Tests successfully claiming a queued job."""
     # Add a queued job
     mock_client.add_job(sample_job_config, sample_sweep_config_id, status="queued")
@@ -107,7 +116,7 @@ def test_claim_job_success(mock_client, sample_job_config, sample_sweep_config_i
     assert job_details["status"] == "running"
 
 
-def test_claim_job_no_queued_jobs(mock_client):
+def test_claim_job_no_queued_jobs(mock_client: LocalJobDB) -> None:
     """Tests claiming a job when no queued jobs are available."""
     # Add a running job
     mock_client.add_job({"config": "details"}, "sweep1", status="running")
@@ -117,8 +126,10 @@ def test_claim_job_no_queued_jobs(mock_client):
 
 
 def test_claim_job_multiple_queued(
-    mock_client, sample_job_config, sample_sweep_config_id
-):
+    mock_client: LocalJobDB,
+    sample_job_config: Dict[str, Any],
+    sample_sweep_config_id: str,
+) -> None:
     """Tests claiming one of multiple queued jobs."""
     mock_client.add_job(sample_job_config, sample_sweep_config_id, status="queued")
     job2_config = {"learning_rate": 0.01}
@@ -141,15 +152,21 @@ def test_claim_job_multiple_queued(
 
 
 def test_claim_job_with_worker_id(
-    mock_client, sample_job_config, sample_sweep_config_id
-):
+    mock_client: LocalJobDB,
+    sample_job_config: Dict[str, Any],
+    sample_sweep_config_id: str,
+) -> None:
     mock_client.add_job(sample_job_config, sample_sweep_config_id, status="queued")
     job = mock_client.claim_job(worker_id="wid1")
     assert job is not None
     assert job["assigned_worker"] == "wid1"
 
 
-def test_update_job(mock_client, sample_job_config, sample_sweep_config_id):
+def test_update_job(
+    mock_client: LocalJobDB,
+    sample_job_config: Dict[str, Any],
+    sample_sweep_config_id: str,
+) -> None:
     """Tests updating an existing job."""
     added_job = mock_client.add_job(sample_job_config, sample_sweep_config_id)
     job_id = added_job["id"]
@@ -168,14 +185,18 @@ def test_update_job(mock_client, sample_job_config, sample_sweep_config_id):
     assert updated_job_details["heartbeat"] == update_data["heartbeat"]
 
 
-def test_update_non_existent_job(mock_client):
+def test_update_non_existent_job(mock_client: LocalJobDB) -> None:
     """Tests updating a job that does not exist."""
     result = mock_client.update_job("non_existent_job_id", {"status": "completed"})
     assert result["success"] is False
     assert "not found" in result["message"].lower()
 
 
-def test_log_metrics(mock_client, sample_job_config, sample_sweep_config_id):
+def test_log_metrics(
+    mock_client: LocalJobDB,
+    sample_job_config: Dict[str, Any],
+    sample_sweep_config_id: str,
+) -> None:
     """Tests logging metrics for a job."""
     added_job = mock_client.add_job(sample_job_config, sample_sweep_config_id)
     job_id = added_job["id"]
@@ -202,7 +223,11 @@ def test_log_metrics(mock_client, sample_job_config, sample_sweep_config_id):
     assert logged_lines[1]["accuracy"] == 0.85
 
 
-def test_record_failure(mock_client, sample_job_config, sample_sweep_config_id):
+def test_record_failure(
+    mock_client: LocalJobDB,
+    sample_job_config: Dict[str, Any],
+    sample_sweep_config_id: str,
+) -> None:
     """Tests recording a failure for a job."""
     added_job = mock_client.add_job(sample_job_config, sample_sweep_config_id)
     job_id = added_job["id"]
@@ -230,8 +255,11 @@ def test_record_failure(mock_client, sample_job_config, sample_sweep_config_id):
 
 
 def test_upload_artifact_file(
-    mock_client, tmp_path, sample_job_config, sample_sweep_config_id
-):
+    mock_client: LocalJobDB,
+    tmp_path: Path,
+    sample_job_config: Dict[str, Any],
+    sample_sweep_config_id: str,
+) -> None:
     """Tests uploading a file artifact."""
     added_job = mock_client.add_job(sample_job_config, sample_sweep_config_id)
     job_id = added_job["id"]
@@ -259,8 +287,11 @@ def test_upload_artifact_file(
 
 
 def test_upload_artifact_root_file(
-    mock_client, tmp_path, sample_job_config, sample_sweep_config_id
-):
+    mock_client: LocalJobDB,
+    tmp_path: Path,
+    sample_job_config: Dict[str, Any],
+    sample_sweep_config_id: str,
+) -> None:
     """Tests uploading a file artifact to the root of the run directory (e.g., metrics.jsonl)."""
     added_job = mock_client.add_job(sample_job_config, sample_sweep_config_id)
     job_id = added_job["id"]
@@ -283,8 +314,11 @@ def test_upload_artifact_root_file(
 
 
 def test_upload_artifact_directory(
-    mock_client, tmp_path, sample_job_config, sample_sweep_config_id
-):
+    mock_client: LocalJobDB,
+    tmp_path: Path,
+    sample_job_config: Dict[str, Any],
+    sample_sweep_config_id: str,
+) -> None:
     """Tests uploading a directory artifact."""
     added_job = mock_client.add_job(sample_job_config, sample_sweep_config_id)
     job_id = added_job["id"]
@@ -314,8 +348,10 @@ def test_upload_artifact_directory(
 
 
 def test_upload_artifact_non_existent_local(
-    mock_client, sample_job_config, sample_sweep_config_id
-):
+    mock_client: LocalJobDB,
+    sample_job_config: Dict[str, Any],
+    sample_sweep_config_id: str,
+) -> None:
     """Tests uploading a non-existent local artifact."""
     added_job = mock_client.add_job(sample_job_config, sample_sweep_config_id)
     job_id = added_job["id"]
@@ -327,7 +363,11 @@ def test_upload_artifact_non_existent_local(
     assert "not found" in result["message"].lower()
 
 
-def test_finalize_job(mock_client, sample_job_config, sample_sweep_config_id):
+def test_finalize_job(
+    mock_client: LocalJobDB,
+    sample_job_config: Dict[str, Any],
+    sample_sweep_config_id: str,
+) -> None:
     """Tests finalizing a job."""
     added_job = mock_client.add_job(
         sample_job_config, sample_sweep_config_id, status="running"
@@ -363,8 +403,11 @@ def test_finalize_job(mock_client, sample_job_config, sample_sweep_config_id):
 
 
 def test_multiple_operations_on_same_job(
-    mock_client, tmp_path, sample_job_config, sample_sweep_config_id
-):
+    mock_client: LocalJobDB,
+    tmp_path: Path,
+    sample_job_config: Dict[str, Any],
+    sample_sweep_config_id: str,
+) -> None:
     """Tests a sequence of operations on a single job."""
     # 1. Add job
     added_job = mock_client.add_job(
@@ -429,7 +472,11 @@ def test_multiple_operations_on_same_job(
 # --- Priority System Tests ---
 
 
-def test_add_job_with_priority(mock_client, sample_job_config, sample_sweep_config_id):
+def test_add_job_with_priority(
+    mock_client: LocalJobDB,
+    sample_job_config: Dict[str, Any],
+    sample_sweep_config_id: str,
+) -> None:
     """Test adding a job with custom priority."""
     job = mock_client.add_job(sample_job_config, sample_sweep_config_id, priority=500)
     assert job["priority"] == 500
@@ -449,7 +496,11 @@ def test_add_job_with_priority(mock_client, sample_job_config, sample_sweep_conf
         mock_client.add_job(sample_job_config, sample_sweep_config_id, priority=-50)
 
 
-def test_update_job_priority(mock_client, sample_job_config, sample_sweep_config_id):
+def test_update_job_priority(
+    mock_client: LocalJobDB,
+    sample_job_config: Dict[str, Any],
+    sample_sweep_config_id: str,
+) -> None:
     """Test updating job priority."""
     job = mock_client.add_job(sample_job_config, sample_sweep_config_id, priority=100)
     job_id = job["id"]
@@ -471,7 +522,11 @@ def test_update_job_priority(mock_client, sample_job_config, sample_sweep_config
     assert result["success"] is False
 
 
-def test_boost_job_priority(mock_client, sample_job_config, sample_sweep_config_id):
+def test_boost_job_priority(
+    mock_client: LocalJobDB,
+    sample_job_config: Dict[str, Any],
+    sample_sweep_config_id: str,
+) -> None:
     """Test boosting job priority."""
     job = mock_client.add_job(sample_job_config, sample_sweep_config_id, priority=200)
     job_id = job["id"]
@@ -494,7 +549,11 @@ def test_boost_job_priority(mock_client, sample_job_config, sample_sweep_config_
     assert "Priority must be between 0 and 1000, got 1150" in result["message"]
 
 
-def test_list_jobs_by_priority(mock_client, sample_job_config, sample_sweep_config_id):
+def test_list_jobs_by_priority(
+    mock_client: LocalJobDB,
+    sample_job_config: Dict[str, Any],
+    sample_sweep_config_id: str,
+) -> None:
     """Test listing jobs ordered by priority."""
     # Add jobs with different priorities
     job1 = mock_client.add_job(sample_job_config, sample_sweep_config_id, priority=100)
@@ -526,8 +585,10 @@ def test_list_jobs_by_priority(mock_client, sample_job_config, sample_sweep_conf
 
 
 def test_claim_job_respects_priority(
-    mock_client, sample_job_config, sample_sweep_config_id
-):
+    mock_client: LocalJobDB,
+    sample_job_config: Dict[str, Any],
+    sample_sweep_config_id: str,
+) -> None:
     """Test that claim_job respects priority order."""
     # Add jobs with different priorities
     job1 = mock_client.add_job(sample_job_config, sample_sweep_config_id, priority=100)
@@ -547,7 +608,11 @@ def test_claim_job_respects_priority(
     assert claimed["id"] == job1["id"]  # priority 100
 
 
-def test_add_reserved_job(mock_client, sample_job_config, sample_sweep_config_id):
+def test_add_reserved_job(
+    mock_client: LocalJobDB,
+    sample_job_config: Dict[str, Any],
+    sample_sweep_config_id: str,
+) -> None:
     """Test adding a job reserved for specific worker."""
     reserved_job = mock_client.add_reserved_job(
         job_config=sample_job_config,
@@ -574,8 +639,10 @@ def test_add_reserved_job(mock_client, sample_job_config, sample_sweep_config_id
 
 
 def test_claim_job_respects_reservations(
-    mock_client, sample_job_config, sample_sweep_config_id
-):
+    mock_client: LocalJobDB,
+    sample_job_config: Dict[str, Any],
+    sample_sweep_config_id: str,
+) -> None:
     """Test that claim_job respects job reservations."""
     # Add regular job and reserved job
     regular_job = mock_client.add_job(
@@ -611,7 +678,11 @@ def test_claim_job_respects_reservations(
 # --- Tests for new helper methods ---
 
 
-def test_safe_read_job_success(mock_client, sample_job_config, sample_sweep_config_id):
+def test_safe_read_job_success(
+    mock_client: LocalJobDB,
+    sample_job_config: Dict[str, Any],
+    sample_sweep_config_id: str,
+) -> None:
     """Test _safe_read_job successfully reads a valid job file."""
     # Add a job to create a valid job file
     added_job = mock_client.add_job(
@@ -629,7 +700,7 @@ def test_safe_read_job_success(mock_client, sample_job_config, sample_sweep_conf
     assert job_data["config_json"] == sample_job_config
 
 
-def test_safe_read_job_nonexistent_file(mock_client):
+def test_safe_read_job_nonexistent_file(mock_client: LocalJobDB) -> None:
     """Test _safe_read_job returns None for nonexistent file."""
     nonexistent_path = os.path.join(mock_client.jobs_dir, "nonexistent.json")
 
@@ -638,7 +709,7 @@ def test_safe_read_job_nonexistent_file(mock_client):
     assert job_data is None
 
 
-def test_safe_read_job_invalid_json(mock_client, tmp_path):
+def test_safe_read_job_invalid_json(mock_client: LocalJobDB, tmp_path: Path) -> None:
     """Test _safe_read_job returns None for invalid JSON file."""
     # Create a file with invalid JSON
     invalid_json_path = os.path.join(mock_client.jobs_dir, "invalid.json")
@@ -651,8 +722,10 @@ def test_safe_read_job_invalid_json(mock_client, tmp_path):
 
 
 def test_is_job_claimable_queued_job(
-    mock_client, sample_job_config, sample_sweep_config_id
-):
+    mock_client: LocalJobDB,
+    sample_job_config: Dict[str, Any],
+    sample_sweep_config_id: str,
+) -> None:
     """Test _is_job_claimable returns True for queued job."""
     added_job = mock_client.add_job(
         sample_job_config, sample_sweep_config_id, status="queued"
@@ -667,8 +740,10 @@ def test_is_job_claimable_queued_job(
 
 
 def test_is_job_claimable_running_job(
-    mock_client, sample_job_config, sample_sweep_config_id
-):
+    mock_client: LocalJobDB,
+    sample_job_config: Dict[str, Any],
+    sample_sweep_config_id: str,
+) -> None:
     """Test _is_job_claimable returns False for running job."""
     added_job = mock_client.add_job(
         sample_job_config, sample_sweep_config_id, status="running"
@@ -683,8 +758,10 @@ def test_is_job_claimable_running_job(
 
 
 def test_is_job_claimable_ignore_reservations(
-    mock_client, sample_job_config, sample_sweep_config_id
-):
+    mock_client: LocalJobDB,
+    sample_job_config: Dict[str, Any],
+    sample_sweep_config_id: str,
+) -> None:
     """Test _is_job_claimable ignores reservations when respect_reservations=False."""
     from datetime import timedelta
 
@@ -707,7 +784,7 @@ def test_is_job_claimable_ignore_reservations(
     assert claimable is True
 
 
-def test_handle_job_reservation_no_reservation(mock_client):
+def test_handle_job_reservation_no_reservation(mock_client: LocalJobDB) -> None:
     """Test _handle_job_reservation returns True when job has no reservation."""
     job_data = {"id": "test_job_123", "status": "queued"}
     job_file_path = os.path.join(mock_client.jobs_dir, "test_job_123.json")
@@ -719,7 +796,7 @@ def test_handle_job_reservation_no_reservation(mock_client):
     assert claimable is True
 
 
-def test_handle_job_reservation_correct_worker(mock_client):
+def test_handle_job_reservation_correct_worker(mock_client: LocalJobDB) -> None:
     """Test _handle_job_reservation returns True when job is reserved for this worker."""
     from datetime import timedelta
 
@@ -740,7 +817,7 @@ def test_handle_job_reservation_correct_worker(mock_client):
     assert claimable is True
 
 
-def test_handle_job_reservation_wrong_worker(mock_client):
+def test_handle_job_reservation_wrong_worker(mock_client: LocalJobDB) -> None:
     """Test _handle_job_reservation returns False when job is reserved for different worker."""
     from datetime import timedelta
 
@@ -762,8 +839,10 @@ def test_handle_job_reservation_wrong_worker(mock_client):
 
 
 def test_clear_expired_reservation(
-    mock_client, sample_job_config, sample_sweep_config_id
-):
+    mock_client: LocalJobDB,
+    sample_job_config: Dict[str, Any],
+    sample_sweep_config_id: str,
+) -> None:
     """Test _clear_expired_reservation removes reservation fields."""
     # Add a job and manually set an expired reservation
     added_job = mock_client.add_job(
@@ -786,8 +865,10 @@ def test_clear_expired_reservation(
 
 
 def test_attempt_claim_job_success(
-    mock_client, sample_job_config, sample_sweep_config_id
-):
+    mock_client: LocalJobDB,
+    sample_job_config: Dict[str, Any],
+    sample_sweep_config_id: str,
+) -> None:
     """Test _attempt_claim_job successfully claims a queued job."""
     # Add a queued job
     added_job = mock_client.add_job(
@@ -808,8 +889,10 @@ def test_attempt_claim_job_success(
 
 
 def test_attempt_claim_job_already_claimed(
-    mock_client, sample_job_config, sample_sweep_config_id
-):
+    mock_client: LocalJobDB,
+    sample_job_config: Dict[str, Any],
+    sample_sweep_config_id: str,
+) -> None:
     """Test _attempt_claim_job returns None when job is already claimed."""
     # Add a job that's already running
     added_job = mock_client.add_job(
@@ -824,7 +907,7 @@ def test_attempt_claim_job_already_claimed(
     assert claimed_job is None
 
 
-def test_attempt_claim_job_nonexistent_file(mock_client):
+def test_attempt_claim_job_nonexistent_file(mock_client: LocalJobDB) -> None:
     """Test _attempt_claim_job returns None for nonexistent file."""
     nonexistent_path = os.path.join(mock_client.jobs_dir, "nonexistent.json")
 
@@ -834,8 +917,10 @@ def test_attempt_claim_job_nonexistent_file(mock_client):
 
 
 def test_discover_claimable_jobs_sorts_by_priority(
-    mock_client, sample_job_config, sample_sweep_config_id
-):
+    mock_client: LocalJobDB,
+    sample_job_config: Dict[str, Any],
+    sample_sweep_config_id: str,
+) -> None:
     """Test _discover_claimable_jobs returns jobs sorted by priority and age."""
     # Add jobs with different priorities
     low_priority_job = mock_client.add_job(
@@ -861,8 +946,10 @@ def test_discover_claimable_jobs_sorts_by_priority(
 
 
 def test_discover_claimable_jobs_excludes_non_queued(
-    mock_client, sample_job_config, sample_sweep_config_id
-):
+    mock_client: LocalJobDB,
+    sample_job_config: Dict[str, Any],
+    sample_sweep_config_id: str,
+) -> None:
     """Test _discover_claimable_jobs excludes non-queued jobs."""
     # Add jobs with different statuses
     mock_client.add_job(sample_job_config, sample_sweep_config_id, status="queued")
@@ -882,7 +969,7 @@ def test_discover_claimable_jobs_excludes_non_queued(
 # --- Stale Jobs Tests ---
 
 
-def test_parse_heartbeat_timestamp_valid(mock_client):
+def test_parse_heartbeat_timestamp_valid(mock_client: LocalJobDB) -> None:
     """Test _parse_heartbeat_timestamp with valid timestamps."""
     from datetime import timezone
 
@@ -902,7 +989,7 @@ def test_parse_heartbeat_timestamp_valid(mock_client):
     assert result.tzinfo == timezone.utc
 
 
-def test_parse_heartbeat_timestamp_invalid(mock_client):
+def test_parse_heartbeat_timestamp_invalid(mock_client: LocalJobDB) -> None:
     """Test _parse_heartbeat_timestamp with invalid timestamps."""
     from dr_exp.job_db.local_job_db import HeartbeatParseError
 
@@ -919,7 +1006,7 @@ def test_parse_heartbeat_timestamp_invalid(mock_client):
         mock_client._parse_heartbeat_timestamp(None)
 
 
-def test_process_job_for_staleness_missing_fields(mock_client):
+def test_process_job_for_staleness_missing_fields(mock_client: LocalJobDB) -> None:
     """Test _process_job_for_staleness with missing required fields."""
     from dr_exp.job_db.local_job_db import JobValidationError
     from datetime import datetime, timezone
@@ -942,7 +1029,7 @@ def test_process_job_for_staleness_missing_fields(mock_client):
     assert result is None
 
 
-def test_process_job_for_staleness_valid_job_not_stale(mock_client):
+def test_process_job_for_staleness_valid_job_not_stale(mock_client: LocalJobDB) -> None:
     """Test _process_job_for_staleness with valid job that is not stale."""
     from datetime import datetime, timezone, timedelta
 
@@ -960,7 +1047,7 @@ def test_process_job_for_staleness_valid_job_not_stale(mock_client):
     assert result is None
 
 
-def test_process_job_for_staleness_valid_job_is_stale(mock_client):
+def test_process_job_for_staleness_valid_job_is_stale(mock_client: LocalJobDB) -> None:
     """Test _process_job_for_staleness with valid job that is stale."""
     from datetime import datetime, timezone, timedelta
     from dr_exp.job_db.base_job_db import StaleJobInfo
@@ -979,7 +1066,7 @@ def test_process_job_for_staleness_valid_job_is_stale(mock_client):
     assert result.age_seconds > max_age
 
 
-def test_process_job_for_staleness_invalid_heartbeat(mock_client):
+def test_process_job_for_staleness_invalid_heartbeat(mock_client: LocalJobDB) -> None:
     """Test _process_job_for_staleness with invalid heartbeat."""
     from dr_exp.job_db.local_job_db import HeartbeatParseError
     from datetime import datetime, timezone
@@ -998,8 +1085,10 @@ def test_process_job_for_staleness_invalid_heartbeat(mock_client):
 
 
 def test_get_stale_jobs_integration(
-    mock_client, sample_job_config, sample_sweep_config_id
-):
+    mock_client: LocalJobDB,
+    sample_job_config: Dict[str, Any],
+    sample_sweep_config_id: str,
+) -> None:
     """Test get_stale_jobs integration with real job data."""
     from datetime import datetime, timezone, timedelta
 

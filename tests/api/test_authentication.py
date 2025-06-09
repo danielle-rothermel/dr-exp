@@ -1,9 +1,11 @@
 """Tests for API authentication and authorization."""
 
+from typing import Dict, Any
+
 from .conftest import create_test_job, Priority, JobStatus
 
 
-def test_public_endpoints_no_auth(client, db_client):
+def test_public_endpoints_no_auth(client: Any, db_client: Any) -> None:
     """Test that public endpoints work without authentication."""
     job = create_test_job(db_client)
     job_id = job["id"]
@@ -25,7 +27,7 @@ def test_public_endpoints_no_auth(client, db_client):
         )
 
 
-def test_admin_endpoints_require_auth(client, db_client):
+def test_admin_endpoints_require_auth(client: Any, db_client: Any) -> None:
     """Test that admin endpoints require authentication."""
     job = create_test_job(db_client, status=JobStatus.FAILED)
     job_id = job["id"]
@@ -53,7 +55,9 @@ def test_admin_endpoints_require_auth(client, db_client):
         )
 
 
-def test_admin_access_with_valid_token(client, db_client, admin_headers):
+def test_admin_access_with_valid_token(
+    client: Any, db_client: Any, admin_headers: Dict[str, str]
+) -> None:
     """Test admin operations work with valid admin token."""
     job = create_test_job(db_client, status=JobStatus.FAILED, priority=Priority.NORMAL)
     job_id = job["id"]
@@ -100,7 +104,9 @@ def test_admin_access_with_valid_token(client, db_client, admin_headers):
     assert data["new_priority"] == Priority.URGENT
 
 
-def test_reader_access_restrictions(client, db_client, reader_headers):
+def test_reader_access_restrictions(
+    client: Any, db_client: Any, reader_headers: Dict[str, str]
+) -> None:
     """Test that reader token cannot access admin endpoints."""
     job = create_test_job(db_client, status=JobStatus.FAILED)
     job_id = job["id"]
@@ -117,7 +123,9 @@ def test_reader_access_restrictions(client, db_client, reader_headers):
         assert resp.status_code == 403, f"Reader should not access {endpoint}"
 
 
-def test_reader_can_access_read_endpoints(client, db_client, reader_headers):
+def test_reader_can_access_read_endpoints(
+    client: Any, db_client: Any, reader_headers: Dict[str, str]
+) -> None:
     """Test that reader token can access read-only endpoints."""
     job = create_test_job(db_client)
     job_id = job["id"]
@@ -136,7 +144,7 @@ def test_reader_can_access_read_endpoints(client, db_client, reader_headers):
         assert resp.status_code in [200, 404], f"Reader should access {endpoint}"
 
 
-def test_malformed_auth_headers(client, db_client):
+def test_malformed_auth_headers(client: Any, db_client: Any) -> None:
     """Test handling of malformed authorization headers."""
     job = create_test_job(db_client)
     job_id = job["id"]
@@ -153,7 +161,7 @@ def test_malformed_auth_headers(client, db_client):
         assert resp.status_code in [401, 403]
 
 
-def test_case_sensitive_tokens(client, db_client):
+def test_case_sensitive_tokens(client: Any, db_client: Any) -> None:
     """Test that tokens are case-sensitive."""
     job = create_test_job(db_client)
     job_id = job["id"]
@@ -165,7 +173,7 @@ def test_case_sensitive_tokens(client, db_client):
     assert resp.status_code == 401
 
 
-def test_empty_authorization_header(client, db_client):
+def test_empty_authorization_header(client: Any, db_client: Any) -> None:
     """Test behavior with empty authorization header."""
     job = create_test_job(db_client)
     job_id = job["id"]
@@ -176,7 +184,7 @@ def test_empty_authorization_header(client, db_client):
     assert resp.status_code in [401, 403]
 
 
-def test_multiple_authorization_headers(client, db_client):
+def test_multiple_authorization_headers(client: Any, db_client: Any) -> None:
     """Test behavior with multiple authorization headers."""
     job = create_test_job(db_client)
     job_id = job["id"]

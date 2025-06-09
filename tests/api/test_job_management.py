@@ -1,9 +1,11 @@
 """Tests for job management endpoints."""
 
+from typing import Any
+
 from .conftest import create_test_job, create_test_metrics, Priority, JobStatus
 
 
-def test_get_job_details(client, db_client):
+def test_get_job_details(client: Any, db_client: Any) -> None:
     """Test retrieving job details."""
     config = {"model": {"name": "resnet"}, "epochs": 100}
     job = create_test_job(db_client, job_config=config, status=JobStatus.QUEUED)
@@ -18,7 +20,7 @@ def test_get_job_details(client, db_client):
     assert data["priority"] == 100
 
 
-def test_get_job_config(client, db_client):
+def test_get_job_config(client: Any, db_client: Any) -> None:
     """Test retrieving job configuration."""
     config = {"model": {"name": "resnet"}, "lr": 0.001}
     job = create_test_job(db_client, job_config=config)
@@ -29,19 +31,19 @@ def test_get_job_config(client, db_client):
     assert resp.json()["config"] == config
 
 
-def test_get_nonexistent_job(client):
+def test_get_nonexistent_job(client: Any) -> None:
     """Test retrieving non-existent job returns 404."""
     resp = client.get("/job/nonexistent-id")
     assert resp.status_code == 404
 
 
-def test_get_nonexistent_config(client):
+def test_get_nonexistent_config(client: Any) -> None:
     """Test retrieving config for non-existent job returns 404."""
     resp = client.get("/config/nonexistent-id")
     assert resp.status_code == 404
 
 
-def test_list_jobs_basic(client, db_client):
+def test_list_jobs_basic(client: Any, db_client: Any) -> None:
     """Test basic job listing."""
     job1 = create_test_job(db_client, sweep_config_id="sweep1", status=JobStatus.QUEUED)
     job2 = create_test_job(
@@ -58,14 +60,14 @@ def test_list_jobs_basic(client, db_client):
     assert job2["id"] in job_ids
 
 
-def test_list_jobs_empty(client):
+def test_list_jobs_empty(client: Any) -> None:
     """Test listing jobs when no jobs exist."""
     resp = client.get("/jobs")
     assert resp.status_code == 200
     assert resp.json() == []
 
 
-def test_job_status_filtering(client, db_client):
+def test_job_status_filtering(client: Any, db_client: Any) -> None:
     """Test filtering jobs by status."""
     queued_job = create_test_job(db_client, status=JobStatus.QUEUED)
     running_job = create_test_job(db_client, status=JobStatus.RUNNING)
@@ -88,7 +90,7 @@ def test_job_status_filtering(client, db_client):
     assert data[0]["status"] == JobStatus.RUNNING
 
 
-def test_priority_filtering(client, db_client):
+def test_priority_filtering(client: Any, db_client: Any) -> None:
     """Test filtering jobs by priority range."""
     _low_job = create_test_job(db_client, priority=Priority.LOW)
     _normal_job = create_test_job(db_client, priority=Priority.NORMAL)
@@ -123,7 +125,7 @@ def test_priority_filtering(client, db_client):
     assert all(Priority.LOW <= p <= Priority.NORMAL for p in priorities)
 
 
-def test_job_sorting(client, db_client):
+def test_job_sorting(client: Any, db_client: Any) -> None:
     """Test sorting jobs by different fields."""
     # Create jobs with different priorities and times
     _job1 = create_test_job(db_client, priority=Priority.HIGH, sweep_config_id="job1")
@@ -147,7 +149,7 @@ def test_job_sorting(client, db_client):
     assert priorities == [Priority.HIGH, Priority.NORMAL, Priority.LOW]
 
 
-def test_invalid_filters(client):
+def test_invalid_filters(client: Any) -> None:
     """Test validation of invalid filter parameters."""
     # Invalid status (only validated when paginated=true)
     resp = client.get("/jobs?paginated=true&job_status=invalid_status")
@@ -169,7 +171,7 @@ def test_invalid_filters(client):
     assert resp.status_code == 400
 
 
-def test_metrics_endpoint(client, db_client):
+def test_metrics_endpoint(client: Any, db_client: Any) -> None:
     """Test retrieving job metrics."""
     job = create_test_job(db_client, status=JobStatus.RUNNING)
     job_id = job["id"]
@@ -197,13 +199,13 @@ def test_metrics_endpoint(client, db_client):
     assert steps[-1] == 104  # Should be last 10 metrics
 
 
-def test_metrics_nonexistent_job(client):
+def test_metrics_nonexistent_job(client: Any) -> None:
     """Test retrieving metrics for non-existent job."""
     resp = client.get("/metrics/nonexistent-id")
     assert resp.status_code == 404
 
 
-def test_metrics_no_metrics_file(client, db_client):
+def test_metrics_no_metrics_file(client: Any, db_client: Any) -> None:
     """Test retrieving metrics when no metrics file exists."""
     job = create_test_job(db_client)
     job_id = job["id"]

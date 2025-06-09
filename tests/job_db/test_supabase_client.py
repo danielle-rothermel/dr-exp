@@ -1,5 +1,6 @@
 import io
 import zipfile
+from typing import Dict, Any, Optional
 
 import pytest
 
@@ -7,51 +8,52 @@ from dr_exp.job_db import SupabaseJobDB, JobDBConfig
 
 
 class StubBucket:
-    def __init__(self, recorder):
+    def __init__(self, recorder: Dict[str, Any]) -> None:
         self.recorder = recorder
 
-    def upload(self, file, path, file_options):
+    def upload(self, file: Any, path: str, file_options: Dict[str, Any]) -> None:
         self.recorder["content"] = file.read()
         self.recorder["path"] = path
         self.recorder["options"] = file_options
-        return None
 
 
 class StubStorage:
-    def __init__(self, recorder):
+    def __init__(self, recorder: Dict[str, Any]) -> None:
         self.recorder = recorder
 
-    def from_(self, _bucket):
+    def from_(self, _bucket: str) -> StubBucket:
         return StubBucket(self.recorder)
 
 
 class StubClient:
-    def __init__(self, recorder):
+    def __init__(self, recorder: Dict[str, Any]) -> None:
         self.storage = StubStorage(recorder)
         self.recorder = recorder
+        self.last_table: Optional[str] = None
 
-    def table(self, name):
+    def table(self, name: str) -> "StubTable":
         self.last_table = name
         return StubTable(name, self.recorder)
 
 
 class StubTable:
-    def __init__(self, name, recorder):
+    def __init__(self, name: str, recorder: Dict[str, Any]) -> None:
         self.name = name
         self.recorder = recorder
+        self.data: Optional[Dict[str, Any]] = None
 
-    def insert(self, data):
+    def insert(self, data: Dict[str, Any]) -> "StubTable":
         self.recorder.setdefault("tables", []).append((self.name, data))
         self.data = data
         return self
 
-    def execute(self):
+    def execute(self) -> Any:
         return type("Resp", (), {"data": [self.data]})()
 
 
 @pytest.fixture
-def stub_client(monkeypatch):
-    recorder = {}
+def stub_client(monkeypatch: Any) -> Dict[str, Any]:
+    recorder: Dict[str, Any] = {}
     client = StubClient(recorder)
     monkeypatch.setattr(
         "dr_exp.job_db.supabase_job_db.create_client",
@@ -60,7 +62,7 @@ def stub_client(monkeypatch):
     return recorder
 
 
-def test_directory_is_zipped(tmp_path, stub_client):
+def test_directory_is_zipped(tmp_path: Any, stub_client: Dict[str, Any]) -> None:
     config = JobDBConfig(
         supabase_url="https://test.supabase.co",
         supabase_key="key",
@@ -77,7 +79,9 @@ def test_directory_is_zipped(tmp_path, stub_client):
     assert z.namelist() == ["file.txt"]
 
 
-def test_empty_suffix_zips_to_default(tmp_path, stub_client):
+def test_empty_suffix_zips_to_default(
+    tmp_path: Any, stub_client: Dict[str, Any]
+) -> None:
     config = JobDBConfig(
         supabase_url="https://test.supabase.co",
         supabase_key="key",
@@ -94,7 +98,7 @@ def test_empty_suffix_zips_to_default(tmp_path, stub_client):
     assert z.namelist() == ["a.txt"]
 
 
-def test_insert_helpers(monkeypatch, stub_client):
+def test_insert_helpers(monkeypatch: Any, stub_client: Dict[str, Any]) -> None:
     config = JobDBConfig(
         supabase_url="https://test.supabase.co",
         supabase_key="key",
@@ -118,7 +122,7 @@ def test_insert_helpers(monkeypatch, stub_client):
     assert result["config_id"] == "cid"
 
 
-def test_write_finished_flag(tmp_path, stub_client):
+def test_write_finished_flag(tmp_path: Any, stub_client: Dict[str, Any]) -> None:
     config = JobDBConfig(
         base_path=str(tmp_path),
         storage_path=str(tmp_path / "storage"),

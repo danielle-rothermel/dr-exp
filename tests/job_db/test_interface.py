@@ -4,12 +4,13 @@ import os
 import tempfile
 import pytest
 from datetime import datetime, UTC, timedelta
+from typing import Generator
 
 from dr_exp.job_db import LocalJobDB, JobDBConfig, StaleJobInfo
 
 
 @pytest.fixture
-def temp_local_db():
+def temp_local_db() -> Generator[LocalJobDB, None, None]:
     """Create a temporary LocalJobDB for testing."""
     with tempfile.TemporaryDirectory() as tmpdir:
         config = JobDBConfig(
@@ -23,12 +24,12 @@ def temp_local_db():
 class TestStreamlinedInterface:
     """Test the new streamlined interface methods."""
 
-    def test_list_running_jobs_empty(self, temp_local_db):
+    def test_list_running_jobs_empty(self, temp_local_db: LocalJobDB) -> None:
         """Test listing running jobs when none exist."""
         result = temp_local_db.list_running_jobs()
         assert result == []
 
-    def test_list_running_jobs_with_data(self, temp_local_db):
+    def test_list_running_jobs_with_data(self, temp_local_db: LocalJobDB) -> None:
         """Test listing running jobs with mixed statuses."""
         # Create test jobs with different statuses
         _job1 = temp_local_db.add_job({"test": 1}, "sweep1", status="queued")
@@ -43,12 +44,12 @@ class TestStreamlinedInterface:
         running_ids = {job["id"] for job in running_jobs}
         assert running_ids == {job2["id"], job4["id"]}
 
-    def test_get_stale_jobs_no_running_jobs(self, temp_local_db):
+    def test_get_stale_jobs_no_running_jobs(self, temp_local_db: LocalJobDB) -> None:
         """Test stale job detection with no running jobs."""
         result = temp_local_db.get_stale_jobs(120)
         assert result == []
 
-    def test_get_stale_jobs_no_heartbeats(self, temp_local_db):
+    def test_get_stale_jobs_no_heartbeats(self, temp_local_db: LocalJobDB) -> None:
         """Test stale job detection with running jobs but no heartbeats."""
         # Create running job without heartbeat
         temp_local_db.add_job({"test": 1}, "sweep1", status="running")
@@ -56,7 +57,9 @@ class TestStreamlinedInterface:
         result = temp_local_db.get_stale_jobs(120)
         assert result == []
 
-    def test_get_stale_jobs_with_fresh_heartbeat(self, temp_local_db):
+    def test_get_stale_jobs_with_fresh_heartbeat(
+        self, temp_local_db: LocalJobDB
+    ) -> None:
         """Test stale job detection with fresh heartbeat."""
         # Create running job
         job = temp_local_db.add_job({"test": 1}, "sweep1", status="running")
@@ -70,7 +73,9 @@ class TestStreamlinedInterface:
         result = temp_local_db.get_stale_jobs(120)  # 2 minutes
         assert result == []
 
-    def test_get_stale_jobs_with_stale_heartbeat(self, temp_local_db):
+    def test_get_stale_jobs_with_stale_heartbeat(
+        self, temp_local_db: LocalJobDB
+    ) -> None:
         """Test stale job detection with old heartbeat."""
         # Create running job
         job = temp_local_db.add_job({"test": 1}, "sweep1", status="running")
@@ -90,17 +95,17 @@ class TestStreamlinedInterface:
         assert stale_job.assigned_worker == "test-worker"
         assert stale_job.age_seconds > 120
 
-    def test_mark_jobs_failed_empty_list(self, temp_local_db):
+    def test_mark_jobs_failed_empty_list(self, temp_local_db: LocalJobDB) -> None:
         """Test marking empty list of jobs as failed."""
         result = temp_local_db.mark_jobs_failed([])
         assert result == {}
 
-    def test_mark_jobs_failed_nonexistent_jobs(self, temp_local_db):
+    def test_mark_jobs_failed_nonexistent_jobs(self, temp_local_db: LocalJobDB) -> None:
         """Test marking nonexistent jobs as failed."""
         result = temp_local_db.mark_jobs_failed(["fake-id-1", "fake-id-2"])
         assert result == {"fake-id-1": False, "fake-id-2": False}
 
-    def test_mark_jobs_failed_success(self, temp_local_db):
+    def test_mark_jobs_failed_success(self, temp_local_db: LocalJobDB) -> None:
         """Test successfully marking jobs as failed."""
         # Create test jobs
         job1 = temp_local_db.add_job({"test": 1}, "sweep1", status="running")
@@ -127,30 +132,30 @@ class TestStreamlinedInterface:
         assert unchanged_job3["status"] == "queued"
         assert "status_reason" not in unchanged_job3
 
-    def test_has_queued_jobs_empty(self, temp_local_db):
+    def test_has_queued_jobs_empty(self, temp_local_db: LocalJobDB) -> None:
         """Test has_queued_jobs with no jobs."""
         assert temp_local_db.has_queued_jobs() is False
 
-    def test_has_queued_jobs_no_queued(self, temp_local_db):
+    def test_has_queued_jobs_no_queued(self, temp_local_db: LocalJobDB) -> None:
         """Test has_queued_jobs with no queued jobs."""
         temp_local_db.add_job({"test": 1}, "sweep1", status="running")
         temp_local_db.add_job({"test": 2}, "sweep2", status="completed")
 
         assert temp_local_db.has_queued_jobs() is False
 
-    def test_has_queued_jobs_with_queued(self, temp_local_db):
+    def test_has_queued_jobs_with_queued(self, temp_local_db: LocalJobDB) -> None:
         """Test has_queued_jobs with queued jobs."""
         temp_local_db.add_job({"test": 1}, "sweep1", status="running")
         temp_local_db.add_job({"test": 2}, "sweep2", status="queued")
 
         assert temp_local_db.has_queued_jobs() is True
 
-    def test_get_queue_summary_empty(self, temp_local_db):
+    def test_get_queue_summary_empty(self, temp_local_db: LocalJobDB) -> None:
         """Test queue summary with no queued jobs."""
         result = temp_local_db.get_queue_summary()
         assert result == []
 
-    def test_get_queue_summary_with_jobs(self, temp_local_db):
+    def test_get_queue_summary_with_jobs(self, temp_local_db: LocalJobDB) -> None:
         """Test queue summary with queued jobs."""
         # Create jobs with different priorities and statuses
         job1 = temp_local_db.add_job(
@@ -183,7 +188,7 @@ class TestStreamlinedInterface:
         assert limited_result[0]["id"] == job4["id"]
         assert limited_result[1]["id"] == job1["id"]
 
-    def test_stale_job_info_dataclass(self):
+    def test_stale_job_info_dataclass(self) -> None:
         """Test StaleJobInfo dataclass functionality."""
         now = datetime.now(UTC)
         stale_job = StaleJobInfo(

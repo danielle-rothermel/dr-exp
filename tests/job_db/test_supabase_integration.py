@@ -7,15 +7,17 @@ Run with: EXPMGR_MODE=supabase_local pytest tests/job_db/test_supabase_integrati
 """
 
 import os
-import pytest
+from typing import Generator
 from datetime import datetime, timezone, timedelta
+
+import pytest
 
 from dr_exp.job_db import SupabaseJobDB, JobDBConfig, StaleJobInfo
 from dr_exp.utils.jobdb_factory import get_job_db_client
 
 
 @pytest.fixture(scope="session")
-def requires_local_supabase():
+def requires_local_supabase() -> None:
     """Skip tests if local Supabase mode is not configured."""
     mode = os.getenv("EXPMGR_MODE")
     if mode != "supabase_local":
@@ -23,7 +25,9 @@ def requires_local_supabase():
 
 
 @pytest.fixture
-def supabase_client(requires_local_supabase):
+def supabase_client(
+    requires_local_supabase: None,
+) -> Generator[SupabaseJobDB, None, None]:
     """Provide a SupabaseJobDB client with transaction rollback."""
     config = JobDBConfig.from_env()
     config.validate()
@@ -38,7 +42,7 @@ def supabase_client(requires_local_supabase):
     _cleanup_test_data(client)
 
 
-def _cleanup_test_data(client):
+def _cleanup_test_data(client: SupabaseJobDB) -> None:
     """Clean up test data by removing jobs with test prefixes."""
     try:
         # Delete test sweep config clusters
@@ -67,7 +71,7 @@ def _cleanup_test_data(client):
 class TestSupabaseIntegration:
     """Integration tests for SupabaseJobDB with real local database."""
 
-    def test_basic_job_workflow(self, supabase_client):
+    def test_basic_job_workflow(self, supabase_client: SupabaseJobDB) -> None:
         """Test creating a cluster, config, and job."""
         # Create test cluster
         cluster = supabase_client.add_sweep_config_cluster(
@@ -92,7 +96,7 @@ class TestSupabaseIntegration:
         assert job["priority"] == 500
         assert job["status"] == "queued"
 
-    def test_job_claiming_priority(self, supabase_client):
+    def test_job_claiming_priority(self, supabase_client: SupabaseJobDB) -> None:
         """Test job claiming respects priority ordering."""
         # Create cluster and config
         cluster = supabase_client.add_sweep_config_cluster(
@@ -123,7 +127,7 @@ class TestSupabaseIntegration:
         assert claimed3["id"] == low_job["id"]
         assert claimed3["priority"] == 100
 
-    def test_job_reservations(self, supabase_client):
+    def test_job_reservations(self, supabase_client: SupabaseJobDB) -> None:
         """Test job reservation system."""
         # Create cluster and config
         cluster = supabase_client.add_sweep_config_cluster(
@@ -154,7 +158,7 @@ class TestSupabaseIntegration:
         assert claimed_correct is not None
         assert claimed_correct["id"] == reserved_job["id"]
 
-    def test_priority_management(self, supabase_client):
+    def test_priority_management(self, supabase_client: SupabaseJobDB) -> None:
         """Test priority boost and update operations."""
         # Create test data
         cluster = supabase_client.add_sweep_config_cluster(
@@ -178,7 +182,7 @@ class TestSupabaseIntegration:
         assert result["success"] is True
         assert result["new_priority"] == 750
 
-    def test_job_listing_by_priority(self, supabase_client):
+    def test_job_listing_by_priority(self, supabase_client: SupabaseJobDB) -> None:
         """Test listing jobs ordered by priority."""
         # Create test data
         cluster = supabase_client.add_sweep_config_cluster(
@@ -209,7 +213,7 @@ class TestSupabaseIntegration:
 class TestSupabasePerformance:
     """Performance tests for Supabase operations."""
 
-    def test_bulk_job_creation(self, supabase_client):
+    def test_bulk_job_creation(self, supabase_client: SupabaseJobDB) -> None:
         """Test creating many jobs efficiently."""
         cluster = supabase_client.add_sweep_config_cluster(
             "test-bulk", "Bulk creation test"
@@ -242,7 +246,7 @@ class TestSupabasePerformance:
 class TestSupabaseStreamlined:
     """Test streamlined interface methods with Supabase."""
 
-    def test_list_running_jobs_empty(self, supabase_client):
+    def test_list_running_jobs_empty(self, supabase_client: SupabaseJobDB) -> None:
         """Test listing running jobs when none exist."""
         _cleanup_test_data(supabase_client, "streamlined-test")
 
@@ -250,7 +254,7 @@ class TestSupabaseStreamlined:
         assert isinstance(result, list)
         # May contain other running jobs, so just check it's a list
 
-    def test_streamlined_workflow(self, supabase_client):
+    def test_streamlined_workflow(self, supabase_client: SupabaseJobDB) -> None:
         """Test a complete workflow using streamlined methods."""
         _cleanup_test_data(supabase_client, "streamlined-test")
 
@@ -341,7 +345,7 @@ class TestSupabaseStreamlined:
             # Clean up
             _cleanup_test_data(supabase_client, "streamlined-test")
 
-    def test_mark_jobs_failed_batch(self, supabase_client):
+    def test_mark_jobs_failed_batch(self, supabase_client: SupabaseJobDB) -> None:
         """Test batch job failure marking."""
         _cleanup_test_data(supabase_client, "streamlined-test")
 
@@ -383,7 +387,7 @@ class TestSupabaseStreamlined:
             _cleanup_test_data(supabase_client, "streamlined-test")
 
 
-def _cleanup_test_data(client, test_prefix="test"):
+def _cleanup_test_data(client: SupabaseJobDB, test_prefix: str = "test") -> None:
     """Clean up test data with given prefix."""
     try:
         # Delete test clusters and associated data
@@ -408,7 +412,7 @@ def _cleanup_test_data(client, test_prefix="test"):
 
 
 # Test using the factory function
-def test_factory_integration():
+def test_factory_integration() -> None:
     """Test that factory function works with local Supabase."""
     if os.getenv("EXPMGR_MODE") != "supabase_local":
         pytest.skip("Requires EXPMGR_MODE=supabase_local")

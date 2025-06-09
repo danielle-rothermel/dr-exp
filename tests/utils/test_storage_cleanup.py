@@ -4,7 +4,7 @@ from dr_exp.job_db import LocalJobDB, JobDBConfig
 from dr_exp.utils.storage_cleanup import cleanup_uploaded_runs
 
 
-def test_cleanup_uploaded_runs(tmp_path):
+def test_cleanup_uploaded_runs(tmp_path: Path) -> None:
     client = LocalJobDB(
         JobDBConfig(
             base_path=str(tmp_path),

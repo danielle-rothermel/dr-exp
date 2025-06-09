@@ -1,18 +1,20 @@
 import json
 import os
+from pathlib import Path
+from typing import Dict, Any
 
 from dr_exp.training.dummy_trainer import train
 from dr_exp.logging.structured_logger import StructuredLogger
 
 
-def make_cfg(tmp_path, num_epochs=4):
+def make_cfg(tmp_path: Path, num_epochs: int = 4) -> Dict[str, Any]:
     return {
         "train": {"num_epochs": num_epochs},
         "log_dir": str(tmp_path / "logs"),
     }
 
 
-def test_train_runs_and_logs(tmp_path):
+def test_train_runs_and_logs(tmp_path: Path) -> None:
     cfg = make_cfg(tmp_path, num_epochs=4)
     logger = StructuredLogger(cfg["log_dir"])
     result = train(cfg, logger)
@@ -48,7 +50,7 @@ class ObjCfg:
         self.log_dir = str(tmp_path / "logs")
 
 
-def test_train_with_obj_cfg_and_default_logger(tmp_path):
+def test_train_with_obj_cfg_and_default_logger(tmp_path: Path) -> None:
     cfg = ObjCfg(tmp_path, 2)
     result = train(cfg)
 

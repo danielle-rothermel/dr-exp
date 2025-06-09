@@ -8,7 +8,7 @@ from unittest.mock import patch
 class TestDiscoverGpus:
     """Test GPU discovery functionality."""
 
-    def test_discover_gpus_from_env(self):
+    def test_discover_gpus_from_env(self) -> None:
         """Test GPU discovery from environment variable."""
         from scripts.run_manager import discover_gpus
 
@@ -16,7 +16,7 @@ class TestDiscoverGpus:
             gpus = discover_gpus(4)
             assert gpus == ["1", "3", "5"]
 
-    def test_discover_gpus_default(self):
+    def test_discover_gpus_default(self) -> None:
         """Test GPU discovery with default behavior."""
         from scripts.run_manager import discover_gpus
 
@@ -24,7 +24,7 @@ class TestDiscoverGpus:
             gpus = discover_gpus(3)
             assert gpus == ["0", "1", "2"]
 
-    def test_discover_gpus_empty_env(self):
+    def test_discover_gpus_empty_env(self) -> None:
         """Test GPU discovery with empty environment variable."""
         from scripts.run_manager import discover_gpus
 
@@ -36,7 +36,7 @@ class TestDiscoverGpus:
 class TestScriptImports:
     """Test that scripts can be imported and have basic structure."""
 
-    def test_manager_script_import(self):
+    def test_manager_script_import(self) -> None:
         """Test manager script can be imported."""
         from scripts.run_manager import main, discover_gpus
 
@@ -45,7 +45,7 @@ class TestScriptImports:
         assert callable(main)
         assert callable(discover_gpus)
 
-    def test_worker_script_import(self):
+    def test_worker_script_import(self) -> None:
         """Test worker script can be imported."""
         from scripts.run_worker import main
 

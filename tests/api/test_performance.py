@@ -3,10 +3,11 @@
 import time
 import threading
 from concurrent.futures import ThreadPoolExecutor, as_completed
+from typing import Any, Dict, List
 from .conftest import create_test_job, create_multiple_jobs, Priority, JobStatus
 
 
-def test_response_time_benchmarks(client):
+def test_response_time_benchmarks(client: Any) -> None:
     """Test that API response times are within acceptable limits."""
     endpoints_with_limits = [
         ("/health", 1.0),  # Health check should be very fast
@@ -27,7 +28,7 @@ def test_response_time_benchmarks(client):
         )
 
 
-def test_concurrent_read_operations(client, db_client):
+def test_concurrent_read_operations(client: Any, db_client: Any) -> None:
     """Test concurrent read operations don't interfere with each other."""
     # Create some test data
     jobs = []
@@ -38,7 +39,7 @@ def test_concurrent_read_operations(client, db_client):
     results = []
     errors = []
 
-    def read_jobs(thread_id):
+    def read_jobs(thread_id: int) -> None:
         """Read jobs from a separate thread."""
         try:
             start_time = time.time()
@@ -87,7 +88,9 @@ def test_concurrent_read_operations(client, db_client):
     assert total_time < 10.0, f"Concurrent reads took too long: {total_time:.3f}s"
 
 
-def test_concurrent_write_operations(client, db_client, admin_headers):
+def test_concurrent_write_operations(
+    client: Any, db_client: Any, admin_headers: Dict[str, str]
+) -> None:
     """Test concurrent write operations handle contention properly."""
     # Create jobs for modification
     jobs = []
@@ -98,7 +101,7 @@ def test_concurrent_write_operations(client, db_client, admin_headers):
     results = []
     errors = []
 
-    def boost_priority(thread_id, job_id):
+    def boost_priority(thread_id: int, job_id: str) -> None:
         """Boost job priority from a separate thread."""
         try:
             start_time = time.time()
@@ -152,10 +155,10 @@ def test_concurrent_write_operations(client, db_client, admin_headers):
         assert result["response_time"] < 5.0
 
 
-def test_load_testing_job_creation(client, db_client):
+def test_load_testing_job_creation(client: Any, db_client: Any) -> None:
     """Test system behavior under job creation load."""
 
-    def create_job_batch(batch_id, batch_size=10):
+    def create_job_batch(batch_id: int, batch_size: int = 10) -> List[Dict[str, Any]]:
         """Create a batch of jobs."""
         batch_jobs = []
         for i in range(batch_size):
@@ -197,7 +200,7 @@ def test_load_testing_job_creation(client, db_client):
     assert len(job_list) >= 50
 
 
-def test_pagination_performance_with_large_dataset(client, db_client):
+def test_pagination_performance_with_large_dataset(client: Any, db_client: Any) -> None:
     """Test pagination performance with a larger dataset."""
     # Create a substantial number of jobs
     _jobs = create_multiple_jobs(
@@ -239,7 +242,7 @@ def test_pagination_performance_with_large_dataset(client, db_client):
         )
 
 
-def test_filtering_performance(client, db_client):
+def test_filtering_performance(client: Any, db_client: Any) -> None:
     """Test performance of filtering operations on large datasets."""
     # Create jobs with various statuses and priorities
     _jobs = create_multiple_jobs(db_client, count=200)
@@ -269,7 +272,7 @@ def test_filtering_performance(client, db_client):
         )
 
 
-def test_memory_usage_stability(client, db_client):
+def test_memory_usage_stability(client: Any, db_client: Any) -> None:
     """Test that repeated operations don't cause memory leaks."""
     import gc
 
@@ -304,10 +307,10 @@ def test_memory_usage_stability(client, db_client):
     # Detailed memory analysis would require more sophisticated tools
 
 
-def test_rate_limiting_behavior(client):
+def test_rate_limiting_behavior(client: Any) -> None:
     """Test behavior under rapid successive requests."""
 
-    def make_rapid_requests(request_count=50):
+    def make_rapid_requests(request_count: int = 50) -> Dict[str, Any]:
         """Make rapid successive requests."""
         start_time = time.time()
         response_times = []
@@ -345,10 +348,10 @@ def test_rate_limiting_behavior(client):
     )
 
 
-def test_database_connection_pooling(client, db_client):
+def test_database_connection_pooling(client: Any, db_client: Any) -> None:
     """Test that database connections are handled efficiently."""
 
-    def database_intensive_operation(operation_id):
+    def database_intensive_operation(operation_id: int) -> List[Any]:
         """Perform database-intensive operations."""
         results = []
 
@@ -393,10 +396,10 @@ def test_database_connection_pooling(client, db_client):
     assert len(all_results) > 0
 
 
-def test_error_handling_under_load(client, admin_headers):
+def test_error_handling_under_load(client: Any, admin_headers: Dict[str, str]) -> None:
     """Test that error handling remains robust under load."""
 
-    def make_failing_request(request_id):
+    def make_failing_request(request_id: int) -> int:
         """Make a request that should fail."""
         fake_job_id = f"fake-job-{request_id}"
         resp = client.post(

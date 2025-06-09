@@ -1,0 +1,94 @@
+Remaining MyPy Type Errors After Adding Type Annotations to Tests
+================================================================
+
+Total: 167 errors in 22 files (checked 45 source files)
+
+Summary by Category:
+-------------------
+
+1. TRAINER FUNCTION SIGNATURE MISMATCHES (Most Critical - ~40+ errors)
+   - Tests expect trainer functions to return Dict[str, Any] 
+   - But actual signature expects Callable[[Any, BaseLogger], TrainingResult]
+   - This affects all manage/ test files that mock trainer functions
+
+2. NULLABLE RETURN VALUES (~30+ errors) 
+   - Methods like get_job_details() return Dict[str, Any] | None
+   - Tests assume non-None and directly index without checking
+   - Need to add null checks or type assertions
+
+3. ABSTRACT CLASS INSTANTIATION (3 errors)
+   - tests/logging/test_base_logger.py tries to instantiate abstract BaseLogger
+   - Need to use concrete implementations or proper mocking
+
+4. FUNCTION MISSING TYPE ANNOTATIONS (1 error)
+   - tests/train_examples/test_dummy_trainer.py:48 - ObjCfg.__init__() missing tmp_path type
+
+5. ARGUMENT TYPE MISMATCHES (3 errors) 
+   - tests/cli/test_cli_validation.py - passing wrong types to validation functions
+
+6. SUPABASE TEST ATTRIBUTE ERRORS (~20 errors)
+   - tests/job_db/test_supabase_isolated.py accesses private _test_* attributes
+   - Also has method assignment issues
+
+Detailed Errors by File:
+-----------------------
+
+tests/train_examples/test_dummy_trainer.py:
+- Line 48: Function missing type annotation for arguments [no-untyped-def]
+
+tests/logging/test_base_logger.py:
+- Line 14: Cannot instantiate abstract class "BaseLogger" [abstract]
+- Line 36: Cannot instantiate abstract class "IncompleteLogger" [abstract]  
+- Line 174: Returning Any from function declared to return "BaseLogger" [no-any-return]
+
+tests/cli/test_cli_validation.py:
+- Line 30: Argument 1 to "validate_priority" has incompatible type "str"; expected "int" [arg-type]
+- Line 50: Argument 1 to "validate_job_id" has incompatible type "int"; expected "str" [arg-type]
+- Line 67: Argument 1 to "validate_positive_int" has incompatible type "str"; expected "int" [arg-type]
+
+tests/job_db/test_supabase_isolated.py:
+- Lines 36-39: "SupabaseJobDB" has no attribute "_test_*" [attr-defined] (4 errors)
+- Lines 53, 68, 74, 86, 93, 102, 129-130: More _test_* attribute errors (8 errors)
+- Lines 77-79: Cannot assign to a method [method-assign] (3 errors)
+- Lines 77-79: Incompatible types in assignment [assignment] (3 errors)
+- Lines 135-136, 161: Value of type "dict[str, Any] | None" is not indexable [index] (3 errors)
+
+tests/job_db/test_localdb_client.py:
+- Lines 116, 183-185, 387-390, 432, 455: Value of type "dict[str, Any] | None" is not indexable [index] (8+ errors)
+- Line 388: Unsupported right operand type for in ("dict[str, Any] | None") [operator]
+
+tests/manage/test_integration.py:
+- Lines 631, 707: Incompatible return value type (got "TrainingResult", expected "dict[str, Any]") [return-value] (2 errors)
+- Lines 654, 729, 750: Argument "trainer_fn" has incompatible type (20+ similar errors)
+- Lines 666, 737, 742, 758-759: Value of type "dict[str, Any] | None" is not indexable [index] (5+ errors)
+
+tests/manage/test_infrastracture.py:
+- Lines 281, 380, 452: Incompatible return value type (got "TrainingResult", expected "dict[str, Any]") [return-value] (3 errors)
+- Line 304: Argument "trainer_fn" has incompatible type (1 error)
+
+tests/manage/test_edge_cases.py:
+- Lines 38, 117, 165, 279, 359, 476, 655, 711, 759: Incompatible return value type (got "TrainingResult", expected "dict[str, Any]") [return-value] (9 errors)
+- Lines 94, 303, 383, 498: Argument "trainer_fn" has incompatible type (4 errors)
+- Lines 677, 834: Returning Any from function declared to return "str" [no-any-return] (2 errors)
+
+Priority for Fixes:
+------------------
+
+HIGH PRIORITY:
+1. Fix trainer function signatures in manage tests (affects ~40+ errors)
+2. Add null checks for get_job_details() and similar methods (~30 errors)
+
+MEDIUM PRIORITY:  
+3. Fix abstract class instantiation in logging tests (3 errors)
+4. Fix CLI validation test argument types (3 errors)
+
+LOW PRIORITY:
+5. Fix missing type annotation in train_examples (1 error)  
+6. Address Supabase test private attribute access (~20 errors)
+
+The core issues are:
+1. Trainer function return type mismatch (TrainingResult vs Dict[str, Any])
+2. Nullable return values being accessed without null checks
+3. Test-specific mocking/setup issues
+
+These errors indicate that while type annotations were successfully added, there are underlying signature mismatches and API usage patterns that need to be addressed for full type safety.
