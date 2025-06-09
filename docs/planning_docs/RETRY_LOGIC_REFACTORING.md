@@ -97,9 +97,9 @@ raise FinalError(f"Unexpected fallthrough after {max_retries} attempts")
 - ~~Multiple try/except blocks with early returns~~
 - ~~Similar error handling paths with subtle differences~~
 
-**manager.py:89-154** - `check_stale_jobs()`
-- Loop with complex exception handling and early continue
-- Multiple early returns in different code paths
+**manager.py:89-154** - `check_stale_jobs()` ✅ **COMPLETED**
+- ~~Loop with complex exception handling and early continue~~
+- ~~Multiple early returns in different code paths~~
 
 #### LOW PRIORITY (Minor cleanup opportunities)
 
@@ -261,3 +261,46 @@ except UploadError as e:
 - `_upload_bundle_with_retry()` - Bundle upload with proper error handling  
 - `_create_success_metadata()` - Success path metadata creation
 - `_handle_upload_failure()` - Single source of truth for upload failure handling
+
+**2025-06-08**: Refactored `manager.py:89-154` - `check_stale_jobs()` function
+- ✅ Eliminated complex loop with mixed continue/re-raise error handling patterns
+- ✅ Created custom StaleJobProcessingError and WorkerRestartError exception classes
+- ✅ Extracted 4 helper methods with single responsibility and fail-fast validation
+- ✅ Implemented linear control flow - each method either succeeds or raises specific exceptions
+- ✅ Improved error isolation - worker restart failures don't crash entire manager process
+- ✅ Added comprehensive unit tests covering all edge cases and error conditions
+- ✅ Verified with mypy and all tests passing - no regressions introduced
+- ✅ Enhanced recoverability - manager continues with next check cycle after processing errors
+
+**Changes Made:**
+```python
+# Before: Complex loop with mixed error handling strategies
+for worker_id in affected_workers:
+    if worker_id not in managed_workers:
+        logging.warning(f"Cannot restart worker {worker_id}: not managed by process manager")
+        continue  # Masks errors for some workers
+    try:
+        self.process_manager.restart_worker(worker_id)
+        logging.info("Restarted worker %s", worker_id)
+    except RuntimeError as e:
+        logging.error(f"Critical: Worker restart failed for {worker_id}: {e}")
+        # Re-raise crashes entire process - inconsistent with continue above
+        raise RuntimeError(f"Manager cannot continue with failing worker infrastructure: {e}") from e
+
+# After: Clean separation with consistent error handling
+try:
+    stale_jobs = self._get_and_log_stale_jobs()
+    if not stale_jobs:
+        return
+    self._mark_stale_jobs_failed(stale_jobs)
+    self._restart_affected_workers(stale_jobs)
+except StaleJobProcessingError as e:
+    logging.error(f"Failed to process stale jobs: {e}")
+    # Allow manager to continue with next check cycle
+```
+
+**Helper Methods Extracted:**
+- `_get_and_log_stale_jobs()` - Stale job discovery and logging with fail-fast validation
+- `_mark_stale_jobs_failed()` - Batch job failure marking with specific error handling
+- `_restart_affected_workers()` - Coordinated worker restart operations with failure collection
+- `_restart_single_worker()` - Atomic worker restart with proper error handling
