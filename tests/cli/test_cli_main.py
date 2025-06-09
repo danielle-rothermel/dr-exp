@@ -1,6 +1,7 @@
 """Tests for CLI main functionality."""
 
 import pytest
+from pathlib import Path
 from unittest.mock import patch, MagicMock
 
 from dr_exp.cli.main import main, build_parser
@@ -32,10 +33,12 @@ def test_main_with_invalid_group() -> None:
     assert exc_info.value.code == 2
 
 
-def test_system_status_command() -> None:
+def test_system_status_command(tmp_path: Path) -> None:
     """Test system status command."""
     # Mock the system creation to avoid actual system setup
-    with patch("dr_exp.cli.commands.status.StatusCommand.create_system") as mock_create:
+    with patch(
+        "dr_exp.cli.commands.status.StatusCommand.create_system_from_args"
+    ) as mock_create:
         mock_system = MagicMock()
         mock_system.get_system_status.return_value = {
             "configuration": {
@@ -63,45 +66,75 @@ def test_system_status_command() -> None:
         }
         mock_create.return_value = mock_system
 
-        exit_code = main(["system", "status"])
+        exit_code = main(
+            ["system", "status", "--base-path", str(tmp_path), "--mode", "files_local"]
+        )
         assert exit_code == 0
         mock_system.get_system_status.assert_called_once()
 
 
-def test_system_discover_gpus_command() -> None:
+def test_system_discover_gpus_command(tmp_path: Path) -> None:
     """Test system discover-gpus command."""
     with patch("dr_exp.cli.commands.discover_gpus.discover_gpus") as mock_discover:
         mock_discover.return_value = ["0", "1"]
 
-        exit_code = main(["system", "discover_gpus"])
+        exit_code = main(
+            [
+                "system",
+                "discover_gpus",
+                "--base-path",
+                str(tmp_path),
+                "--mode",
+                "files_local",
+            ]
+        )
         assert exit_code == 0
         mock_discover.assert_called_once()
 
 
-def test_validation_error_handling() -> None:
+def test_validation_error_handling(tmp_path: Path) -> None:
     """Test that validation errors are handled properly."""
     with patch(
         "dr_exp.cli.commands.discover_gpus.validate_positive_int"
     ) as mock_validate:
         mock_validate.side_effect = ValidationError("Test validation error")
 
-        exit_code = main(["system", "discover_gpus", "--gpus-per-node", "0"])
+        exit_code = main(
+            [
+                "system",
+                "discover_gpus",
+                "--base-path",
+                str(tmp_path),
+                "--mode",
+                "files_local",
+                "--gpus-per-node",
+                "0",
+            ]
+        )
         assert exit_code == 1
 
 
-def test_keyboard_interrupt_handling() -> None:
+def test_keyboard_interrupt_handling(tmp_path: Path) -> None:
     """Test keyboard interrupt handling."""
-    with patch("dr_exp.cli.commands.status.StatusCommand.create_system") as mock_create:
+    with patch(
+        "dr_exp.cli.commands.status.StatusCommand.create_system_from_args"
+    ) as mock_create:
         mock_create.side_effect = KeyboardInterrupt()
 
-        exit_code = main(["system", "status"])
+        exit_code = main(
+            ["system", "status", "--base-path", str(tmp_path), "--mode", "files_local"]
+        )
         assert exit_code == 1
 
 
-def test_unexpected_error_handling() -> None:
+def test_unexpected_error_handling(tmp_path: Path) -> None:
     """Test unexpected error handling."""
-    with patch("dr_exp.cli.commands.status.StatusCommand.create_system") as mock_create:
+    with patch(
+        "dr_exp.cli.commands.status.StatusCommand.create_system_from_args"
+    ) as mock_create:
         mock_create.side_effect = RuntimeError("Unexpected error")
 
-        exit_code = main(["system", "status"])
+        exit_code = main(
+            ["system", "status", "--base-path", str(tmp_path), "--mode", "files_local"]
+        )
         assert exit_code == 1

@@ -1,9 +1,7 @@
 import os
-from unittest.mock import patch
 from pathlib import Path
 import pytest
 from scripts.reset_local_jobdb import reset_job_db
-from dr_exp.job_db import JobDBConfig
 
 
 def create_mock_environment(base_path: str) -> None:
@@ -27,35 +25,28 @@ def test_reset_mock_db(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
     base = str(tmp_path)
     storage_path = str(tmp_path / "storage")
 
-    # Mock the config to use our test paths
-    mock_config = JobDBConfig(
-        base_path=base, storage_path=storage_path, mode="files_local"
-    )
+    create_mock_environment(base)
 
-    with patch("scripts.reset_local_jobdb.JobDBConfig.from_env") as mock_from_env:
-        mock_from_env.return_value = mock_config
+    # ensure files exist before reset
+    job_data_dir = os.path.join(base, "job_data")
+    storage_dir = storage_path
 
-        create_mock_environment(base)
+    assert os.listdir(job_data_dir)
+    assert os.path.exists(os.path.join(job_data_dir, "job_database_errors.jsonl"))
+    assert os.listdir(storage_dir)
 
-        # ensure files exist before reset
-        job_data_dir = os.path.join(base, "job_data")
-        storage_dir = storage_path
+    # Call reset_job_db with explicit parameters
+    reset_job_db(base_path=base, mode="files_local", storage_path=storage_path)
 
-        assert os.listdir(job_data_dir)
-        assert os.path.exists(os.path.join(job_data_dir, "job_database_errors.jsonl"))
-        assert os.listdir(storage_dir)
+    # directories should be recreated and mostly empty
+    assert os.path.isdir(job_data_dir)
+    assert os.path.isdir(storage_dir)
+    assert os.path.isfile(os.path.join(job_data_dir, "job_database_errors.jsonl"))
 
-        reset_job_db()
+    # The reset should have cleared these
+    assert os.listdir(job_data_dir) == [
+        "job_database_errors.jsonl",
+    ]  # Only structure remains
 
-        # directories should be recreated and mostly empty
-        assert os.path.isdir(job_data_dir)
-        assert os.path.isdir(storage_dir)
-        assert os.path.isfile(os.path.join(job_data_dir, "job_database_errors.jsonl"))
-
-        # The reset should have cleared these
-        assert os.listdir(job_data_dir) == [
-            "job_database_errors.jsonl",
-        ]  # Only structure remains
-
-        # Storage should be empty after reset
-        assert os.listdir(storage_dir) == []
+    # Storage should be empty after reset
+    assert os.listdir(storage_dir) == []

@@ -63,19 +63,14 @@ def temp_job_db() -> Generator[LocalJobDB, None, None]:
 @pytest.fixture(scope="session")
 def supabase_test_mode() -> bool:
     """Check if we should run Supabase integration tests."""
-    return (
-        os.getenv("EXPMGR_MODE") == "supabase_local"
-        and os.getenv("RUN_SUPABASE_TESTS") == "1"
-    )
+    # Check if Supabase is available for testing
+    return os.getenv("RUN_SUPABASE_TESTS") == "1"
 
 
 @pytest.fixture
 def reset_supabase_db() -> None:
     """Reset the local Supabase database before test."""
-    if (
-        os.getenv("EXPMGR_MODE") == "supabase_local"
-        and os.getenv("RUN_SUPABASE_TESTS") == "1"
-    ):
+    if os.getenv("RUN_SUPABASE_TESTS") == "1":
         try:
             # Reset the database
             subprocess.run(
@@ -93,7 +88,12 @@ def clean_supabase_client() -> SupabaseJobDB:
     if os.getenv("EXPMGR_MODE") != "supabase_local":
         pytest.skip("Requires EXPMGR_MODE=supabase_local")
 
-    config = JobDBConfig.from_env()
+    config = JobDBConfig(
+        base_path=os.getenv("DR_EXP_BASE_PATH", "./logs"),
+        mode="supabase_local",
+        storage_path=os.getenv("DR_EXP_STORAGE_PATH", "./storage"),
+        # Supabase credentials will be read from environment in validate()
+    )
     config.validate()
     return SupabaseJobDB(config)
 

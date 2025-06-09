@@ -18,15 +18,15 @@ def setup_logging() -> None:
     # Configure logging to show INFO level messages for dr_exp modules
     logging.basicConfig(
         level=logging.INFO,
-        format='%(levelname)s: %(message)s',
-        handlers=[logging.StreamHandler(sys.stderr)]
+        format="%(levelname)s: %(message)s",
+        handlers=[logging.StreamHandler(sys.stderr)],
     )
-    
+
     # Only show INFO+ messages from dr_exp modules, suppress others
-    logging.getLogger('dr_exp').setLevel(logging.INFO)
-    
+    logging.getLogger("dr_exp").setLevel(logging.INFO)
+
     # Suppress noisy third-party loggers
-    for logger_name in ['urllib3', 'requests', 'boto3', 'botocore']:
+    for logger_name in ["urllib3", "requests", "boto3", "botocore"]:
         logging.getLogger(logger_name).setLevel(logging.WARNING)
 
 
@@ -102,7 +102,7 @@ def main(argv: Optional[Sequence[str]] = None) -> int:
     """
     # Set up logging to show diagnostic information
     setup_logging()
-    
+
     parser = build_parser()
     args = parser.parse_args(argv)
 

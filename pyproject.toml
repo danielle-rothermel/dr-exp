@@ -53,3 +53,50 @@ warn_unused_configs = true
 disallow_untyped_defs = true
 # Ignore missing imports for libraries without type stubs
 ignore_missing_imports = true
+
+[tool.pytest.ini_options]
+# Test discovery
+testpaths = ["tests"]
+python_files = ["test_*.py"]
+python_classes = ["Test*"]
+python_functions = ["test_*"]
+
+# Markers
+markers = [
+    "supabase: marks tests as requiring local Supabase (deselect with '-m \"not supabase\"')",
+    "slow: marks tests as slow running (deselect with '-m \"not slow\"')",
+    "fast: marks tests as fast running (select with '-m \"fast\"')",
+    "concurrency: marks tests that test concurrent behavior",
+    "integration: marks tests as integration tests",
+    "unit: marks tests as unit tests",
+    "edge_case: marks tests for edge case scenarios",
+    "timeout: marks tests that include timeouts (very slow)"
+]
+
+# Logging (disabled by default for clean test output)
+# Enable with: pytest --log-cli-level=INFO
+log_cli = false
+log_cli_level = "INFO"
+log_cli_format = "%(asctime)s [%(levelname)8s] %(name)s: %(message)s"
+log_cli_date_format = "%Y-%m-%d %H:%M:%S"
+
+# Warnings
+filterwarnings = [
+    "ignore::UserWarning",
+    "ignore::DeprecationWarning"
+]
+
+# Coverage
+addopts = [
+    "--strict-markers",
+    "--strict-config",
+    "-ra",
+    "--cov=dr_exp",
+    "--cov-report=term-missing",
+    "--cov-report=html:htmlcov",
+    "--cov-fail-under=80"
+]
+
+# Asyncio configuration
+asyncio_mode = "auto"
+asyncio_default_fixture_loop_scope = "function"

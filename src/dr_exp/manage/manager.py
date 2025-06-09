@@ -7,7 +7,6 @@ import time
 from datetime import datetime, timedelta, UTC
 from typing import List, Optional
 
-from dr_exp.utils.jobdb_factory import get_job_db_client
 from dr_exp.job_db.base_job_db import BaseJobDB, StaleJobInfo
 from .process_manager import ProcessManager, BaseProcessManager
 
@@ -39,7 +38,7 @@ class Manager:
         heartbeat_timeout: int,
         idle_timeout_mins: int,
         base_dir: str,
-        client: Optional[BaseJobDB] = None,
+        client: BaseJobDB,
         process_manager: Optional[BaseProcessManager] = None,
     ) -> None:
         """Create a new Manager.
@@ -56,8 +55,8 @@ class Manager:
             Minutes to wait before shutting down when idle.
         base_dir : str
             Base directory for manager logs and worker directories.
-        client : BaseJobDB, optional
-            Job database client. If None, uses factory to create.
+        client : BaseJobDB
+            Job database client.
         process_manager : ProcessManager, optional
             Process manager for spawning workers. If None, uses default.
         """
@@ -66,7 +65,7 @@ class Manager:
         self.heartbeat_timeout = heartbeat_timeout
         self.idle_timeout = timedelta(minutes=idle_timeout_mins)
         self.base_dir = base_dir
-        self.job_db = client or get_job_db_client()
+        self.job_db = client
         self.process_manager = process_manager or ProcessManager()
 
         self.last_activity = datetime.now(UTC)

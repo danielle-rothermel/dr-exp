@@ -1,10 +1,12 @@
 """Base command class for CLI commands."""
 
 import sys
+import os
 from abc import ABC, abstractmethod
 from argparse import ArgumentParser, Namespace
 from typing import Optional
 
+from dr_exp.job_db.config import JobDBConfig
 from dr_exp.utils.factory import create_system, SystemConfig, Factory
 from dr_exp.utils.cli_validation import ValidationError
 
@@ -29,6 +31,30 @@ class BaseCommand(ABC):
     def description(self) -> str:
         """Detailed description for the command."""
         pass
+
+    def add_common_arguments(self, parser: ArgumentParser) -> None:
+        """Add common configuration arguments to all commands.
+
+        Parameters
+        ----------
+        parser : ArgumentParser
+            The argument parser to add arguments to
+        """
+        parser.add_argument(
+            "--base-path",
+            required=True,
+            help="Base directory for experiment data (jobs stored in {base-path}/job_data)",
+        )
+        parser.add_argument(
+            "--mode",
+            required=True,
+            choices=["files_local", "supabase_local", "supabase_remote"],
+            help="Database mode",
+        )
+        parser.add_argument(
+            "--storage-path",
+            help="Storage directory for artifacts (default: {base-path}/storage)",
+        )
 
     @abstractmethod
     def add_arguments(self, parser: ArgumentParser) -> None:
@@ -57,13 +83,44 @@ class BaseCommand(ABC):
         """
         pass
 
+    def create_system_from_args(self, args: Namespace) -> Factory:
+        """Create a system factory using CLI arguments.
+
+        Parameters
+        ----------
+        args : Namespace
+            Parsed command line arguments containing --base-path and --mode
+
+        Returns
+        -------
+        Factory
+            System factory instance
+        """
+        # Default storage path if not provided
+        storage_path = getattr(args, "storage_path", None) or os.path.join(
+            args.base_path, "storage"
+        )
+
+        # Build configuration from CLI arguments
+        config = JobDBConfig(
+            base_path=args.base_path,
+            storage_path=storage_path,
+            mode=args.mode,
+            # Supabase credentials will be read from environment in validate()
+        )
+
+        system_config = SystemConfig(job_db_config=config)
+        return create_system(system_config)
+
     def create_system(self, system_config: Optional[SystemConfig] = None) -> Factory:
         """Create a system factory with optional configuration.
+
+        DEPRECATED: Use create_system_from_args() instead.
 
         Parameters
         ----------
         system_config : SystemConfig, optional
-            System configuration. If None, uses defaults from environment.
+            System configuration. If None, uses factory defaults.
 
         Returns
         -------

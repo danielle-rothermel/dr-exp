@@ -57,8 +57,14 @@ def test_config_hash_deterministic() -> None:
 
 
 def test_get_supabase_client_modes(monkeypatch: Any, tmp_path: Path) -> None:
-    monkeypatch.delenv("EXPMGR_MODE", raising=False)
-    client = client_provider.get_job_db_client()
+    # Test files_local mode
+    config_local = JobDBConfig(
+        base_path=str(tmp_path),
+        mode="files_local",
+        storage_path=str(tmp_path / "storage"),
+    )
+    config_local.validate()
+    client = client_provider.get_job_db_client(config_local)
     assert isinstance(client, LocalJobDB)
 
     class Dummy:
@@ -68,20 +74,33 @@ def test_get_supabase_client_modes(monkeypatch: Any, tmp_path: Path) -> None:
             self.key = config.supabase_key
             self.base_path = config.base_path
 
-    monkeypatch.setenv("EXPMGR_MODE", "supabase_remote")
+    # Test supabase_remote mode with credentials
     monkeypatch.setenv("SUPABASE_URL", "http://x")
-    monkeypatch.setenv("SUPABASE_SERVICE_ROLE_KEY", "k")
+    monkeypatch.setenv("SUPABASE_KEY", "k")
     monkeypatch.setattr("dr_exp.utils.jobdb_factory.SupabaseJobDB", Dummy)
-    client = client_provider.get_job_db_client()
+
+    config_remote = JobDBConfig(
+        base_path=str(tmp_path),
+        mode="supabase_remote",
+        storage_path=str(tmp_path / "storage"),
+    )
+    config_remote.validate()
+    client = client_provider.get_job_db_client(config_remote)
     assert isinstance(client, Dummy)
     assert client.url == "http://x"
     assert client.key == "k"
 
-    monkeypatch.setenv("EXPMGR_MODE", "supabase_remote")
+    # Test supabase_remote mode without credentials (should fail)
     monkeypatch.delenv("SUPABASE_URL")
-    monkeypatch.delenv("SUPABASE_SERVICE_ROLE_KEY")
+    monkeypatch.delenv("SUPABASE_KEY")
+
+    # JobDBConfig now validates automatically in __post_init__, so we expect ValueError at construction
     with pytest.raises(ValueError):
-        client_provider.get_job_db_client()
+        JobDBConfig(
+            base_path=str(tmp_path),
+            mode="supabase_remote",
+            storage_path=str(tmp_path / "storage"),
+        )
 
 
 def test_metrics_loader(tmp_path: Path) -> None:

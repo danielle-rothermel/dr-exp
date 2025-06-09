@@ -23,6 +23,7 @@ class BoostPriorityCommand(BaseCommand):
         return "Increase job priority by specified amount"
 
     def add_arguments(self, parser: ArgumentParser) -> None:
+        self.add_common_arguments(parser)
         parser.add_argument("job_id", help="Job ID to boost")
         parser.add_argument(
             "--amount",
@@ -35,7 +36,7 @@ class BoostPriorityCommand(BaseCommand):
         validate_job_id(args.job_id)
         validate_positive_int(args.amount, "amount")
 
-        system = self.create_system()
+        system = self.create_system_from_args(args)
         client = system.job_db
         result = client.boost_job_priority(args.job_id, boost_amount=args.amount)
 

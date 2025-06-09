@@ -1,5 +1,6 @@
 """Run manager command."""
 
+import os
 from argparse import ArgumentParser, Namespace
 
 from dr_exp.cli.base_command import BaseCommand
@@ -25,6 +26,7 @@ class RunCommand(BaseCommand):
         return "Launch the manager which supervises worker processes"
 
     def add_arguments(self, parser: ArgumentParser) -> None:
+        self.add_common_arguments(parser)
         parser.add_argument(
             "--gpus-per-node",
             type=int,
@@ -57,19 +59,36 @@ class RunCommand(BaseCommand):
         validate_positive_int(args.heartbeat_timeout, "heartbeat-timeout")
         validate_positive_int(args.idle_timeout_mins, "idle-timeout-mins")
 
+        # Get basic system from CLI args
+        system = self.create_system_from_args(args)
+
         # Discover GPUs
         gpus = discover_gpus(args.gpus_per_node)
 
-        # Create system configuration
+        # Create custom system configuration with manager-specific settings
+        from dr_exp.job_db.config import JobDBConfig
+
+        storage_path = getattr(args, "storage_path", None) or os.path.join(
+            args.base_path, "storage"
+        )
+        job_db_config = JobDBConfig(
+            base_path=args.base_path,
+            storage_path=storage_path,
+            mode=args.mode,
+        )
+
         system_config = SystemConfig(
+            job_db_config=job_db_config,
             gpus=gpus,
             workers_per_gpu=args.workers_per_gpu,
             heartbeat_timeout=args.heartbeat_timeout,
             idle_timeout_mins=args.idle_timeout_mins,
         )
 
-        # Create and run manager
-        system = self.create_system(system_config)
+        # Create and run manager with custom config
+        from dr_exp.utils.factory import create_system
+
+        system = create_system(system_config)
         manager = system.create_manager()
         manager.run()
 

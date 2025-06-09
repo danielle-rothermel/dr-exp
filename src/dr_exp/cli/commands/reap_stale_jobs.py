@@ -24,6 +24,7 @@ class ReapStaleJobsCommand(BaseCommand):
         return "Update stale running jobs to failed status"
 
     def add_arguments(self, parser: ArgumentParser) -> None:
+        self.add_common_arguments(parser)
         parser.add_argument(
             "--max-age-mins",
             type=int,
@@ -34,7 +35,7 @@ class ReapStaleJobsCommand(BaseCommand):
     def run(self, args: Namespace) -> int:
         validate_positive_int(args.max_age_mins, "max-age-mins")
 
-        system = self.create_system()
+        system = self.create_system_from_args(args)
         client = system.job_db
         count = reap_stale_jobs(client, args.max_age_mins)
         print(f"Marked {count} stale job(s) as failed")

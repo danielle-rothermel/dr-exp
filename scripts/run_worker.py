@@ -2,6 +2,7 @@
 """Run a worker using the new architecture."""
 
 import argparse
+import os
 import sys
 
 from dr_exp.utils.factory import create_system, SystemConfig
@@ -48,11 +49,19 @@ def main() -> None:
         help="Heartbeat interval in seconds (default: 5.0)",
     )
 
-    # Database mode override
+    # Required configuration
+    parser.add_argument(
+        "--base-path", required=True, help="Base directory for experiment data"
+    )
     parser.add_argument(
         "--mode",
+        required=True,
         choices=["files_local", "supabase_local", "supabase_remote"],
-        help="Override database mode from environment",
+        help="Database mode",
+    )
+    parser.add_argument(
+        "--storage-path",
+        help="Storage directory for artifacts (default: {base-path}/storage)",
     )
 
     # Continuous operation
@@ -71,10 +80,11 @@ def main() -> None:
     args = parser.parse_args()
 
     try:
-        # Create job database config
-        job_db_config = JobDBConfig.from_env()
-        if args.mode:
-            job_db_config.mode = args.mode
+        # Create job database config from CLI arguments
+        storage_path = args.storage_path or os.path.join(args.base_path, "storage")
+        job_db_config = JobDBConfig(
+            base_path=args.base_path, storage_path=storage_path, mode=args.mode
+        )
 
         # Create system configuration
         system_config = SystemConfig(

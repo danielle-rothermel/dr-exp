@@ -22,6 +22,7 @@ class SetPriorityCommand(BaseCommand):
         return "Set job priority to exact value"
 
     def add_arguments(self, parser: ArgumentParser) -> None:
+        self.add_common_arguments(parser)
         parser.add_argument("job_id", help="Job ID to update")
         parser.add_argument("priority", type=int, help="New priority value (0-1000)")
         parser.add_argument(
@@ -33,7 +34,7 @@ class SetPriorityCommand(BaseCommand):
         validate_job_id(args.job_id)
         validate_priority(args.priority)
 
-        system = self.create_system()
+        system = self.create_system_from_args(args)
         client = system.job_db
         result = client.update_job_priority(
             args.job_id, args.priority, reason=args.reason

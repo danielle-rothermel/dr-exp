@@ -78,13 +78,13 @@ def test_environment_variable_isolation(monkeypatch: Any) -> None:
     """Test that environment variables are properly isolated."""
     import os
 
-    # Set some test environment variables
+    # Set some test environment variables (using Supabase vars that are still relevant)
     monkeypatch.setenv("TEST_VAR", "test_value")
-    monkeypatch.setenv("EXPMGR_MODE", "files_local")
+    monkeypatch.setenv("SUPABASE_URL", "http://test.supabase.co")
 
     # Verify they're set
     assert os.getenv("TEST_VAR") == "test_value"
-    assert os.getenv("EXPMGR_MODE") == "files_local"
+    assert os.getenv("SUPABASE_URL") == "http://test.supabase.co"
 
     # Environment will be restored after test
 

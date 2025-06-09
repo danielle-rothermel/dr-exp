@@ -34,19 +34,17 @@ class TestSystemConfig:
 
     def test_default_initialization(self) -> None:
         """Test system config with default values."""
-        with patch.dict(
-            "os.environ", {"EXPMGR_MODE": "files_local", "DR_EXP_BASE_PATH": "/tmp"}
-        ):
-            config = SystemConfig()
+        job_db_config = JobDBConfig(base_path="/tmp", mode="files_local")
+        config = SystemConfig(job_db_config=job_db_config)
 
-            assert isinstance(config.job_db_config, JobDBConfig)
-            assert isinstance(config.gpus, list)
-            assert config.workers_per_gpu == 1
-            assert config.heartbeat_timeout == 60
-            assert config.idle_timeout_mins == 30
-            assert config.max_claim_attempts == 5
-            assert config.worker_heartbeat_interval == 5.0
-            assert config.multiprocessing_start_method == "fork"
+        assert isinstance(config.job_db_config, JobDBConfig)
+        assert isinstance(config.gpus, list)
+        assert config.workers_per_gpu == 1
+        assert config.heartbeat_timeout == 60
+        assert config.idle_timeout_mins == 30
+        assert config.max_claim_attempts == 5
+        assert config.worker_heartbeat_interval == 5.0
+        assert config.multiprocessing_start_method == "fork"
 
     def test_custom_initialization(self, temp_config: SystemConfig) -> None:
         """Test system config with custom values."""
@@ -59,23 +57,21 @@ class TestSystemConfig:
         """Test GPU discovery from CUDA_VISIBLE_DEVICES."""
         with patch.dict(
             "os.environ",
-            {
-                "CUDA_VISIBLE_DEVICES": "2,3,4",
-                "EXPMGR_MODE": "files_local",
-                "DR_EXP_BASE_PATH": "/tmp",
-            },
+            {"CUDA_VISIBLE_DEVICES": "2,3,4"},
         ):
-            config = SystemConfig()
+            job_db_config = JobDBConfig(base_path="/tmp", mode="files_local")
+            config = SystemConfig(job_db_config=job_db_config)
             assert config.gpus == ["2", "3", "4"]
 
     def test_gpu_discovery_default(self) -> None:
         """Test GPU discovery default behavior."""
         with patch.dict(
             "os.environ",
-            {"EXPMGR_MODE": "files_local", "DR_EXP_BASE_PATH": "/tmp"},
+            {},
             clear=True,
         ):
-            config = SystemConfig()
+            job_db_config = JobDBConfig(base_path="/tmp", mode="files_local")
+            config = SystemConfig(job_db_config=job_db_config)
             assert config.gpus == ["0"]
 
     def test_manager_base_dir_default(self, tmp_path: Path) -> None:
@@ -156,11 +152,10 @@ class TestFactory:
 
     def test_initialization_default_config(self) -> None:
         """Test factory initialization with default config."""
-        with patch.dict(
-            "os.environ", {"EXPMGR_MODE": "files_local", "DR_EXP_BASE_PATH": "/tmp"}
-        ):
-            factory = Factory()
-            assert isinstance(factory.config, SystemConfig)
+        job_db_config = JobDBConfig(base_path="/tmp", mode="files_local")
+        system_config = SystemConfig(job_db_config=job_db_config)
+        factory = Factory(system_config)
+        assert isinstance(factory.config, SystemConfig)
 
     def test_job_db_property(self, temp_config: SystemConfig) -> None:
         """Test job database property."""
@@ -277,13 +272,12 @@ class TestCreateStreamlinedSystem:
 
     def test_create_with_default_config(self) -> None:
         """Test creating system with default config."""
-        with patch.dict(
-            "os.environ", {"EXPMGR_MODE": "files_local", "DR_EXP_BASE_PATH": "/tmp"}
-        ):
-            system = create_system()
+        job_db_config = JobDBConfig(base_path="/tmp", mode="files_local")
+        system_config = SystemConfig(job_db_config=job_db_config)
+        system = create_system(system_config)
 
-            assert isinstance(system, Factory)
-            assert isinstance(system.config, SystemConfig)
+        assert isinstance(system, Factory)
+        assert isinstance(system.config, SystemConfig)
 
     def test_full_workflow_example(self, temp_config: SystemConfig) -> None:
         """Test a complete workflow example."""

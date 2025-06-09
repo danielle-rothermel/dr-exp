@@ -26,106 +26,144 @@ src/dr_exp/
 - **Priority-Based Scheduling**: Jobs have priorities 0-1000, highest runs first
 - **Worker-Manager Model**: Manager coordinates, Workers execute training
 
-## 🔧 ENVIRONMENT SETUP
+## 🔧 CONFIGURATION
 
-### Required Environment Variables
-- `EXPMGR_MODE`: Controls which database stores job data
-- `DR_EXP_BASE_PATH`: Controls where job data and logs are stored
+### CLI-Based Configuration
+All commands now require explicit configuration via CLI arguments. No environment variables needed for paths and modes.
 
-### Environment Modes
+### Required Arguments (All Commands)
+- `--base-path /path/to/data` - Base directory for experiment data (jobs stored in `{base-path}/job_data/`)
+- `--mode files_local|supabase_local|supabase_remote` - Database mode
+
+### Optional Arguments
+- `--storage-path /path/to/storage` - Storage directory for artifacts (defaults to `{base-path}/storage/`)
+
+### Supabase Credentials (Environment Variables)
+For security, Supabase credentials remain in environment variables:
+- `SUPABASE_URL` - Supabase project URL (required for supabase modes)
+- `SUPABASE_KEY` - Supabase service role key (required for supabase modes)
+
+### Database Modes
 
 #### Simple Testing (Files Local)
-Use for quick testing without database setup:
 ```bash
-export EXPMGR_MODE=files_local
-export DR_EXP_BASE_PATH="./logs"
+# No environment setup needed - all via CLI
+# Commands use: --base-path ./logs --mode files_local
 ```
 - Stores job data in JSON files at `./logs/job_data/`
 - No database services required
 - Good for isolated testing
 
 #### Development (Supabase Local) 
-Use for full-featured local development:
 ```bash
-export EXPMGR_MODE=supabase_local
-export DR_EXP_BASE_PATH="./logs"
-supabase start  # Local PostgreSQL with full features
+# Start local Supabase
+supabase start
+
+# Commands use: --base-path ./logs --mode supabase_local
+# Credentials automatically use local defaults
 ```
-- Local PostgreSQL with web UI
+- Local PostgreSQL with web UI at `http://127.0.0.1:54323`
 - Real-time features and API
-- Visit: `http://127.0.0.1:54323` for database UI
+- No credential setup needed for local mode
 
 #### Production (Supabase Remote)
 ```bash
-export EXPMGR_MODE=supabase_remote
-export DR_EXP_BASE_PATH="./logs"
+# Set credentials in environment
 export SUPABASE_URL="your-project-url"
 export SUPABASE_KEY="your-service-role-key"
+
+# Commands use: --base-path ./logs --mode supabase_remote
 ```
 - Cloud Supabase deployment
-- Requires valid Supabase credentials
+- Requires valid Supabase credentials in environment
 
-**⚠️ Important:** Always use consistent environment variables across all commands in a workflow.
+**⚠️ Important:** Always use consistent `--base-path` and `--mode` across all commands in a workflow.
 
 ## 📋 COMMON WORKFLOWS
 
 ### Quick Dev Cycle (Supabase Local)
 ```bash
-# 1. Set up environment (run once per session)
-export EXPMGR_MODE=supabase_local
-export DR_EXP_BASE_PATH="./logs"
+# 1. Start local Supabase (run once per session)
 supabase start
 
 # 2. Upload test jobs
 uvrp scripts/upload_configs.py \
+  --base-path ./logs \
+  --mode supabase_local \
   --base-config-path configs \
   --config-name decon_config \
   --sweep "limit_train_batches=10 model=alexnet_cifar epochs=5" \
   --priority 150
 
 # 3. Run worker
-uv run python scripts/manager_cli.py system run_worker dev_worker ./work
+uv run python scripts/manager_cli.py \
+  --base-path ./logs \
+  --mode supabase_local \
+  system run_worker dev_worker ./work
 ```
 
 ### Simple Testing Cycle (Files Local)
 ```bash
-# 1. Set up environment (run once per session)
-export EXPMGR_MODE=files_local
-export DR_EXP_BASE_PATH="./logs"
-
-# 2. Upload test jobs
+# 1. Upload test jobs (no setup needed)
 uvrp scripts/upload_configs.py \
+  --base-path ./logs \
+  --mode files_local \
   --base-config-path configs \
   --config-name decon_config \
   --sweep "limit_train_batches=10 epochs=2" \
   --priority 150
 
-# 3. Run worker
-uv run python scripts/manager_cli.py system run_worker dev_worker ./work
+# 2. Run worker
+uv run python scripts/manager_cli.py \
+  --base-path ./logs \
+  --mode files_local \
+  system run_worker dev_worker ./work
 ```
 
 ### Priority Management
 ```bash
 # Upload urgent job
-uvrp scripts/manager_cli.py job upload_configs --priority 800 --sweep "..."
+uvrp scripts/manager_cli.py \
+  --base-path ./logs \
+  --mode files_local \
+  job upload_configs \
+  --priority 800 \
+  --sweep "..."
 
 # Boost existing job
-uvrp scripts/manager_cli.py job boost_priority <job_id> --amount 200
+uvrp scripts/manager_cli.py \
+  --base-path ./logs \
+  --mode files_local \
+  job boost_priority <job_id> \
+  --amount 200
 
 # Run single job immediately (bypasses queue)
-uvrp scripts/manager_cli.py job run_one --overrides "model=resnet,lr=0.001"
+uvrp scripts/manager_cli.py \
+  --base-path ./logs \
+  --mode files_local \
+  job run_one \
+  --overrides "model=resnet,lr=0.001"
 ```
 
 ### Debug and Diagnostics
 ```bash
 # Show detailed system configuration
-uv run python scripts/manager_cli.py debug debug_config
+uv run python scripts/manager_cli.py \
+  --base-path ./logs \
+  --mode files_local \
+  debug debug_config
 
 # Perform comprehensive health check
-uv run python scripts/manager_cli.py debug debug_health_check
+uv run python scripts/manager_cli.py \
+  --base-path ./logs \
+  --mode files_local \
+  debug debug_health_check
 
 # Health check with verbose details
-uv run python scripts/manager_cli.py debug debug_health_check --verbose
+uv run python scripts/manager_cli.py \
+  --base-path ./logs \
+  --mode files_local \
+  debug debug_health_check --verbose
 ```
 
 ## 🔍 KEY FILES & THEIR ROLES
@@ -168,52 +206,55 @@ uv run python scripts/manager_cli.py debug debug_health_check --verbose
 ### Configuration Issues
 
 #### Worker Reports "no_job" But Jobs Exist
-**Symptoms:** `uv run python scripts/manager_cli.py job list_jobs` shows queued jobs, but worker completes with "no_job" status.
+**Symptoms:** `uv run python scripts/manager_cli.py --base-path ./logs --mode files_local job list_jobs` shows queued jobs, but worker completes with "no_job" status.
 
 **Cause:** Configuration mismatch between job upload and worker execution.
 
 **Debug Steps:**
 1. **Run system health check** (recommended first step):
    ```bash
-   uv run python scripts/manager_cli.py debug debug_health_check --verbose
+   uv run python scripts/manager_cli.py \
+     --base-path ./logs \
+     --mode files_local \
+     debug debug_health_check --verbose
    ```
 
 2. **Check configuration details**:
    ```bash
-   uv run python scripts/manager_cli.py debug debug_config
+   uv run python scripts/manager_cli.py \
+     --base-path ./logs \
+     --mode files_local \
+     debug debug_config
    ```
 
 3. **Manual verification** (if needed):
    ```bash
-   echo "EXPMGR_MODE: $EXPMGR_MODE"
-   echo "DR_EXP_BASE_PATH: $DR_EXP_BASE_PATH"
-   
    # For files_local mode, check if jobs exist in expected location
    ls -la ./logs/job_data/
    ```
 
-4. **Fix:** Use consistent environment variables:
+4. **Fix:** Use consistent CLI arguments:
    ```bash
-   export EXPMGR_MODE=files_local
-   export DR_EXP_BASE_PATH="./logs"
-   # Run both upload and worker commands with same environment
+   # Ensure same --base-path and --mode for all commands
+   uvrp scripts/upload_configs.py --base-path ./logs --mode files_local ...
+   uv run python scripts/manager_cli.py --base-path ./logs --mode files_local system run_worker ...
    ```
 
 #### Jobs Not Being Uploaded
 **Symptoms:** Upload command succeeds but `job list_jobs` shows no jobs.
 
-**Cause:** Different `DR_EXP_BASE_PATH` between upload and list commands.
+**Cause:** Different `--base-path` or `--mode` between upload and list commands.
 
-**Fix:** Ensure same environment for all commands in workflow.
+**Fix:** Ensure same CLI arguments for all commands in workflow.
 
 ### Database Issues
 - **"No such table"**: Run `supabase db reset` to apply migrations
-- **Connection failures**: Check `EXPMGR_MODE` environment variable matches database state
-- **Stale data**: Use `scripts/reset_local_jobdb.py` for files_local mode
+- **Connection failures**: Check `--mode` argument matches database state (files_local vs supabase_local)
+- **Stale data**: Use `scripts/reset_local_jobdb.py --base-path ./logs --mode files_local` for files_local mode
 
 ### Job Execution
-- **Jobs stuck in queue**: Check priorities with `job list_jobs --status queued`
-- **Worker not claiming**: Verify consistent `DR_EXP_BASE_PATH` between upload and worker
+- **Jobs stuck in queue**: Check priorities with `--base-path ./logs --mode files_local job list_jobs --status queued`
+- **Worker not claiming**: Verify consistent `--base-path` and `--mode` between upload and worker commands
 - **Training failures**: Check `StructuredLogger` setup in worker code
 
 ### Configuration
@@ -229,9 +270,10 @@ uv run python scripts/manager_cli.py debug debug_health_check --verbose
 - API: Use FastAPI test client with auth tokens
 
 ### Integration Tests
-- Use `EXPMGR_MODE=files_local` for fast test cycles
+- Use `--mode files_local` for fast test cycles (no environment variables needed)
 - Test complete workflows: upload → claim → execute → complete
 - Verify priority ordering in job queues
+- All tests use explicit `JobDBConfig(base_path=..., mode=...)` construction
 
 ### Development Debugging
 - **API logs**: `uvicorn dr_exp.api.main:app --reload --log-level debug`

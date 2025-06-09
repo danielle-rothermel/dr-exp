@@ -168,45 +168,63 @@ class TestProcessManager:
 class TestHelperFunctions:
     """Test helper functions."""
 
-    @patch.dict("os.environ", {"DR_EXP_BASE_PATH": "/custom/path"})
     @patch("dr_exp.manage.process_manager.run_worker")
-    def test_run_worker_main_custom_path(self, mock_run_worker: Any) -> None:
-        """Test run_worker_main with custom base path."""
-        run_worker_main("worker1", "/work/dir")
+    def test_run_worker_main_custom_path(
+        self, mock_run_worker: Any, tmp_path: Any
+    ) -> None:
+        """Test run_worker_main with explicit configuration."""
+        custom_path = str(tmp_path / "custom")
+        work_dir = str(tmp_path / "work")
 
-        mock_run_worker.assert_called_once_with(
-            base_path="/custom/path", work_dir="/work/dir", worker_id="worker1"
-        )
+        run_worker_main("worker1", work_dir, custom_path, "files_local")
 
-    @patch.dict("os.environ", {}, clear=True)
+        # Should call run_worker with client, base_path, work_dir, worker_id
+        assert mock_run_worker.called
+        call_args = mock_run_worker.call_args
+        assert call_args.kwargs["base_path"] == custom_path
+        assert call_args.kwargs["work_dir"] == work_dir
+        assert call_args.kwargs["worker_id"] == "worker1"
+        assert "client" in call_args.kwargs
+
     @patch("dr_exp.manage.process_manager.run_worker")
-    def test_run_worker_main_default_path(self, mock_run_worker: Any) -> None:
-        """Test run_worker_main requires DR_EXP_BASE_PATH environment variable."""
-        # Should raise exception when DR_EXP_BASE_PATH is not set
-        with pytest.raises(
-            AssertionError,
-            match="DR_EXP_BASE_PATH environment variable is required but not set",
-        ):
-            run_worker_main("worker1", "/work/dir")
+    def test_run_worker_main_with_explicit_args(
+        self, mock_run_worker: Any, tmp_path: Any
+    ) -> None:
+        """Test run_worker_main with explicit arguments."""
+        test_path = str(tmp_path / "test")
+        work_dir = str(tmp_path / "work")
 
-        # Should not have called run_worker
-        mock_run_worker.assert_not_called()
+        run_worker_main("worker1", work_dir, test_path, "files_local")
+
+        # Should call run_worker with proper arguments
+        assert mock_run_worker.called
+        call_args = mock_run_worker.call_args
+        assert call_args.kwargs["base_path"] == test_path
+        assert call_args.kwargs["work_dir"] == work_dir
+        assert call_args.kwargs["worker_id"] == "worker1"
+        assert "client" in call_args.kwargs
 
     @patch("os.makedirs")
-    @patch.dict("os.environ", {}, clear=True)
     @patch("dr_exp.manage.process_manager.run_worker_main")
-    def test_worker_target(self, mock_run_worker_main: Any, mock_makedirs: Any) -> None:
+    def test_worker_target(
+        self, mock_run_worker_main: Any, mock_makedirs: Any, tmp_path: Any
+    ) -> None:
         """Test _worker_target function."""
-        _worker_target("/base/path", "worker1", "0", "/worker/dir")
+        base_path = str(tmp_path / "base")
+        worker_dir = str(tmp_path / "worker")
+
+        _worker_target(base_path, "worker1", "0", worker_dir, "files_local")
 
         # Should set environment variables
         assert os.environ["CUDA_VISIBLE_DEVICES"] == "0"
-        assert os.environ["DR_EXP_BASE_PATH"] == "/base/path"
 
         # Should create worker directory
-        mock_makedirs.assert_called_once_with("/worker/dir", exist_ok=True)
+        mock_makedirs.assert_called_once_with(worker_dir, exist_ok=True)
 
-        # Should call run_worker_main
+        # Should call run_worker_main with all required arguments
         mock_run_worker_main.assert_called_once_with(
-            worker_id="worker1", work_dir="/worker/dir"
+            worker_id="worker1",
+            work_dir=worker_dir,
+            base_path=base_path,
+            mode="files_local",
         )

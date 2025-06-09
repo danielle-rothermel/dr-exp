@@ -633,7 +633,16 @@ def create_app(base_path: str = ".") -> FastAPI:
             )
             raise
 
-    client = get_job_db_client()
+    # Create configuration from environment variables for API service
+    import os
+    from dr_exp.job_db.config import JobDBConfig
+
+    # API service reads configuration from environment
+    base_path = os.getenv("DR_EXP_BASE_PATH", "./logs")
+    mode = os.getenv("EXPMGR_MODE", "files_local")
+
+    config = JobDBConfig(base_path=base_path, mode=mode)
+    client = get_job_db_client(config)
     loader = MetricsLoader(client)
     manager = ConnectionManager()
 

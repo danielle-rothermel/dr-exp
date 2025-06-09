@@ -1,5 +1,3 @@
-from typing import Optional
-
 from dotenv import load_dotenv
 
 from dr_exp.job_db import BaseJobDB, LocalJobDB, SupabaseJobDB, JobDBConfig
@@ -7,13 +5,13 @@ from dr_exp.job_db import BaseJobDB, LocalJobDB, SupabaseJobDB, JobDBConfig
 load_dotenv()
 
 
-def get_job_db_client(config: Optional[JobDBConfig] = None) -> BaseJobDB:
-    """Create JobDB client from config or environment.
+def get_job_db_client(config: JobDBConfig) -> BaseJobDB:
+    """Create JobDB client from config.
 
     Parameters
     ----------
-    config : JobDBConfig, optional
-        Configuration object. If None, creates config from environment variables.
+    config : JobDBConfig
+        Configuration object with explicit parameters.
 
     Returns
     -------
@@ -25,8 +23,6 @@ def get_job_db_client(config: Optional[JobDBConfig] = None) -> BaseJobDB:
     ValueError
         If configuration is invalid.
     """
-    if config is None:
-        config = JobDBConfig.from_env()
 
     config.validate()
 
