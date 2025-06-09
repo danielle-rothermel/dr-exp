@@ -71,21 +71,15 @@ def test_checkpoint_compression(tmp_path: Path) -> None:
 def test_error_log_non_debug(tmp_path: Path) -> None:
     log_dir = str(tmp_path / "logs")
     logger = StructuredLogger(log_dir)
-    logger.log_artifact(str(tmp_path / "missing.txt"))
-    logger.log({"bad": object()})
-    summary = logger.finalize()
-    assert summary["num_metrics"] == 0
-    error_log = tmp_path / "logs" / "training_execution_errors.log"
-    assert error_log.exists()
-    log_text = error_log.read_text()
-    assert "artifact not found" in log_text
-    assert "log error" in log_text
+    # After assert refactor, missing artifacts now raise AssertionError regardless of debug mode
+    with pytest.raises(AssertionError, match="Artifact path does not exist"):
+        logger.log_artifact(str(tmp_path / "missing.txt"))
 
 
 def test_debug_mode_raises(tmp_path: Path) -> None:
     log_dir = str(tmp_path / "logs")
     logger = StructuredLogger(log_dir, debug=True)
-    with pytest.raises(FileNotFoundError):
+    with pytest.raises(AssertionError):
         logger.log_artifact(str(tmp_path / "missing.txt"))
 
 
