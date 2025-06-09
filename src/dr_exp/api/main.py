@@ -98,6 +98,7 @@ class ConnectionManager:
 
         message_text = json.dumps(message)
         disconnected = set()
+        total_connections = len(self.active_connections)
 
         for connection in self.active_connections:
             try:
@@ -105,11 +106,18 @@ class ConnectionManager:
             except Exception as e:
                 logger.error(f"Critical WebSocket failure during broadcast: {e}")
                 disconnected.add(connection)
-                # Continue with other connections but track failures
 
-        # Remove disconnected clients
+        # Remove disconnected clients and log results
         for connection in disconnected:
             self.disconnect(connection)
+
+        if disconnected:
+            successful = total_connections - len(disconnected)
+            logger.warning(
+                f"Broadcast partial success: {successful}/{total_connections} connections"
+            )
+        else:
+            logger.debug(f"Broadcast successful to all {total_connections} connections")
 
 
 def get_admin_key() -> str:

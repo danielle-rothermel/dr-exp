@@ -1,7 +1,10 @@
 """Tests for WebSocket real-time communication."""
 
 import json
+from unittest.mock import AsyncMock, patch
+import pytest
 from .conftest import create_test_job, Priority
+from dr_exp.api.main import ConnectionManager
 
 
 def test_websocket_connection_basic(client):
@@ -332,3 +335,162 @@ def test_websocket_connection_close_handling(client):
         websocket.send_text("test after reconnect")
         response = websocket.receive_text()
         assert "test after reconnect" in response
+
+
+@pytest.mark.asyncio
+async def test_connection_manager_broadcast_success():
+    """Test ConnectionManager broadcast method with all successful connections."""
+    manager = ConnectionManager()
+
+    # Create mock connections
+    mock_conn1 = AsyncMock()
+    mock_conn2 = AsyncMock()
+
+    manager.active_connections.add(mock_conn1)
+    manager.active_connections.add(mock_conn2)
+
+    message = {"type": "test", "data": "broadcast_test"}
+
+    with patch("dr_exp.api.main.logger") as mock_logger:
+        await manager.broadcast(message)
+
+        # Verify all connections received the message
+        mock_conn1.send_text.assert_called_once_with(
+            '{"type": "test", "data": "broadcast_test"}'
+        )
+        mock_conn2.send_text.assert_called_once_with(
+            '{"type": "test", "data": "broadcast_test"}'
+        )
+
+        # Verify success logging
+        mock_logger.debug.assert_called_once_with(
+            "Broadcast successful to all 2 connections"
+        )
+        mock_logger.warning.assert_not_called()
+
+
+@pytest.mark.asyncio
+async def test_connection_manager_broadcast_partial_failure():
+    """Test ConnectionManager broadcast method with some failing connections."""
+    manager = ConnectionManager()
+
+    # Create mock connections - one succeeds, one fails
+    mock_conn_success = AsyncMock()
+    mock_conn_fail = AsyncMock()
+    mock_conn_fail.send_text.side_effect = Exception("Connection broken")
+
+    manager.active_connections.add(mock_conn_success)
+    manager.active_connections.add(mock_conn_fail)
+
+    message = {"type": "test", "data": "partial_fail_test"}
+
+    with patch("dr_exp.api.main.logger") as mock_logger:
+        await manager.broadcast(message)
+
+        # Verify successful connection got the message
+        mock_conn_success.send_text.assert_called_once_with(
+            '{"type": "test", "data": "partial_fail_test"}'
+        )
+
+        # Verify failed connection was attempted
+        mock_conn_fail.send_text.assert_called_once_with(
+            '{"type": "test", "data": "partial_fail_test"}'
+        )
+
+        # Verify failed connection was removed from active connections
+        assert mock_conn_fail not in manager.active_connections
+        assert mock_conn_success in manager.active_connections
+
+        # Verify logging of partial failure
+        mock_logger.error.assert_called_once_with(
+            "Critical WebSocket failure during broadcast: Connection broken"
+        )
+        mock_logger.warning.assert_called_once_with(
+            "Broadcast partial success: 1/2 connections"
+        )
+        mock_logger.debug.assert_not_called()
+
+
+@pytest.mark.asyncio
+async def test_connection_manager_broadcast_all_failures():
+    """Test ConnectionManager broadcast method with all connections failing."""
+    manager = ConnectionManager()
+
+    # Create mock connections that all fail
+    mock_conn1 = AsyncMock()
+    mock_conn2 = AsyncMock()
+    mock_conn1.send_text.side_effect = Exception("Connection 1 broken")
+    mock_conn2.send_text.side_effect = Exception("Connection 2 broken")
+
+    manager.active_connections.add(mock_conn1)
+    manager.active_connections.add(mock_conn2)
+
+    message = {"type": "test", "data": "all_fail_test"}
+
+    with patch("dr_exp.api.main.logger") as mock_logger:
+        await manager.broadcast(message)
+
+        # Verify all connections were attempted
+        mock_conn1.send_text.assert_called_once_with(
+            '{"type": "test", "data": "all_fail_test"}'
+        )
+        mock_conn2.send_text.assert_called_once_with(
+            '{"type": "test", "data": "all_fail_test"}'
+        )
+
+        # Verify all connections were removed
+        assert len(manager.active_connections) == 0
+
+        # Verify error logging
+        assert mock_logger.error.call_count == 2
+        mock_logger.warning.assert_called_once_with(
+            "Broadcast partial success: 0/2 connections"
+        )
+
+
+@pytest.mark.asyncio
+async def test_connection_manager_broadcast_empty_connections():
+    """Test ConnectionManager broadcast method with no active connections."""
+    manager = ConnectionManager()
+
+    message = {"type": "test", "data": "empty_test"}
+
+    with patch("dr_exp.api.main.logger") as mock_logger:
+        await manager.broadcast(message)
+
+        # Verify no logging occurred (early return)
+        mock_logger.debug.assert_not_called()
+        mock_logger.warning.assert_not_called()
+        mock_logger.error.assert_not_called()
+
+
+@pytest.mark.asyncio
+async def test_connection_manager_broadcast_json_serialization():
+    """Test ConnectionManager broadcast method handles complex JSON serialization."""
+    manager = ConnectionManager()
+
+    mock_conn = AsyncMock()
+    manager.active_connections.add(mock_conn)
+
+    # Complex message with nested structures
+    message = {
+        "type": "complex",
+        "data": {
+            "nested": {"deeply": {"nested": True}},
+            "array": [1, 2, 3],
+            "unicode": "测试",
+            "null_value": None,
+        },
+    }
+
+    with patch("dr_exp.api.main.logger") as mock_logger:
+        await manager.broadcast(message)
+
+        # Verify message was serialized correctly
+        expected_json = json.dumps(message)
+        mock_conn.send_text.assert_called_once_with(expected_json)
+
+        # Verify success logging
+        mock_logger.debug.assert_called_once_with(
+            "Broadcast successful to all 1 connections"
+        )
