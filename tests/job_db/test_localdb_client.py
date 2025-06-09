@@ -606,3 +606,274 @@ def test_claim_job_respects_reservations(
 
     claimed = mock_client.claim_job(worker_id="worker_456", respect_reservations=False)
     assert claimed["id"] == reserved_job2["id"]  # Can claim despite reservation
+
+
+# --- Tests for new helper methods ---
+
+
+def test_safe_read_job_success(mock_client, sample_job_config, sample_sweep_config_id):
+    """Test _safe_read_job successfully reads a valid job file."""
+    # Add a job to create a valid job file
+    added_job = mock_client.add_job(
+        sample_job_config, sample_sweep_config_id, status="queued"
+    )
+    job_id = added_job["id"]
+    job_file_path = os.path.join(mock_client.jobs_dir, f"{job_id}.json")
+
+    # Test reading the job file
+    job_data = mock_client._safe_read_job(job_file_path)
+
+    assert job_data is not None
+    assert job_data["id"] == job_id
+    assert job_data["status"] == "queued"
+    assert job_data["config_json"] == sample_job_config
+
+
+def test_safe_read_job_nonexistent_file(mock_client):
+    """Test _safe_read_job returns None for nonexistent file."""
+    nonexistent_path = os.path.join(mock_client.jobs_dir, "nonexistent.json")
+
+    job_data = mock_client._safe_read_job(nonexistent_path)
+
+    assert job_data is None
+
+
+def test_safe_read_job_invalid_json(mock_client, tmp_path):
+    """Test _safe_read_job returns None for invalid JSON file."""
+    # Create a file with invalid JSON
+    invalid_json_path = os.path.join(mock_client.jobs_dir, "invalid.json")
+    with open(invalid_json_path, "w") as f:
+        f.write("{ invalid json content")
+
+    job_data = mock_client._safe_read_job(invalid_json_path)
+
+    assert job_data is None
+
+
+def test_is_job_claimable_queued_job(
+    mock_client, sample_job_config, sample_sweep_config_id
+):
+    """Test _is_job_claimable returns True for queued job."""
+    added_job = mock_client.add_job(
+        sample_job_config, sample_sweep_config_id, status="queued"
+    )
+    job_file_path = os.path.join(mock_client.jobs_dir, f"{added_job['id']}.json")
+
+    claimable = mock_client._is_job_claimable(
+        added_job, "worker_123", respect_reservations=True, job_file_path=job_file_path
+    )
+
+    assert claimable is True
+
+
+def test_is_job_claimable_running_job(
+    mock_client, sample_job_config, sample_sweep_config_id
+):
+    """Test _is_job_claimable returns False for running job."""
+    added_job = mock_client.add_job(
+        sample_job_config, sample_sweep_config_id, status="running"
+    )
+    job_file_path = os.path.join(mock_client.jobs_dir, f"{added_job['id']}.json")
+
+    claimable = mock_client._is_job_claimable(
+        added_job, "worker_123", respect_reservations=True, job_file_path=job_file_path
+    )
+
+    assert claimable is False
+
+
+def test_is_job_claimable_ignore_reservations(
+    mock_client, sample_job_config, sample_sweep_config_id
+):
+    """Test _is_job_claimable ignores reservations when respect_reservations=False."""
+    from datetime import timedelta
+
+    # Set reservation to expire 1 hour in the future (not expired)
+    future_time = datetime.now(timezone.utc) + timedelta(hours=1)
+    # Create a job with a reservation for another worker
+    job_data = {
+        "id": "test_job_123",
+        "status": "queued",
+        "config_json": sample_job_config,
+        "reserved_for_worker": "other_worker",
+        "reservation_expires_at": future_time.isoformat() + "Z",
+    }
+    job_file_path = os.path.join(mock_client.jobs_dir, "test_job_123.json")
+
+    claimable = mock_client._is_job_claimable(
+        job_data, "worker_123", respect_reservations=False, job_file_path=job_file_path
+    )
+
+    assert claimable is True
+
+
+def test_handle_job_reservation_no_reservation(mock_client):
+    """Test _handle_job_reservation returns True when job has no reservation."""
+    job_data = {"id": "test_job_123", "status": "queued"}
+    job_file_path = os.path.join(mock_client.jobs_dir, "test_job_123.json")
+
+    claimable = mock_client._handle_job_reservation(
+        job_data, "worker_123", job_file_path
+    )
+
+    assert claimable is True
+
+
+def test_handle_job_reservation_correct_worker(mock_client):
+    """Test _handle_job_reservation returns True when job is reserved for this worker."""
+    from datetime import timedelta
+
+    # Set reservation to expire 1 hour in the future (not expired)
+    future_time = datetime.now(timezone.utc) + timedelta(hours=1)
+    job_data = {
+        "id": "test_job_123",
+        "status": "queued",
+        "reserved_for_worker": "worker_123",
+        "reservation_expires_at": future_time.isoformat() + "Z",
+    }
+    job_file_path = os.path.join(mock_client.jobs_dir, "test_job_123.json")
+
+    claimable = mock_client._handle_job_reservation(
+        job_data, "worker_123", job_file_path
+    )
+
+    assert claimable is True
+
+
+def test_handle_job_reservation_wrong_worker(mock_client):
+    """Test _handle_job_reservation returns False when job is reserved for different worker."""
+    from datetime import timedelta
+
+    # Set reservation to expire 1 hour in the future (not expired)
+    future_time = datetime.now(timezone.utc) + timedelta(hours=1)
+    job_data = {
+        "id": "test_job_123",
+        "status": "queued",
+        "reserved_for_worker": "other_worker",
+        "reservation_expires_at": future_time.isoformat() + "Z",
+    }
+    job_file_path = os.path.join(mock_client.jobs_dir, "test_job_123.json")
+
+    claimable = mock_client._handle_job_reservation(
+        job_data, "worker_123", job_file_path
+    )
+
+    assert claimable is False
+
+
+def test_clear_expired_reservation(
+    mock_client, sample_job_config, sample_sweep_config_id
+):
+    """Test _clear_expired_reservation removes reservation fields."""
+    # Add a job and manually set an expired reservation
+    added_job = mock_client.add_job(
+        sample_job_config, sample_sweep_config_id, status="queued"
+    )
+    job_id = added_job["id"]
+    job_file_path = os.path.join(mock_client.jobs_dir, f"{job_id}.json")
+
+    # Add reservation fields
+    job_data = added_job.copy()
+    job_data["reserved_for_worker"] = "expired_worker"
+    job_data["reservation_expires_at"] = "2020-01-01T00:00:00Z"  # Expired
+
+    # Call clear reservation
+    mock_client._clear_expired_reservation(job_data, job_file_path)
+
+    # Check that reservation fields are removed from in-memory data
+    assert "reserved_for_worker" not in job_data
+    assert "reservation_expires_at" not in job_data
+
+
+def test_attempt_claim_job_success(
+    mock_client, sample_job_config, sample_sweep_config_id
+):
+    """Test _attempt_claim_job successfully claims a queued job."""
+    # Add a queued job
+    added_job = mock_client.add_job(
+        sample_job_config, sample_sweep_config_id, status="queued"
+    )
+    job_id = added_job["id"]
+    job_file_path = os.path.join(mock_client.jobs_dir, f"{job_id}.json")
+
+    # Attempt to claim the job
+    claimed_job = mock_client._attempt_claim_job(job_file_path, "worker_123")
+
+    assert claimed_job is not None
+    assert claimed_job["id"] == job_id
+    assert claimed_job["status"] == "running"
+    assert claimed_job["assigned_worker"] == "worker_123"
+    assert "heartbeat" in claimed_job
+    assert "started_at" in claimed_job
+
+
+def test_attempt_claim_job_already_claimed(
+    mock_client, sample_job_config, sample_sweep_config_id
+):
+    """Test _attempt_claim_job returns None when job is already claimed."""
+    # Add a job that's already running
+    added_job = mock_client.add_job(
+        sample_job_config, sample_sweep_config_id, status="running"
+    )
+    job_id = added_job["id"]
+    job_file_path = os.path.join(mock_client.jobs_dir, f"{job_id}.json")
+
+    # Attempt to claim the job
+    claimed_job = mock_client._attempt_claim_job(job_file_path, "worker_123")
+
+    assert claimed_job is None
+
+
+def test_attempt_claim_job_nonexistent_file(mock_client):
+    """Test _attempt_claim_job returns None for nonexistent file."""
+    nonexistent_path = os.path.join(mock_client.jobs_dir, "nonexistent.json")
+
+    claimed_job = mock_client._attempt_claim_job(nonexistent_path, "worker_123")
+
+    assert claimed_job is None
+
+
+def test_discover_claimable_jobs_sorts_by_priority(
+    mock_client, sample_job_config, sample_sweep_config_id
+):
+    """Test _discover_claimable_jobs returns jobs sorted by priority and age."""
+    # Add jobs with different priorities
+    low_priority_job = mock_client.add_job(
+        sample_job_config, sample_sweep_config_id, status="queued", priority=100
+    )
+    high_priority_job = mock_client.add_job(
+        sample_job_config, sample_sweep_config_id, status="queued", priority=500
+    )
+    medium_priority_job = mock_client.add_job(
+        sample_job_config, sample_sweep_config_id, status="queued", priority=300
+    )
+
+    # Discover claimable jobs
+    available_jobs = mock_client._discover_claimable_jobs(
+        "worker_123", respect_reservations=True
+    )
+
+    # Should be sorted by priority (highest first)
+    assert len(available_jobs) == 3
+    assert available_jobs[0][1]["id"] == high_priority_job["id"]  # Priority 500
+    assert available_jobs[1][1]["id"] == medium_priority_job["id"]  # Priority 300
+    assert available_jobs[2][1]["id"] == low_priority_job["id"]  # Priority 100
+
+
+def test_discover_claimable_jobs_excludes_non_queued(
+    mock_client, sample_job_config, sample_sweep_config_id
+):
+    """Test _discover_claimable_jobs excludes non-queued jobs."""
+    # Add jobs with different statuses
+    mock_client.add_job(sample_job_config, sample_sweep_config_id, status="queued")
+    mock_client.add_job(sample_job_config, sample_sweep_config_id, status="running")
+    mock_client.add_job(sample_job_config, sample_sweep_config_id, status="completed")
+
+    # Discover claimable jobs
+    available_jobs = mock_client._discover_claimable_jobs(
+        "worker_123", respect_reservations=True
+    )
+
+    # Should only include queued job
+    assert len(available_jobs) == 1
+    assert available_jobs[0][1]["status"] == "queued"
