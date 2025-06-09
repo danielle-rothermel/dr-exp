@@ -1,3 +1,4 @@
+import os
 import time
 from typing import Any, Dict, Optional, cast
 
@@ -221,7 +222,8 @@ def train_with_decon(
                         error="Configuration must include 'log_dir' attribute"
                     )
                 log_dir = cfg.log_dir
-            logger = StructuredLogger(log_dir)
+            debug_mode = os.getenv("DEBUG", "False").lower() in ("true", "1", "yes")
+            logger = StructuredLogger(log_dir, debug=debug_mode)
         except Exception as e:
             # No logger available, return basic failure info
             return create_failure_result(error=f"Failed to create logger: {str(e)}")
