@@ -57,11 +57,10 @@ class TestMockProcessManager:
         """Test launching workers."""
         manager = MockProcessManager()
 
-        result1 = manager.launch_worker("worker1", "0", "/tmp")
-        result2 = manager.launch_worker("worker2", "1", "/tmp")
+        # launch_worker now returns None (success) or raises exception (failure)
+        manager.launch_worker("worker1", "0", "/tmp")
+        manager.launch_worker("worker2", "1", "/tmp")
 
-        assert result1 is True
-        assert result2 is True
         assert manager.launch_count == 2
         assert manager.get_worker_count() == 2
 
@@ -92,9 +91,9 @@ class TestMockProcessManager:
         manager.launch_worker("worker1", "0", "/tmp")
         manager.stop_all_workers()  # Mark as not alive
 
-        result = manager.restart_worker("worker1")
+        # restart_worker now returns None (success) or raises exception (failure)
+        manager.restart_worker("worker1")
 
-        assert result is True
         assert manager.restart_count == 1
 
         status = manager.get_worker_status()
@@ -104,9 +103,10 @@ class TestMockProcessManager:
         """Test restarting a nonexistent worker."""
         manager = MockProcessManager()
 
-        result = manager.restart_worker("nonexistent")
+        # restart_worker now raises exception for nonexistent workers
+        with pytest.raises(RuntimeError, match="Cannot restart worker nonexistent: worker not found"):
+            manager.restart_worker("nonexistent")
 
-        assert result is False
         assert manager.restart_count == 0
 
 
@@ -138,9 +138,9 @@ class TestProcessManager:
         """Test restarting a nonexistent worker."""
         manager = ProcessManager()
 
-        result = manager.restart_worker("nonexistent")
-
-        assert result is False
+        # restart_worker now raises exception for nonexistent workers
+        with pytest.raises(RuntimeError, match="Cannot restart worker nonexistent: worker not found"):
+            manager.restart_worker("nonexistent")
 
     def test_interface_methods_exist(self):
         """Test that ProcessManager implements all required interface methods."""
@@ -176,12 +176,13 @@ class TestHelperFunctions:
     @patch.dict("os.environ", {}, clear=True)
     @patch("dr_exp.manage.process_manager.run_worker")
     def test_run_worker_main_default_path(self, mock_run_worker):
-        """Test run_worker_main with default base path."""
-        run_worker_main("worker1", "/work/dir")
-
-        mock_run_worker.assert_called_once_with(
-            base_path="./job_data", work_dir="/work/dir", worker_id="worker1"
-        )
+        """Test run_worker_main requires DR_EXP_BASE_PATH environment variable."""
+        # Should raise exception when DR_EXP_BASE_PATH is not set
+        with pytest.raises(RuntimeError, match="DR_EXP_BASE_PATH environment variable is required but not set"):
+            run_worker_main("worker1", "/work/dir")
+        
+        # Should not have called run_worker
+        mock_run_worker.assert_not_called()
 
     @patch("os.makedirs")
     @patch.dict("os.environ", {}, clear=True)

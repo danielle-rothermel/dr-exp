@@ -244,7 +244,7 @@ def get_effective_priority(job: Dict[str, Any], strategy: str = "combined") -> i
     int
         Effective priority value after applying strategy adjustments.
     """
-    base_priority = job.get("priority", PRIORITY_DEFAULT)
+    base_priority = job["priority"]  # Fail fast if priority missing
     adjustment = apply_priority_strategy(job, strategy)
     effective_priority = validate_priority(base_priority + adjustment)
 

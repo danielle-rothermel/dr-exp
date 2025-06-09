@@ -130,13 +130,25 @@ class Manager:
                 failed_failures,
             )
 
-        # Restart affected workers
+        # Restart affected workers - fail fast if infrastructure is compromised
         affected_workers = {job.assigned_worker for job in stale_jobs}
+        managed_workers = set(self.process_manager.get_worker_status().keys())
+        
         for worker_id in affected_workers:
-            if self.process_manager.restart_worker(worker_id):
+            if worker_id not in managed_workers:
+                # Worker not managed by process manager - likely external worker, log and continue
+                logging.warning(f"Cannot restart worker {worker_id}: not managed by process manager")
+                continue
+                
+            try:
+                self.process_manager.restart_worker(worker_id)
                 logging.info("Restarted worker %s", worker_id)
-            else:
-                logging.warning("Failed to restart worker %s", worker_id)
+            except RuntimeError as e:
+                logging.error(f"Critical: Worker restart failed for {worker_id}: {e}")
+                # Re-raise to fail fast - infrastructure problems should not be masked
+                raise RuntimeError(
+                    f"Manager cannot continue with failing worker infrastructure: {e}"
+                ) from e
 
     def check_idle_timeout(self) -> None:
         """Shutdown manager if idle for longer than idle_timeout.
@@ -161,7 +173,10 @@ class Manager:
                 "No running jobs, but %d queued jobs remain. Top priorities: %s",
                 len(queue_summary),
                 [
-                    {"id": job.get("id"), "priority": job.get("priority", 100)}
+                    {
+                        "id": job["id"],
+                        "priority": job["priority"],
+                    }  # Fail fast if required fields missing
                     for job in queue_summary
                 ],
             )

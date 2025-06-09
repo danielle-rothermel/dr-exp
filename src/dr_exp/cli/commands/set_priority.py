@@ -39,13 +39,13 @@ class SetPriorityCommand(BaseCommand):
             args.job_id, args.priority, reason=args.reason
         )
 
-        if result.get("success"):
+        if result["success"]:
             print(f"Priority updated to {args.priority}")
             if args.reason:
                 print(f"Reason: {args.reason}")
             return 0
         else:
             print(
-                f"Failed to update priority: {result.get('message', 'Unknown error')}"
+                f"Failed to update priority: {result['message']}"
             )
             return 1

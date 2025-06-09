@@ -1,5 +1,6 @@
 """Process management interface for worker processes."""
 
+import logging
 import os
 import multiprocessing as mp
 from typing import Dict, Optional, Any
@@ -10,7 +11,11 @@ from .worker import run_worker
 
 def run_worker_main(worker_id: str, work_dir: str) -> None:
     """Wrapper to execute the worker with base path from env."""
-    base_path = os.environ.get("DR_EXP_BASE_PATH", "./job_data")
+    if "DR_EXP_BASE_PATH" not in os.environ:
+        raise RuntimeError(
+            "DR_EXP_BASE_PATH environment variable is required but not set"
+        )
+    base_path = os.environ["DR_EXP_BASE_PATH"]
     run_worker(base_path=base_path, work_dir=work_dir, worker_id=worker_id)
 
 
@@ -28,7 +33,7 @@ class BaseProcessManager(ABC):
     """Abstract base class for process management."""
 
     @abstractmethod
-    def launch_worker(self, worker_id: str, gpu_id: str, base_dir: str) -> bool:
+    def launch_worker(self, worker_id: str, gpu_id: str, base_dir: str) -> None:
         """Launch a worker process.
 
         Parameters
@@ -40,10 +45,10 @@ class BaseProcessManager(ABC):
         base_dir : str
             Base directory for worker files.
 
-        Returns
-        -------
-        bool
-            True if worker was launched successfully.
+        Raises
+        ------
+        RuntimeError
+            If worker launch fails.
         """
         pass
 
@@ -53,7 +58,7 @@ class BaseProcessManager(ABC):
         pass
 
     @abstractmethod
-    def restart_worker(self, worker_id: str) -> bool:
+    def restart_worker(self, worker_id: str) -> None:
         """Restart a specific worker process.
 
         Parameters
@@ -61,10 +66,10 @@ class BaseProcessManager(ABC):
         worker_id : str
             Identifier of the worker to restart.
 
-        Returns
-        -------
-        bool
-            True if worker was restarted successfully.
+        Raises
+        ------
+        RuntimeError
+            If worker restart fails.
         """
         pass
 
@@ -108,10 +113,14 @@ class ProcessManager(BaseProcessManager):
         except ValueError:
             self.ctx = mp.get_context()
 
-        # Extract base path from environment
-        self.base_path = os.environ.get("DR_EXP_BASE_PATH", "./job_data")
+        # Extract base path from environment - fail fast if not configured
+        if "DR_EXP_BASE_PATH" not in os.environ:
+            raise RuntimeError(
+                "DR_EXP_BASE_PATH environment variable is required for process management"
+            )
+        self.base_path = os.environ["DR_EXP_BASE_PATH"]
 
-    def launch_worker(self, worker_id: str, gpu_id: str, base_dir: str) -> bool:
+    def launch_worker(self, worker_id: str, gpu_id: str, base_dir: str) -> None:
         """Launch a worker process."""
         try:
             worker_dir = os.path.join(base_dir, worker_id)
@@ -127,11 +136,11 @@ class ProcessManager(BaseProcessManager):
                 "worker_dir": worker_dir,
             }
 
-            return True
-
         except Exception as e:
-            print(f"Error launching worker {worker_id}: {e}")
-            return False
+            logging.error(f"Critical: Failed to launch worker {worker_id}: {e}")
+            raise RuntimeError(
+                f"Worker launch failed - system cannot operate with insufficient workers: {e}"
+            ) from e
 
     def stop_all_workers(self) -> None:
         """Stop all running worker processes."""
@@ -147,11 +156,11 @@ class ProcessManager(BaseProcessManager):
 
         self.workers.clear()
 
-    def restart_worker(self, worker_id: str) -> bool:
+    def restart_worker(self, worker_id: str) -> None:
         """Restart a specific worker process."""
         info = self.workers.get(worker_id)
         if not info:
-            return False
+            raise RuntimeError(f"Cannot restart worker {worker_id}: worker not found")
 
         try:
             # Stop the existing process
@@ -176,13 +185,13 @@ class ProcessManager(BaseProcessManager):
             # Update worker info
             self.workers[worker_id]["process"] = new_proc
 
-            return True
-
         except Exception as e:
-            print(f"Error restarting worker {worker_id}: {e}")
+            logging.error(f"Critical: Failed to restart worker {worker_id}: {e}")
             # Remove the failed worker
             self.workers.pop(worker_id, None)
-            return False
+            raise RuntimeError(
+                f"Worker restart failed - infrastructure may be compromised: {e}"
+            ) from e
 
     def get_worker_count(self) -> int:
         """Get the total number of managed workers."""
@@ -213,11 +222,10 @@ class MockProcessManager(BaseProcessManager):
         self.restart_count = 0
         self.stop_count = 0
 
-    def launch_worker(self, worker_id: str, gpu_id: str, base_dir: str) -> bool:
+    def launch_worker(self, worker_id: str, gpu_id: str, base_dir: str) -> None:
         """Mock launch worker."""
         self.launch_count += 1
         self.workers[worker_id] = {"gpu": gpu_id, "base_dir": base_dir, "alive": True}
-        return True
 
     def stop_all_workers(self) -> None:
         """Mock stop all workers."""
@@ -225,14 +233,13 @@ class MockProcessManager(BaseProcessManager):
         for worker_info in self.workers.values():
             worker_info["alive"] = False
 
-    def restart_worker(self, worker_id: str) -> bool:
+    def restart_worker(self, worker_id: str) -> None:
         """Mock restart worker."""
         if worker_id not in self.workers:
-            return False
+            raise RuntimeError(f"Cannot restart worker {worker_id}: worker not found")
 
         self.restart_count += 1
         self.workers[worker_id]["alive"] = True
-        return True
 
     def get_worker_count(self) -> int:
         """Get the total number of managed workers."""

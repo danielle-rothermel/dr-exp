@@ -39,11 +39,11 @@ class BoostPriorityCommand(BaseCommand):
         client = system.job_db
         result = client.boost_job_priority(args.job_id, boost_amount=args.amount)
 
-        if result.get("success"):
+        if result["success"]:
             print(
                 f"Priority boosted: {result['old_priority']} -> {result['new_priority']}"
             )
             return 0
         else:
-            print(f"Failed to boost priority: {result.get('message', 'Unknown error')}")
+            print(f"Failed to boost priority: {result['message']}")
             return 1

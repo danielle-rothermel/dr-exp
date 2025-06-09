@@ -322,33 +322,36 @@ class TestManagerIntegration:
 
     def test_with_default_factory(self, temp_dir):
         """Test manager creation with default job database factory."""
-        # This should use the factory to create a real job database
-        manager = Manager(
-            gpus=["0"],
-            workers_per_gpu=1,
-            heartbeat_timeout=30,
-            idle_timeout_mins=5,
-            base_dir=temp_dir,
-        )
+        # Set required environment variable for ProcessManager
+        with patch.dict("os.environ", {"DR_EXP_BASE_PATH": temp_dir}):
+            # This should use the factory to create a real job database
+            manager = Manager(
+                gpus=["0"],
+                workers_per_gpu=1,
+                heartbeat_timeout=30,
+                idle_timeout_mins=5,
+                base_dir=temp_dir,
+            )
 
-        # Should have a real job database client
-        assert manager.job_db is not None
-        assert hasattr(manager.job_db, "list_running_jobs")
-        assert hasattr(manager.job_db, "get_stale_jobs")
-        assert hasattr(manager.job_db, "mark_jobs_failed")
-        assert hasattr(manager.job_db, "has_queued_jobs")
-        assert hasattr(manager.job_db, "get_queue_summary")
+            # Should have a real job database client
+            assert manager.job_db is not None
+            assert hasattr(manager.job_db, "list_running_jobs")
+            assert hasattr(manager.job_db, "get_stale_jobs")
+            assert hasattr(manager.job_db, "mark_jobs_failed")
+            assert hasattr(manager.job_db, "has_queued_jobs")
+            assert hasattr(manager.job_db, "get_queue_summary")
 
     def test_with_default_process_manager(self, temp_dir, mock_job_db):
         """Test manager creation with default process manager."""
-        manager = Manager(
-            gpus=["0"],
-            workers_per_gpu=1,
-            heartbeat_timeout=30,
-            idle_timeout_mins=5,
-            base_dir=temp_dir,
-            client=mock_job_db,
-        )
+        with patch.dict(os.environ, {"DR_EXP_BASE_PATH": temp_dir}):
+            manager = Manager(
+                gpus=["0"],
+                workers_per_gpu=1,
+                heartbeat_timeout=30,
+                idle_timeout_mins=5,
+                base_dir=temp_dir,
+                client=mock_job_db,
+            )
 
         # Should have a real process manager
         assert manager.process_manager is not None

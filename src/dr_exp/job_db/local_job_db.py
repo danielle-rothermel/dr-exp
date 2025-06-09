@@ -164,8 +164,8 @@ class LocalJobDB(BaseJobDB):
         # Sort by priority (higher first), then by age (older first)
         queued_jobs.sort(
             key=lambda item: (
-                -item[1].get("priority", 100),  # Negative for descending priority
-                item[1].get("created_at", ""),  # Older jobs first at same priority
+                -item[1]["priority"],  # Fail fast if priority missing
+                item[1]["created_at"],  # Fail fast if created_at missing
             )
         )
 
@@ -497,7 +497,7 @@ class LocalJobDB(BaseJobDB):
                 with open(job_file_path, "r") as f:
                     job_data = json.load(f)
 
-                old_priority = job_data.get("priority", 100)
+                old_priority = job_data["priority"]  # Fail fast if priority missing
                 job_data["priority"] = new_priority
 
                 # Add audit trail
@@ -553,11 +553,12 @@ class LocalJobDB(BaseJobDB):
                 with open(job_file_path, "r") as f:
                     job_data = json.load(f)
 
-                old_priority = job_data.get("priority", 100)
+                old_priority = job_data["priority"]  # Fail fast if priority missing
                 new_priority = self._validate_priority(old_priority + boost_amount)
                 job_data["priority"] = new_priority
                 job_data["priority_boost_count"] = (
-                    job_data.get("priority_boost_count", 0) + 1
+                    job_data.get("priority_boost_count", 0)
+                    + 1  # Boost count can legitimately default to 0
                 )
 
                 # Add audit trail
@@ -615,7 +616,7 @@ class LocalJobDB(BaseJobDB):
         # Sort by priority (highest first), then by age (oldest first)
         jobs.sort(
             key=lambda job: (
-                -job.get("priority", 100),  # Negative for descending priority
+                -job["priority"],  # Fail fast if priority missing
                 job.get("created_at", ""),  # Older jobs first at same priority
             )
         )
@@ -867,7 +868,9 @@ class LocalJobDB(BaseJobDB):
                         queued_jobs.append(
                             {
                                 "id": job_data.get("id"),
-                                "priority": job_data.get("priority", 100),
+                                "priority": job_data[
+                                    "priority"
+                                ],  # Fail fast if priority missing
                                 "created_at": job_data.get("created_at", ""),
                             }
                         )
