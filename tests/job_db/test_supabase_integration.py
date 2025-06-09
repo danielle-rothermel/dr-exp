@@ -39,33 +39,7 @@ def supabase_client(
 
     # Clean up: Delete any test data created during the test
     # For now, we'll use a simple cleanup approach
-    _cleanup_test_data(client)
-
-
-def _cleanup_test_data(client: SupabaseJobDB) -> None:
-    """Clean up test data by removing jobs with test prefixes."""
-    try:
-        # Delete test sweep config clusters
-        response = (
-            client.supabase.table("sweep_config_clusters")
-            .select("id")
-            .like("name", "test-%")
-            .execute()
-        )
-        for cluster in response.data or []:
-            # Delete associated configs and jobs first (cascade should handle this, but being explicit)
-            client.supabase.table("jobs").delete().match(
-                {"config_id": cluster["id"]}
-            ).execute()
-            client.supabase.table("sweep_configs").delete().match(
-                {"cluster_id": cluster["id"]}
-            ).execute()
-            client.supabase.table("sweep_config_clusters").delete().match(
-                {"id": cluster["id"]}
-            ).execute()
-    except Exception as e:
-        # Don't fail tests due to cleanup issues
-        print(f"Warning: Cleanup failed: {e}")
+    _cleanup_test_data(client, "test")
 
 
 class TestSupabaseIntegration:

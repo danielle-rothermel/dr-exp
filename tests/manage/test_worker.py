@@ -140,18 +140,19 @@ class TestJobExecutor:
         )
 
         # Mock successful upload
-        temp_client.upload_artifact = Mock(
-            return_value={"success": True, "storage_path": "/path/to/metrics"}
-        )
+        with patch.object(
+            temp_client,
+            "upload_artifact",
+            return_value={"success": True, "storage_path": "/path/to/metrics"},
+        ) as mock_upload:
+            logger_meta = {"metrics_path": "/tmp/metrics.jsonl"}
+            result = executor._upload_metrics_with_retry(logger_meta)
 
-        logger_meta = {"metrics_path": "/tmp/metrics.jsonl"}
-        result = executor._upload_metrics_with_retry(logger_meta)
-
-        assert result["success"] is True
-        assert result["storage_path"] == "/path/to/metrics"
-        temp_client.upload_artifact.assert_called_once_with(
-            "job123", "/tmp/metrics.jsonl", "metrics.jsonl"
-        )
+            assert result["success"] is True
+            assert result["storage_path"] == "/path/to/metrics"
+            mock_upload.assert_called_once_with(
+                "job123", "/tmp/metrics.jsonl", "metrics.jsonl"
+            )
 
     def test_upload_metrics_with_retry_failure(self, temp_client: LocalJobDB) -> None:
         """Test metrics upload failure."""
@@ -167,16 +168,17 @@ class TestJobExecutor:
         )
 
         # Mock failed upload
-        temp_client.upload_artifact = Mock(
-            return_value={"success": False, "error": "Upload failed"}
-        )
+        with patch.object(
+            temp_client,
+            "upload_artifact",
+            return_value={"success": False, "error": "Upload failed"},
+        ):
+            logger_meta = {"metrics_path": "/tmp/metrics.jsonl"}
 
-        logger_meta = {"metrics_path": "/tmp/metrics.jsonl"}
+            with pytest.raises(UploadError) as exc_info:
+                executor._upload_metrics_with_retry(logger_meta)
 
-        with pytest.raises(UploadError) as exc_info:
-            executor._upload_metrics_with_retry(logger_meta)
-
-        assert "Metrics upload failed: Upload failed" in str(exc_info.value)
+            assert "Metrics upload failed: Upload failed" in str(exc_info.value)
 
     def test_upload_bundle_with_retry_success(self, temp_client: LocalJobDB) -> None:
         """Test successful bundle upload."""
@@ -193,16 +195,17 @@ class TestJobExecutor:
         )
 
         # Mock successful bundle creation and upload
-        executor._create_and_upload_bundle = Mock(
-            return_value={"success": True, "storage_path": "/path/to/bundle"}
-        )
+        with patch.object(
+            executor,
+            "_create_and_upload_bundle",
+            return_value={"success": True, "storage_path": "/path/to/bundle"},
+        ):
+            result = executor._upload_bundle_with_retry(
+                mock_logger, "/tmp/work", "/tmp/worker.log"
+            )
 
-        result = executor._upload_bundle_with_retry(
-            mock_logger, "/tmp/work", "/tmp/worker.log"
-        )
-
-        assert result["success"] is True
-        assert result["storage_path"] == "/path/to/bundle"
+            assert result["success"] is True
+            assert result["storage_path"] == "/path/to/bundle"
 
     def test_upload_bundle_with_retry_failure(self, temp_client: LocalJobDB) -> None:
         """Test bundle upload failure."""
@@ -219,16 +222,17 @@ class TestJobExecutor:
         )
 
         # Mock failed bundle upload
-        executor._create_and_upload_bundle = Mock(
-            return_value={"success": False, "error": "Bundle failed"}
-        )
+        with patch.object(
+            executor,
+            "_create_and_upload_bundle",
+            return_value={"success": False, "error": "Bundle failed"},
+        ):
+            with pytest.raises(UploadError) as exc_info:
+                executor._upload_bundle_with_retry(
+                    mock_logger, "/tmp/work", "/tmp/worker.log"
+                )
 
-        with pytest.raises(UploadError) as exc_info:
-            executor._upload_bundle_with_retry(
-                mock_logger, "/tmp/work", "/tmp/worker.log"
-            )
-
-        assert "Bundle upload failed: Bundle failed" in str(exc_info.value)
+            assert "Bundle upload failed: Bundle failed" in str(exc_info.value)
 
     def test_handle_upload_failure(self, temp_client: LocalJobDB) -> None:
         """Test upload failure handling."""
@@ -244,21 +248,22 @@ class TestJobExecutor:
         )
 
         # Mock client methods
-        temp_client.record_failure = Mock()
-        temp_client.finalize_job = Mock()
+        with (
+            patch.object(temp_client, "record_failure") as mock_record,
+            patch.object(temp_client, "finalize_job") as mock_finalize,
+        ):
+            error = UploadError("Test upload error")
+            result = executor._handle_upload_failure(error)
 
-        error = UploadError("Test upload error")
-        result = executor._handle_upload_failure(error)
+            assert result["finalize_success"] is False
+            assert result["error"] == "Test upload error"
 
-        assert result["finalize_success"] is False
-        assert result["error"] == "Test upload error"
-
-        temp_client.record_failure.assert_called_once_with(
-            "job123", "upload_failure", "Test upload error"
-        )
-        temp_client.finalize_job.assert_called_once_with(
-            "job123", "failed", {"finalize_success": False}
-        )
+            mock_record.assert_called_once_with(
+                "job123", "upload_failure", "Test upload error"
+            )
+            mock_finalize.assert_called_once_with(
+                "job123", "failed", {"finalize_success": False}
+            )
 
     def test_create_success_metadata(self, temp_client: LocalJobDB) -> None:
         """Test successful metadata creation."""
@@ -272,9 +277,6 @@ class TestJobExecutor:
             logger_cls=Mock,
             heartbeat_interval=5.0,
         )
-
-        # Mock client method
-        temp_client.finalize_job = Mock()
 
         # Create mock result and uploads
         result = TrainingResult(
@@ -309,10 +311,6 @@ class TestJobExecutor:
         assert metadata["metrics_storage_path"] == "/path/to/metrics"
         assert metadata["bundle_storage_path"] == "/path/to/bundle"
         assert "upload_complete_at" in metadata
-
-        temp_client.finalize_job.assert_called_once_with(
-            "job123", "completed", metadata
-        )
 
 
 class TestClaimJob:

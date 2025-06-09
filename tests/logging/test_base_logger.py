@@ -169,7 +169,9 @@ def test_abc_inheritance() -> None:
 def test_logger_factory_compatibility() -> None:
     """Test that logger instances work with factory patterns."""
 
-    def create_logger(logger_cls: type[BaseLogger], log_dir: str) -> BaseLogger:
+    def create_logger(
+        logger_cls: type[StructuredLogger], log_dir: str
+    ) -> StructuredLogger:
         """Simple factory function."""
         return logger_cls(log_dir)
 

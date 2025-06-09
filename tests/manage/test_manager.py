@@ -9,7 +9,8 @@ from typing import Any, Dict, List
 
 from dr_exp.manage.manager import Manager
 from dr_exp.manage.process_manager import MockProcessManager
-from dr_exp.job_db import StaleJobInfo
+from dr_exp.job_db import StaleJobInfo, BaseJobDB
+from typing import cast
 
 
 class MockJobDB:
@@ -71,7 +72,7 @@ def streamlined_manager(
         heartbeat_timeout=30,
         idle_timeout_mins=5,
         base_dir=temp_dir,
-        client=mock_job_db,
+        client=cast(BaseJobDB, mock_job_db),
         process_manager=mock_process_manager,
     )
 
@@ -408,14 +409,17 @@ class TestManager:
         ]
 
         # Mock partial failure in mark_jobs_failed
-        def mock_mark_failed(job_ids: List[str], reason: str) -> Dict[str, bool]:
+        def mock_mark_failed(
+            job_ids: List[str], reason: str = "worker_lost"
+        ) -> Dict[str, bool]:
             return {"job1": True, "job2": False}
 
-        mock_job_db.mark_jobs_failed = mock_mark_failed
-
-        # Should raise StaleJobProcessingError
-        with pytest.raises(StaleJobProcessingError) as exc_info:
-            streamlined_manager._mark_stale_jobs_failed(stale_jobs)
+        with patch.object(
+            mock_job_db, "mark_jobs_failed", side_effect=mock_mark_failed
+        ):
+            # Should raise StaleJobProcessingError
+            with pytest.raises(StaleJobProcessingError) as exc_info:
+                streamlined_manager._mark_stale_jobs_failed(stale_jobs)
 
         assert "Failed to mark 1 jobs as failed" in str(exc_info.value)
 
@@ -539,13 +543,16 @@ class TestManager:
         ]
 
         # Mock mark_jobs_failed to return failure
-        def mock_mark_failed(job_ids: List[str], reason: str) -> Dict[str, bool]:
+        def mock_mark_failed(
+            job_ids: List[str], reason: str = "worker_lost"
+        ) -> Dict[str, bool]:
             return {"job1": False}
 
-        mock_job_db.mark_jobs_failed = mock_mark_failed
-
-        # Should not raise exception - error should be caught and logged
-        streamlined_manager.check_stale_jobs()
+        with patch.object(
+            mock_job_db, "mark_jobs_failed", side_effect=mock_mark_failed
+        ):
+            # Should not raise exception - error should be caught and logged
+            streamlined_manager.check_stale_jobs()
 
         # Should have attempted to mark job as failed
         assert len(mock_job_db.mark_failed_calls) == 0  # Our mock doesn't record calls
@@ -618,7 +625,7 @@ class TestManagerIntegration:
                 heartbeat_timeout=30,
                 idle_timeout_mins=5,
                 base_dir=temp_dir,
-                client=mock_job_db,
+                client=cast(BaseJobDB, mock_job_db),
             )
 
         # Should have a real process manager
