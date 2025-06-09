@@ -1,0 +1,72 @@
+MyPy Type Errors Found - Total: 31 errors in 2 files (UPDATED)
+
+PROGRESS: Reduced from 74 to 31 errors (58% improvement)
+✅ FIXED: 12 complete files with all errors resolved
+❌ REMAINING: 2 files with complex type issues
+
+✅ RECENTLY FIXED:
+- src/dr_exp/utils/config_upload.py - Fixed yield type compatibility issue
+- src/dr_exp/manage/worker.py - Fixed missing return statements
+- src/dr_exp/api/main.py - Fixed all 17 FastAPI type annotation issues
+
+=== src/dr_exp/job_db/supabase_job_db.py ===
+Line 87: error: Returning Any from function declared to return "dict[str, Any] | None" [no-any-return]
+Line 153: error: Item "None" of "SingleAPIResponse[Any] | None" has no attribute "data" [union-attr]
+Line 192: error: Returning Any from function declared to return "dict[str, Any] | None" [no-any-return]
+Line 397: error: Returning Any from function declared to return "dict[str, Any]" [no-any-return]
+Line 428: error: Item "None" of "SingleAPIResponse[Any] | None" has no attribute "data" [union-attr]
+Line 477: error: Returning Any from function declared to return "dict[str, Any]" [no-any-return]
+Line 537: error: Returning Any from function declared to return "dict[str, Any]" [no-any-return]
+Line 634: error: Returning Any from function declared to return "dict[str, Any]" [no-any-return]
+Line 853: error: Returning Any from function declared to return "dict[str, Any]" [no-any-return]
+Line 1024: error: Missing return statement [return]
+
+
+=== src/dr_exp/training/decon_trainer.py ===
+Line 61: error: Argument 1 to "validate_model_config" has incompatible type "dict[str | bytes | int | Enum | float | bool, Any] | list[Any] | str | Any | None"; expected "dict[str, Any]" [arg-type]
+Line 65: error: Argument 1 to "validate_optimizer_config" has incompatible type "dict[str | bytes | int | Enum | float | bool, Any] | list[Any] | str | Any | None"; expected "dict[str, Any]" [arg-type]
+Line 69: error: Argument 1 to "validate_scheduler_config" has incompatible type "dict[str | bytes | int | Enum | float | bool, Any] | list[Any] | str | Any | None"; expected "dict[str, Any]" [arg-type]
+Line 73: error: Argument 1 to "validate_training_config" has incompatible type "dict[str | bytes | int | Enum | float | bool, Any] | list[Any] | str | Any | None"; expected "dict[str, Any]" [arg-type]
+Line 78: error: Incompatible return value type (got "DictConfig | ListConfig", expected "OmegaConf") [return-value]
+Line 84: error: Function is missing a type annotation for one or more arguments [no-untyped-def]
+Line 87: error: Need type annotation for "final_metrics" (hint: "final_metrics: dict[<type>, <type>] = ...") [var-annotated]
+Line 88: error: Need type annotation for "logged_epochs" (hint: "logged_epochs: set[<type>] = ...") [var-annotated]
+Line 93: error: Function is missing a return type annotation [no-untyped-def]
+Line 97: error: Function is missing a return type annotation [no-untyped-def]
+Line 229: error: Argument 1 to "create_cifar10_training_components" has incompatible type "OmegaConf"; expected "DictConfig" [arg-type]
+Line 236: error: "OmegaConf" has no attribute "model" [attr-defined]
+Line 237: error: "OmegaConf" has no attribute "model" [attr-defined]
+Line 243: error: "OmegaConf" has no attribute "epochs" [attr-defined]
+Line 244: error: "OmegaConf" has no attribute "batch_size" [attr-defined]
+Line 245: error: "OmegaConf" has no attribute "optim" [attr-defined]
+Line 246: error: "OmegaConf" has no attribute "machine" [attr-defined]
+Line 255: error: Argument 4 to "train_model" has incompatible type "OmegaConf"; expected "DictConfig" [arg-type]
+Line 266: error: "OmegaConf" has no attribute "epochs" [attr-defined]
+Line 267: error: "OmegaConf" has no attribute "model" [attr-defined]
+Line 278: error: "OmegaConf" has no attribute "epochs" [attr-defined]
+
+===============================================================================
+COMPLETED FIXES (43 errors fixed in 12 files):
+
+✅ src/dr_exp/training/training_result.py - Added missing return type annotation
+✅ src/dr_exp/logging/logger_paths.py - Added missing return type annotation  
+✅ src/dr_exp/utils/priority.py - Fixed Any return types and missing parameter annotations
+✅ src/dr_exp/job_db/local_job_db.py - Fixed 3 Any return type issues with proper type annotations
+✅ src/dr_exp/api/models.py - Added missing type annotations to 2 functions
+✅ src/dr_exp/cli/base_command.py - Fixed Optional type default
+✅ src/dr_exp/cli/command_groups.py - Added missing return type annotation
+✅ src/dr_exp/cli/registry.py - Added missing return type annotation + type ignore for abstract class
+✅ src/dr_exp/manage/process_manager.py - Fixed BaseContext.Process issues with type ignore
+✅ src/dr_exp/utils/factory.py - Fixed Manager argument type compatibility
+✅ src/dr_exp/utils/config_upload.py - Fixed yield type compatibility issue (1 error)
+✅ src/dr_exp/manage/worker.py - Fixed missing return statements in _finalize_and_upload function (3 errors)
+✅ src/dr_exp/api/main.py - Fixed all 17 FastAPI type annotation issues including return types, middleware parameters, response models, and global app assignment
+
+===============================================================================
+REMAINING ISSUES BY COMPLEXITY:
+
+HIGH COMPLEXITY (require extensive refactoring):
+- decon_trainer.py: OmegaConf/DictConfig type system conflicts (21 errors)
+- supabase_job_db.py: Third-party Supabase API type stubs issues (10 errors)
+
+===============================================================================

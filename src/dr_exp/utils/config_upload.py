@@ -6,7 +6,7 @@ import hashlib
 import itertools
 import json
 import re
-from typing import Any, Dict, Iterable, List
+from typing import Any, Dict, Iterable, List, cast
 
 import hydra
 from hydra.core.global_hydra import GlobalHydra
@@ -52,7 +52,9 @@ def generate_configs(
     with hydra.initialize_config_dir(config_dir=base_config_path, version_base=None):
         for overrides in _generate_override_combinations(sweep_params):
             cfg = hydra.compose(config_name=config_name, overrides=overrides)
-            yield OmegaConf.to_container(cfg, resolve=True, throw_on_missing=True)
+            container = OmegaConf.to_container(cfg, resolve=True, throw_on_missing=True)
+            assert isinstance(container, dict), f"Expected dict, got {type(container)}"
+            yield cast(Dict[str, Any], container)
 
 
 def config_hash(cfg: Dict[str, Any]) -> str:

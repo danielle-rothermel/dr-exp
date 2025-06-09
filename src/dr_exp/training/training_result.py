@@ -24,7 +24,7 @@ class TrainingResult:
     training_time: float
     error: Optional[str] = None
 
-    def __post_init__(self):
+    def __post_init__(self) -> None:
         """Validate fields immediately on creation to fail fast."""
         if self.status not in ["success", "failed"]:
             raise ValueError(

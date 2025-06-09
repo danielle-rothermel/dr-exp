@@ -178,7 +178,7 @@ class LocalJobDB(BaseJobDB):
                 ):
                     # Re-read under exclusive lock to ensure status hasn't changed
                     with open(job_file_path, "r") as f:
-                        current_job_data = json.load(f)
+                        current_job_data: dict[str, Any] = json.load(f)
 
                     if current_job_data.get("status") == "queued":
                         # Claim the job
@@ -393,7 +393,8 @@ class LocalJobDB(BaseJobDB):
         job_file_path = os.path.join(self.jobs_dir, f"{job_id}.json")
         if os.path.exists(job_file_path):
             with open(job_file_path, "r") as f:
-                return json.load(f)
+                job_data: dict[str, Any] = json.load(f)
+                return job_data
         return None
 
     def get_config_for_job(self, job_id: str) -> Optional[Dict[str, Any]]:
@@ -411,7 +412,8 @@ class LocalJobDB(BaseJobDB):
         """
         job_data = self.get_job_details(job_id)
         if job_data and "config_json" in job_data:
-            return job_data["config_json"]
+            config_data: dict[str, Any] = job_data["config_json"]
+            return config_data
         # logger.debug(f"Config not found for job {job_id}")
         return None
 

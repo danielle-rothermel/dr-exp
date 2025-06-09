@@ -72,7 +72,7 @@ class BaseCommand(ABC):
         """
         return create_system(system_config)
 
-    def handle_error(self, error: Exception, message: str = None) -> int:
+    def handle_error(self, error: Exception, message: Optional[str] = None) -> int:
         """Handle command errors consistently.
 
         Parameters

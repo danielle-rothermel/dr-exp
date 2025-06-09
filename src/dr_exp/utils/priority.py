@@ -191,7 +191,7 @@ def calculate_failure_penalty(job: Dict[str, Any], max_penalty: int = 200) -> in
     int
         Priority penalty amount (negative value, 0 to -max_penalty).
     """
-    retry_count = job.get("retry_index", 0)
+    retry_count: int = job.get("retry_index", 0)
 
     # Apply penalty: -50 priority per retry, capped at max_penalty
     penalty = min(retry_count * 50, max_penalty)
@@ -199,7 +199,7 @@ def calculate_failure_penalty(job: Dict[str, Any], max_penalty: int = 200) -> in
 
 
 def apply_priority_strategy(
-    job: Dict[str, Any], strategy: str = "age_boost", **strategy_params
+    job: Dict[str, Any], strategy: str = "age_boost", **strategy_params: Any
 ) -> int:
     """Apply a priority adjustment strategy to a job.
 
