@@ -47,12 +47,11 @@ def validate_and_extract_decon_config(dr_exp_cfg: Any) -> DictConfig:
     # Ensure basic structure exists before detailed validation
     required_top_level = ["model", "optim", "lrsched", "data", "machine", "paths"]
     missing_top_level = [f for f in required_top_level if f not in decon_cfg]
-    if missing_top_level:
-        raise ValueError(
-            f"Missing required top-level config sections: {missing_top_level}\n"
-            f"Config must include sections: {required_top_level}\n"
-            f"Use Hydra config composition to provide complete configurations."
-        )
+    assert not missing_top_level, (
+        f"Missing required top-level config sections: {missing_top_level}\n"
+        f"Config must include sections: {required_top_level}\n"
+        f"Use Hydra config composition to provide complete configurations."
+    )
 
     # Use deconCNN's own validation functions - these will fail fast with detailed errors
     try:
@@ -81,7 +80,7 @@ def validate_and_extract_decon_config(dr_exp_cfg: Any) -> DictConfig:
         deconcnn.validate_training_config(training_dict)
 
     except Exception as e:
-        raise ValueError(f"deconCNN config validation failed: {str(e)}")
+        assert False, f"deconCNN config validation failed: {str(e)}"
 
     return cast(DictConfig, decon_cfg)
 

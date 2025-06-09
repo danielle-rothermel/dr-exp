@@ -26,20 +26,21 @@ class TrainingResult:
 
     def __post_init__(self) -> None:
         """Validate fields immediately on creation to fail fast."""
-        if self.status not in ["success", "failed"]:
-            raise ValueError(
-                f"status must be 'success' or 'failed', got: {self.status}"
-            )
-        if self.status == "failed" and self.error is None:
-            raise ValueError("error field is required when status='failed'")
-        if self.status == "success" and self.error is not None:
-            raise ValueError("error field must be None when status='success'")
-        if self.num_epochs < 0:
-            raise ValueError(f"num_epochs must be non-negative, got: {self.num_epochs}")
-        if self.num_checkpoints < 0:
-            raise ValueError(
-                f"num_checkpoints must be non-negative, got: {self.num_checkpoints}"
-            )
+        assert self.status in ["success", "failed"], (
+            f"status must be 'success' or 'failed', got: {self.status}"
+        )
+        assert not (self.status == "failed" and self.error is None), (
+            "error field is required when status='failed'"
+        )
+        assert not (self.status == "success" and self.error is not None), (
+            "error field must be None when status='success'"
+        )
+        assert self.num_epochs >= 0, (
+            f"num_epochs must be non-negative, got: {self.num_epochs}"
+        )
+        assert self.num_checkpoints >= 0, (
+            f"num_checkpoints must be non-negative, got: {self.num_checkpoints}"
+        )
 
 
 def create_success_result(

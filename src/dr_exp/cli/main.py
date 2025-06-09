@@ -66,7 +66,7 @@ def _find_command_name_in_group(group_name: str, command_attr: str) -> str:
         for cmd_name in COMMAND_GROUP_MAPPING[group_name]:
             if cmd_name == command_with_hyphens:
                 return cmd_name
-    raise KeyError(f"Command not found: {command_attr} in group {group_name}")
+    assert False, f"Command not found: {command_attr} in group {group_name}"
 
 
 def main(argv: Optional[Sequence[str]] = None) -> int:
