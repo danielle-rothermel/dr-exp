@@ -1,6 +1,6 @@
 import os
 import time
-from typing import Any, Dict, Optional
+from typing import Any, Dict, List, Optional
 
 import torch
 from omegaconf import OmegaConf
@@ -159,29 +159,35 @@ class DrExpClassificationModule:
         return final_metrics
 
 
-def train_with_decon(cfg: Any = None, logger: Optional[BaseLogger] = None, **hydra_overrides) -> TrainingResult:
-    """Training function integrating deconCNN with dr_exp.
+
+def train_with_decon(cfg: Dict[str, Any], logger: Optional[BaseLogger] = None) -> TrainingResult:
+    """Training function for deconCNN integration (worker execution).
+    
+    This function expects a complete, pre-composed configuration from the JobDB.
+    It does NOT handle Hydra composition - that should be done during upload.
     
     Parameters
     ----------
-    cfg : Any, optional
-        If provided, will validate as deconCNN config. If None, will load from deconcnn_configs.
+    cfg : Dict[str, Any]
+        Complete deconCNN configuration (from JobDB)
     logger : BaseLogger, optional
         dr_exp's StructuredLogger for metrics/checkpoints
-    hydra_overrides : dict
-        Override parameters for Hydra config composition
         
     Returns
     -------
     TrainingResult
         Structured result with all required training metrics and metadata.
     """
-    # 1. Setup logger first - if this fails, we can't log anything
+    # 1. Validate input - cfg is required for worker execution
+    if cfg is None:
+        return create_failure_result(
+            error="cfg parameter is required for worker execution. Use scripts/upload_configs.py with --base-config-path=deconcnn_configs during upload step."
+        )
+    
+    # 2. Setup logger - if this fails, we can't log anything
     if logger is None:
         try:
-            log_dir = "./logs"
-            if cfg:
-                log_dir = cfg.get("log_dir", "./logs") if isinstance(cfg, dict) else getattr(cfg, "log_dir", "./logs")
+            log_dir = cfg.get("log_dir", "./logs") if isinstance(cfg, dict) else getattr(cfg, "log_dir", "./logs")
             logger = StructuredLogger(log_dir)
         except Exception as e:
             # No logger available, return basic failure info
@@ -192,48 +198,20 @@ def train_with_decon(cfg: Any = None, logger: Optional[BaseLogger] = None, **hyd
     # Now we have a guaranteed logger, so we can proceed with training
     try:
         
-        # 2. Load config - either from provided cfg or from deconcnn_configs
-        if cfg is not None:
-            # Legacy path: validate provided config
-            decon_cfg = validate_and_extract_decon_config(cfg)
-        else:
-            # New path: load from deconcnn_configs with Hydra
-            from pathlib import Path
-            from hydra import compose, initialize_config_dir
-            from hydra.core.global_hydra import GlobalHydra
-            
-            # Clear any existing Hydra instance
-            GlobalHydra.instance().clear()
-            
-            # Get absolute path to deconcnn_configs
-            config_dir = str(Path("deconcnn_configs").absolute())
-            
-            # Default overrides for fast testing
-            default_overrides = [
-                "epochs=2",
-                "batch_size=32", 
-                "+limit_train_batches=2",
-                "machine=mac",
-                "model=alexnet_cifar",
-                "enable_checkpointing=false"
-            ]
-            
-            # Merge with any provided overrides
-            overrides = list(hydra_overrides.get('overrides', default_overrides))
-            
-            with initialize_config_dir(config_dir=config_dir, version_base=None):
-                decon_cfg = compose(config_name="config", overrides=overrides)
+        # 3. Validate the provided config (should be complete from JobDB)
+        decon_cfg = validate_and_extract_decon_config(cfg)
         
-        # 3. Create deconCNN training components
+        # 4. Create deconCNN training components
         model, data_module, trainer = deconcnn.create_cifar10_training_components(decon_cfg)
         
         # 4. Wrap the Lightning module to log metrics to dr_exp
         dr_exp_module = DrExpClassificationModule(model, logger)
         
         # 5. Log initial configuration
+        model_name = getattr(decon_cfg.model, 'name', None) or getattr(decon_cfg.model, 'architecture', 'unknown')
         logger.log({
             "config_summary": {
-                "model_name": decon_cfg.model.name,
+                "model_name": model_name,
                 "epochs": decon_cfg.epochs,
                 "batch_size": decon_cfg.batch_size,
                 "learning_rate": decon_cfg.optim.lr,

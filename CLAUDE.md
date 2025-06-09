@@ -1,57 +1,155 @@
 # CLAUDE.md
 
-## System Overview
+This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
 
-dr_exp is a distributed job scheduler for machine learning experiments. Its core components are:
-- Manager (src/dr_exp/manage/manager.py): Assigns jobs from the queue.
-- Worker (src/dr_exp/manage/worker.py): Executes a single job.
-- JobDB (src/dr_exp/job_db/): A database (Supabase or local) for job state.
-- API (src/dr_exp/api/main.py): A FastAPI backend for the UI and CLI.
-- CLI (src/dr_exp/cli/): A command-line interface for managing the system.
+## Project Overview
+
+`dr_exp` is a distributed experiment management system for deep learning research. It coordinates job execution across GPU clusters using a priority-based queue system with real-time monitoring.
 
 ## Development Commands
 
-### Python Backend
-- **Install dependencies**: `uv sync`
-- **Run tests**: `uv run pytest`
-- **Start API server**: `uv run uvicorn dr_exp.api.main:app --reload` (serves on http://localhost:8000)
-- **Run manager**: `uv run python scripts/run_manager.py`
-- **Run worker**: `uv run python scripts/run_worker.py`
-- **Manager CLI**: `uv run python scripts/manager_cli.py <command>` (see CLI Commands section)
-- **Reset local job database**: `uv run python scripts/reset_local_jobdb.py`
+### Environment Setup
+```bash
+# Python dependencies
+uv sync
 
-### Supabase
-- **Install Supabase CLI**: `brew install supabase/tap/supabase` (recommended) or other methods
-- **Start local Supabase**: `supabase start` (requires Docker)
-- **Stop local Supabase**: `supabase stop`
-- **Reset local database**: `supabase db reset` (applies all migrations)
+# Frontend dependencies  
+cd react-babysitter-ui && npm install
 
-### Environment Configuration
+# Local database (recommended for development)
+supabase start
+export EXPMGR_MODE=supabase_local
+```
 
-- `EXPMGR_MODE`: Database mode selection
-  - `"files_local"`: Local JSON files (simple, no Docker required)
-  - `"supabase_local"`: Local Supabase with full features (requires Docker)
-  - `"supabase_remote"`: Production Supabase (requires cloud account)
-- `DR_EXP_BASE_PATH`: Base directory for job data storage
-- `ADMIN_API_KEY`: API key for admin endpoints (defaults to "testkey")
-- Supabase connection vars (for supabase_remote): `SUPABASE_URL`, `SUPABASE_KEY`, `SUPABASE_SERVICE_ROLE_KEY`
-- `PYTHONPATH`: Should include the project root for proper imports
+### Running Services
+```bash
+# Backend API
+uv run uvicorn dr_exp.api.main:app --reload
 
-## Testing
+# Frontend
+cd react-babysitter-ui && npm run dev
 
-**Test Infrastructure:**
-- Comprehensive test suite with enhanced fixtures in `tests/conftest.py` and `tests/manage/conftest.py`
-- Parallel test execution using pytest-xdist for improved performance
-- Test categorization with markers for fast/slow/concurrency/integration tests
+# Job management via CLI
+uv run python scripts/manager_cli.py job upload-configs --sweep "model=resnet,vit"
+uv run python scripts/manager_cli.py system run --gpus-per-node 2
+```
 
-**Running Tests:**
-- **All tests**: `uv run pytest`
-- **Parallel execution**: `uv run pytest -n auto`
-- **Fast tests only**: `uv run pytest -m "fast"`
-- **Skip slow tests**: `uv run pytest -m "not slow"`
-- **Specific test types**: `uv run pytest -m "concurrency"` or `uv run pytest -m "integration"`
+### Testing & Quality
+```bash
+# Run tests with coverage
+uv run pytest --cov=dr_exp --cov-report=term-missing
 
-**Key Testing Patterns:** Use direct `trainer_fn` parameters, event-driven synchronization, and enhanced fixtures for deterministic testing.
+# Fast tests only
+uv run pytest -m "fast"
+
+# Skip Supabase-dependent tests
+uv run pytest -m "not supabase"
+
+# Linting
+cd react-babysitter-ui && npm run lint
+uv run ruff check src/ tests/
+```
+
+## Core Architecture
+
+### Three-Mode System
+1. **`EXPMGR_MODE=files_local`**: JSON files, no dependencies
+2. **`EXPMGR_MODE=supabase_local`**: Local PostgreSQL via Docker
+3. **`EXPMGR_MODE=supabase_remote`**: Cloud PostgreSQL for production
+
+### Abstract Interface Pattern
+The system uses `BaseJobDB` abstract interface to eliminate mixed responsibilities:
+- `Manager` coordinates workers using only abstract methods
+- `LocalJobDB` and `SupabaseJobDB` implement the same interface
+- Factory pattern ensures consistent system configuration
+
+### Component Structure
+- **`src/dr_exp/job_db/`**: Database abstraction layer
+- **`src/dr_exp/manage/`**: Manager/Worker coordination system  
+- **`src/dr_exp/api/`**: FastAPI backend with WebSocket support
+- **`src/dr_exp/cli/`**: Command-line interface with grouped commands
+- **`src/dr_exp/logging/`**: Structured metrics and artifact logging
+- **`react-babysitter-ui/`**: Real-time monitoring frontend
+
+### Priority System
+5-tier job priorities (0-1000):
+- SYSTEM (900-1000): Critical maintenance
+- URGENT (700-899): Deadline experiments
+- HIGH (400-699): Important work
+- NORMAL (100-399): Default range
+- LOW (0-99): Background jobs
+
+## Key Development Patterns
+
+### Configuration Management
+- Uses Hydra for complex config composition
+- Supports hyperparameter sweeps via `--sweep` flag
+- Environment-aware configuration in `src/dr_exp/job_db/config.py`
+
+### Testing Strategy
+- 172+ tests with pytest markers: `supabase`, `slow`, `fast`, `integration`, `unit`
+- Event-driven testing using threading events for coordination
+- Mock fixtures with enhanced time mocking
+- Isolated test databases for parallel execution
+
+### Database Operations
+Always use abstract interface methods in business logic:
+```python
+# Good: Uses abstract interface
+jobs = job_db.get_stale_jobs(max_age_seconds=300)
+job_db.mark_jobs_failed(job_ids, reason="timeout")
+
+# Avoid: Database-specific implementations in business logic
+```
+
+### CLI Command Development
+Commands follow command pattern in `src/dr_exp/cli/commands/`:
+- Inherit from `BaseCommand`
+- Grouped by function: `job`, `system`, `admin`
+- Use `scripts/manager_cli.py` as entry point
+
+### Error Handling
+- Comprehensive logging with structured output
+- Graceful degradation for worker failures
+- Automatic job heartbeat monitoring
+- Stack trace preservation in error logging
+
+## Integration Points
+
+### deconCNN Training Library
+- Uses Lightning callback wrapper pattern
+- Official config support via `decon_trainer.py`
+- Example configs in `src/dr_exp/train_examples/configs/`
+
+### SLURM Integration
+- Batch job submission via `scripts/slurm_job.sbatch`
+- GPU discovery and resource management
+- Distributed worker coordination
+
+### Storage & Artifacts
+- Supabase object storage for artifacts
+- Local filesystem fallback
+- Checkpoint compression and upload coordination
+
+## Common Development Tasks
+
+### Adding New Commands
+1. Create command class in `src/dr_exp/cli/commands/`
+2. Register in `src/dr_exp/cli/registry.py`
+3. Add to appropriate group in `src/dr_exp/cli/command_groups.py`
+4. Follow existing command patterns
+
+### Database Schema Changes
+1. Create migration in `supabase/migrations/`
+2. Update abstract interface in `BaseJobDB` if needed
+3. Implement in both `LocalJobDB` and `SupabaseJobDB`
+4. Add tests for new functionality
+
+### Frontend Development
+- React 19 with Vite build system
+- Tailwind CSS for styling
+- WebSocket integration for real-time updates
+- Axios for HTTP requests
 
 ## CRITICAL DEVELOPMENT PRINCIPLES
 
@@ -143,5 +241,4 @@ EXPMGR_MODE="files_local" uv run python scripts/upload_configs.py \
 EXPMGR_MODE="files_local" uv run python scripts/run_decon_worker.py
 ```
 
-See `DECON_INTEGRATION_GUIDE.md` for complete details and next steps.
-
+When making changes, ensure compatibility across all three database modes, maintain the abstract interface pattern, and strictly follow the development principles above.
