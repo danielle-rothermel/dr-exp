@@ -7,7 +7,7 @@ import deconcnn
 
 from dr_exp.logging.base_logger import BaseLogger
 from dr_exp.logging.structured_logger import StructuredLogger
-from dr_exp.training.result import (
+from dr_exp.training.training_result import (
     TrainingResult,
     create_success_result,
     create_failure_result,

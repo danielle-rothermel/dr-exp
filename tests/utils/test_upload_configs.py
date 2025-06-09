@@ -6,13 +6,7 @@ from dr_exp.utils import config_upload
 from scripts import upload_configs
 
 
-CONFIG_DIR = (
-    Path(__file__).resolve().parents[2]
-    / "src"
-    / "dr_exp"
-    / "train_examples"
-    / "configs"
-)
+CONFIG_DIR = Path(__file__).resolve().parents[2] / "configs"
 
 
 def test_generate_and_upload(tmp_path):
@@ -24,11 +18,11 @@ def test_generate_and_upload(tmp_path):
             mode="files_local",
         )
     )
-    sweep = "model=resnet,vit optim.lr=0.01,0.02"
+    sweep = "model=resnet18_cifar,alexnet_cifar optim.lr=0.01,0.02"
 
     jobs = config_upload.upload_configs(
         base_config_path=str(cfg_dir),
-        config_name="config.yaml",
+        config_name="decon_config.yaml",
         sweep=sweep,
         client=client,
         cluster_name="c1",
@@ -43,7 +37,10 @@ def test_generate_and_upload(tmp_path):
         data = json.loads(jf.read_text())
         cfg = data["config_json"]["config"]
         assert cfg["optim"]["lr"] in [0.01, 0.02]
-        assert cfg["model"]["name"] in ["resnet18", "vit_base_patch16_224"]
+        # Check for either architecture (resnet18) or name (alexnet) fields
+        model_cfg = cfg["model"]
+        model_identifier = model_cfg.get("architecture") or model_cfg.get("name")
+        assert model_identifier in ["resnet18", "CifarAlexNet", "alexnet"]
         assert data["config_id"] == config_upload.config_hash(cfg)
 
 
@@ -69,9 +66,9 @@ def test_cli_main(tmp_path, monkeypatch, capsys):
             "--base-config-path",
             str(cfg_dir),
             "--config-name",
-            "config.yaml",
+            "decon_config.yaml",
             "--sweep",
-            "model=vit optim.lr=0.1,0.2",
+            "model=alexnet_cifar optim.lr=0.1,0.2",
         ]
     )
     out = capsys.readouterr().out

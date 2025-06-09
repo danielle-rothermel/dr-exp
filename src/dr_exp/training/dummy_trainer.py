@@ -4,7 +4,7 @@ from typing import Any, Optional
 
 from dr_exp.logging.base_logger import BaseLogger
 from dr_exp.logging.structured_logger import StructuredLogger
-from dr_exp.training.result import TrainingResult, create_success_result
+from dr_exp.training.training_result import TrainingResult, create_success_result
 
 
 def train(cfg: Any, logger: Optional[BaseLogger] = None) -> TrainingResult:

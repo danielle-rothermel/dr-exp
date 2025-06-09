@@ -25,4 +25,3 @@ validation:
 
 logging:
   log_interval: 50 # Log every 50 steps
-

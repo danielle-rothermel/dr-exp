@@ -12,7 +12,7 @@ from unittest.mock import patch
 
 from dr_exp.job_db import JobDBConfig, LocalJobDB, SupabaseJobDB
 from dr_exp.utils.factory import create_system, SystemConfig
-from dr_exp.training.result import create_success_result
+from dr_exp.training import create_success_result
 
 
 def make_wrapped_config(config_dict, metadata=None):

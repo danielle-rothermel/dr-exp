@@ -12,7 +12,7 @@ from dr_exp.job_db import JobDBConfig
 from dr_exp.manage.manager import Manager
 from dr_exp.manage.worker import run_worker
 from dr_exp.manage.process_manager import MockProcessManager
-from dr_exp.training.result import create_success_result
+from dr_exp.training import create_success_result
 from tests.conftest import make_wrapped_config
 
 

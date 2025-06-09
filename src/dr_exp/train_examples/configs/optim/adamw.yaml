@@ -1,3 +1,0 @@
-name: adamw  # deconCNN optimizer name
-lr: 0.001 # Default learning rate, can be swept
-weight_decay: 0.0001

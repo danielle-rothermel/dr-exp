@@ -1,244 +1,148 @@
-# CLAUDE.md
+# dr_exp - Deep Learning Experiment Manager
 
-This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
+## 🏗️ ARCHITECTURE OVERVIEW
 
-## Project Overview
+### What This System Does
+- Manages large-scale ML experiments on SLURM GPU clusters
+- Priority-based job queue (0-1000) with smart scheduling
+- Centralized data storage (Supabase) + real-time web monitoring
+- Hydra-based config management with hyperparameter sweeps
 
-`dr_exp` is a distributed experiment management system for deep learning research. It coordinates job execution across GPU clusters using a priority-based queue system with real-time monitoring.
+### Core Components
+```
+src/dr_exp/
+├── job_db/          # Database abstraction (BaseJobDB → LocalJobDB/SupabaseJobDB)
+├── manage/          # Manager/Worker system + ProcessManager
+├── api/             # FastAPI backend + WebSocket
+├── logging/         # StructuredLogger for metrics/artifacts
+├── cli/             # CLI Utility for using manage functionality
+├── training/        # Training functions used by workers
+└── utils/           # Factory, priority system helpers
+```
 
-## Development Commands
+### Key Design Patterns
+- **Abstract Interface First**: All DB operations use `BaseJobDB` interface
+- **Factory Pattern**: `Factory` creates integrated components with shared config
+- **Priority-Based Scheduling**: Jobs have priorities 0-1000, highest runs first
+- **Worker-Manager Model**: Manager coordinates, Workers execute training
 
-### Environment Setup
+## 🔧 ENVIRONMENT MODES
+
+- `EXPMGR_MODE`: Controls which database stores job data
+- `DR_EXP_BASE_PATH`: Controls where logs are written (always use a path prefixed by  `./logs/`)
+
+### Simple Testing
 ```bash
-# Python dependencies
-uv sync
+export EXPMGR_MODE=files_local  # JSON files in job_data/
+```
 
-# Frontend dependencies  
-cd react-babysitter-ui && npm install
+### Development (Always Use)
+```bash
+export EXPMGR_MODE=supabase_local
+supabase start  # Local PostgreSQL with full features
+```
 
-# Local database (recommended for development)
+### Production
+```bash
+export EXPMGR_MODE=supabase_remote  # Cloud Supabase
+```
+
+## 📋 COMMON WORKFLOWS
+
+### Quick Dev Cycle
+```bash
+# 1. Start services
 supabase start
 export EXPMGR_MODE=supabase_local
+
+# 2. Upload test jobs
+uvrp scripts/upload_configs.py \
+  --base-config-path configs \
+  --config-name decon_config \
+  --sweep "limit_train_batches=10 model=alexnet_cifar epochs=5" \
+  --priority 150
+
+# 3. Run worker
+DR_EXP_BASE_PATH="./logs/test0" uv run python scripts/manager_cli.py system run-worker dev_worker ./work
 ```
 
-### Running Services
+### Priority Management
 ```bash
-# Backend API
-uv run uvicorn dr_exp.api.main:app --reload
+# Upload urgent job
+uvrp scripts/manager_cli.py job upload-configs --priority 800 --sweep "..."
 
-# Frontend
-cd react-babysitter-ui && npm run dev
+# Boost existing job
+uvrp scripts/manager_cli.py job boost-priority <job_id> --amount 200
 
-# Job management via CLI
-uv run python scripts/manager_cli.py job upload-configs --sweep "model=resnet,vit"
-uv run python scripts/manager_cli.py system run --gpus-per-node 2
+# Run single job immediately (bypasses queue)
+uvrp scripts/manager_cli.py job run-one --overrides "model=resnet,lr=0.001"
 ```
 
-### Testing & Quality
-```bash
-# Run tests with coverage
-uv run pytest --cov=dr_exp --cov-report=term-missing
+## 🔍 KEY FILES & THEIR ROLES
 
-# Fast tests only
-uv run pytest -m "fast"
+### Database Layer (`src/dr_exp/job_db/`)
+- `base_job_db.py` - **NEVER MODIFY**: Abstract interface contract
+- `local_job_db.py` - JSON file implementation for testing
+- `supabase_job_db.py` - PostgreSQL implementation for production
 
-# Skip Supabase-dependent tests
-uv run pytest -m "not supabase"
+### Manager System (`src/dr_exp/manage/`)
+- `manager.py` - Coordinates workers, claims jobs by priority
+- `worker.py` - Executes training, logs metrics, handles errors
+- `factory.py` - **START HERE**: Creates properly configured systems
 
-# Linting
-cd react-babysitter-ui && npm run lint
-uv run ruff check src/ tests/
-```
+### API & Frontend
+- `src/dr_exp/api/main.py` - FastAPI app with WebSocket
+- `react-babysitter-ui/` - Real-time monitoring interface
+- Visit: `http://localhost:8000/docs` (API), `http://localhost:5173` (UI)
 
-## Core Architecture
+## ⚠️ CRITICAL CONSTRAINTS
 
-### Three-Mode System
-1. **`EXPMGR_MODE=files_local`**: JSON files, no dependencies
-2. **`EXPMGR_MODE=supabase_local`**: Local PostgreSQL via Docker
-3. **`EXPMGR_MODE=supabase_remote`**: Cloud PostgreSQL for production
+### Database Abstraction Rules
+- **Manager ONLY uses BaseJobDB methods** - no database-specific code
+- **Never bypass the interface** - all DB access through job_db layer
+- **Factory creates integrated components** - don't instantiate directly
 
-### Abstract Interface Pattern
-The system uses `BaseJobDB` abstract interface to eliminate mixed responsibilities:
-- `Manager` coordinates workers using only abstract methods
-- `LocalJobDB` and `SupabaseJobDB` implement the same interface
-- Factory pattern ensures consistent system configuration
-
-### Component Structure
-- **`src/dr_exp/job_db/`**: Database abstraction layer
-- **`src/dr_exp/manage/`**: Manager/Worker coordination system  
-- **`src/dr_exp/api/`**: FastAPI backend with WebSocket support
-- **`src/dr_exp/cli/`**: Command-line interface with grouped commands
-- **`src/dr_exp/logging/`**: Structured metrics and artifact logging
-- **`react-babysitter-ui/`**: Real-time monitoring frontend
-
-### Priority System
-5-tier job priorities (0-1000):
-- SYSTEM (900-1000): Critical maintenance
-- URGENT (700-899): Deadline experiments
-- HIGH (400-699): Important work
-- NORMAL (100-399): Default range
-- LOW (0-99): Background jobs
-
-## Key Development Patterns
-
-### Configuration Management
-- Uses Hydra for complex config composition
-- Supports hyperparameter sweeps via `--sweep` flag
-- Environment-aware configuration in `src/dr_exp/job_db/config.py`
-
-### Testing Strategy
-- 172+ tests with pytest markers: `supabase`, `slow`, `fast`, `integration`, `unit`
-- Event-driven testing using threading events for coordination
-- Mock fixtures with enhanced time mocking
-- Isolated test databases for parallel execution
-
-### Database Operations
-Always use abstract interface methods in business logic:
-```python
-# Good: Uses abstract interface
-jobs = job_db.get_stale_jobs(max_age_seconds=300)
-job_db.mark_jobs_failed(job_ids, reason="timeout")
-
-# Avoid: Database-specific implementations in business logic
-```
-
-### CLI Command Development
-Commands follow command pattern in `src/dr_exp/cli/commands/`:
-- Inherit from `BaseCommand`
-- Grouped by function: `job`, `system`, `admin`
-- Use `scripts/manager_cli.py` as entry point
-
-### Error Handling
-- Comprehensive logging with structured output
-- Graceful degradation for worker failures
-- Automatic job heartbeat monitoring
-- Stack trace preservation in error logging
-
-## Integration Points
-
-### deconCNN Training Library
-- Uses Lightning callback wrapper pattern
-- Official config support via `decon_trainer.py`
-- Example configs in `src/dr_exp/train_examples/configs/`
+### Priority System Rules
+- **0-1000 range**: 0=lowest, 1000=highest
+- **System jobs (900-1000)**: Critical maintenance only
+- **Urgent jobs (700-899)**: Deadlines, "run one" functionality
+- **Normal jobs (100-399)**: Default range
 
 ### SLURM Integration
-- Batch job submission via `scripts/slurm_job.sbatch`
-- GPU discovery and resource management
-- Distributed worker coordination
+- Workers designed for multi-GPU SLURM environments
+- Use `scripts/slurm_job.sbatch` for cluster submission
+- Manager handles `--gpus-per-node` and `--workers-per-gpu` scaling
 
-### Storage & Artifacts
-- Supabase object storage for artifacts
-- Local filesystem fallback
-- Checkpoint compression and upload coordination
+## 🚨 COMMON GOTCHAS
 
-## Common Development Tasks
+### Database Issues
+- **"No such table"**: Run `supabase db reset` to apply migrations
+- **Connection failures**: Check `EXPMGR_MODE` environment variable
+- **Stale data**: Use `scripts/reset_local_jobdb.py` for files_local mode
 
-### Adding New Commands
-1. Create command class in `src/dr_exp/cli/commands/`
-2. Register in `src/dr_exp/cli/registry.py`
-3. Add to appropriate group in `src/dr_exp/cli/command_groups.py`
-4. Follow existing command patterns
+### Job Execution
+- **Jobs stuck in queue**: Check priorities with `job list-jobs --status queued`
+- **Worker not claiming**: Ensure `job_id` reserved correctly in database
+- **Training failures**: Check `StructuredLogger` setup in worker code
 
-### Database Schema Changes
-1. Create migration in `supabase/migrations/`
-2. Update abstract interface in `BaseJobDB` if needed
-3. Implement in both `LocalJobDB` and `SupabaseJobDB`
-4. Add tests for new functionality
+### Configuration
+- **Hydra configs live in**: `configs/`
+- **Override syntax**: `model=resnet,vit lr=0.01,0.001` (comma-separated values)
+- **Custom configs**: Place in configs/ directory, reference by name
 
-### Frontend Development
-- React 19 with Vite build system
-- Tailwind CSS for styling
-- WebSocket integration for real-time updates
-- Axios for HTTP requests
+## 🧪 TESTING PATTERNS
 
-## CRITICAL DEVELOPMENT PRINCIPLES
+### Unit Tests
+- Database layer: Test against both LocalJobDB and SupabaseJobDB
+- Manager: Mock BaseJobDB interface, test job claiming logic
+- API: Use FastAPI test client with auth tokens
 
-⚠️ **ALL code changes must follow these mandatory principles:**
+### Integration Tests
+- Use `EXPMGR_MODE=files_local` for fast test cycles
+- Test complete workflows: upload → claim → execute → complete
+- Verify priority ordering in job queues
 
-### 1. **Fail Fast and Loud - NEVER Silent Failures**
-```python
-# ❌ WRONG - Silent failure with default
-value = config.get("required_field", "default")
-
-# ✅ CORRECT - Immediate failure  
-value = config["required_field"]  # KeyError if missing
-
-# ❌ WRONG - Continues with None
-result = upload_file(path)
-storage_path = result.get("storage_path")  # None if upload failed
-
-# ✅ CORRECT - Fails immediately
-result = upload_file(path)
-storage_path = result["storage_path"]  # KeyError if upload failed
-```
-
-**Requirements:**
-- Never use `.get()` with defaults to mask missing required data
-- Prefer `KeyError`/`AttributeError` over silent `None` returns
-- Add validation that raises `ValueError`/`TypeError` when assumptions violated
-- Use assertions for invariants that must always be true
-
-### 2. **Zero Backward Compatibility - Break Everything Immediately**
-```python
-# ❌ WRONG - Backward compatibility masks interface changes
-def process_result(result):
-    if isinstance(result, dict):  # Old format
-        return result.get("status", "unknown")
-    return result.status  # New format
-
-# ✅ CORRECT - Force immediate migration
-def process_result(result: TrainingResult):  # Type enforced
-    return result.status  # AttributeError if wrong type
-```
-
-**Requirements:**
-- Make incompatible changes obvious through `TypeError`/`AttributeError`
-- Force all callers to update to new patterns explicitly  
-- Never provide fallback behavior that masks interface changes
-- Use strict type annotations and runtime type checking
-
-### 3. **Flag Strange Patterns - Stop and Alert User**
-**When you encounter ANY of these patterns, STOP immediately and alert the user:**
-
-- `.get(key, default)` patterns that could mask missing data
-- Exception handling that continues with partial/invalid state  
-- Functions that return `None` instead of raising exceptions
-- Double/redundant operations (like recording failures twice)
-- Magic defaults or implicit behavior that could hide bugs
-- Silent type coercions or data transformations
-
-### 4. **Enforce Strict Contracts**
-```python
-# ❌ WRONG - Loose dictionary interface
-def train(config: dict) -> dict:
-    return {"status": "success", "acc": 0.95}
-
-# ✅ CORRECT - Strict dataclass contract
-def train(config: TrainingConfig) -> TrainingResult:
-    return TrainingResult(status="success", final_val_acc=0.95, ...)
-```
-
-**Requirements:**
-- Use dataclasses with validation over loose dictionaries
-- Require all parameters explicitly rather than providing defaults
-- Make required fields fail immediately if missing
-- Document and enforce exact contracts between components
-
-## deconCNN Integration Status
-
-**✅ COMPLETE**: Core integration between deconCNN and dr_exp is working
-- Training function: `src/dr_exp/train_examples/decon_trainer.py`
-- Type system: `src/dr_exp/training/result.py` with strict `TrainingResult` enforcement
-- Config system: Proper Hydra composition with deconCNN validation
-- Worker: `scripts/run_decon_worker.py` with type enforcement
-
-**Usage:**
-```bash
-# Upload and run deconCNN training jobs
-export DR_EXP_BASE_PATH="./experiment_data"
-EXPMGR_MODE="files_local" uv run python scripts/upload_configs.py \
-  --base-config-path /path/to/configs --config-name decon_integration_config
-EXPMGR_MODE="files_local" uv run python scripts/run_decon_worker.py
-```
-
-When making changes, ensure compatibility across all three database modes, maintain the abstract interface pattern, and strictly follow the development principles above.
+### Development Debugging
+- **API logs**: `uvicorn dr_exp.api.main:app --reload --log-level debug`
+- **WebSocket**: Browser dev tools Network tab to see live updates
+- **Database state**: Use Supabase Studio at `http://127.0.0.1:54323`
