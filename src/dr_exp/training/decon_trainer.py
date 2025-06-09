@@ -1,8 +1,8 @@
 import time
-from typing import Any, Dict, Optional
+from typing import Any, Dict, Optional, cast
 
 import torch
-from omegaconf import OmegaConf
+from omegaconf import OmegaConf, DictConfig
 import deconcnn
 
 from dr_exp.logging.base_logger import BaseLogger
@@ -14,7 +14,7 @@ from dr_exp.training.training_result import (
 )
 
 
-def validate_and_extract_decon_config(dr_exp_cfg: Any) -> OmegaConf:
+def validate_and_extract_decon_config(dr_exp_cfg: Any) -> DictConfig:
     """Extract and validate deconCNN config from dr_exp wrapper.
 
     Uses deconCNN's own validation functions to ensure config correctness.
@@ -57,44 +57,52 @@ def validate_and_extract_decon_config(dr_exp_cfg: Any) -> OmegaConf:
     # Use deconCNN's own validation functions - these will fail fast with detailed errors
     try:
         # Validate model configuration
-        model_dict = OmegaConf.to_container(decon_cfg.model, resolve=True)
+        model_dict = cast(
+            dict[str, Any], OmegaConf.to_container(decon_cfg.model, resolve=True)
+        )
         deconcnn.validate_model_config(model_dict)
 
         # Validate optimizer configuration
-        optim_dict = OmegaConf.to_container(decon_cfg.optim, resolve=True)
+        optim_dict = cast(
+            dict[str, Any], OmegaConf.to_container(decon_cfg.optim, resolve=True)
+        )
         deconcnn.validate_optimizer_config(optim_dict)
 
         # Validate scheduler configuration
-        lrsched_dict = OmegaConf.to_container(decon_cfg.lrsched, resolve=True)
+        lrsched_dict = cast(
+            dict[str, Any], OmegaConf.to_container(decon_cfg.lrsched, resolve=True)
+        )
         deconcnn.validate_scheduler_config(lrsched_dict)
 
         # Validate training configuration (epochs, batch_size, etc.)
-        training_dict = OmegaConf.to_container(decon_cfg, resolve=True)
+        training_dict = cast(
+            dict[str, Any], OmegaConf.to_container(decon_cfg, resolve=True)
+        )
         deconcnn.validate_training_config(training_dict)
 
     except Exception as e:
         raise ValueError(f"deconCNN config validation failed: {str(e)}")
 
-    return decon_cfg
+    return cast(DictConfig, decon_cfg)
 
 
 class DrExpClassificationModule:
     """Wrapper around deconCNN's ClassificationModule that logs to dr_exp's StructuredLogger."""
 
-    def __init__(self, decon_module, dr_exp_logger: BaseLogger):
+    def __init__(self, decon_module: Any, dr_exp_logger: BaseLogger) -> None:
         self.decon_module = decon_module
         self.dr_exp_logger = dr_exp_logger
-        self.final_metrics = {}
-        self.logged_epochs = set()  # Track which epochs we've already logged
+        self.final_metrics: dict[str, Any] = {}
+        self.logged_epochs: set[int] = set()  # Track which epochs we've already logged
 
         # Replace the original on_validation_epoch_end method
         self._wrap_validation_epoch_end()
 
-    def _wrap_validation_epoch_end(self):
+    def _wrap_validation_epoch_end(self) -> None:
         """Wrap the validation epoch end to capture and log metrics."""
         original_method = self.decon_module.on_validation_epoch_end
 
-        def wrapped_on_validation_epoch_end():
+        def wrapped_on_validation_epoch_end() -> None:
             # Call the original method first
             original_method()
 
@@ -226,7 +234,7 @@ def train_with_decon(
 
         # 4. Create deconCNN training components
         model, data_module, trainer = deconcnn.create_cifar10_training_components(
-            decon_cfg
+            cast(DictConfig, decon_cfg)
         )
 
         # 4. Wrap the Lightning module to log metrics to dr_exp
@@ -252,7 +260,7 @@ def train_with_decon(
         initial_time = time.time()
 
         # Train the model using deconCNN's training function
-        deconcnn.train_model(trainer, model, data_module, decon_cfg)
+        deconcnn.train_model(trainer, model, data_module, cast(DictConfig, decon_cfg))
 
         training_time = time.time() - initial_time
 
