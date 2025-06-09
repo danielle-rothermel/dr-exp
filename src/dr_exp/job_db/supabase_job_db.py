@@ -6,7 +6,7 @@ import shutil
 import tempfile
 import uuid
 from supabase import create_client, Client
-from typing import Optional, Dict, Any, List
+from typing import Optional, Dict, Any, List, cast
 from datetime import datetime, timezone, timedelta, UTC
 
 from .base_job_db import BaseJobDB, StaleJobInfo
@@ -84,7 +84,9 @@ class SupabaseJobDB(BaseJobDB):
                 "claim_next_job", {"worker_id_input": effective_worker_id}
             ).execute()
             if response.data:
-                return response.data[0]  # RPC might return a list with one item
+                return cast(
+                    dict[str, Any], response.data[0]
+                )  # RPC might return a list with one item
             return None  # No jobs available - legitimate case
         except Exception as e:
             logger.error(f"Critical database error claiming job: {e}")
@@ -150,7 +152,9 @@ class SupabaseJobDB(BaseJobDB):
                 .maybe_single()
                 .execute()
             )
-            return response.data if response.data else None  # None = job not found
+            if response and response.data:
+                return cast(dict[str, Any], response.data)
+            return None  # None = job not found
         except Exception as e:
             logger.error(
                 f"Critical database error getting job details for {job_id}: {e}"
@@ -189,9 +193,9 @@ class SupabaseJobDB(BaseJobDB):
                     .execute()
                 )
                 if response.data:
-                    return response.data[
-                        "config_json"
-                    ]  # Fail fast if config_json missing
+                    return cast(
+                        dict[str, Any], response.data["config_json"]
+                    )  # Fail fast if config_json missing
             return None  # Job not found or no config_id - legitimate cases
         except RuntimeError:
             # Re-raise database errors from get_job_details
@@ -394,7 +398,7 @@ class SupabaseJobDB(BaseJobDB):
             )
             if not response.data:
                 raise RuntimeError("Database insertion returned no data")
-            return response.data[0]
+            return cast(dict[str, Any], response.data[0])
         except Exception as e:
             logger.error(f"Critical database error adding sweep config cluster: {e}")
             raise RuntimeError(f"Failed to create sweep config cluster: {e}") from e
@@ -425,7 +429,9 @@ class SupabaseJobDB(BaseJobDB):
                 .maybe_single()
                 .execute()
             )
-            return response.data if response.data else None  # None = not found
+            if response and response.data:
+                return cast(dict[str, Any], response.data)
+            return None  # None = not found
         except Exception as e:
             logger.error(
                 f"Critical database error checking sweep config existence: {e}"
@@ -474,7 +480,7 @@ class SupabaseJobDB(BaseJobDB):
             response = self.supabase.table("sweep_configs").insert(data).execute()
             if not response.data:
                 raise RuntimeError("Database insertion returned no data")
-            return response.data[0]
+            return cast(dict[str, Any], response.data[0])
         except Exception as e:
             logger.error(f"Critical database error adding sweep config: {e}")
             raise RuntimeError(f"Failed to create sweep config: {e}") from e
@@ -534,7 +540,7 @@ class SupabaseJobDB(BaseJobDB):
             response = self.supabase.table("jobs").insert(data).execute()
             if not response.data:
                 raise RuntimeError("Database insertion returned no data")
-            return response.data[0]
+            return cast(dict[str, Any], response.data[0])
         except ValueError:
             # Re-raise validation errors
             raise
@@ -626,7 +632,7 @@ class SupabaseJobDB(BaseJobDB):
             if not response.data:
                 raise RuntimeError("Failed to create job entry: no data returned")
 
-            created_job = response.data[0]
+            created_job = cast(dict[str, Any], response.data[0])
 
             # Add the config_json for compatibility with LocalJobDB interface
             created_job["config_json"] = job_config
@@ -844,7 +850,7 @@ class SupabaseJobDB(BaseJobDB):
         try:
             response = self.supabase.table("jobs").insert(data).execute()
             if response.data:
-                job_record = response.data[0]
+                job_record = cast(dict[str, Any], response.data[0])
                 # Add the config_json to the response for consistency with LocalJobDB
                 job_record["config_json"] = job_config
                 logger.info(
