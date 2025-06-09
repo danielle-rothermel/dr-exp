@@ -1,8 +1,4 @@
-from dotenv import load_dotenv
-
 from dr_exp.job_db import BaseJobDB, LocalJobDB, SupabaseJobDB, JobDBConfig
-
-load_dotenv()
 
 
 def get_job_db_client(config: JobDBConfig) -> BaseJobDB:
@@ -20,12 +16,11 @@ def get_job_db_client(config: JobDBConfig) -> BaseJobDB:
 
     Raises
     ------
-    ValueError
+    AssertionError
         If configuration is invalid.
     """
 
     config.validate()
-
     if config.mode in ["supabase_remote", "supabase_local"]:
         return SupabaseJobDB(config)
     else:
