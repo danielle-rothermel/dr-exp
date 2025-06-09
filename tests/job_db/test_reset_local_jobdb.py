@@ -1,5 +1,7 @@
 import os
 from unittest.mock import patch
+from pathlib import Path
+import pytest
 from scripts.reset_local_jobdb import reset_job_db
 from dr_exp.job_db import JobDBConfig
 
@@ -24,7 +26,7 @@ def create_mock_environment(base_path: str) -> None:
         f.write("data")
 
 
-def test_reset_mock_db(tmp_path, monkeypatch):
+def test_reset_mock_db(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
     base = str(tmp_path)
     storage_path = str(tmp_path / "storage")
 

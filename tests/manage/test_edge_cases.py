@@ -11,6 +11,7 @@ import tempfile
 import os
 from unittest.mock import patch
 from pathlib import Path
+from typing import Any, Dict
 
 from dr_exp.manage.worker import run_worker
 from dr_exp.manage.manager import Manager
@@ -25,14 +26,14 @@ class TestDatabaseErrorScenarios:
     @pytest.mark.edge_case
     @pytest.mark.fast
     def test_worker_handles_database_connection_failure(
-        self, isolated_job_db, worker_execution_helper
-    ):
+        self, isolated_job_db: Any, worker_execution_helper: Any
+    ) -> None:
         """Test worker behavior when database connection fails during execution."""
         # Create a job
         job = isolated_job_db.add_test_job({"test": "db_failure"})
 
         # Mock training function that succeeds
-        def successful_train(config, logger):
+        def successful_train(config: Dict[str, Any], logger: Any) -> Dict[str, Any]:
             logger.log({"test_metric": 0.95})
             return create_success_result(
                 final_metrics={
@@ -53,7 +54,7 @@ class TestDatabaseErrorScenarios:
         original_update = isolated_job_db.update_job
         call_count = 0
 
-        def failing_update(job_id, updates):
+        def failing_update(job_id: str, updates: Dict[str, Any]) -> Any:
             nonlocal call_count
             call_count += 1
             # Fail heartbeat updates but allow other updates
@@ -72,7 +73,7 @@ class TestDatabaseErrorScenarios:
 
     @pytest.mark.edge_case
     @pytest.mark.fast
-    def test_worker_handles_config_fetch_failure(self, integration_system):
+    def test_worker_handles_config_fetch_failure(self, integration_system: Any) -> None:
         """Test worker behavior when job config cannot be fetched."""
         # Create a job
         job = integration_system.job_db.add_job(
@@ -105,13 +106,13 @@ class TestDatabaseErrorScenarios:
     @pytest.mark.edge_case
     @pytest.mark.fast
     def test_worker_handles_artifact_upload_failure(
-        self, isolated_job_db, worker_execution_helper
-    ):
+        self, isolated_job_db: Any, worker_execution_helper: Any
+    ) -> None:
         """Test worker behavior when artifact upload fails."""
         # Create a job
         job = isolated_job_db.add_test_job({"test": "upload_failure"})
 
-        def successful_train(config, logger):
+        def successful_train(config: Dict[str, Any], logger: Any) -> Dict[str, Any]:
             logger.log({"test_metric": 0.95})
             return create_success_result(
                 final_metrics={
@@ -129,7 +130,7 @@ class TestDatabaseErrorScenarios:
             )
 
         # Mock upload_artifact to fail
-        def failing_upload(job_id, file_path, remote_name):
+        def failing_upload(job_id: str, file_path: str, remote_name: str) -> None:
             raise IOError("Upload service unavailable")
 
         with patch.object(
@@ -150,13 +151,15 @@ class TestTrainingFunctionErrors:
     @pytest.mark.edge_case
     @pytest.mark.slow
     @pytest.mark.timeout
-    def test_training_function_timeout(self, isolated_job_db, worker_execution_helper):
+    def test_training_function_timeout(
+        self, isolated_job_db: Any, worker_execution_helper: Any
+    ) -> None:
         """Test worker behavior when training function hangs."""
         # Create a job
         _job = isolated_job_db.add_test_job({"test": "timeout"})
 
         # Training function that simulates hanging (optimized for faster testing)
-        def hanging_train(config, logger):
+        def hanging_train(config: Dict[str, Any], logger: Any) -> Dict[str, Any]:
             time.sleep(1)  # Reduced from 10s to 1s for faster testing
             logger.log({"test_metric": 0.95})
             return create_success_result(
@@ -184,13 +187,13 @@ class TestTrainingFunctionErrors:
     @pytest.mark.edge_case
     @pytest.mark.fast
     def test_training_function_memory_error(
-        self, isolated_job_db, worker_execution_helper
-    ):
+        self, isolated_job_db: Any, worker_execution_helper: Any
+    ) -> None:
         """Test worker behavior when training function runs out of memory."""
         # Create a job
         job = isolated_job_db.add_test_job({"test": "memory_error"})
 
-        def memory_error_train(config, logger):
+        def memory_error_train(config: Dict[str, Any], logger: Any) -> None:
             raise MemoryError("Out of memory during training")
 
         status = worker_execution_helper.run_worker_with_trainer(memory_error_train)
@@ -208,13 +211,13 @@ class TestTrainingFunctionErrors:
     @pytest.mark.edge_case
     @pytest.mark.fast
     def test_training_function_user_interrupt(
-        self, isolated_job_db, worker_execution_helper
-    ):
+        self, isolated_job_db: Any, worker_execution_helper: Any
+    ) -> None:
         """Test worker behavior when training is interrupted by user."""
         # Create a job
         job = isolated_job_db.add_test_job({"test": "user_interrupt"})
 
-        def interrupted_train(config, logger):
+        def interrupted_train(config: Dict[str, Any], logger: Any) -> None:
             # Use a custom exception to simulate interruption without actually interrupting the test
             raise RuntimeError("User interrupted training (simulated)")
 
@@ -229,13 +232,13 @@ class TestTrainingFunctionErrors:
     @pytest.mark.edge_case
     @pytest.mark.fast
     def test_training_function_corrupted_data(
-        self, isolated_job_db, worker_execution_helper
-    ):
+        self, isolated_job_db: Any, worker_execution_helper: Any
+    ) -> None:
         """Test worker behavior when training encounters corrupted data."""
         # Create a job
         job = isolated_job_db.add_test_job({"test": "corrupted_data"})
 
-        def corrupted_data_train(config, logger):
+        def corrupted_data_train(config: Dict[str, Any], logger: Any) -> None:
             raise ValueError("Corrupted data detected in batch 15")
 
         status = worker_execution_helper.run_worker_with_trainer(corrupted_data_train)
@@ -254,8 +257,8 @@ class TestConcurrencyAndRaceConditions:
     @pytest.mark.concurrency
     @pytest.mark.slow
     def test_multiple_workers_claiming_same_job(
-        self, isolated_job_db, worker_coordination
-    ):
+        self, isolated_job_db: Any, worker_coordination: Any
+    ) -> None:
         """Test that multiple workers cannot claim the same job."""
         # Create a single high-priority job
         job = isolated_job_db.add_test_job({"test": "race_condition"}, priority=900)
@@ -269,7 +272,7 @@ class TestConcurrencyAndRaceConditions:
             completion_events[worker_id] = threading.Event()
 
         # Mock training function that coordinates execution
-        def coordinated_train(config, logger):
+        def coordinated_train(config: Dict[str, Any], logger: Any) -> Dict[str, Any]:
             # Signal that training started and wait briefly
             time.sleep(0.1)
             logger.log({"test_metric": 0.95})
@@ -292,7 +295,7 @@ class TestConcurrencyAndRaceConditions:
         worker_threads = []
         worker_results = {}
 
-        def run_worker_thread(worker_id):
+        def run_worker_thread(worker_id: str) -> None:
             status = run_worker(
                 base_path=isolated_job_db.config.base_path,
                 max_claim_attempts=1,  # Only try once to avoid retries
@@ -335,8 +338,8 @@ class TestConcurrencyAndRaceConditions:
     @pytest.mark.concurrency
     @pytest.mark.fast
     def test_concurrent_job_claiming_with_priorities(
-        self, priority_job_factory, worker_coordination
-    ):
+        self, priority_job_factory: Any, worker_coordination: Any
+    ) -> None:
         """Test priority ordering is maintained under concurrent access."""
         # Create jobs with different priorities
         _jobs = priority_job_factory.create_high_medium_low_jobs()
@@ -345,7 +348,9 @@ class TestConcurrencyAndRaceConditions:
         execution_order = []
         order_lock = threading.Lock()
 
-        def priority_tracking_train(config, logger):
+        def priority_tracking_train(
+            config: Dict[str, Any], logger: Any
+        ) -> Dict[str, Any]:
             with order_lock:
                 priority_level = config.get("priority_test", "unknown")
                 execution_order.append(priority_level)
@@ -370,7 +375,7 @@ class TestConcurrencyAndRaceConditions:
         worker_threads = []
         worker_results = {}
 
-        def run_concurrent_worker(worker_id):
+        def run_concurrent_worker(worker_id: str) -> None:
             status = run_worker(
                 base_path=priority_job_factory.job_db.config.base_path,
                 max_claim_attempts=2,
@@ -403,7 +408,9 @@ class TestConcurrencyAndRaceConditions:
     @pytest.mark.edge_case
     @pytest.mark.concurrency
     @pytest.mark.fast
-    def test_worker_crash_during_execution(self, isolated_job_db, enhanced_mock_time):
+    def test_worker_crash_during_execution(
+        self, isolated_job_db: Any, enhanced_mock_time: Any
+    ) -> None:
         """Test system recovery when worker crashes during job execution."""
         # Create a job and claim it (simulating worker taking it)
         _job = isolated_job_db.add_test_job({"test": "worker_crash"})
@@ -444,7 +451,9 @@ class TestConcurrencyAndRaceConditions:
     @pytest.mark.edge_case
     @pytest.mark.concurrency
     @pytest.mark.slow
-    def test_high_frequency_job_creation_and_processing(self, isolated_job_db):
+    def test_high_frequency_job_creation_and_processing(
+        self, isolated_job_db: Any
+    ) -> None:
         """Test system behavior under high-frequency job creation and processing."""
         # Create many jobs rapidly
         jobs = []
@@ -460,7 +469,7 @@ class TestConcurrencyAndRaceConditions:
         worker_threads = []
         worker_results = {}
 
-        def high_frequency_train(config, logger):
+        def high_frequency_train(config: Dict[str, Any], logger: Any) -> Dict[str, Any]:
             # Simulate quick processing with some variability
             time.sleep(0.01 + (config["job_in_batch"] * 0.01))
             logger.log({"batch_id": config["batch_id"], "processed": True})
@@ -479,7 +488,7 @@ class TestConcurrencyAndRaceConditions:
                 training_time=0.01,
             )
 
-        def run_high_frequency_worker(worker_id):
+        def run_high_frequency_worker(worker_id: str) -> None:
             completed_count = 0
             while True:
                 status = run_worker(
@@ -520,7 +529,7 @@ class TestConcurrencyAndRaceConditions:
     @pytest.mark.edge_case
     @pytest.mark.concurrency
     @pytest.mark.fast
-    def test_concurrent_database_access_patterns(self, isolated_job_db):
+    def test_concurrent_database_access_patterns(self, isolated_job_db: Any) -> None:
         """Test various concurrent database access patterns."""
         from datetime import datetime, UTC
 
@@ -532,7 +541,7 @@ class TestConcurrencyAndRaceConditions:
         # Pattern 1: Concurrent job claiming
         claim_results = {}
 
-        def concurrent_claimer(worker_id, claim_count=3):
+        def concurrent_claimer(worker_id: str, claim_count: int = 3) -> None:
             claimed_jobs = []
             for i in range(claim_count):
                 try:
@@ -567,7 +576,7 @@ class TestConcurrencyAndRaceConditions:
         # Pattern 2: Concurrent status updates
         status_update_results = {}
 
-        def concurrent_status_updater(worker_id):
+        def concurrent_status_updater(worker_id: str) -> None:
             updates_made = 0
             for job_id in claim_results.get(worker_id, []):
                 try:
@@ -605,12 +614,14 @@ class TestResourceConstraints:
 
     @pytest.mark.edge_case
     @pytest.mark.fast
-    def test_disk_space_exhaustion(self, isolated_job_db, worker_execution_helper):
+    def test_disk_space_exhaustion(
+        self, isolated_job_db: Any, worker_execution_helper: Any
+    ) -> None:
         """Test worker behavior when disk space is exhausted."""
         # Create a job
         job = isolated_job_db.add_test_job({"test": "disk_space"})
 
-        def disk_space_train(config, logger):
+        def disk_space_train(config: Dict[str, Any], logger: Any) -> None:
             # Simulate disk space error during checkpoint saving
             logger.log({"epoch": 1, "loss": 0.5})
             # This would normally save a checkpoint and fail due to disk space
@@ -627,15 +638,15 @@ class TestResourceConstraints:
     @pytest.mark.edge_case
     @pytest.mark.fast
     def test_temporary_directory_cleanup(
-        self, isolated_job_db, worker_execution_helper
-    ):
+        self, isolated_job_db: Any, worker_execution_helper: Any
+    ) -> None:
         """Test that temporary directories are properly cleaned up."""
         # Create a job
         _job = isolated_job_db.add_test_job({"test": "temp_cleanup"})
 
         created_temp_dirs = []
 
-        def temp_tracking_train(config, logger):
+        def temp_tracking_train(config: Dict[str, Any], logger: Any) -> Dict[str, Any]:
             # Create some temporary files to test cleanup
             temp_file = tempfile.mktemp()
             created_temp_dirs.append(temp_file)
@@ -660,7 +671,7 @@ class TestResourceConstraints:
         original_mkdtemp = tempfile.mkdtemp
         created_work_dirs = []
 
-        def tracking_mkdtemp(*args, **kwargs):
+        def tracking_mkdtemp(*args: Any, **kwargs: Any) -> str:
             temp_dir = original_mkdtemp(*args, **kwargs)
             created_work_dirs.append(temp_dir)
             return temp_dir
@@ -679,12 +690,16 @@ class TestResourceConstraints:
 
     @pytest.mark.edge_case
     @pytest.mark.fast
-    def test_logger_resource_limits(self, isolated_job_db, worker_execution_helper):
+    def test_logger_resource_limits(
+        self, isolated_job_db: Any, worker_execution_helper: Any
+    ) -> None:
         """Test logger behavior under resource constraints."""
         # Create a job
         job = isolated_job_db.add_test_job({"test": "logger_limits"})
 
-        def resource_intensive_train(config, logger):
+        def resource_intensive_train(
+            config: Dict[str, Any], logger: Any
+        ) -> Dict[str, Any]:
             # Log many metrics to test resource limits
             for i in range(1000):
                 logger.log({"step": i, "metric": 0.95 + i * 0.001})
@@ -724,15 +739,15 @@ class TestRecoveryMechanisms:
     @pytest.mark.edge_case
     @pytest.mark.fast
     def test_automatic_job_retry_after_failure(
-        self, isolated_job_db, worker_execution_helper
-    ):
+        self, isolated_job_db: Any, worker_execution_helper: Any
+    ) -> None:
         """Test automatic retry mechanism for failed jobs."""
         # Create a job that will fail initially
         job = isolated_job_db.add_test_job({"test": "auto_retry", "retry_count": 0})
 
         attempt_count = 0
 
-        def retry_train(config, logger):
+        def retry_train(config: Dict[str, Any], logger: Any) -> Dict[str, Any]:
             nonlocal attempt_count
             attempt_count += 1
 
@@ -788,8 +803,8 @@ class TestRecoveryMechanisms:
     @pytest.mark.edge_case
     @pytest.mark.fast
     def test_graceful_shutdown_during_training(
-        self, isolated_job_db, worker_execution_helper
-    ):
+        self, isolated_job_db: Any, worker_execution_helper: Any
+    ) -> None:
         """Test graceful shutdown when training is in progress."""
         # Create a job
         job = isolated_job_db.add_test_job({"test": "graceful_shutdown"})
@@ -797,7 +812,9 @@ class TestRecoveryMechanisms:
         shutdown_event = threading.Event()
         training_started = threading.Event()
 
-        def graceful_shutdown_train(config, logger):
+        def graceful_shutdown_train(
+            config: Dict[str, Any], logger: Any
+        ) -> Dict[str, Any]:
             training_started.set()
 
             # Simulate long-running training that checks for shutdown
@@ -813,7 +830,7 @@ class TestRecoveryMechanisms:
 
             return {"final_val_acc": 0.95, "status": "success"}
 
-        def run_worker_with_shutdown():
+        def run_worker_with_shutdown() -> str:
             return worker_execution_helper.run_worker_with_trainer(
                 graceful_shutdown_train
             )
@@ -841,8 +858,8 @@ class TestRecoveryMechanisms:
     @pytest.mark.integration
     @pytest.mark.fast
     def test_manager_recovery_after_restart(
-        self, integration_system, enhanced_mock_time
-    ):
+        self, integration_system: Any, enhanced_mock_time: Any
+    ) -> None:
         """Test manager recovery after unexpected restart."""
         # Create multiple jobs in different states
         jobs = []
@@ -890,10 +907,10 @@ class TestRecoveryMechanisms:
         # Since we don't have direct access to the fixture, let's create a simple datetime patch
         from datetime import datetime, UTC
 
-        def create_datetime_patch():
+        def create_datetime_patch() -> Any:
             return patch("dr_exp.job_db.local_job_db.datetime")
 
-        def configure_patch(mock_datetime):
+        def configure_patch(mock_datetime: Any) -> Any:
             mock_datetime.now.return_value = enhanced_mock_time.now()
             mock_datetime.UTC = UTC
             mock_datetime.fromisoformat = datetime.fromisoformat

@@ -1,9 +1,11 @@
 """Tests for HTTP response headers and security features."""
 
+from typing import Any, Dict
+
 from .conftest import create_test_job, JobStatus
 
 
-def test_security_headers_present(client):
+def test_security_headers_present(client: Any) -> None:
     """Test that security headers are present on all responses."""
     endpoints = [
         "/health",
@@ -31,7 +33,7 @@ def test_security_headers_present(client):
                 )
 
 
-def test_content_type_headers(client, db_client):
+def test_content_type_headers(client: Any, db_client: Any) -> None:
     """Test that content-type headers are correct for different responses."""
     # Create a test job for endpoints that need it
     job = create_test_job(db_client)
@@ -53,7 +55,7 @@ def test_content_type_headers(client, db_client):
             assert "application/json" in resp.headers["content-type"]
 
 
-def test_api_version_headers_consistency(client, db_client):
+def test_api_version_headers_consistency(client: Any, db_client: Any) -> None:
     """Test that API version headers are consistent across all endpoints."""
     job = create_test_job(db_client)
     job_id = job["id"]
@@ -80,7 +82,7 @@ def test_api_version_headers_consistency(client, db_client):
             )
 
 
-def test_performance_timing_headers(client):
+def test_performance_timing_headers(client: Any) -> None:
     """Test that performance timing headers are present and reasonable."""
     endpoints = ["/health", "/metrics", "/api", "/jobs"]
 
@@ -100,7 +102,7 @@ def test_performance_timing_headers(client):
             )
 
 
-def test_deprecation_headers_on_legacy_endpoints(client, db_client):
+def test_deprecation_headers_on_legacy_endpoints(client: Any, db_client: Any) -> None:
     """Test that deprecation headers are correctly applied to legacy endpoints."""
     job = create_test_job(db_client)
     job_id = job["id"]
@@ -130,7 +132,7 @@ def test_deprecation_headers_on_legacy_endpoints(client, db_client):
             assert "/api/v1" in migration_guide or "v1" in migration_guide
 
 
-def test_no_deprecation_headers_on_current_endpoints(client):
+def test_no_deprecation_headers_on_current_endpoints(client: Any) -> None:
     """Test that current API endpoints do not have deprecation headers."""
     current_endpoints = ["/health", "/metrics", "/ws", "/docs"]
 
@@ -145,7 +147,7 @@ def test_no_deprecation_headers_on_current_endpoints(client):
             )
 
 
-def test_cors_headers_development(client):
+def test_cors_headers_development(client: Any) -> None:
     """Test CORS headers in development environment."""
     # In development, CORS might be permissive
     resp = client.get("/health")
@@ -157,7 +159,7 @@ def test_cors_headers_development(client):
         assert origin in ["*", "http://localhost:5173", "http://localhost:3000"]
 
 
-def test_cache_control_headers(client):
+def test_cache_control_headers(client: Any) -> None:
     """Test cache control headers for different types of responses."""
     # Health endpoint should not be cached aggressively
     resp = client.get("/health")
@@ -170,7 +172,7 @@ def test_cache_control_headers(client):
         assert "no-cache" in cache_control or "max-age" in cache_control
 
 
-def test_content_length_headers(client, db_client):
+def test_content_length_headers(client: Any, db_client: Any) -> None:
     """Test that content-length headers are present and accurate."""
     job = create_test_job(db_client)
     job_id = job["id"]
@@ -196,7 +198,7 @@ def test_content_length_headers(client, db_client):
             )
 
 
-def test_server_headers_security(client):
+def test_server_headers_security(client: Any) -> None:
     """Test that server headers don't expose sensitive information."""
     resp = client.get("/health")
     assert resp.status_code == 200
@@ -208,7 +210,7 @@ def test_server_headers_security(client):
         assert "uvicorn" not in server or "/" not in server
 
 
-def test_headers_on_error_responses(client):
+def test_headers_on_error_responses(client: Any) -> None:
     """Test that security headers are present even on error responses."""
     # Test 404 response
     resp = client.get("/nonexistent-endpoint")
@@ -222,7 +224,9 @@ def test_headers_on_error_responses(client):
         )
 
 
-def test_headers_on_admin_endpoints(client, db_client, admin_headers):
+def test_headers_on_admin_endpoints(
+    client: Any, db_client: Any, admin_headers: Dict[str, str]
+) -> None:
     """Test headers on authenticated admin endpoints."""
     job = create_test_job(db_client, status=JobStatus.FAILED)
     job_id = job["id"]
@@ -239,7 +243,9 @@ def test_headers_on_admin_endpoints(client, db_client, admin_headers):
     assert "application/json" in resp.headers["content-type"]
 
 
-def test_headers_consistency_across_methods(client, db_client, admin_headers):
+def test_headers_consistency_across_methods(
+    client: Any, db_client: Any, admin_headers: Dict[str, str]
+) -> None:
     """Test that headers are consistent across different HTTP methods."""
     job = create_test_job(db_client)
     job_id = job["id"]
@@ -265,7 +271,7 @@ def test_headers_consistency_across_methods(client, db_client, admin_headers):
     assert get_resp.headers["x-api-version"] == post_resp.headers["x-api-version"]
 
 
-def test_websocket_headers_different(client):
+def test_websocket_headers_different(client: Any) -> None:
     """Test that WebSocket endpoints have different header behavior."""
     # WebSocket upgrade should behave differently from regular HTTP
     # Note: TestClient WebSocket connection might not expose all headers
@@ -277,7 +283,7 @@ def test_websocket_headers_different(client):
         # Detailed header testing for WebSocket is limited in test environment
 
 
-def test_response_time_header_accuracy(client):
+def test_response_time_header_accuracy(client: Any) -> None:
     """Test that response time headers reflect actual processing time."""
     import time
 

@@ -1,9 +1,11 @@
 """Tests for API monitoring and system endpoints."""
 
+from typing import Any
+
 from .conftest import create_test_job, JobStatus
 
 
-def test_health_endpoint_basic(client):
+def test_health_endpoint_basic(client: Any) -> None:
     """Test basic health check endpoint functionality."""
     resp = client.get("/health")
     assert resp.status_code == 200
@@ -30,7 +32,7 @@ def test_health_endpoint_basic(client):
     assert isinstance(data["job_stats"], dict)
 
 
-def test_health_endpoint_job_stats_structure(client, db_client):
+def test_health_endpoint_job_stats_structure(client: Any, db_client: Any) -> None:
     """Test that health endpoint returns correct job statistics."""
     # Create jobs with different statuses
     create_test_job(db_client, status=JobStatus.QUEUED)
@@ -56,7 +58,7 @@ def test_health_endpoint_job_stats_structure(client, db_client):
     assert job_stats["failed"] >= 1
 
 
-def test_metrics_endpoint_basic(client):
+def test_metrics_endpoint_basic(client: Any) -> None:
     """Test basic metrics endpoint functionality."""
     resp = client.get("/metrics")
     assert resp.status_code == 200
@@ -88,7 +90,7 @@ def test_metrics_endpoint_basic(client):
     assert data["running_jobs"] >= 0
 
 
-def test_metrics_endpoint_job_counts(client, db_client):
+def test_metrics_endpoint_job_counts(client: Any, db_client: Any) -> None:
     """Test that metrics endpoint returns accurate job counts."""
     # Start with clean state and create specific jobs
     _queued_jobs = [
@@ -122,7 +124,7 @@ def test_metrics_endpoint_job_counts(client, db_client):
     assert job_stats["completed"] >= 1
 
 
-def test_api_info_endpoint(client):
+def test_api_info_endpoint(client: Any) -> None:
     """Test API information endpoint."""
     resp = client.get("/api")
     assert resp.status_code == 200
@@ -155,7 +157,7 @@ def test_api_info_endpoint(client):
     assert v1_info["docs"] == "/docs"
 
 
-def test_response_headers_version(client):
+def test_response_headers_version(client: Any) -> None:
     """Test that API version headers are present."""
     endpoints_to_test = ["/health", "/metrics", "/api", "/jobs"]
 
@@ -168,7 +170,7 @@ def test_response_headers_version(client):
         assert resp.headers["X-API-Version"] == "1.0.0"
 
 
-def test_response_headers_timing(client):
+def test_response_headers_timing(client: Any) -> None:
     """Test that performance timing headers are present."""
     resp = client.get("/health")
     assert resp.status_code == 200
@@ -181,7 +183,7 @@ def test_response_headers_timing(client):
     assert 0 <= process_time <= 10.0  # Should be under 10 seconds for health check
 
 
-def test_deprecation_headers_presence(client):
+def test_deprecation_headers_presence(client: Any) -> None:
     """Test that deprecation headers are added to non-versioned endpoints."""
     # Endpoints that should have deprecation headers
     deprecated_endpoints = ["/jobs", "/job/123", "/config/123", "/metrics/123"]
@@ -198,7 +200,7 @@ def test_deprecation_headers_presence(client):
             assert "deprecated" in deprecation_notice.lower()
 
 
-def test_no_deprecation_headers_for_excluded_paths(client):
+def test_no_deprecation_headers_for_excluded_paths(client: Any) -> None:
     """Test that deprecation headers are not added to excluded paths."""
     # Endpoints that should NOT have deprecation headers (based on API middleware logic)
     excluded_endpoints = ["/health", "/metrics", "/ws", "/docs"]
@@ -214,7 +216,7 @@ def test_no_deprecation_headers_for_excluded_paths(client):
             )
 
 
-def test_health_endpoint_database_status(client, db_client):
+def test_health_endpoint_database_status(client: Any, db_client: Any) -> None:
     """Test health endpoint database status reporting."""
     resp = client.get("/health")
     assert resp.status_code == 200
@@ -234,7 +236,7 @@ def test_health_endpoint_database_status(client, db_client):
     assert data["database_status"] == "healthy"
 
 
-def test_metrics_endpoint_active_connections(client):
+def test_metrics_endpoint_active_connections(client: Any) -> None:
     """Test metrics endpoint active connections tracking."""
     resp = client.get("/metrics")
     assert resp.status_code == 200
@@ -247,14 +249,14 @@ def test_metrics_endpoint_active_connections(client):
     assert data["active_connections"] >= 0
 
 
-def test_concurrent_health_checks(client):
+def test_concurrent_health_checks(client: Any) -> None:
     """Test multiple concurrent health check requests."""
     import threading
 
     results = []
     errors = []
 
-    def make_request():
+    def make_request() -> None:
         try:
             resp = client.get("/health")
             results.append(resp.status_code)
@@ -281,7 +283,7 @@ def test_concurrent_health_checks(client):
     assert all(status == 200 for status in results)
 
 
-def test_uptime_consistency(client):
+def test_uptime_consistency(client: Any) -> None:
     """Test that uptime values are consistent and increasing."""
     import time
 

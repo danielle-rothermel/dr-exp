@@ -12,7 +12,7 @@ from dr_exp.utils.cli_validation import (
 )
 
 
-def test_validate_priority():
+def test_validate_priority() -> None:
     """Test priority validation."""
     # Valid priorities
     assert validate_priority(0) == 0
@@ -30,7 +30,7 @@ def test_validate_priority():
         validate_priority("invalid")
 
 
-def test_validate_job_id():
+def test_validate_job_id() -> None:
     """Test job ID validation."""
     # Valid job IDs (must be at least 8 characters)
     assert validate_job_id("job12345") == "job12345"
@@ -50,7 +50,7 @@ def test_validate_job_id():
         validate_job_id(123)
 
 
-def test_validate_positive_int():
+def test_validate_positive_int() -> None:
     """Test positive integer validation."""
     # Valid values
     assert validate_positive_int(1, "test") == 1
@@ -67,7 +67,7 @@ def test_validate_positive_int():
         validate_positive_int("invalid", "test")
 
 
-def test_validate_job_statuses():
+def test_validate_job_statuses() -> None:
     """Test job status validation."""
     # Valid statuses
     assert validate_job_statuses(["queued"]) == ["queued"]
@@ -81,7 +81,7 @@ def test_validate_job_statuses():
         validate_job_statuses(["invalid"])
 
 
-def test_validate_config_overrides():
+def test_validate_config_overrides() -> None:
     """Test config override validation."""
     # Valid overrides
     assert validate_config_overrides("") == []

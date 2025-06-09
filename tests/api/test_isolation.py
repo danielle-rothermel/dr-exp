@@ -2,10 +2,11 @@
 
 import tempfile
 from pathlib import Path
+from typing import Any, Dict
 from .conftest import create_test_job, JobStatus
 
 
-def test_test_isolation_between_functions(tmp_path, monkeypatch):
+def test_test_isolation_between_functions(tmp_path: Any, monkeypatch: Any) -> None:
     """Test that test functions don't interfere with each other."""
     from dr_exp.api.main import create_app
     from fastapi.testclient import TestClient
@@ -55,7 +56,7 @@ def test_test_isolation_between_functions(tmp_path, monkeypatch):
     assert job1["id"] != job2["id"]
 
 
-def test_temporary_directory_cleanup():
+def test_temporary_directory_cleanup() -> None:
     """Test that temporary directories are properly cleaned up."""
     with tempfile.TemporaryDirectory() as tmp_dir:
         tmp_path = Path(tmp_dir)
@@ -73,7 +74,7 @@ def test_temporary_directory_cleanup():
     assert not tmp_path.exists()
 
 
-def test_environment_variable_isolation(monkeypatch):
+def test_environment_variable_isolation(monkeypatch: Any) -> None:
     """Test that environment variables are properly isolated."""
     import os
 
@@ -88,7 +89,7 @@ def test_environment_variable_isolation(monkeypatch):
     # Environment will be restored after test
 
 
-def test_database_state_isolation(client, db_client):
+def test_database_state_isolation(client: Any, db_client: Any) -> None:
     """Test that database state doesn't leak between tests."""
     # This test should start with an empty database
     resp = client.get("/jobs")
@@ -113,7 +114,7 @@ def test_database_state_isolation(client, db_client):
     assert resp.json()["id"] == job["id"]
 
 
-def test_api_client_independence(tmp_path, monkeypatch):
+def test_api_client_independence(tmp_path: Any, monkeypatch: Any) -> None:
     """Test that multiple API clients can operate independently."""
     from dr_exp.api.main import create_app
     from fastapi.testclient import TestClient
@@ -143,7 +144,12 @@ def test_api_client_independence(tmp_path, monkeypatch):
     assert resp1.json()["id"] == resp2.json()["id"]
 
 
-def test_fixture_consistency(client, db_client, admin_headers, reader_headers):
+def test_fixture_consistency(
+    client: Any,
+    db_client: Any,
+    admin_headers: Dict[str, str],
+    reader_headers: Dict[str, str],
+) -> None:
     """Test that fixtures provide consistent interface."""
     # Test that all required fixtures are available and work
     assert client is not None
@@ -165,7 +171,7 @@ def test_fixture_consistency(client, db_client, admin_headers, reader_headers):
     assert admin_headers["Authorization"] != reader_headers["Authorization"]
 
 
-def test_test_data_consistency():
+def test_test_data_consistency() -> None:
     """Test that test data generation is consistent and predictable."""
     from .conftest import Priority
 
@@ -183,7 +189,7 @@ def test_test_data_consistency():
     assert JobStatus.KILLED in valid_statuses
 
 
-def test_error_state_isolation(client, db_client):
+def test_error_state_isolation(client: Any, db_client: Any) -> None:
     """Test that error states don't affect subsequent tests."""
     # Try to access non-existent resource
     resp = client.get("/job/nonexistent-id")

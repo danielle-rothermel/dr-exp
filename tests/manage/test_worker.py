@@ -4,6 +4,7 @@ import os
 import zipfile
 import pytest
 from unittest.mock import Mock, patch
+from typing import Any, Dict
 
 from dr_exp.job_db import LocalJobDB, JobDBConfig
 from dr_exp.manage.worker import (
@@ -16,7 +17,7 @@ from dr_exp.manage.worker import (
 )
 
 
-def make_config():
+def make_config() -> Dict[str, Any]:
     """Create a test configuration in the wrapped format expected by the system."""
     return {
         "config": {
@@ -34,7 +35,7 @@ def make_config():
 
 
 @pytest.fixture
-def temp_client(tmp_path):
+def temp_client(tmp_path: Any) -> LocalJobDB:
     """Create a temporary LocalJobDB client."""
     return LocalJobDB(
         JobDBConfig(
@@ -48,7 +49,7 @@ def temp_client(tmp_path):
 class TestHeartbeatManager:
     """Test the HeartbeatManager class."""
 
-    def test_initialization(self):
+    def test_initialization(self) -> None:
         """Test heartbeat manager initialization."""
         mock_client = Mock()
         manager = HeartbeatManager(mock_client, "job123", 5.0)
@@ -59,7 +60,7 @@ class TestHeartbeatManager:
         assert manager.thread is None
         assert not manager.stop_event.is_set()
 
-    def test_start_and_stop(self):
+    def test_start_and_stop(self) -> None:
         """Test starting and stopping heartbeat."""
         mock_client = Mock()
         manager = HeartbeatManager(
@@ -79,7 +80,7 @@ class TestHeartbeatManager:
 class TestManagedWorkDirectory:
     """Test the managed work directory context manager."""
 
-    def test_with_provided_directory(self, tmp_path):
+    def test_with_provided_directory(self, tmp_path: Any) -> None:
         """Test with an explicitly provided work directory."""
         work_dir = str(tmp_path / "work")
 
@@ -90,7 +91,7 @@ class TestManagedWorkDirectory:
         # Directory should still exist after context (not cleaned up)
         assert os.path.exists(work_dir)
 
-    def test_with_temporary_directory(self):
+    def test_with_temporary_directory(self) -> None:
         """Test with automatically created temporary directory."""
         with managed_work_directory(None, "job123") as managed_dir:
             assert managed_dir is not None
@@ -104,7 +105,7 @@ class TestManagedWorkDirectory:
 class TestJobExecutor:
     """Test the JobExecutor class."""
 
-    def test_initialization(self, temp_client):
+    def test_initialization(self, temp_client: LocalJobDB) -> None:
         """Test job executor initialization."""
         job = {"id": "job123", "status": "running"}
         mock_trainer = Mock()
@@ -123,7 +124,7 @@ class TestJobExecutor:
         assert executor.trainer_fn is mock_trainer
         assert executor.heartbeat_interval == 5.0
 
-    def test_upload_metrics_with_retry_success(self, temp_client):
+    def test_upload_metrics_with_retry_success(self, temp_client: LocalJobDB) -> None:
         """Test successful metrics upload."""
         job = {"id": "job123", "status": "running"}
         mock_trainer = Mock()
@@ -150,7 +151,7 @@ class TestJobExecutor:
             "job123", "/tmp/metrics.jsonl", "metrics.jsonl"
         )
 
-    def test_upload_metrics_with_retry_failure(self, temp_client):
+    def test_upload_metrics_with_retry_failure(self, temp_client: LocalJobDB) -> None:
         """Test metrics upload failure."""
         job = {"id": "job123", "status": "running"}
         mock_trainer = Mock()
@@ -175,7 +176,7 @@ class TestJobExecutor:
 
         assert "Metrics upload failed: Upload failed" in str(exc_info.value)
 
-    def test_upload_bundle_with_retry_success(self, temp_client):
+    def test_upload_bundle_with_retry_success(self, temp_client: LocalJobDB) -> None:
         """Test successful bundle upload."""
         job = {"id": "job123", "status": "running"}
         mock_trainer = Mock()
@@ -201,7 +202,7 @@ class TestJobExecutor:
         assert result["success"] is True
         assert result["storage_path"] == "/path/to/bundle"
 
-    def test_upload_bundle_with_retry_failure(self, temp_client):
+    def test_upload_bundle_with_retry_failure(self, temp_client: LocalJobDB) -> None:
         """Test bundle upload failure."""
         job = {"id": "job123", "status": "running"}
         mock_trainer = Mock()
@@ -227,7 +228,7 @@ class TestJobExecutor:
 
         assert "Bundle upload failed: Bundle failed" in str(exc_info.value)
 
-    def test_handle_upload_failure(self, temp_client):
+    def test_handle_upload_failure(self, temp_client: LocalJobDB) -> None:
         """Test upload failure handling."""
         job = {"id": "job123", "status": "running"}
         mock_trainer = Mock()
@@ -257,7 +258,7 @@ class TestJobExecutor:
             "job123", "failed", {"finalize_success": False}
         )
 
-    def test_create_success_metadata(self, temp_client):
+    def test_create_success_metadata(self, temp_client: LocalJobDB) -> None:
         """Test successful metadata creation."""
         job = {"id": "job123", "status": "running"}
         mock_trainer = Mock()
@@ -317,7 +318,7 @@ class TestJobExecutor:
 class TestClaimJob:
     """Test the job claiming logic."""
 
-    def test_claim_normal_job_success(self, temp_client):
+    def test_claim_normal_job_success(self, temp_client: LocalJobDB) -> None:
         """Test successful normal job claiming."""
         # Add a job to claim
         job = temp_client.add_job(make_config(), "sweep1", status="queued")
@@ -328,13 +329,13 @@ class TestClaimJob:
         assert result["id"] == job["id"]
         assert result["assigned_worker"] == "worker1"
 
-    def test_claim_normal_job_no_jobs(self, temp_client):
+    def test_claim_normal_job_no_jobs(self, temp_client: LocalJobDB) -> None:
         """Test normal job claiming when no jobs available."""
         result = _claim_job(temp_client, "worker1", None, 2, True)
 
         assert result == "no_job"
 
-    def test_claim_target_job_success(self, temp_client):
+    def test_claim_target_job_success(self, temp_client: LocalJobDB) -> None:
         """Test successful target job claiming."""
         # Add a job to claim
         job = temp_client.add_job(make_config(), "sweep1", status="queued")
@@ -344,13 +345,13 @@ class TestClaimJob:
         assert isinstance(result, dict)
         assert result["id"] == job["id"]
 
-    def test_claim_target_job_not_found(self, temp_client):
+    def test_claim_target_job_not_found(self, temp_client: LocalJobDB) -> None:
         """Test target job claiming when job doesn't exist."""
         result = _claim_job(temp_client, "worker1", "nonexistent", 3, True)
 
         assert result == "job_not_found"
 
-    def test_claim_target_job_not_queued(self, temp_client):
+    def test_claim_target_job_not_queued(self, temp_client: LocalJobDB) -> None:
         """Test target job claiming when job is not queued."""
         # Add a job but mark it as running
         job = temp_client.add_job(make_config(), "sweep1", status="running")
@@ -363,7 +364,7 @@ class TestClaimJob:
 class TestStreamlinedWorker:
     """Test the main streamlined worker function."""
 
-    def test_worker_success(self, tmp_path, temp_client):
+    def test_worker_success(self, tmp_path: Any, temp_client: LocalJobDB) -> None:
         """Test successful job execution."""
         job = temp_client.add_job(make_config(), "sweep1", status="queued")
 
@@ -398,7 +399,7 @@ class TestStreamlinedWorker:
             assert "artifacts/loss_plot.txt" in names
             assert any(n.startswith("checkpoints/") for n in names)
 
-    def test_worker_no_job(self, tmp_path, temp_client):
+    def test_worker_no_job(self, tmp_path: Any, temp_client: LocalJobDB) -> None:
         """Test worker when no jobs are available."""
         work_dir = tmp_path / "work"
         result = run_worker(
@@ -412,11 +413,13 @@ class TestStreamlinedWorker:
 
         assert result == "no_job"
 
-    def test_worker_training_failure(self, tmp_path, temp_client):
+    def test_worker_training_failure(
+        self, tmp_path: Any, temp_client: LocalJobDB
+    ) -> None:
         """Test worker when training function fails."""
         job = temp_client.add_job(make_config(), "sweep1", status="queued")
 
-        def failing_train(cfg, logger):
+        def failing_train(cfg: Dict[str, Any], logger: Any) -> None:
             raise RuntimeError("Training failed")
 
         work_dir = tmp_path / "work"
@@ -440,7 +443,9 @@ class TestStreamlinedWorker:
         assert "RuntimeError" in job_data["error_message"]
         assert "Training failed" in job_data["error_message"]
 
-    def test_worker_with_target_job(self, tmp_path, temp_client):
+    def test_worker_with_target_job(
+        self, tmp_path: Any, temp_client: LocalJobDB
+    ) -> None:
         """Test worker with specific target job ID."""
         job = temp_client.add_job(make_config(), "sweep1", status="queued")
 
@@ -459,7 +464,9 @@ class TestStreamlinedWorker:
         assert job_data["status"] == "completed"
         assert job_data["assigned_worker"] == "w0"
 
-    def test_worker_with_nonexistent_target_job(self, tmp_path, temp_client):
+    def test_worker_with_nonexistent_target_job(
+        self, tmp_path: Any, temp_client: LocalJobDB
+    ) -> None:
         """Test worker with nonexistent target job ID."""
         status = run_worker(
             base_path=str(tmp_path),
@@ -471,7 +478,9 @@ class TestStreamlinedWorker:
 
         assert status == "job_not_found"
 
-    def test_worker_config_missing(self, tmp_path, temp_client):
+    def test_worker_config_missing(
+        self, tmp_path: Any, temp_client: LocalJobDB
+    ) -> None:
         """Test worker when job config is missing."""
         # Create a job but don't set up config properly
         job = temp_client.add_job(make_config(), "sweep1", status="queued")

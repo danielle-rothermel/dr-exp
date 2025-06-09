@@ -1,5 +1,6 @@
 import json
 from pathlib import Path
+from typing import Any
 
 from dr_exp.job_db import LocalJobDB, JobDBConfig
 from dr_exp.utils import config_upload
@@ -9,7 +10,7 @@ from scripts import upload_configs
 CONFIG_DIR = Path(__file__).resolve().parents[2] / "configs"
 
 
-def test_generate_and_upload(tmp_path):
+def test_generate_and_upload(tmp_path: Path) -> None:
     cfg_dir = CONFIG_DIR
     client = LocalJobDB(
         JobDBConfig(
@@ -44,7 +45,7 @@ def test_generate_and_upload(tmp_path):
         assert data["config_id"] == config_upload.config_hash(cfg)
 
 
-def test_cli_main(tmp_path, monkeypatch, capsys):
+def test_cli_main(tmp_path: Path, monkeypatch: Any, capsys: Any) -> None:
     cfg_dir = CONFIG_DIR
     client_path = tmp_path / "env"
     client = LocalJobDB(
@@ -56,7 +57,7 @@ def test_cli_main(tmp_path, monkeypatch, capsys):
     )
 
     # monkeypatch client inside module
-    def mock_client():
+    def mock_client() -> LocalJobDB:
         return client
 
     monkeypatch.setattr("scripts.upload_configs.get_job_db_client", mock_client)

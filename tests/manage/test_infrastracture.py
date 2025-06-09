@@ -5,6 +5,7 @@ These tests serve as both validation of the infrastructure and examples for futu
 """
 
 import threading
+from typing import Any, Dict, Callable
 
 from dr_exp.manage.worker import run_worker
 from dr_exp.training import create_success_result
@@ -14,7 +15,9 @@ from tests.conftest import make_wrapped_config
 class TestEnhancedTimeFixtures:
     """Demonstrate enhanced time-controlled testing patterns."""
 
-    def test_milestone_based_timing(self, enhanced_mock_time, isolated_job_db):
+    def test_milestone_based_timing(
+        self, enhanced_mock_time: Any, isolated_job_db: Any
+    ) -> None:
         """Test using named milestones for time coordination."""
         # Create a job that will be checked for staleness
         job = isolated_job_db.add_test_job({"test": "milestone_timing"})
@@ -36,12 +39,12 @@ class TestEnhancedTimeFixtures:
         time_diff = (stale_time - start_time).total_seconds()
         assert time_diff >= 25  # Should be at least 2*10 + 5 buffer
 
-    def test_event_coordination_with_timing(self, enhanced_mock_time):
+    def test_event_coordination_with_timing(self, enhanced_mock_time: Any) -> None:
         """Test event coordination with milestone timing."""
         # Start waiting for a milestone in a thread
         milestone_reached = threading.Event()
 
-        def wait_for_milestone():
+        def wait_for_milestone() -> None:
             if enhanced_mock_time.wait_for_milestone("test_event", timeout=2):
                 milestone_reached.set()
 
@@ -59,7 +62,7 @@ class TestEnhancedTimeFixtures:
 class TestDatabaseStateManagement:
     """Demonstrate enhanced database state management utilities."""
 
-    def test_job_creation_patterns(self, isolated_job_db):
+    def test_job_creation_patterns(self, isolated_job_db: Any) -> None:
         """Test standardized job creation patterns."""
         # Create jobs with realistic priority distribution
         jobs = isolated_job_db.create_test_jobs(count=5, priority_range=(200, 800))
@@ -71,7 +74,7 @@ class TestDatabaseStateManagement:
         assert max(priorities) <= 800
         assert len(set(priorities)) == 5  # All different priorities
 
-    def test_state_verification_utilities(self, isolated_job_db):
+    def test_state_verification_utilities(self, isolated_job_db: Any) -> None:
         """Test database state verification helpers."""
         # Create jobs in different states
         isolated_job_db.add_test_job({"state": "queued"}, status="queued")
@@ -86,7 +89,7 @@ class TestDatabaseStateManagement:
         job_statuses = {job["id"]: job["status"] for job in all_jobs}
         isolated_job_db.verify_job_statuses(job_statuses)
 
-    def test_database_isolation(self, isolated_job_db):
+    def test_database_isolation(self, isolated_job_db: Any) -> None:
         """Test that database isolation works correctly."""
         # Add some jobs
         _job1 = isolated_job_db.add_test_job({"test": "isolation_1"})
@@ -105,7 +108,9 @@ class TestDatabaseStateManagement:
 class TestEventDrivenUtilities:
     """Demonstrate event-driven test coordination utilities."""
 
-    def test_worker_coordination_basic(self, worker_coordination, integration_system):
+    def test_worker_coordination_basic(
+        self, worker_coordination: Any, integration_system: Any
+    ) -> None:
         """Test basic worker coordination patterns."""
         worker_id = "coordinated_worker_1"
 
@@ -127,7 +132,7 @@ class TestEventDrivenUtilities:
         result = []
         exception_caught = []
 
-        def run_coordinated_worker():
+        def run_coordinated_worker() -> None:
             try:
                 status = run_worker(
                     base_path=integration_system.config.job_db_config.base_path,
@@ -174,8 +179,8 @@ class TestEventDrivenUtilities:
         assert result[0] == "completed"
 
     def test_multiple_worker_coordination(
-        self, worker_coordination, integration_system
-    ):
+        self, worker_coordination: Any, integration_system: Any
+    ) -> None:
         """Test coordination of multiple workers."""
         worker_ids = ["worker_1", "worker_2", "worker_3"]
 
@@ -199,8 +204,10 @@ class TestEventDrivenUtilities:
         for worker_id in worker_ids:
             trainer_fn = worker_coordination.create_coordinated_trainer(worker_id)
 
-            def create_worker_runner(wid, tfn):
-                def run():
+            def create_worker_runner(
+                wid: str, tfn: Callable[..., Any]
+            ) -> Callable[[], None]:
+                def run() -> None:
                     status = run_worker(
                         base_path=integration_system.config.job_db_config.base_path,
                         max_claim_attempts=integration_system.config.max_claim_attempts,
@@ -246,7 +253,9 @@ class TestEventDrivenUtilities:
 class TestManageSpecificFixtures:
     """Demonstrate manage-specific enhanced fixtures."""
 
-    def test_heartbeat_monitoring(self, heartbeat_monitor, integration_system):
+    def test_heartbeat_monitoring(
+        self, heartbeat_monitor: Any, integration_system: Any
+    ) -> None:
         """Test heartbeat monitoring utilities."""
         # Add a job
         _job = integration_system.job_db.add_job(
@@ -264,7 +273,9 @@ class TestManageSpecificFixtures:
             execution_started = threading.Event()
             can_complete = threading.Event()
 
-            def mock_train_with_heartbeat(config, logger, *args, **kwargs):
+            def mock_train_with_heartbeat(
+                config: Dict[str, Any], logger: Any, *args: Any, **kwargs: Any
+            ) -> Dict[str, Any]:
                 execution_started.set()
                 can_complete.wait(timeout=5)
                 return create_success_result(
@@ -285,7 +296,7 @@ class TestManageSpecificFixtures:
             # Run worker in thread
             result = []
 
-            def run_worker_thread():
+            def run_worker_thread() -> None:
                 status = run_worker(
                     base_path=integration_system.config.job_db_config.base_path,
                     max_claim_attempts=integration_system.config.max_claim_attempts,
@@ -316,7 +327,9 @@ class TestManageSpecificFixtures:
         # Verify heartbeat count
         assert heartbeat_monitor.get_heartbeat_count() >= 2
 
-    def test_stale_job_detection_helper(self, stale_job_detector, integration_manager):
+    def test_stale_job_detection_helper(
+        self, stale_job_detector: Any, integration_manager: Any
+    ) -> None:
         """Test stale job detection helper utilities."""
         # Create a stale job
         stale_job = stale_job_detector.create_stale_job(
@@ -344,7 +357,9 @@ class TestManageSpecificFixtures:
         assert job_details["status"] == "failed"
         assert "worker_lost" in job_details.get("status_reason", "")
 
-    def test_priority_job_factory(self, priority_job_factory, worker_execution_helper):
+    def test_priority_job_factory(
+        self, priority_job_factory: Any, worker_execution_helper: Any
+    ) -> None:
         """Test priority job factory and execution helper."""
         # Create high/medium/low priority jobs
         jobs = priority_job_factory.create_high_medium_low_jobs()
@@ -357,7 +372,9 @@ class TestManageSpecificFixtures:
         # Track execution order
         execution_order = []
 
-        def priority_tracking_trainer(config, logger, *args, **kwargs):
+        def priority_tracking_trainer(
+            config: Dict[str, Any], logger: Any, *args: Any, **kwargs: Any
+        ) -> Dict[str, Any]:
             priority_level = config.get("priority_test")
             execution_order.append(priority_level)
             return create_success_result(
@@ -391,12 +408,12 @@ class TestInfrastructureIntegration:
 
     def test_complete_enhanced_workflow(
         self,
-        enhanced_mock_time,
-        isolated_job_db,
-        worker_coordination,
-        heartbeat_monitor,
-        integration_system,
-    ):
+        enhanced_mock_time: Any,
+        isolated_job_db: Any,
+        worker_coordination: Any,
+        heartbeat_monitor: Any,
+        integration_system: Any,
+    ) -> None:
         """Test a complete workflow using all enhanced infrastructure."""
         # Phase 1: Setup with timing milestones
         enhanced_mock_time.set_milestone("test_start")
@@ -417,8 +434,12 @@ class TestInfrastructureIntegration:
 
             for worker_id in worker_ids:
 
-                def create_enhanced_trainer(wid):
-                    def enhanced_trainer(config, logger, *args, **kwargs):
+                def create_enhanced_trainer(
+                    wid: str,
+                ) -> Callable[[Dict[str, Any], Any], Dict[str, Any]]:
+                    def enhanced_trainer(
+                        config: Dict[str, Any], logger: Any, *args: Any, **kwargs: Any
+                    ) -> Dict[str, Any]:
                         # Track execution
                         job_key = config.get("job_number", "unknown")
                         execution_order.append(f"{wid}_job_{job_key}")
@@ -447,8 +468,10 @@ class TestInfrastructureIntegration:
 
                 trainer_fn = create_enhanced_trainer(worker_id)
 
-                def create_worker_runner(wid, tfn):
-                    def run():
+                def create_worker_runner(
+                    wid: str, tfn: Callable[..., Any]
+                ) -> Callable[[], None]:
+                    def run() -> None:
                         status = run_worker(
                             base_path=integration_system.config.job_db_config.base_path,
                             max_claim_attempts=integration_system.config.max_claim_attempts,

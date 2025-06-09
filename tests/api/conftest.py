@@ -2,16 +2,18 @@
 
 import json
 from pathlib import Path
-from typing import Dict, Any, Optional, List
+from typing import Dict, Any, Optional, List, Tuple
 
 import pytest
 from fastapi.testclient import TestClient
+from fastapi import FastAPI
 
 from dr_exp.api.main import create_app
+from dr_exp.job_db.base_job_db import BaseJobDB
 
 
 @pytest.fixture
-def isolated_app(tmp_path, monkeypatch):
+def isolated_app(tmp_path: Any, monkeypatch: Any) -> FastAPI:
     """Create an isolated API app with fresh database."""
     monkeypatch.setenv("ADMIN_API_KEY", "secret")
     monkeypatch.setenv("READER_API_KEY", "readkey")
@@ -23,43 +25,43 @@ def isolated_app(tmp_path, monkeypatch):
 
 
 @pytest.fixture
-def client(isolated_app):
+def client(isolated_app: FastAPI) -> TestClient:
     """Create test client from isolated app."""
     return TestClient(isolated_app)
 
 
 @pytest.fixture
-def db_client(isolated_app):
+def db_client(isolated_app: FastAPI) -> BaseJobDB:
     """Get database client from isolated app."""
     return isolated_app.state.client
 
 
 @pytest.fixture
-def admin_headers():
+def admin_headers() -> Dict[str, str]:
     """Authentication headers for admin user."""
     return {"Authorization": "Bearer secret"}
 
 
 @pytest.fixture
-def reader_headers():
+def reader_headers() -> Dict[str, str]:
     """Authentication headers for reader user."""
     return {"Authorization": "Bearer readkey"}
 
 
 @pytest.fixture
-def invalid_headers():
+def invalid_headers() -> Dict[str, str]:
     """Invalid authentication headers for testing."""
     return {"Authorization": "Bearer invalid"}
 
 
 # Test data factories
 def create_test_job(
-    db_client,
+    db_client: BaseJobDB,
     job_config: Optional[Dict[str, Any]] = None,
     sweep_config_id: str = "test_sweep",
     status: str = "queued",
     priority: int = 100,
-    **kwargs,
+    **kwargs: Any,
 ) -> Dict[str, Any]:
     """Create a test job with sensible defaults."""
     if job_config is None:
@@ -74,7 +76,9 @@ def create_test_job(
     )
 
 
-def create_test_metrics(db_client, job_id: str, num_metrics: int = 10):
+def create_test_metrics(
+    db_client: BaseJobDB, job_id: str, num_metrics: int = 10
+) -> Any:
     """Create test metrics file for a job."""
     run_dir = Path(db_client.storage_dir) / f"run_{job_id}"
     run_dir.mkdir(parents=True, exist_ok=True)
@@ -95,10 +99,10 @@ def create_test_metrics(db_client, job_id: str, num_metrics: int = 10):
 
 
 def create_multiple_jobs(
-    db_client,
+    db_client: BaseJobDB,
     count: int,
     status_distribution: Optional[Dict[str, float]] = None,
-    priority_range: Optional[tuple] = None,
+    priority_range: Optional[Tuple[int, int]] = None,
 ) -> List[Dict[str, Any]]:
     """Create multiple test jobs with configurable distributions.
 

@@ -1,17 +1,18 @@
 """Tests for the BaseJobDB abstract base class."""
 
 import pytest
+from typing import Any, Dict, List, Optional
 
 from dr_exp.job_db import BaseJobDB, LocalJobDB, SupabaseJobDB, JobDBConfig
 
 
-def test_base_job_db_is_abstract():
+def test_base_job_db_is_abstract() -> None:
     """Test that BaseJobDB cannot be instantiated directly."""
     with pytest.raises(TypeError):
         BaseJobDB()
 
 
-def test_base_job_db_inheritance():
+def test_base_job_db_inheritance() -> None:
     """Test that BaseJobDB is properly inherited by concrete implementations."""
     assert issubclass(LocalJobDB, BaseJobDB)
     assert issubclass(SupabaseJobDB, BaseJobDB)
@@ -21,7 +22,7 @@ def test_base_job_db_inheritance():
     assert isinstance(LocalJobDB(config), BaseJobDB)
 
 
-def test_base_job_db_enforces_abstract_methods():
+def test_base_job_db_enforces_abstract_methods() -> None:
     """Test that concrete implementations must implement all abstract methods."""
 
     class IncompleteJobDB(BaseJobDB):
@@ -35,7 +36,7 @@ def test_base_job_db_enforces_abstract_methods():
         IncompleteJobDB()
 
 
-def test_base_job_db_optional_methods_raise_not_implemented():
+def test_base_job_db_optional_methods_raise_not_implemented() -> None:
     """Test that optional methods raise NotImplementedError by default."""
 
     # Create a minimal implementation that only implements abstract methods
@@ -43,64 +44,86 @@ def test_base_job_db_optional_methods_raise_not_implemented():
         jobs_dir = "/tmp"
         storage_dir = "/tmp/storage"
 
-        def claim_job(self, worker_id=None, respect_reservations=True):
+        def claim_job(
+            self, worker_id: Optional[str] = None, respect_reservations: bool = True
+        ) -> Optional[Dict[str, Any]]:
             return None
 
-        def update_job(self, job_id, data):
+        def update_job(self, job_id: str, data: Dict[str, Any]) -> Dict[str, Any]:
             return {"success": True}
 
-        def get_job_details(self, job_id):
+        def get_job_details(self, job_id: str) -> Optional[Dict[str, Any]]:
             return None
 
-        def get_config_for_job(self, job_id):
+        def get_config_for_job(self, job_id: str) -> Optional[Dict[str, Any]]:
             return None
 
-        def record_failure(self, job_id, error_type, message, stacktrace=None):
+        def record_failure(
+            self,
+            job_id: str,
+            error_type: str,
+            message: str,
+            stacktrace: Optional[str] = None,
+        ) -> Dict[str, Any]:
             return {"success": True}
 
-        def finalize_job(self, job_id, final_status, metadata):
+        def finalize_job(
+            self, job_id: str, final_status: str, metadata: Dict[str, Any]
+        ) -> Dict[str, Any]:
             return {"success": True}
 
-        def upload_artifact(self, job_id, local_path, remote_path_suffix):
+        def upload_artifact(
+            self, job_id: str, local_path: str, remote_path_suffix: str
+        ) -> Dict[str, Any]:
             return {"success": True}
 
-        def update_job_priority(self, job_id, new_priority, reason=None):
+        def update_job_priority(
+            self, job_id: str, new_priority: int, reason: Optional[str] = None
+        ) -> Dict[str, Any]:
             return {"success": True}
 
-        def boost_job_priority(self, job_id, boost_amount=100):
+        def boost_job_priority(
+            self, job_id: str, boost_amount: int = 100
+        ) -> Dict[str, Any]:
             return {"success": True}
 
-        def list_jobs_by_priority(self, status_filter=None, limit=None):
+        def list_jobs_by_priority(
+            self, status_filter: Optional[List[str]] = None, limit: Optional[int] = None
+        ) -> List[Dict[str, Any]]:
             return []
 
         def add_reserved_job(
             self,
-            job_config,
-            sweep_config_id,
-            reserved_for_worker,
-            reservation_timeout=300,
-            priority=100,
-            status="queued",
-        ):
+            job_config: Dict[str, Any],
+            sweep_config_id: str,
+            reserved_for_worker: str,
+            reservation_timeout: int = 300,
+            priority: int = 100,
+            status: str = "queued",
+        ) -> Dict[str, Any]:
             return {"id": "test_job", "reserved_for_worker": reserved_for_worker}
 
         # New abstract methods
-        def list_running_jobs(self):
+        def list_running_jobs(self) -> List[Dict[str, Any]]:
             return []
 
-        def get_stale_jobs(self, max_age_seconds):
+        def get_stale_jobs(self, max_age_seconds: int) -> List[Any]:
             return []
 
-        def mark_jobs_failed(self, job_ids, reason="worker_lost"):
+        def mark_jobs_failed(
+            self, job_ids: List[str], reason: str = "worker_lost"
+        ) -> Dict[str, bool]:
             return {}
 
-        def has_queued_jobs(self):
+        def has_queued_jobs(self) -> bool:
             return False
 
-        def get_queue_summary(self, limit=5):
+        def get_queue_summary(self, limit: int = 5) -> List[Dict[str, Any]]:
             return []
 
-        def get_metrics(self, run_id, limit=None):
+        def get_metrics(
+            self, run_id: str, limit: Optional[int] = None
+        ) -> List[Dict[str, Any]]:
             return []
 
     db = MinimalJobDB()
@@ -116,7 +139,7 @@ def test_base_job_db_optional_methods_raise_not_implemented():
         db.log_metrics("job1", [])
 
 
-def test_local_job_db_implements_optional_methods():
+def test_local_job_db_implements_optional_methods() -> None:
     """Test that LocalJobDB properly implements optional methods."""
     config = JobDBConfig(
         base_path="/tmp", storage_path="/tmp/storage", mode="files_local"
@@ -130,7 +153,7 @@ def test_local_job_db_implements_optional_methods():
     # Note: We don't test add_job and log_metrics here as they require actual file operations
 
 
-def test_interface_consistency():
+def test_interface_consistency() -> None:
     """Test that both implementations have consistent interfaces."""
     local_config = JobDBConfig(
         base_path="/tmp", storage_path="/tmp/storage", mode="files_local"
@@ -179,7 +202,7 @@ def test_interface_consistency():
         assert hasattr(supabase_db, method) and callable(getattr(supabase_db, method))
 
 
-def test_base_job_db_docstrings():
+def test_base_job_db_docstrings() -> None:
     """Test that abstract methods have proper docstrings."""
     methods_to_check = [
         "claim_job",
@@ -202,7 +225,7 @@ def test_base_job_db_docstrings():
         )
 
 
-def test_type_annotations():
+def test_type_annotations() -> None:
     """Test that BaseJobDB methods have proper type annotations."""
     import inspect
 

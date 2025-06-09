@@ -1,9 +1,13 @@
 """Tests for API error boundaries and edge cases."""
 
+from typing import Dict, Any
+
 from .conftest import create_test_job, create_test_metrics, JobStatus
 
 
-def test_malformed_json_requests(client, db_client, admin_headers):
+def test_malformed_json_requests(
+    client: Any, db_client: Any, admin_headers: Dict[str, str]
+) -> None:
     """Test handling of malformed JSON in request bodies."""
     job = create_test_job(db_client)
     job_id = job["id"]
@@ -30,7 +34,7 @@ def test_malformed_json_requests(client, db_client, admin_headers):
         )
 
 
-def test_missing_required_fields(client, admin_headers):
+def test_missing_required_fields(client: Any, admin_headers: Dict[str, str]) -> None:
     """Test handling of requests with missing required fields."""
     missing_field_requests = [
         ("/job/kill", {}),  # Missing job_id
@@ -49,7 +53,9 @@ def test_missing_required_fields(client, admin_headers):
         )
 
 
-def test_invalid_field_types(client, db_client, admin_headers):
+def test_invalid_field_types(
+    client: Any, db_client: Any, admin_headers: Dict[str, str]
+) -> None:
     """Test handling of requests with invalid field types."""
     job = create_test_job(db_client)
     job_id = job["id"]
@@ -71,7 +77,9 @@ def test_invalid_field_types(client, db_client, admin_headers):
         )
 
 
-def test_out_of_range_values(client, db_client, admin_headers):
+def test_out_of_range_values(
+    client: Any, db_client: Any, admin_headers: Dict[str, str]
+) -> None:
     """Test handling of values outside valid ranges."""
     job = create_test_job(db_client)
     job_id = job["id"]
@@ -100,7 +108,7 @@ def test_out_of_range_values(client, db_client, admin_headers):
         )
 
 
-def test_nonexistent_job_operations(client, admin_headers):
+def test_nonexistent_job_operations(client: Any, admin_headers: Dict[str, str]) -> None:
     """Test operations on jobs that don't exist."""
     fake_job_id = "00000000-0000-0000-0000-000000000000"
 
@@ -118,7 +126,7 @@ def test_nonexistent_job_operations(client, admin_headers):
         )
 
 
-def test_extremely_long_strings(client, admin_headers):
+def test_extremely_long_strings(client: Any, admin_headers: Dict[str, str]) -> None:
     """Test handling of extremely long string inputs."""
     very_long_string = "x" * 10000  # 10KB string
     extremely_long_string = "y" * 100000  # 100KB string
@@ -139,7 +147,9 @@ def test_extremely_long_strings(client, admin_headers):
         )
 
 
-def test_unicode_and_special_characters(client, db_client, admin_headers):
+def test_unicode_and_special_characters(
+    client: Any, db_client: Any, admin_headers: Dict[str, str]
+) -> None:
     """Test handling of unicode and special characters."""
     job = create_test_job(db_client)
     job_id = job["id"]
@@ -168,7 +178,9 @@ def test_unicode_and_special_characters(client, db_client, admin_headers):
         )
 
 
-def test_concurrent_operations_on_same_job(client, db_client, admin_headers):
+def test_concurrent_operations_on_same_job(
+    client: Any, db_client: Any, admin_headers: Dict[str, str]
+) -> None:
     """Test concurrent operations on the same job."""
     import threading
 
@@ -178,7 +190,7 @@ def test_concurrent_operations_on_same_job(client, db_client, admin_headers):
     results = []
     errors = []
 
-    def make_request(operation_id):
+    def make_request(operation_id: int) -> None:
         try:
             resp = client.post(
                 "/job/boost-priority",
@@ -214,7 +226,7 @@ def test_concurrent_operations_on_same_job(client, db_client, admin_headers):
         )
 
 
-def test_pagination_edge_cases(client, db_client):
+def test_pagination_edge_cases(client: Any, db_client: Any) -> None:
     """Test edge cases in pagination parameters."""
     # Create a few jobs for testing
     for i in range(3):
@@ -241,7 +253,7 @@ def test_pagination_edge_cases(client, db_client):
         )
 
 
-def test_metrics_edge_cases(client, db_client):
+def test_metrics_edge_cases(client: Any, db_client: Any) -> None:
     """Test edge cases for metrics endpoints."""
     job = create_test_job(db_client)
     job_id = job["id"]
@@ -268,7 +280,7 @@ def test_metrics_edge_cases(client, db_client):
     assert resp.status_code in [200, 400, 422]
 
 
-def test_database_unavailable_simulation(tmp_path, monkeypatch):
+def test_database_unavailable_simulation(tmp_path: Any, monkeypatch: Any) -> None:
     """Test behavior when database operations fail."""
     # This is harder to test without actually breaking the database
     # But we can test with an invalid path
@@ -293,7 +305,7 @@ def test_database_unavailable_simulation(tmp_path, monkeypatch):
         pass
 
 
-def test_very_large_responses(client, db_client):
+def test_very_large_responses(client: Any, db_client: Any) -> None:
     """Test handling of potentially large responses."""
     # Create many jobs to test large response handling
     jobs = []
@@ -318,7 +330,9 @@ def test_very_large_responses(client, db_client):
     assert data["total"] >= 50
 
 
-def test_request_without_content_type(client, admin_headers):
+def test_request_without_content_type(
+    client: Any, admin_headers: Dict[str, str]
+) -> None:
     """Test requests without Content-Type header."""
     # Remove Content-Type from headers
     headers_without_content_type = {
@@ -334,7 +348,9 @@ def test_request_without_content_type(client, admin_headers):
     assert resp.status_code in [200, 400, 404, 415, 422]
 
 
-def test_empty_and_whitespace_only_strings(client, db_client, admin_headers):
+def test_empty_and_whitespace_only_strings(
+    client: Any, db_client: Any, admin_headers: Dict[str, str]
+) -> None:
     """Test handling of empty and whitespace-only strings."""
     job = create_test_job(db_client)
     job_id = job["id"]

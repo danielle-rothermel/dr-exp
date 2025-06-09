@@ -2,6 +2,7 @@
 
 import pytest
 from unittest.mock import patch
+from pathlib import Path
 
 from dr_exp.utils.factory import SystemConfig, Factory, create_system
 from dr_exp.job_db import JobDBConfig, LocalJobDB
@@ -10,7 +11,7 @@ from dr_exp.manage.process_manager import ProcessManager
 
 
 @pytest.fixture
-def temp_config(tmp_path):
+def temp_config(tmp_path: Path) -> SystemConfig:
     """Create a temporary system configuration."""
     job_db_config = JobDBConfig(
         base_path=str(tmp_path),
@@ -31,7 +32,7 @@ def temp_config(tmp_path):
 class TestSystemConfig:
     """Test the SystemConfig class."""
 
-    def test_default_initialization(self):
+    def test_default_initialization(self) -> None:
         """Test system config with default values."""
         with patch.dict(
             "os.environ", {"EXPMGR_MODE": "files_local", "DR_EXP_BASE_PATH": "/tmp"}
@@ -47,14 +48,14 @@ class TestSystemConfig:
             assert config.worker_heartbeat_interval == 5.0
             assert config.multiprocessing_start_method == "fork"
 
-    def test_custom_initialization(self, temp_config):
+    def test_custom_initialization(self, temp_config: SystemConfig) -> None:
         """Test system config with custom values."""
         assert temp_config.gpus == ["0", "1"]
         assert temp_config.workers_per_gpu == 2
         assert temp_config.heartbeat_timeout == 30
         assert temp_config.idle_timeout_mins == 5
 
-    def test_gpu_discovery_from_env(self):
+    def test_gpu_discovery_from_env(self) -> None:
         """Test GPU discovery from CUDA_VISIBLE_DEVICES."""
         with patch.dict(
             "os.environ",
@@ -67,7 +68,7 @@ class TestSystemConfig:
             config = SystemConfig()
             assert config.gpus == ["2", "3", "4"]
 
-    def test_gpu_discovery_default(self):
+    def test_gpu_discovery_default(self) -> None:
         """Test GPU discovery default behavior."""
         with patch.dict(
             "os.environ",
@@ -77,7 +78,7 @@ class TestSystemConfig:
             config = SystemConfig()
             assert config.gpus == ["0"]
 
-    def test_manager_base_dir_default(self, tmp_path):
+    def test_manager_base_dir_default(self, tmp_path: Path) -> None:
         """Test default manager base directory."""
         job_db_config = JobDBConfig(
             base_path=str(tmp_path),
@@ -89,26 +90,28 @@ class TestSystemConfig:
         )
         assert config.manager_base_dir == str(tmp_path / "manager")
 
-    def test_validation_success(self, temp_config):
+    def test_validation_success(self, temp_config: SystemConfig) -> None:
         """Test successful validation."""
         # Should not raise any exceptions
         temp_config.validate()
 
-    def test_validation_no_gpus(self, temp_config):
+    def test_validation_no_gpus(self, temp_config: SystemConfig) -> None:
         """Test validation with no GPUs."""
         temp_config.gpus = []
 
         with pytest.raises(ValueError, match="At least one GPU must be specified"):
             temp_config.validate()
 
-    def test_validation_invalid_workers_per_gpu(self, temp_config):
+    def test_validation_invalid_workers_per_gpu(
+        self, temp_config: SystemConfig
+    ) -> None:
         """Test validation with invalid workers per GPU."""
         temp_config.workers_per_gpu = 0
 
         with pytest.raises(ValueError, match="workers_per_gpu must be at least 1"):
             temp_config.validate()
 
-    def test_validation_low_heartbeat_timeout(self, temp_config):
+    def test_validation_low_heartbeat_timeout(self, temp_config: SystemConfig) -> None:
         """Test validation with too low heartbeat timeout."""
         temp_config.heartbeat_timeout = 5
 
@@ -117,7 +120,9 @@ class TestSystemConfig:
         ):
             temp_config.validate()
 
-    def test_validation_low_worker_heartbeat_interval(self, temp_config):
+    def test_validation_low_worker_heartbeat_interval(
+        self, temp_config: SystemConfig
+    ) -> None:
         """Test validation with too low worker heartbeat interval."""
         temp_config.worker_heartbeat_interval = 0.05
 
@@ -126,7 +131,9 @@ class TestSystemConfig:
         ):
             temp_config.validate()
 
-    def test_validation_heartbeat_interval_vs_timeout(self, temp_config):
+    def test_validation_heartbeat_interval_vs_timeout(
+        self, temp_config: SystemConfig
+    ) -> None:
         """Test validation with heartbeat interval >= timeout."""
         temp_config.worker_heartbeat_interval = 35
         temp_config.heartbeat_timeout = 30
@@ -141,12 +148,12 @@ class TestSystemConfig:
 class TestFactory:
     """Test the Factory class."""
 
-    def test_initialization_with_config(self, temp_config):
+    def test_initialization_with_config(self, temp_config: SystemConfig) -> None:
         """Test factory initialization with config."""
         factory = Factory(temp_config)
         assert factory.config is temp_config
 
-    def test_initialization_default_config(self):
+    def test_initialization_default_config(self) -> None:
         """Test factory initialization with default config."""
         with patch.dict(
             "os.environ", {"EXPMGR_MODE": "files_local", "DR_EXP_BASE_PATH": "/tmp"}
@@ -154,7 +161,7 @@ class TestFactory:
             factory = Factory()
             assert isinstance(factory.config, SystemConfig)
 
-    def test_job_db_property(self, temp_config):
+    def test_job_db_property(self, temp_config: SystemConfig) -> None:
         """Test job database property."""
         factory = Factory(temp_config)
 
@@ -166,7 +173,7 @@ class TestFactory:
         job_db2 = factory.job_db
         assert job_db is job_db2
 
-    def test_process_manager_property(self, temp_config):
+    def test_process_manager_property(self, temp_config: SystemConfig) -> None:
         """Test process manager property."""
         factory = Factory(temp_config)
 
@@ -178,7 +185,7 @@ class TestFactory:
         pm2 = factory.process_manager
         assert pm is pm2
 
-    def test_create_manager(self, temp_config):
+    def test_create_manager(self, temp_config: SystemConfig) -> None:
         """Test creating a manager."""
         factory = Factory(temp_config)
         manager = factory.create_manager()
@@ -189,7 +196,7 @@ class TestFactory:
         assert manager.heartbeat_timeout == 30
         assert manager.idle_timeout.total_seconds() == 5 * 60
 
-    def test_run_worker(self, temp_config):
+    def test_run_worker(self, temp_config: SystemConfig) -> None:
         """Test running a worker."""
         factory = Factory(temp_config)
 
@@ -212,7 +219,7 @@ class TestFactory:
             assert call_args.kwargs["target_job_id"] == job["id"]
             assert call_args.kwargs["client"] is factory.job_db
 
-    def test_get_system_status_empty(self, temp_config):
+    def test_get_system_status_empty(self, temp_config: SystemConfig) -> None:
         """Test getting system status with no jobs."""
         factory = Factory(temp_config)
         status = factory.get_system_status()
@@ -229,7 +236,7 @@ class TestFactory:
         assert status["queue_preview"] == []
         assert status["stale_jobs_preview"] == []
 
-    def test_get_system_status_with_jobs(self, temp_config):
+    def test_get_system_status_with_jobs(self, temp_config: SystemConfig) -> None:
         """Test getting system status with jobs."""
         factory = Factory(temp_config)
 
@@ -260,14 +267,14 @@ class TestFactory:
 class TestCreateStreamlinedSystem:
     """Test the create_system function."""
 
-    def test_create_with_config(self, temp_config):
+    def test_create_with_config(self, temp_config: SystemConfig) -> None:
         """Test creating system with provided config."""
         system = create_system(temp_config)
 
         assert isinstance(system, Factory)
         assert system.config is temp_config
 
-    def test_create_with_default_config(self):
+    def test_create_with_default_config(self) -> None:
         """Test creating system with default config."""
         with patch.dict(
             "os.environ", {"EXPMGR_MODE": "files_local", "DR_EXP_BASE_PATH": "/tmp"}
@@ -277,7 +284,7 @@ class TestCreateStreamlinedSystem:
             assert isinstance(system, Factory)
             assert isinstance(system.config, SystemConfig)
 
-    def test_full_workflow_example(self, temp_config):
+    def test_full_workflow_example(self, temp_config: SystemConfig) -> None:
         """Test a complete workflow example."""
         # Create system
         system = create_system(temp_config)
@@ -301,7 +308,7 @@ class TestCreateStreamlinedSystem:
 class TestIntegration:
     """Integration tests for the streamlined factory."""
 
-    def test_end_to_end_configuration(self, tmp_path):
+    def test_end_to_end_configuration(self, tmp_path: Path) -> None:
         """Test end-to-end configuration and component creation."""
         # Create a complete configuration
         job_db_config = JobDBConfig(

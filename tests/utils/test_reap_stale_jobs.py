@@ -1,6 +1,8 @@
 from datetime import datetime, UTC, timedelta
 from unittest.mock import Mock
+from typing import Any, Dict
 import pytest
+from pathlib import Path
 
 from dr_exp.job_db import LocalJobDB, JobDBConfig
 from dr_exp.utils.job_reaper import (
@@ -13,7 +15,7 @@ from dr_exp.utils.job_reaper import (
 )
 
 
-def test_reap_marks_stale_job(tmp_path):
+def test_reap_marks_stale_job(tmp_path: Path) -> None:
     client = LocalJobDB(
         JobDBConfig(
             base_path=str(tmp_path),
@@ -28,11 +30,12 @@ def test_reap_marks_stale_job(tmp_path):
     count = reap_stale_jobs(client, max_age_mins=5)
     assert count == 1
     data = client.get_job_details(job["id"])
+    assert data is not None
     assert data["status"] == "failed"
     assert data["status_reason"] == "manager_died"
 
 
-def test_reap_ignores_recent_job(tmp_path):
+def test_reap_ignores_recent_job(tmp_path: Path) -> None:
     client = LocalJobDB(
         JobDBConfig(
             base_path=str(tmp_path),
@@ -47,10 +50,11 @@ def test_reap_ignores_recent_job(tmp_path):
     count = reap_stale_jobs(client, max_age_mins=5)
     assert count == 0
     data = client.get_job_details(job["id"])
+    assert data is not None
     assert data["status"] == "running"
 
 
-def test_reap_handles_invalid_jobs_gracefully(tmp_path, caplog):
+def test_reap_handles_invalid_jobs_gracefully(tmp_path: Path, caplog: Any) -> None:
     """Test that reap_stale_jobs handles invalid job data gracefully."""
     client = LocalJobDB(
         JobDBConfig(
@@ -81,16 +85,20 @@ def test_reap_handles_invalid_jobs_gracefully(tmp_path, caplog):
     assert "Invalid heartbeat for job" in caplog.text
 
     # Verify final states
-    assert client.get_job_details(job1["id"])["status"] == "completed"
-    assert client.get_job_details(job2["id"])["status"] == "running"
-    assert client.get_job_details(job3["id"])["status"] == "running"
-    assert client.get_job_details(job4["id"])["status"] == "failed"
+    data1 = client.get_job_details(job1["id"])
+    data2 = client.get_job_details(job2["id"])
+    data3 = client.get_job_details(job3["id"])
+    data4 = client.get_job_details(job4["id"])
+    assert data1 is not None and data1["status"] == "completed"
+    assert data2 is not None and data2["status"] == "running"
+    assert data3 is not None and data3["status"] == "running"
+    assert data4 is not None and data4["status"] == "failed"
 
 
 class TestGetJobsList:
     """Test _get_jobs_list helper function."""
 
-    def test_get_jobs_list_with_list_jobs_method(self):
+    def test_get_jobs_list_with_list_jobs_method(self) -> None:
         """Test client with list_jobs method."""
         mock_client = Mock()
         mock_client.list_jobs.return_value = [{"id": "test"}]
@@ -100,7 +108,7 @@ class TestGetJobsList:
         assert list(result) == [{"id": "test"}]
         mock_client.list_jobs.assert_called_once()
 
-    def test_get_jobs_list_without_list_jobs_method(self):
+    def test_get_jobs_list_without_list_jobs_method(self) -> None:
         """Test client without list_jobs method (direct supabase access)."""
         mock_client = Mock()
         del mock_client.list_jobs  # Remove the method
@@ -119,36 +127,39 @@ class TestGetJobsList:
 class TestShouldMarkJobStale:
     """Test _should_mark_job_stale helper function."""
 
-    def test_non_running_job_raises_validation_error(self):
+    def test_non_running_job_raises_validation_error(self) -> None:
         """Test that non-running jobs raise JobValidationError."""
-        job = {"status": "completed", "heartbeat": "2024-01-01T00:00:00Z"}
+        job: Dict[str, Any] = {
+            "status": "completed",
+            "heartbeat": "2024-01-01T00:00:00Z",
+        }
         now = datetime.now(UTC)
         cutoff = timedelta(minutes=5)
 
         with pytest.raises(JobValidationError, match="Job is not in running status"):
             _should_mark_job_stale(job, now, cutoff)
 
-    def test_missing_heartbeat_raises_validation_error(self):
+    def test_missing_heartbeat_raises_validation_error(self) -> None:
         """Test that missing heartbeat raises JobValidationError."""
-        job = {"status": "running"}
+        job: Dict[str, Any] = {"status": "running"}
         now = datetime.now(UTC)
         cutoff = timedelta(minutes=5)
 
         with pytest.raises(JobValidationError, match="Job missing heartbeat timestamp"):
             _should_mark_job_stale(job, now, cutoff)
 
-    def test_empty_heartbeat_raises_validation_error(self):
+    def test_empty_heartbeat_raises_validation_error(self) -> None:
         """Test that empty heartbeat raises JobValidationError."""
-        job = {"status": "running", "heartbeat": ""}
+        job: Dict[str, Any] = {"status": "running", "heartbeat": ""}
         now = datetime.now(UTC)
         cutoff = timedelta(minutes=5)
 
         with pytest.raises(JobValidationError, match="Job missing heartbeat timestamp"):
             _should_mark_job_stale(job, now, cutoff)
 
-    def test_invalid_heartbeat_format_raises_parse_error(self):
+    def test_invalid_heartbeat_format_raises_parse_error(self) -> None:
         """Test that invalid heartbeat format raises HeartbeatParseError."""
-        job = {"status": "running", "heartbeat": "invalid-format"}
+        job: Dict[str, Any] = {"status": "running", "heartbeat": "invalid-format"}
         now = datetime.now(UTC)
         cutoff = timedelta(minutes=5)
 
@@ -157,10 +168,13 @@ class TestShouldMarkJobStale:
         ):
             _should_mark_job_stale(job, now, cutoff)
 
-    def test_stale_job_returns_true(self):
+    def test_stale_job_returns_true(self) -> None:
         """Test that stale job returns True."""
         old_time = datetime.now(UTC) - timedelta(minutes=10)
-        job = {"status": "running", "heartbeat": old_time.isoformat() + "Z"}
+        job: Dict[str, Any] = {
+            "status": "running",
+            "heartbeat": old_time.isoformat() + "Z",
+        }
         now = datetime.now(UTC)
         cutoff = timedelta(minutes=5)
 
@@ -168,10 +182,13 @@ class TestShouldMarkJobStale:
 
         assert result is True
 
-    def test_recent_job_returns_false(self):
+    def test_recent_job_returns_false(self) -> None:
         """Test that recent job returns False."""
         recent_time = datetime.now(UTC) - timedelta(minutes=2)
-        job = {"status": "running", "heartbeat": recent_time.isoformat() + "Z"}
+        job: Dict[str, Any] = {
+            "status": "running",
+            "heartbeat": recent_time.isoformat() + "Z",
+        }
         now = datetime.now(UTC)
         cutoff = timedelta(minutes=5)
 
@@ -179,10 +196,13 @@ class TestShouldMarkJobStale:
 
         assert result is False
 
-    def test_heartbeat_with_z_suffix_parsed_correctly(self):
+    def test_heartbeat_with_z_suffix_parsed_correctly(self) -> None:
         """Test that heartbeat with Z suffix is parsed correctly."""
         old_time = datetime.now(UTC) - timedelta(minutes=10)
-        job = {"status": "running", "heartbeat": old_time.isoformat() + "Z"}
+        job: Dict[str, Any] = {
+            "status": "running",
+            "heartbeat": old_time.isoformat() + "Z",
+        }
         now = datetime.now(UTC)
         cutoff = timedelta(minutes=5)
 
@@ -190,10 +210,10 @@ class TestShouldMarkJobStale:
 
         assert result is True
 
-    def test_heartbeat_without_z_suffix_parsed_correctly(self):
+    def test_heartbeat_without_z_suffix_parsed_correctly(self) -> None:
         """Test that heartbeat without Z suffix is parsed correctly."""
         old_time = datetime.now(UTC) - timedelta(minutes=10)
-        job = {"status": "running", "heartbeat": old_time.isoformat()}
+        job: Dict[str, Any] = {"status": "running", "heartbeat": old_time.isoformat()}
         now = datetime.now(UTC)
         cutoff = timedelta(minutes=5)
 
@@ -205,10 +225,10 @@ class TestShouldMarkJobStale:
 class TestMarkJobStale:
     """Test _mark_job_stale helper function."""
 
-    def test_mark_job_stale_calls_update_job(self):
+    def test_mark_job_stale_calls_update_job(self) -> None:
         """Test that _mark_job_stale calls client.update_job correctly."""
         mock_client = Mock()
-        job = {"id": "test-job-id"}
+        job: Dict[str, Any] = {"id": "test-job-id"}
 
         _mark_job_stale(mock_client, job)
 

@@ -2,12 +2,13 @@
 
 import json
 from unittest.mock import AsyncMock, patch
+from typing import Any, Dict
 import pytest
 from .conftest import create_test_job, Priority
 from dr_exp.api.main import ConnectionManager
 
 
-def test_websocket_connection_basic(client):
+def test_websocket_connection_basic(client: Any) -> None:
     """Test basic WebSocket connection establishment."""
     with client.websocket_connect("/ws") as websocket:
         # Send a test message
@@ -18,7 +19,7 @@ def test_websocket_connection_basic(client):
         assert "Echo: test message" in data
 
 
-def test_websocket_connection_lifecycle(client):
+def test_websocket_connection_lifecycle(client: Any) -> None:
     """Test WebSocket connection and disconnection."""
     # Test that we can establish multiple connections
     with client.websocket_connect("/ws") as ws1:
@@ -33,7 +34,7 @@ def test_websocket_connection_lifecycle(client):
             assert "message2" in response2
 
 
-def test_websocket_invalid_json(client):
+def test_websocket_invalid_json(client: Any) -> None:
     """Test WebSocket handling of invalid JSON."""
     with client.websocket_connect("/ws") as websocket:
         # Send invalid JSON
@@ -44,7 +45,7 @@ def test_websocket_invalid_json(client):
         assert "invalid json" in data
 
 
-def test_websocket_empty_message(client):
+def test_websocket_empty_message(client: Any) -> None:
     """Test WebSocket handling of empty messages."""
     with client.websocket_connect("/ws") as websocket:
         websocket.send_text("")
@@ -53,7 +54,7 @@ def test_websocket_empty_message(client):
         assert "Echo:" in data
 
 
-def test_websocket_large_message(client):
+def test_websocket_large_message(client: Any) -> None:
     """Test WebSocket handling of large messages."""
     with client.websocket_connect("/ws") as websocket:
         large_message = "x" * 10000  # 10KB message
@@ -63,7 +64,7 @@ def test_websocket_large_message(client):
         assert large_message in data
 
 
-def test_websocket_json_message(client):
+def test_websocket_json_message(client: Any) -> None:
     """Test WebSocket handling of JSON messages."""
     with client.websocket_connect("/ws") as websocket:
         test_data = {"type": "test", "data": {"key": "value"}}
@@ -73,7 +74,7 @@ def test_websocket_json_message(client):
         assert json.dumps(test_data) in response
 
 
-def test_websocket_concurrent_connections(client):
+def test_websocket_concurrent_connections(client: Any) -> None:
     """Test multiple concurrent WebSocket connections."""
     connections = []
 
@@ -102,7 +103,7 @@ def test_websocket_concurrent_connections(client):
                 pass  # Connection might already be closed
 
 
-def test_websocket_connection_manager_state(client):
+def test_websocket_connection_manager_state(client: Any) -> None:
     """Test that WebSocket connection manager tracks connections properly."""
     # This is more of an integration test to ensure the ConnectionManager
     # is working correctly under the hood
@@ -131,7 +132,7 @@ def test_websocket_connection_manager_state(client):
     # (We can't directly test this without exposing the connection manager)
 
 
-def test_websocket_message_format_validation(client):
+def test_websocket_message_format_validation(client: Any) -> None:
     """Test WebSocket message format handling."""
     with client.websocket_connect("/ws") as websocket:
         # Test various message formats
@@ -150,7 +151,7 @@ def test_websocket_message_format_validation(client):
             assert msg in response
 
 
-def test_websocket_connection_limits(client):
+def test_websocket_connection_limits(client: Any) -> None:
     """Test WebSocket connection limits and resource management."""
     max_connections = 10
     connections = []
@@ -179,7 +180,7 @@ def test_websocket_connection_limits(client):
                 pass  # Connection might already be closed
 
 
-def test_websocket_error_handling(client):
+def test_websocket_error_handling(client: Any) -> None:
     """Test WebSocket error handling and recovery."""
     with client.websocket_connect("/ws") as websocket:
         # Test normal operation
@@ -202,7 +203,7 @@ def test_websocket_error_handling(client):
                 assert case in response
 
 
-def test_websocket_connection_lifecycle_events(client):
+def test_websocket_connection_lifecycle_events(client: Any) -> None:
     """Test WebSocket connection and disconnection events."""
     # Test establishing connection
     with client.websocket_connect("/ws") as websocket:
@@ -225,7 +226,7 @@ def test_websocket_connection_lifecycle_events(client):
         assert "new_connection" in response
 
 
-def test_websocket_concurrent_message_handling(client):
+def test_websocket_concurrent_message_handling(client: Any) -> None:
     """Test handling of concurrent messages from single connection."""
     import threading
 
@@ -233,7 +234,7 @@ def test_websocket_concurrent_message_handling(client):
         responses = []
         errors = []
 
-        def send_message(msg_id):
+        def send_message(msg_id: int) -> None:
             try:
                 message = f"concurrent_msg_{msg_id}"
                 websocket.send_text(message)
@@ -266,7 +267,7 @@ def test_websocket_concurrent_message_handling(client):
         assert actual_messages == expected_messages
 
 
-def test_websocket_message_size_limits(client):
+def test_websocket_message_size_limits(client: Any) -> None:
     """Test WebSocket message size handling."""
     with client.websocket_connect("/ws") as websocket:
         # Test progressively larger messages
@@ -281,7 +282,9 @@ def test_websocket_message_size_limits(client):
             assert len(response) >= size
 
 
-def test_websocket_broadcast_integration(client, db_client, admin_headers):
+def test_websocket_broadcast_integration(
+    client: Any, db_client: Any, admin_headers: Dict[str, str]
+) -> None:
     """Test integration with actual API operations for broadcasting."""
     import json
     import time
@@ -320,7 +323,7 @@ def test_websocket_broadcast_integration(client, db_client, admin_headers):
             pass
 
 
-def test_websocket_connection_close_handling(client):
+def test_websocket_connection_close_handling(client: Any) -> None:
     """Test graceful handling of WebSocket connection closure."""
     with client.websocket_connect("/ws") as websocket:
         websocket.send_text("test before close")
@@ -338,7 +341,7 @@ def test_websocket_connection_close_handling(client):
 
 
 @pytest.mark.asyncio
-async def test_connection_manager_broadcast_success():
+async def test_connection_manager_broadcast_success() -> None:
     """Test ConnectionManager broadcast method with all successful connections."""
     manager = ConnectionManager()
 
@@ -370,7 +373,7 @@ async def test_connection_manager_broadcast_success():
 
 
 @pytest.mark.asyncio
-async def test_connection_manager_broadcast_partial_failure():
+async def test_connection_manager_broadcast_partial_failure() -> None:
     """Test ConnectionManager broadcast method with some failing connections."""
     manager = ConnectionManager()
 
@@ -412,7 +415,7 @@ async def test_connection_manager_broadcast_partial_failure():
 
 
 @pytest.mark.asyncio
-async def test_connection_manager_broadcast_all_failures():
+async def test_connection_manager_broadcast_all_failures() -> None:
     """Test ConnectionManager broadcast method with all connections failing."""
     manager = ConnectionManager()
 
@@ -449,7 +452,7 @@ async def test_connection_manager_broadcast_all_failures():
 
 
 @pytest.mark.asyncio
-async def test_connection_manager_broadcast_empty_connections():
+async def test_connection_manager_broadcast_empty_connections() -> None:
     """Test ConnectionManager broadcast method with no active connections."""
     manager = ConnectionManager()
 
@@ -465,7 +468,7 @@ async def test_connection_manager_broadcast_empty_connections():
 
 
 @pytest.mark.asyncio
-async def test_connection_manager_broadcast_json_serialization():
+async def test_connection_manager_broadcast_json_serialization() -> None:
     """Test ConnectionManager broadcast method handles complex JSON serialization."""
     manager = ConnectionManager()
 

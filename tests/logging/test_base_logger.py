@@ -2,18 +2,19 @@
 
 import pytest
 from abc import ABC
+from typing import Any, Dict
 
 from dr_exp.logging.base_logger import BaseLogger
 from dr_exp.logging.structured_logger import StructuredLogger
 
 
-def test_base_logger_is_abstract():
+def test_base_logger_is_abstract() -> None:
     """Test that BaseLogger cannot be instantiated directly."""
     with pytest.raises(TypeError):
         BaseLogger()
 
 
-def test_base_logger_inheritance():
+def test_base_logger_inheritance() -> None:
     """Test that BaseLogger is properly inherited by concrete implementations."""
     assert issubclass(StructuredLogger, BaseLogger)
 
@@ -22,7 +23,7 @@ def test_base_logger_inheritance():
     assert isinstance(logger, BaseLogger)
 
 
-def test_base_logger_enforces_abstract_methods():
+def test_base_logger_enforces_abstract_methods() -> None:
     """Test that concrete implementations must implement all abstract methods."""
 
     class IncompleteLogger(BaseLogger):
@@ -35,30 +36,30 @@ def test_base_logger_enforces_abstract_methods():
         IncompleteLogger()
 
 
-def test_minimal_logger_implementation():
+def test_minimal_logger_implementation() -> None:
     """Test a minimal implementation that satisfies all abstract methods."""
     from dr_exp.logging.logger_paths import LoggerPathManager
 
     class MinimalLogger(BaseLogger):
         run_id = "test_run"
 
-        def __init__(self):
+        def __init__(self) -> None:
             self._paths = LoggerPathManager("/tmp/minimal_logs")
 
         @property
-        def paths(self):
+        def paths(self) -> Any:
             return self._paths
 
-        def log(self, metrics):
+        def log(self, metrics: Dict[str, Any]) -> None:
             pass
 
-        def save_checkpoint(self, state_dict, tag):
+        def save_checkpoint(self, state_dict: Dict[str, Any], tag: str) -> str:
             return f"/tmp/checkpoint_{tag}.pt"
 
-        def log_artifact(self, path):
+        def log_artifact(self, path: str) -> None:
             pass
 
-        def finalize(self):
+        def finalize(self) -> Dict[str, Any]:
             return {"finalize_success": True}
 
     # Should be able to instantiate
@@ -74,7 +75,7 @@ def test_minimal_logger_implementation():
     assert result["finalize_success"] is True
 
 
-def test_structured_logger_implements_interface():
+def test_structured_logger_implements_interface() -> None:
     """Test that StructuredLogger properly implements the BaseLogger interface."""
     logger = StructuredLogger("/tmp/test_logs")
 
@@ -95,7 +96,7 @@ def test_structured_logger_implements_interface():
         assert hasattr(logger, prop)
 
 
-def test_interface_consistency():
+def test_interface_consistency() -> None:
     """Test that the interface is consistent across implementations."""
     logger = StructuredLogger("/tmp/test_logs")
 
@@ -124,7 +125,7 @@ def test_interface_consistency():
     assert len(base_params) == len(impl_params)
 
 
-def test_base_logger_docstrings():
+def test_base_logger_docstrings() -> None:
     """Test that abstract methods have proper docstrings."""
     methods_to_check = ["log", "save_checkpoint", "log_artifact", "finalize"]
 
@@ -138,7 +139,7 @@ def test_base_logger_docstrings():
             )
 
 
-def test_type_annotations():
+def test_type_annotations() -> None:
     """Test that BaseLogger methods have proper type annotations."""
     import inspect
 
@@ -153,7 +154,7 @@ def test_type_annotations():
     assert hasattr(sig, "return_annotation") or "return" in str(sig)
 
 
-def test_abc_inheritance():
+def test_abc_inheritance() -> None:
     """Test that BaseLogger properly inherits from ABC."""
     assert issubclass(BaseLogger, ABC)
 
@@ -165,10 +166,10 @@ def test_abc_inheritance():
     assert hasattr(BaseLogger.paths, "__isabstractmethod__")
 
 
-def test_logger_factory_compatibility():
+def test_logger_factory_compatibility() -> None:
     """Test that logger instances work with factory patterns."""
 
-    def create_logger(logger_cls, log_dir):
+    def create_logger(logger_cls: type, log_dir: str) -> BaseLogger:
         """Simple factory function."""
         return logger_cls(log_dir)
 

@@ -4,6 +4,7 @@ import pytest
 import threading
 from unittest.mock import patch
 from pathlib import Path
+from typing import Any, Dict, List, Optional, Callable
 
 from dr_exp.manage.manager import Manager
 from dr_exp.manage.process_manager import MockProcessManager
@@ -11,7 +12,7 @@ from dr_exp.manage.worker import run_worker
 
 
 @pytest.fixture
-def integration_manager(integration_system, enhanced_mock_time):
+def integration_manager(integration_system: Any, enhanced_mock_time: Any) -> Manager:
     """Manager configured for integration testing with enhanced timing control."""
     manager = Manager(
         gpus=integration_system.config.gpus,
@@ -28,20 +29,24 @@ def integration_manager(integration_system, enhanced_mock_time):
 
 
 @pytest.fixture
-def heartbeat_monitor():
+def heartbeat_monitor() -> Any:
     """Utility for monitoring heartbeat updates during worker execution."""
 
     class HeartbeatMonitor:
-        def __init__(self):
+        def __init__(self) -> None:
             self.heartbeat_updates = []
             self.heartbeat_events = {}
             self.original_update_method = None
 
-        def start_monitoring(self, job_db, job_id=None, required_count=2):
+        def start_monitoring(
+            self, job_db: Any, job_id: Optional[str] = None, required_count: int = 2
+        ) -> Any:
             """Start monitoring heartbeat updates."""
             self.original_update_method = job_db.update_job
 
-            def track_heartbeat_updates(job_id_param, updates):
+            def track_heartbeat_updates(
+                job_id_param: str, updates: Dict[str, Any]
+            ) -> Any:
                 if "heartbeat" in updates:
                     self.heartbeat_updates.append(
                         {
@@ -65,7 +70,7 @@ def heartbeat_monitor():
                 job_db, "update_job", side_effect=track_heartbeat_updates
             )
 
-        def wait_for_heartbeats(self, count=2, timeout=5):
+        def wait_for_heartbeats(self, count: int = 2, timeout: int = 5) -> bool:
             """Wait for a specific number of heartbeats."""
             if "sufficient_heartbeats" not in self.heartbeat_events:
                 self.heartbeat_events["sufficient_heartbeats"] = threading.Event()
@@ -76,13 +81,13 @@ def heartbeat_monitor():
 
             return self.heartbeat_events["sufficient_heartbeats"].wait(timeout)
 
-        def get_heartbeat_count(self, job_id=None):
+        def get_heartbeat_count(self, job_id: Optional[str] = None) -> int:
             """Get heartbeat count for specific job or total."""
             if job_id:
                 return len([h for h in self.heartbeat_updates if h["job_id"] == job_id])
             return len(self.heartbeat_updates)
 
-        def reset(self):
+        def reset(self) -> None:
             """Reset monitoring state."""
             self.heartbeat_updates.clear()
             self.heartbeat_events.clear()
@@ -91,14 +96,19 @@ def heartbeat_monitor():
 
 
 @pytest.fixture
-def stale_job_detector(enhanced_mock_time):
+def stale_job_detector(enhanced_mock_time: Any) -> Any:
     """Utility for testing stale job detection with deterministic timing."""
 
     class StaleJobDetector:
-        def __init__(self, mock_time):
+        def __init__(self, mock_time: Any) -> None:
             self.mock_time = mock_time
 
-        def create_stale_job(self, job_db, heartbeat_age_seconds, config=None):
+        def create_stale_job(
+            self,
+            job_db: Any,
+            heartbeat_age_seconds: int,
+            config: Optional[Dict[str, Any]] = None,
+        ) -> Dict[str, Any]:
             """Create a job with a stale heartbeat."""
             if config is None:
                 config = {"test": "stale_job"}
@@ -118,18 +128,18 @@ def stale_job_detector(enhanced_mock_time):
 
             return job
 
-        def advance_time_for_stale_detection(self, heartbeat_timeout):
+        def advance_time_for_stale_detection(self, heartbeat_timeout: int) -> None:
             """Advance time to trigger stale job detection."""
             self.mock_time.advance_to_make_stale(heartbeat_timeout)
 
-        def create_mock_datetime_patch(self):
+        def create_mock_datetime_patch(self) -> tuple[Callable, Callable]:
             """Create a patch for datetime module in job_db for stale detection."""
             from datetime import datetime, UTC
 
-            def create_patch():
+            def create_patch() -> Any:
                 return patch("dr_exp.job_db.local_job_db.datetime")
 
-            def configure_patch(mock_datetime):
+            def configure_patch(mock_datetime: Any) -> Any:
                 mock_datetime.now.return_value = self.mock_time.now()
                 mock_datetime.UTC = UTC
                 mock_datetime.fromisoformat = datetime.fromisoformat
@@ -141,15 +151,17 @@ def stale_job_detector(enhanced_mock_time):
 
 
 @pytest.fixture
-def worker_execution_helper(integration_system):
+def worker_execution_helper(integration_system: Any) -> Any:
     """Helper for executing workers with consistent patterns."""
 
     class WorkerExecutionHelper:
-        def __init__(self, system):
+        def __init__(self, system: Any) -> None:
             self.system = system
             self.execution_results = []
 
-        def run_worker_with_trainer(self, trainer_fn, worker_id=None, **kwargs):
+        def run_worker_with_trainer(
+            self, trainer_fn: Callable, worker_id: Optional[str] = None, **kwargs: Any
+        ) -> Any:
             """Run worker with specified trainer function."""
             if worker_id is None:
                 worker_id = f"test_worker_{len(self.execution_results)}"
@@ -172,12 +184,17 @@ def worker_execution_helper(integration_system):
 
             return status
 
-        def run_coordinated_worker(self, coordination, worker_id, trainer_fn=None):
+        def run_coordinated_worker(
+            self,
+            coordination: Any,
+            worker_id: str,
+            trainer_fn: Optional[Callable] = None,
+        ) -> threading.Thread:
             """Run worker with coordination events."""
             if trainer_fn is None:
                 trainer_fn = coordination.create_coordinated_trainer(worker_id)
 
-            def worker_thread():
+            def worker_thread() -> None:
                 status = self.run_worker_with_trainer(trainer_fn, worker_id)
                 self.execution_results[-1]["thread_status"] = status
 
@@ -185,11 +202,11 @@ def worker_execution_helper(integration_system):
             thread.start()
             return thread
 
-        def get_last_result(self):
+        def get_last_result(self) -> Optional[Dict[str, Any]]:
             """Get the most recent execution result."""
             return self.execution_results[-1] if self.execution_results else None
 
-        def get_results_by_status(self, status):
+        def get_results_by_status(self, status: str) -> List[Dict[str, Any]]:
             """Get all results with specific status."""
             return [r for r in self.execution_results if r["status"] == status]
 
@@ -197,14 +214,16 @@ def worker_execution_helper(integration_system):
 
 
 @pytest.fixture
-def priority_job_factory(isolated_job_db):
+def priority_job_factory(isolated_job_db: Any) -> Any:
     """Factory for creating jobs with specific priority patterns."""
 
     class PriorityJobFactory:
-        def __init__(self, job_db):
+        def __init__(self, job_db: Any) -> None:
             self.job_db = job_db
 
-        def create_priority_sequence(self, priorities, base_config=None):
+        def create_priority_sequence(
+            self, priorities: List[int], base_config: Optional[Dict[str, Any]] = None
+        ) -> List[Dict[str, Any]]:
             """Create jobs with specified priorities for testing execution order."""
             if base_config is None:
                 base_config = {}
@@ -224,14 +243,14 @@ def priority_job_factory(isolated_job_db):
 
             return jobs
 
-        def create_mixed_priority_jobs(self, count=5):
+        def create_mixed_priority_jobs(self, count: int = 5) -> List[Dict[str, Any]]:
             """Create jobs with mixed priorities for realistic testing."""
             import random
 
             priorities = random.sample(range(100, 1000, 50), count)
             return self.create_priority_sequence(priorities)
 
-        def create_high_medium_low_jobs(self):
+        def create_high_medium_low_jobs(self) -> List[Dict[str, Any]]:
             """Create the classic high/medium/low priority test set."""
             return self.create_priority_sequence(
                 [900, 500, 100], {"test_type": "priority_ordering"}

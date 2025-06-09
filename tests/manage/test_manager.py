@@ -5,6 +5,7 @@ import tempfile
 import pytest
 from datetime import datetime, timezone, timedelta
 from unittest.mock import patch
+from typing import Any, Dict, List
 
 from dr_exp.manage.manager import Manager
 from dr_exp.manage.process_manager import MockProcessManager
@@ -14,51 +15,55 @@ from dr_exp.job_db import StaleJobInfo
 class MockJobDB:
     """Mock job database for testing."""
 
-    def __init__(self):
-        self.running_jobs = []
-        self.stale_jobs = []
-        self.has_queued = False
-        self.queue_summary = []
-        self.mark_failed_calls = []
+    def __init__(self) -> None:
+        self.running_jobs: List[Dict[str, Any]] = []
+        self.stale_jobs: List[StaleJobInfo] = []
+        self.has_queued: bool = False
+        self.queue_summary: List[Dict[str, Any]] = []
+        self.mark_failed_calls: List[Dict[str, Any]] = []
 
-    def list_running_jobs(self):
+    def list_running_jobs(self) -> List[Dict[str, Any]]:
         return self.running_jobs
 
-    def get_stale_jobs(self, max_age_seconds):
+    def get_stale_jobs(self, max_age_seconds: int) -> List[StaleJobInfo]:
         return self.stale_jobs
 
-    def mark_jobs_failed(self, job_ids, reason="worker_lost"):
+    def mark_jobs_failed(
+        self, job_ids: List[str], reason: str = "worker_lost"
+    ) -> Dict[str, bool]:
         self.mark_failed_calls.append({"job_ids": job_ids, "reason": reason})
         return {job_id: True for job_id in job_ids}
 
-    def has_queued_jobs(self):
+    def has_queued_jobs(self) -> bool:
         return self.has_queued
 
-    def get_queue_summary(self, limit=5):
+    def get_queue_summary(self, limit: int = 5) -> List[Dict[str, Any]]:
         return self.queue_summary[:limit]
 
 
 @pytest.fixture
-def temp_dir():
+def temp_dir() -> Any:
     """Create a temporary directory for testing."""
     with tempfile.TemporaryDirectory() as tmpdir:
         yield tmpdir
 
 
 @pytest.fixture
-def mock_job_db():
+def mock_job_db() -> MockJobDB:
     """Create a mock job database."""
     return MockJobDB()
 
 
 @pytest.fixture
-def mock_process_manager():
+def mock_process_manager() -> MockProcessManager:
     """Create a mock process manager."""
     return MockProcessManager()
 
 
 @pytest.fixture
-def streamlined_manager(temp_dir, mock_job_db, mock_process_manager):
+def streamlined_manager(
+    temp_dir: str, mock_job_db: MockJobDB, mock_process_manager: MockProcessManager
+) -> Manager:
     """Create a Manager for testing."""
     return Manager(
         gpus=["0", "1"],
@@ -75,8 +80,12 @@ class TestManager:
     """Test the Manager implementation."""
 
     def test_initialization(
-        self, streamlined_manager, temp_dir, mock_job_db, mock_process_manager
-    ):
+        self,
+        streamlined_manager: Manager,
+        temp_dir: str,
+        mock_job_db: MockJobDB,
+        mock_process_manager: MockProcessManager,
+    ) -> None:
         """Test manager initialization."""
         assert streamlined_manager.gpus == ["0", "1"]
         assert streamlined_manager.workers_per_gpu == 2
@@ -90,7 +99,9 @@ class TestManager:
         # Check that log directory was created
         assert os.path.exists(temp_dir)
 
-    def test_start_workers(self, streamlined_manager, mock_process_manager):
+    def test_start_workers(
+        self, streamlined_manager: Manager, mock_process_manager: MockProcessManager
+    ) -> None:
         """Test worker startup."""
         streamlined_manager.start_workers()
 
@@ -109,7 +120,9 @@ class TestManager:
         assert worker_status["worker_1_0"]["gpu"] == "1"
         assert worker_status["worker_1_1"]["gpu"] == "1"
 
-    def test_stop_all_workers(self, streamlined_manager, mock_process_manager):
+    def test_stop_all_workers(
+        self, streamlined_manager: Manager, mock_process_manager: MockProcessManager
+    ) -> None:
         """Test stopping all workers."""
         streamlined_manager.start_workers()
         assert mock_process_manager.get_worker_count() == 4
@@ -121,7 +134,9 @@ class TestManager:
         worker_status = mock_process_manager.get_worker_status()
         assert all(not status["alive"] for status in worker_status.values())
 
-    def test_check_stale_jobs_no_stale_jobs(self, streamlined_manager, mock_job_db):
+    def test_check_stale_jobs_no_stale_jobs(
+        self, streamlined_manager: Manager, mock_job_db: MockJobDB
+    ) -> None:
         """Test stale job checking when no stale jobs exist."""
         mock_job_db.stale_jobs = []
 
@@ -131,8 +146,11 @@ class TestManager:
         assert len(mock_job_db.mark_failed_calls) == 0
 
     def test_check_stale_jobs_with_stale_jobs(
-        self, streamlined_manager, mock_job_db, mock_process_manager
-    ):
+        self,
+        streamlined_manager: Manager,
+        mock_job_db: MockJobDB,
+        mock_process_manager: MockProcessManager,
+    ) -> None:
         """Test stale job checking with stale jobs."""
         # Create stale jobs
         now = datetime.now(timezone.utc)
@@ -168,8 +186,8 @@ class TestManager:
         assert mock_process_manager.restart_count == 2
 
     def test_check_idle_timeout_with_running_jobs(
-        self, streamlined_manager, mock_job_db
-    ):
+        self, streamlined_manager: Manager, mock_job_db: MockJobDB
+    ) -> None:
         """Test idle timeout check when there are running jobs."""
         # Set up running jobs
         mock_job_db.running_jobs = [
@@ -191,8 +209,8 @@ class TestManager:
         assert not streamlined_manager.shutdown
 
     def test_check_idle_timeout_no_jobs_within_timeout(
-        self, streamlined_manager, mock_job_db
-    ):
+        self, streamlined_manager: Manager, mock_job_db: MockJobDB
+    ) -> None:
         """Test idle timeout check with no jobs but within timeout."""
         # No running jobs
         mock_job_db.running_jobs = []
@@ -208,7 +226,9 @@ class TestManager:
         # Should not shutdown
         assert not streamlined_manager.shutdown
 
-    def test_check_idle_timeout_exceeds_timeout(self, streamlined_manager, mock_job_db):
+    def test_check_idle_timeout_exceeds_timeout(
+        self, streamlined_manager: Manager, mock_job_db: MockJobDB
+    ) -> None:
         """Test idle timeout check when timeout is exceeded."""
         # No running jobs
         mock_job_db.running_jobs = []
@@ -225,8 +245,8 @@ class TestManager:
         assert streamlined_manager.shutdown
 
     def test_check_idle_timeout_with_queued_jobs(
-        self, streamlined_manager, mock_job_db
-    ):
+        self, streamlined_manager: Manager, mock_job_db: MockJobDB
+    ) -> None:
         """Test idle timeout check logs queued jobs."""
         # No running jobs but some queued
         mock_job_db.running_jobs = []
@@ -246,7 +266,12 @@ class TestManager:
         # Should not shutdown (within timeout)
         assert not streamlined_manager.shutdown
 
-    def test_log_status(self, streamlined_manager, mock_job_db, mock_process_manager):
+    def test_log_status(
+        self,
+        streamlined_manager: Manager,
+        mock_job_db: MockJobDB,
+        mock_process_manager: MockProcessManager,
+    ) -> None:
         """Test status logging."""
         # Set up test data
         mock_job_db.running_jobs = [{"id": "job1"}, {"id": "job2"}]
@@ -258,7 +283,9 @@ class TestManager:
         streamlined_manager.log_status()
 
     @patch("signal.signal")
-    def test_signal_handling(self, mock_signal, streamlined_manager):
+    def test_signal_handling(
+        self, mock_signal: Any, streamlined_manager: Manager
+    ) -> None:
         """Test signal handling setup."""
         # Mock the signal handling to avoid actual signal registration
         with (
@@ -274,8 +301,8 @@ class TestManager:
             assert mock_signal.call_count >= 2
 
     def test_run_with_immediate_shutdown(
-        self, streamlined_manager, mock_process_manager
-    ):
+        self, streamlined_manager: Manager, mock_process_manager: MockProcessManager
+    ) -> None:
         """Test run method with immediate shutdown."""
         # Set shutdown flag to exit immediately
         streamlined_manager.shutdown = True
@@ -287,7 +314,9 @@ class TestManager:
             assert mock_process_manager.launch_count == 4
             assert mock_process_manager.stop_count == 1
 
-    def test_get_and_log_stale_jobs_empty(self, streamlined_manager, mock_job_db):
+    def test_get_and_log_stale_jobs_empty(
+        self, streamlined_manager: Manager, mock_job_db: MockJobDB
+    ) -> None:
         """Test _get_and_log_stale_jobs with no stale jobs."""
         mock_job_db.stale_jobs = []
 
@@ -295,7 +324,9 @@ class TestManager:
 
         assert result == []
 
-    def test_get_and_log_stale_jobs_with_jobs(self, streamlined_manager, mock_job_db):
+    def test_get_and_log_stale_jobs_with_jobs(
+        self, streamlined_manager: Manager, mock_job_db: MockJobDB
+    ) -> None:
         """Test _get_and_log_stale_jobs with stale jobs."""
         now = datetime.now(timezone.utc)
         stale_time = now - timedelta(minutes=5)
@@ -321,7 +352,9 @@ class TestManager:
         assert result[0].job_id == "job1"
         assert result[1].job_id == "job2"
 
-    def test_mark_stale_jobs_failed_success(self, streamlined_manager, mock_job_db):
+    def test_mark_stale_jobs_failed_success(
+        self, streamlined_manager: Manager, mock_job_db: MockJobDB
+    ) -> None:
         """Test _mark_stale_jobs_failed with successful job marking."""
         now = datetime.now(timezone.utc)
         stale_time = now - timedelta(minutes=5)
@@ -351,8 +384,8 @@ class TestManager:
         assert call["reason"] == "worker_lost"
 
     def test_mark_stale_jobs_failed_partial_failure(
-        self, streamlined_manager, mock_job_db
-    ):
+        self, streamlined_manager: Manager, mock_job_db: MockJobDB
+    ) -> None:
         """Test _mark_stale_jobs_failed with partial failures."""
         from dr_exp.manage.manager import StaleJobProcessingError
 
@@ -375,7 +408,7 @@ class TestManager:
         ]
 
         # Mock partial failure in mark_jobs_failed
-        def mock_mark_failed(job_ids, reason):
+        def mock_mark_failed(job_ids: List[str], reason: str) -> Dict[str, bool]:
             return {"job1": True, "job2": False}
 
         mock_job_db.mark_jobs_failed = mock_mark_failed
@@ -387,8 +420,8 @@ class TestManager:
         assert "Failed to mark 1 jobs as failed" in str(exc_info.value)
 
     def test_restart_affected_workers_success(
-        self, streamlined_manager, mock_process_manager
-    ):
+        self, streamlined_manager: Manager, mock_process_manager: MockProcessManager
+    ) -> None:
         """Test _restart_affected_workers with successful restarts."""
         now = datetime.now(timezone.utc)
         stale_time = now - timedelta(minutes=5)
@@ -418,8 +451,8 @@ class TestManager:
         assert mock_process_manager.restart_count == 2
 
     def test_restart_affected_workers_unmanaged_worker(
-        self, streamlined_manager, mock_process_manager
-    ):
+        self, streamlined_manager: Manager, mock_process_manager: MockProcessManager
+    ) -> None:
         """Test _restart_affected_workers with unmanaged worker."""
         now = datetime.now(timezone.utc)
         stale_time = now - timedelta(minutes=5)
@@ -442,8 +475,8 @@ class TestManager:
         assert mock_process_manager.restart_count == 0
 
     def test_restart_single_worker_success(
-        self, streamlined_manager, mock_process_manager
-    ):
+        self, streamlined_manager: Manager, mock_process_manager: MockProcessManager
+    ) -> None:
         """Test _restart_single_worker with successful restart."""
         # Start workers first
         streamlined_manager.start_workers()
@@ -456,10 +489,10 @@ class TestManager:
         assert mock_process_manager.restart_count == 1
 
     def test_restart_single_worker_unmanaged(
-        self, streamlined_manager, mock_process_manager
-    ):
+        self, streamlined_manager: Manager, mock_process_manager: MockProcessManager
+    ) -> None:
         """Test _restart_single_worker with unmanaged worker."""
-        managed_workers = set()  # Empty set - no managed workers
+        managed_workers: set[str] = set()  # Empty set - no managed workers
 
         # Should not raise exception (just logs warning)
         streamlined_manager._restart_single_worker("external_worker", managed_workers)
@@ -468,8 +501,8 @@ class TestManager:
         assert mock_process_manager.restart_count == 0
 
     def test_restart_single_worker_failure(
-        self, streamlined_manager, mock_process_manager
-    ):
+        self, streamlined_manager: Manager, mock_process_manager: MockProcessManager
+    ) -> None:
         """Test _restart_single_worker with restart failure."""
         from dr_exp.manage.manager import WorkerRestartError
 
@@ -478,7 +511,7 @@ class TestManager:
         managed_workers = set(mock_process_manager.get_worker_status().keys())
 
         # Mock restart failure
-        def mock_restart_worker(worker_id):
+        def mock_restart_worker(worker_id: str) -> None:
             raise RuntimeError("Restart failed")
 
         mock_process_manager.restart_worker = mock_restart_worker
@@ -490,8 +523,8 @@ class TestManager:
         assert "Failed to restart worker worker_0_0" in str(exc_info.value)
 
     def test_check_stale_jobs_processing_error_handling(
-        self, streamlined_manager, mock_job_db
-    ):
+        self, streamlined_manager: Manager, mock_job_db: MockJobDB
+    ) -> None:
         """Test check_stale_jobs handles StaleJobProcessingError gracefully."""
         now = datetime.now(timezone.utc)
         stale_time = now - timedelta(minutes=5)
@@ -506,7 +539,7 @@ class TestManager:
         ]
 
         # Mock mark_jobs_failed to return failure
-        def mock_mark_failed(job_ids, reason):
+        def mock_mark_failed(job_ids: List[str], reason: str) -> Dict[str, bool]:
             return {"job1": False}
 
         mock_job_db.mark_jobs_failed = mock_mark_failed
@@ -518,13 +551,16 @@ class TestManager:
         assert len(mock_job_db.mark_failed_calls) == 0  # Our mock doesn't record calls
 
     def test_run_single_loop_iteration(
-        self, streamlined_manager, mock_job_db, mock_process_manager
-    ):
+        self,
+        streamlined_manager: Manager,
+        mock_job_db: MockJobDB,
+        mock_process_manager: MockProcessManager,
+    ) -> None:
         """Test a single iteration of the run loop."""
         # Set up for one loop iteration
         loop_count = 0
 
-        def mock_sleep(seconds):
+        def mock_sleep(seconds: float) -> None:
             nonlocal loop_count
             loop_count += 1
             if loop_count >= 1:
@@ -538,7 +574,7 @@ class TestManager:
             assert mock_process_manager.launch_count == 4
             assert mock_process_manager.stop_count == 1
 
-    def test_handle_signal(self, streamlined_manager):
+    def test_handle_signal(self, streamlined_manager: Manager) -> None:
         """Test signal handler."""
         assert not streamlined_manager.shutdown
 
@@ -550,7 +586,7 @@ class TestManager:
 class TestManagerIntegration:
     """Integration tests for Manager with real components."""
 
-    def test_with_default_factory(self, temp_dir):
+    def test_with_default_factory(self, temp_dir: str) -> None:
         """Test manager creation with default job database factory."""
         # Set required environment variable for ProcessManager
         with patch.dict("os.environ", {"DR_EXP_BASE_PATH": temp_dir}):
@@ -571,7 +607,9 @@ class TestManagerIntegration:
             assert hasattr(manager.job_db, "has_queued_jobs")
             assert hasattr(manager.job_db, "get_queue_summary")
 
-    def test_with_default_process_manager(self, temp_dir, mock_job_db):
+    def test_with_default_process_manager(
+        self, temp_dir: str, mock_job_db: MockJobDB
+    ) -> None:
         """Test manager creation with default process manager."""
         with patch.dict(os.environ, {"DR_EXP_BASE_PATH": temp_dir}):
             manager = Manager(

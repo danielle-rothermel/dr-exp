@@ -1,11 +1,12 @@
 """Tests for the LoggerPathManager and LoggerPathConfig."""
 
 import os
+from pathlib import Path
 
 from dr_exp.logging.logger_paths import LoggerPathConfig, LoggerPathManager
 
 
-def test_logger_path_config_defaults():
+def test_logger_path_config_defaults() -> None:
     """Test LoggerPathConfig default values."""
     config = LoggerPathConfig(base_dir="/tmp/logs")
     assert config.base_dir == "/tmp/logs"
@@ -15,7 +16,7 @@ def test_logger_path_config_defaults():
     assert config.error_filename == "errors.log"
 
 
-def test_logger_path_config_custom():
+def test_logger_path_config_custom() -> None:
     """Test LoggerPathConfig with custom values."""
     config = LoggerPathConfig(
         base_dir="/custom/logs",
@@ -31,7 +32,7 @@ def test_logger_path_config_custom():
     assert config.error_filename == "error_log.txt"
 
 
-def test_logger_path_manager_from_string(tmp_path):
+def test_logger_path_manager_from_string(tmp_path: Path) -> None:
     """Test LoggerPathManager initialization from string."""
     log_dir = str(tmp_path / "logs")
     manager = LoggerPathManager(log_dir)
@@ -43,7 +44,7 @@ def test_logger_path_manager_from_string(tmp_path):
     assert manager.error_log_path == os.path.join(log_dir, "errors.log")
 
 
-def test_logger_path_manager_from_config(tmp_path):
+def test_logger_path_manager_from_config(tmp_path: Path) -> None:
     """Test LoggerPathManager initialization from LoggerPathConfig."""
     config = LoggerPathConfig(
         base_dir=str(tmp_path / "logs"),
@@ -62,7 +63,7 @@ def test_logger_path_manager_from_config(tmp_path):
     assert manager.error_log_path == os.path.join(base, "test_errors.log")
 
 
-def test_logger_path_manager_creates_directories(tmp_path):
+def test_logger_path_manager_creates_directories(tmp_path: Path) -> None:
     """Test that LoggerPathManager creates necessary directories."""
     log_dir = str(tmp_path / "new_logs")
     manager = LoggerPathManager(log_dir)
@@ -72,7 +73,7 @@ def test_logger_path_manager_creates_directories(tmp_path):
     assert os.path.exists(manager.artifact_dir)
 
 
-def test_checkpoint_path_generation():
+def test_checkpoint_path_generation() -> None:
     """Test checkpoint path generation."""
     manager = LoggerPathManager("/tmp/logs")
 
@@ -85,7 +86,7 @@ def test_checkpoint_path_generation():
     assert path == "/tmp/logs/checkpoints/checkpoint_best.pt.gz"
 
 
-def test_artifact_path_generation():
+def test_artifact_path_generation() -> None:
     """Test artifact path generation."""
     manager = LoggerPathManager("/tmp/logs")
 
@@ -96,7 +97,7 @@ def test_artifact_path_generation():
     assert path == "/tmp/logs/artifacts/results/metrics.csv"
 
 
-def test_paths_are_consistent():
+def test_paths_are_consistent() -> None:
     """Test that paths remain consistent across multiple accesses."""
     manager = LoggerPathManager("/tmp/logs")
 
