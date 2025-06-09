@@ -18,11 +18,11 @@ from dr_exp.cli.commands.status import StatusCommand
 
 class CommandRegistry:
     """Registry for managing CLI commands."""
-    
+
     def __init__(self):
         self._commands: Dict[str, Type[BaseCommand]] = {}
         self._register_default_commands()
-    
+
     def _register_default_commands(self) -> None:
         """Register all default commands."""
         commands = [
@@ -38,13 +38,13 @@ class CommandRegistry:
             UploadConfigsCommand,
             StatusCommand,
         ]
-        
+
         for command_class in commands:
             self.register(command_class)
-    
+
     def register(self, command_class: Type[BaseCommand]) -> None:
         """Register a command class.
-        
+
         Parameters
         ----------
         command_class : Type[BaseCommand]
@@ -53,20 +53,20 @@ class CommandRegistry:
         # Create temporary instance to get the name
         instance = command_class()
         self._commands[instance.name] = command_class
-    
+
     def get(self, name: str) -> Type[BaseCommand]:
         """Get a command class by name.
-        
+
         Parameters
         ----------
         name : str
             Command name
-            
+
         Returns
         -------
         Type[BaseCommand]
             Command class
-            
+
         Raises
         ------
         KeyError
@@ -75,10 +75,10 @@ class CommandRegistry:
         if name not in self._commands:
             raise KeyError(f"Unknown command: {name}")
         return self._commands[name]
-    
+
     def list_commands(self) -> Dict[str, str]:
         """List all available commands with their help text.
-        
+
         Returns
         -------
         Dict[str, str]
@@ -89,7 +89,7 @@ class CommandRegistry:
             instance = command_class()
             result[name] = instance.help
         return result
-    
+
     @property
     def command_names(self) -> list[str]:
         """Get list of all command names."""

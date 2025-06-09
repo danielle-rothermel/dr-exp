@@ -1,6 +1,5 @@
 """Tests for API authentication and authorization."""
 
-import pytest
 from .conftest import create_test_job, Priority, JobStatus
 
 
@@ -12,16 +11,18 @@ def test_public_endpoints_no_auth(client, db_client):
     # These endpoints should work without auth
     public_endpoints = [
         "/health",
-        "/metrics", 
+        "/metrics",
         "/api",
         "/jobs",
         f"/job/{job_id}",
         f"/config/{job_id}",
     ]
-    
+
     for endpoint in public_endpoints:
         resp = client.get(endpoint)
-        assert resp.status_code in [200, 404], f"Endpoint {endpoint} failed with {resp.status_code}"
+        assert resp.status_code in [200, 404], (
+            f"Endpoint {endpoint} failed with {resp.status_code}"
+        )
 
 
 def test_admin_endpoints_require_auth(client, db_client):
@@ -35,19 +36,21 @@ def test_admin_endpoints_require_auth(client, db_client):
         ("/job/boost-priority", {"job_id": job_id, "boost_amount": 100}),
         ("/job/set-priority", {"job_id": job_id, "priority": 500}),
     ]
-    
+
     for endpoint, payload in admin_endpoints:
         # Test without auth (may return 401 or 403)
         resp = client.post(endpoint, json=payload)
-        assert resp.status_code in [401, 403], f"Endpoint {endpoint} should require auth"
-        
+        assert resp.status_code in [401, 403], (
+            f"Endpoint {endpoint} should require auth"
+        )
+
         # Test with invalid auth
         resp = client.post(
-            endpoint, 
-            json=payload,
-            headers={"Authorization": "Bearer invalid"}
+            endpoint, json=payload, headers={"Authorization": "Bearer invalid"}
         )
-        assert resp.status_code in [401, 403], f"Endpoint {endpoint} should reject invalid token"
+        assert resp.status_code in [401, 403], (
+            f"Endpoint {endpoint} should reject invalid token"
+        )
 
 
 def test_admin_access_with_valid_token(client, db_client, admin_headers):
@@ -56,22 +59,14 @@ def test_admin_access_with_valid_token(client, db_client, admin_headers):
     job_id = job["id"]
 
     # Test kill job
-    resp = client.post(
-        "/job/kill", 
-        json={"job_id": job_id}, 
-        headers=admin_headers
-    )
+    resp = client.post("/job/kill", json={"job_id": job_id}, headers=admin_headers)
     assert resp.status_code == 200
     data = resp.json()
     assert data["success"] is True
     assert data["job_id"] == job_id
 
     # Test requeue job
-    resp = client.post(
-        "/job/requeue",
-        json={"job_id": job_id},
-        headers=admin_headers
-    )
+    resp = client.post("/job/requeue", json={"job_id": job_id}, headers=admin_headers)
     assert resp.status_code == 200
     data = resp.json()
     assert data["success"] is True
@@ -81,7 +76,7 @@ def test_admin_access_with_valid_token(client, db_client, admin_headers):
     resp = client.post(
         "/job/boost-priority",
         json={"job_id": job_id, "boost_amount": 100},
-        headers=admin_headers
+        headers=admin_headers,
     )
     assert resp.status_code == 200
     data = resp.json()
@@ -92,8 +87,12 @@ def test_admin_access_with_valid_token(client, db_client, admin_headers):
     # Test set priority
     resp = client.post(
         "/job/set-priority",
-        json={"job_id": job_id, "priority": Priority.URGENT, "reason": "urgent deadline"},
-        headers=admin_headers
+        json={
+            "job_id": job_id,
+            "priority": Priority.URGENT,
+            "reason": "urgent deadline",
+        },
+        headers=admin_headers,
     )
     assert resp.status_code == 200
     data = resp.json()
@@ -112,7 +111,7 @@ def test_reader_access_restrictions(client, db_client, reader_headers):
         ("/job/boost-priority", {"job_id": job_id, "boost_amount": 100}),
         ("/job/set-priority", {"job_id": job_id, "priority": 500}),
     ]
-    
+
     for endpoint, payload in admin_endpoints:
         resp = client.post(endpoint, json=payload, headers=reader_headers)
         assert resp.status_code == 403, f"Reader should not access {endpoint}"
@@ -126,12 +125,12 @@ def test_reader_can_access_read_endpoints(client, db_client, reader_headers):
     read_endpoints = [
         "/health",
         "/metrics",
-        "/api", 
+        "/api",
         "/jobs",
         f"/job/{job_id}",
         f"/config/{job_id}",
     ]
-    
+
     for endpoint in read_endpoints:
         resp = client.get(endpoint, headers=reader_headers)
         assert resp.status_code in [200, 404], f"Reader should access {endpoint}"
@@ -144,17 +143,13 @@ def test_malformed_auth_headers(client, db_client):
 
     malformed_headers = [
         {"Authorization": "invalid"},  # Missing Bearer
-        {"Authorization": "Bearer"},   # Missing token
+        {"Authorization": "Bearer"},  # Missing token
         {"Authorization": "Basic token"},  # Wrong scheme
         {"Authorization": "Bearer "},  # Empty token
     ]
-    
+
     for headers in malformed_headers:
-        resp = client.post(
-            "/job/kill", 
-            json={"job_id": job_id},
-            headers=headers
-        )
+        resp = client.post("/job/kill", json={"job_id": job_id}, headers=headers)
         assert resp.status_code in [401, 403]
 
 
@@ -165,12 +160,8 @@ def test_case_sensitive_tokens(client, db_client):
 
     # Test with wrong case
     wrong_case_headers = {"Authorization": "Bearer SECRET"}  # Should be "secret"
-    
-    resp = client.post(
-        "/job/kill",
-        json={"job_id": job_id},
-        headers=wrong_case_headers
-    )
+
+    resp = client.post("/job/kill", json={"job_id": job_id}, headers=wrong_case_headers)
     assert resp.status_code == 401
 
 
@@ -180,9 +171,7 @@ def test_empty_authorization_header(client, db_client):
     job_id = job["id"]
 
     resp = client.post(
-        "/job/kill",
-        json={"job_id": job_id},
-        headers={"Authorization": ""}
+        "/job/kill", json={"job_id": job_id}, headers={"Authorization": ""}
     )
     assert resp.status_code in [401, 403]
 
@@ -198,8 +187,8 @@ def test_multiple_authorization_headers(client, db_client):
         json={"job_id": job_id},
         headers=[
             ("Authorization", "Bearer secret"),
-            ("Authorization", "Bearer invalid")
-        ]
+            ("Authorization", "Bearer invalid"),
+        ],
     )
     # Behavior may vary, but should either work with first header or reject
     assert resp.status_code in [200, 401]

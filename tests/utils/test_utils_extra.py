@@ -79,7 +79,11 @@ def test_get_supabase_client_modes(monkeypatch, tmp_path):
 
 
 def test_metrics_loader(tmp_path):
-    config = JobDBConfig(base_path=str(tmp_path), storage_path=str(tmp_path / "storage"), mode="files_local")
+    config = JobDBConfig(
+        base_path=str(tmp_path),
+        storage_path=str(tmp_path / "storage"),
+        mode="files_local",
+    )
     client = LocalJobDB(config)
     loader = MetricsLoader(client, maxsize=2)
     run_id = "r1"

@@ -4,7 +4,6 @@ from __future__ import annotations
 
 from pathlib import Path
 import argparse
-import os
 from typing import Any, Dict, List, Sequence
 
 from dr_exp.utils import config_upload
@@ -44,10 +43,10 @@ def build_arg_parser() -> argparse.ArgumentParser:
 
 def run(args: argparse.Namespace) -> List[Dict[str, Any]]:
     client = get_job_db_client()
-    
+
     # Convert relative path to absolute path for Hydra
     base_config_path = Path(args.base_config_path).resolve()
-    
+
     return config_upload.upload_configs(
         base_config_path=str(base_config_path),
         config_name=args.config_name,

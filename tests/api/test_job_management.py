@@ -1,6 +1,5 @@
 """Tests for job management endpoints."""
 
-import pytest
 from .conftest import create_test_job, create_test_metrics, Priority, JobStatus
 
 
@@ -12,7 +11,7 @@ def test_get_job_details(client, db_client):
 
     resp = client.get(f"/job/{job_id}")
     assert resp.status_code == 200
-    
+
     data = resp.json()
     assert data["id"] == job_id
     assert data["status"] == JobStatus.QUEUED
@@ -37,7 +36,7 @@ def test_get_nonexistent_job(client):
 
 
 def test_get_nonexistent_config(client):
-    """Test retrieving config for non-existent job returns 404.""" 
+    """Test retrieving config for non-existent job returns 404."""
     resp = client.get("/config/nonexistent-id")
     assert resp.status_code == 404
 
@@ -45,11 +44,13 @@ def test_get_nonexistent_config(client):
 def test_list_jobs_basic(client, db_client):
     """Test basic job listing."""
     job1 = create_test_job(db_client, sweep_config_id="sweep1", status=JobStatus.QUEUED)
-    job2 = create_test_job(db_client, sweep_config_id="sweep2", status=JobStatus.RUNNING)
+    job2 = create_test_job(
+        db_client, sweep_config_id="sweep2", status=JobStatus.RUNNING
+    )
 
     resp = client.get("/jobs")
     assert resp.status_code == 200
-    
+
     data = resp.json()
     assert isinstance(data, list)
     job_ids = {job["id"] for job in data}
@@ -68,7 +69,7 @@ def test_job_status_filtering(client, db_client):
     """Test filtering jobs by status."""
     queued_job = create_test_job(db_client, status=JobStatus.QUEUED)
     running_job = create_test_job(db_client, status=JobStatus.RUNNING)
-    completed_job = create_test_job(db_client, status=JobStatus.COMPLETED)
+    _completed_job = create_test_job(db_client, status=JobStatus.COMPLETED)
 
     # Test filtering by queued status
     resp = client.get("/jobs?job_status=queued")
@@ -89,9 +90,9 @@ def test_job_status_filtering(client, db_client):
 
 def test_priority_filtering(client, db_client):
     """Test filtering jobs by priority range."""
-    low_job = create_test_job(db_client, priority=Priority.LOW)
-    normal_job = create_test_job(db_client, priority=Priority.NORMAL)
-    high_job = create_test_job(db_client, priority=Priority.HIGH)
+    _low_job = create_test_job(db_client, priority=Priority.LOW)
+    _normal_job = create_test_job(db_client, priority=Priority.NORMAL)
+    _high_job = create_test_job(db_client, priority=Priority.HIGH)
 
     # Test minimum priority filter
     resp = client.get(f"/jobs?priority_min={Priority.NORMAL}")
@@ -112,7 +113,9 @@ def test_priority_filtering(client, db_client):
     assert {Priority.LOW, Priority.NORMAL} == set(priorities)
 
     # Test priority range filter
-    resp = client.get(f"/jobs?priority_min={Priority.LOW}&priority_max={Priority.NORMAL}")
+    resp = client.get(
+        f"/jobs?priority_min={Priority.LOW}&priority_max={Priority.NORMAL}"
+    )
     assert resp.status_code == 200
     data = resp.json()
     assert len(data) == 2
@@ -123,9 +126,9 @@ def test_priority_filtering(client, db_client):
 def test_job_sorting(client, db_client):
     """Test sorting jobs by different fields."""
     # Create jobs with different priorities and times
-    job1 = create_test_job(db_client, priority=Priority.HIGH, sweep_config_id="job1") 
-    job2 = create_test_job(db_client, priority=Priority.LOW, sweep_config_id="job2")
-    job3 = create_test_job(db_client, priority=Priority.NORMAL, sweep_config_id="job3")
+    _job1 = create_test_job(db_client, priority=Priority.HIGH, sweep_config_id="job1")
+    _job2 = create_test_job(db_client, priority=Priority.LOW, sweep_config_id="job2")
+    _job3 = create_test_job(db_client, priority=Priority.NORMAL, sweep_config_id="job3")
 
     # Test sorting by priority (ascending)
     resp = client.get("/jobs?sort_by=priority&sort_order=asc")
@@ -170,7 +173,7 @@ def test_metrics_endpoint(client, db_client):
     """Test retrieving job metrics."""
     job = create_test_job(db_client, status=JobStatus.RUNNING)
     job_id = job["id"]
-    
+
     # Create test metrics
     create_test_metrics(db_client, job_id, num_metrics=105)
 
@@ -187,7 +190,7 @@ def test_metrics_endpoint(client, db_client):
     data = resp.json()
     assert len(data["metrics"]) == 10
     assert data["count"] == 10
-    
+
     # Verify metrics are ordered (latest last)
     metrics = data["metrics"]
     steps = [m["step"] for m in metrics]
@@ -204,6 +207,6 @@ def test_metrics_no_metrics_file(client, db_client):
     """Test retrieving metrics when no metrics file exists."""
     job = create_test_job(db_client)
     job_id = job["id"]
-    
+
     resp = client.get(f"/metrics/{job_id}")
     assert resp.status_code == 404

@@ -18,7 +18,7 @@ def build_arg_parser() -> argparse.ArgumentParser:
 
 
 def main(argv: Optional[list[str]] = None) -> None:
-    args = build_arg_parser().parse_args(argv)
+    build_arg_parser().parse_args(argv)
     client = get_job_db_client()
     count = cleanup_uploaded_runs(client)
     print(f"Removed {count} run directory(s)")

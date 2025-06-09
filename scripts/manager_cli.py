@@ -12,7 +12,7 @@ from dr_exp.cli.main import main as cli_main
 
 def main(argv: Sequence[str] | None = None) -> None:
     """Entry point for the CLI.
-    
+
     This function maintains backward compatibility while delegating
     to the new command pattern architecture.
     """
@@ -23,6 +23,7 @@ def main(argv: Sequence[str] | None = None) -> None:
 def build_arg_parser():
     """Deprecated: Use dr_exp.cli.main.build_parser instead."""
     from dr_exp.cli.main import build_parser
+
     return build_parser()
 
 

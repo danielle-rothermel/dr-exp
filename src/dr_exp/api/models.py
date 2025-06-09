@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from typing import Any, Dict, List, Optional
 
-from pydantic import BaseModel, ConfigDict, Field, field_validator
+from pydantic import BaseModel, Field, field_validator
 
 
 class KillRequest(BaseModel):
@@ -21,7 +21,9 @@ class BoostPriorityRequest(BaseModel):
     """Request body for boosting job priority."""
 
     job_id: str = Field(..., description="Job identifier to boost")
-    boost_amount: int = Field(100, ge=1, le=1000, description="Amount to boost priority")
+    boost_amount: int = Field(
+        100, ge=1, le=1000, description="Amount to boost priority"
+    )
 
 
 class SetPriorityRequest(BaseModel):
@@ -29,7 +31,9 @@ class SetPriorityRequest(BaseModel):
 
     job_id: str = Field(..., description="Job identifier to update")
     priority: int = Field(..., ge=0, le=1000, description="New priority value (0-1000)")
-    reason: Optional[str] = Field(None, description="Optional reason for priority change")
+    reason: Optional[str] = Field(
+        None, description="Optional reason for priority change"
+    )
 
 
 class MetricsResponse(BaseModel):
@@ -37,11 +41,10 @@ class MetricsResponse(BaseModel):
 
     metrics: List[Dict[str, Any]] = Field(..., description="List of metric records")
     count: int = Field(..., description="Number of metrics returned")
-    
-    
+
     def __init__(self, **data):
-        if 'metrics' in data and 'count' not in data:
-            data['count'] = len(data['metrics'])
+        if "metrics" in data and "count" not in data:
+            data["count"] = len(data["metrics"])
         super().__init__(**data)
 
 
@@ -52,20 +55,24 @@ class JobModel(BaseModel):
     status: str = Field(..., description="Current job status")
     priority: int = Field(100, ge=0, le=1000, description="Job priority (0-1000)")
     retry_index: Optional[int] = Field(None, description="Number of retry attempts")
-    assigned_worker: Optional[str] = Field(None, description="Worker assigned to this job")
+    assigned_worker: Optional[str] = Field(
+        None, description="Worker assigned to this job"
+    )
     created_at: Optional[str] = Field(None, description="Job creation timestamp")
     started_at: Optional[str] = Field(None, description="Job start timestamp")
     end_time: Optional[str] = Field(None, description="Job completion timestamp")
     heartbeat: Optional[str] = Field(None, description="Last worker heartbeat")
-    kill_requested: Optional[bool] = Field(False, description="Whether job termination was requested")
+    kill_requested: Optional[bool] = Field(
+        False, description="Whether job termination was requested"
+    )
     config_id: Optional[str] = Field(None, description="Configuration identifier")
-    
-    @field_validator('status')
+
+    @field_validator("status")
     @classmethod
     def validate_status(cls, v):
-        valid_statuses = {'queued', 'running', 'completed', 'failed', 'killed'}
+        valid_statuses = {"queued", "running", "completed", "failed", "killed"}
         if v not in valid_statuses:
-            raise ValueError(f'Status must be one of: {valid_statuses}')
+            raise ValueError(f"Status must be one of: {valid_statuses}")
         return v
 
 
@@ -90,7 +97,9 @@ class ErrorResponse(BaseModel):
 
     error: str = Field(..., description="Error type or category")
     detail: str = Field(..., description="Detailed error message")
-    job_id: Optional[str] = Field(None, description="Related job identifier if applicable")
+    job_id: Optional[str] = Field(
+        None, description="Related job identifier if applicable"
+    )
 
 
 class SuccessResponse(BaseModel):
@@ -98,7 +107,9 @@ class SuccessResponse(BaseModel):
 
     success: bool = Field(True, description="Operation success indicator")
     message: str = Field(..., description="Human-readable success message")
-    job_id: Optional[str] = Field(None, description="Related job identifier if applicable")
+    job_id: Optional[str] = Field(
+        None, description="Related job identifier if applicable"
+    )
 
 
 class PaginatedJobsResponse(BaseModel):
@@ -115,21 +126,25 @@ class PaginatedJobsResponse(BaseModel):
 
 class HealthResponse(BaseModel):
     """API health check response."""
-    
+
     status: str = Field(..., description="Health status (healthy/unhealthy)")
     timestamp: str = Field(..., description="Current timestamp")
     uptime_seconds: float = Field(..., description="API uptime in seconds")
     version: str = Field(..., description="API version")
     database_status: str = Field(..., description="Database connection status")
-    job_stats: Dict[str, int] = Field(..., description="Current job statistics by status")
+    job_stats: Dict[str, int] = Field(
+        ..., description="Current job statistics by status"
+    )
 
 
 class SystemMetricsResponse(BaseModel):
     """System metrics response."""
-    
+
     timestamp: str = Field(..., description="Metrics collection timestamp")
     uptime_seconds: float = Field(..., description="API uptime in seconds")
-    active_connections: int = Field(..., description="Number of active WebSocket connections")
+    active_connections: int = Field(
+        ..., description="Number of active WebSocket connections"
+    )
     job_stats: Dict[str, int] = Field(..., description="Job statistics by status")
     total_jobs: int = Field(..., description="Total number of jobs in system")
     queue_depth: int = Field(..., description="Number of queued jobs")

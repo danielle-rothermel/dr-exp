@@ -10,19 +10,19 @@ from dr_exp.utils.cli_validation import validate_positive_int
 
 class DiscoverGpusCommand(BaseCommand):
     """List visible GPU IDs."""
-    
+
     @property
     def name(self) -> str:
         return "discover-gpus"
-    
+
     @property
     def help(self) -> str:
         return "List visible GPU IDs"
-    
+
     @property
     def description(self) -> str:
         return "Print GPU IDs that the manager would use"
-    
+
     def add_arguments(self, parser: ArgumentParser) -> None:
         parser.add_argument(
             "--gpus-per-node",
@@ -30,7 +30,7 @@ class DiscoverGpusCommand(BaseCommand):
             default=CLI_DEFAULTS.GPUS_PER_NODE,
             help=f"Total GPUs on the node if CUDA_VISIBLE_DEVICES is not set (default: {CLI_DEFAULTS.GPUS_PER_NODE})",
         )
-    
+
     def run(self, args: Namespace) -> int:
         validate_positive_int(args.gpus_per_node, "gpus-per-node")
         gpus = discover_gpus(args.gpus_per_node)

@@ -18,7 +18,7 @@ logger = logging.getLogger(__name__)
 
 class LocalJobDB(BaseJobDB):
     """Local filesystem-backed job database implementation.
-    
+
     This class provides a development and testing job database implementation
     using local JSON files for job storage and the local filesystem for
     artifact storage. Ideal for local development, testing, and offline work.
@@ -28,7 +28,7 @@ class LocalJobDB(BaseJobDB):
         """Initialize the local job database from configuration.
 
         Creates the necessary directories for job storage, metrics, and artifacts.
-        
+
         Parameters
         ----------
         config : JobDBConfig
@@ -37,7 +37,7 @@ class LocalJobDB(BaseJobDB):
         config.validate()
         super().__init__(config.base_path, config.storage_path)
         self.config = config
-        
+
         # Local-specific directories and files
         self.metrics_dir = os.path.join(self.jobs_dir, "metrics")
         self.errors_file = os.path.join(self.jobs_dir, "errors.jsonl")
@@ -48,7 +48,7 @@ class LocalJobDB(BaseJobDB):
 
     def _atomic_write(self, target_file_path: str, data: str) -> None:
         """Write data to a file atomically using a temporary file.
-        
+
         Parameters
         ----------
         target_file_path : str
@@ -72,7 +72,7 @@ class LocalJobDB(BaseJobDB):
 
     def list_jobs(self) -> List[Dict[str, Any]]:
         """Return a list of all job records in the database.
-        
+
         Returns
         -------
         list[dict[str, Any]]
@@ -92,19 +92,21 @@ class LocalJobDB(BaseJobDB):
 
     # --- Interface methods based on docs/supabase_mock.md ---
 
-    def claim_job(self, worker_id: Optional[str] = None, respect_reservations: bool = True) -> Optional[Dict[str, Any]]:
+    def claim_job(
+        self, worker_id: Optional[str] = None, respect_reservations: bool = True
+    ) -> Optional[Dict[str, Any]]:
         """Atomically claim the highest priority available queued job.
-        
+
         Looks for jobs with status='queued', sorts by priority (highest first),
         then by age (oldest first), and claims the first available job.
         Uses file-level locking for atomicity across processes.
-        
+
         Parameters
         ----------
         worker_id : str, optional
             Identifier of the worker claiming the job. If not provided,
             a mock worker ID will be generated.
-            
+
         Returns
         -------
         dict[str, Any] | None
@@ -118,7 +120,9 @@ class LocalJobDB(BaseJobDB):
 
             job_file_path = os.path.join(self.jobs_dir, job_file_name)
             try:
-                with portalocker.Lock(job_file_path, mode="r", flags=portalocker.LOCK_SH):
+                with portalocker.Lock(
+                    job_file_path, mode="r", flags=portalocker.LOCK_SH
+                ):
                     with open(job_file_path, "r") as f:
                         job_data = json.load(f)
                     if job_data.get("status") == "queued":
@@ -131,15 +135,24 @@ class LocalJobDB(BaseJobDB):
                                 job_data.pop("reservation_expires_at", None)
                                 # Update the job file to clear reservation
                                 try:
-                                    with portalocker.Lock(job_file_path, mode="r+b", flags=portalocker.LOCK_EX):
-                                        self._atomic_write(job_file_path, json.dumps(job_data, indent=4))
+                                    with portalocker.Lock(
+                                        job_file_path,
+                                        mode="r+b",
+                                        flags=portalocker.LOCK_EX,
+                                    ):
+                                        self._atomic_write(
+                                            job_file_path,
+                                            json.dumps(job_data, indent=4),
+                                        )
                                 except Exception as e:
-                                    logger.warning(f"Failed to clear expired reservation for job {job_id}: {e}")
+                                    logger.warning(
+                                        f"Failed to clear expired reservation for job {job_data.get('job_id', 'unknown')}: {e}"
+                                    )
                                     # Continue even if cleanup fails
                             elif job_data["reserved_for_worker"] != worker_id:
                                 # Skip jobs reserved for other workers
                                 continue
-                        
+
                         queued_jobs.append((job_file_path, job_data))
             except Exception as e:
                 logger.error(f"Error reading job file {job_file_path}: {e}")
@@ -152,26 +165,32 @@ class LocalJobDB(BaseJobDB):
         queued_jobs.sort(
             key=lambda item: (
                 -item[1].get("priority", 100),  # Negative for descending priority
-                item[1].get("created_at", "")   # Older jobs first at same priority
+                item[1].get("created_at", ""),  # Older jobs first at same priority
             )
         )
 
         # Try to claim jobs in priority order
         for job_file_path, job_data in queued_jobs:
             try:
-                with portalocker.Lock(job_file_path, mode="r+b", flags=portalocker.LOCK_EX):
+                with portalocker.Lock(
+                    job_file_path, mode="r+b", flags=portalocker.LOCK_EX
+                ):
                     # Re-read under exclusive lock to ensure status hasn't changed
                     with open(job_file_path, "r") as f:
                         current_job_data = json.load(f)
-                    
+
                     if current_job_data.get("status") == "queued":
                         # Claim the job
                         current_job_data["status"] = "running"
                         current_job_data["assigned_worker"] = worker_id or (
                             f"mock_worker_{uuid.uuid4().hex[:6]}"
                         )
-                        current_job_data["heartbeat"] = datetime.now(UTC).isoformat() + "Z"
-                        current_job_data["started_at"] = datetime.now(UTC).isoformat() + "Z"
+                        current_job_data["heartbeat"] = (
+                            datetime.now(UTC).isoformat() + "Z"
+                        )
+                        current_job_data["started_at"] = (
+                            datetime.now(UTC).isoformat() + "Z"
+                        )
 
                         self._atomic_write(
                             job_file_path, json.dumps(current_job_data, indent=4)
@@ -185,14 +204,14 @@ class LocalJobDB(BaseJobDB):
 
     def update_job(self, job_id: str, data: Dict[str, Any]) -> Dict[str, Any]:
         """Update a job record with new data.
-        
+
         Parameters
         ----------
         job_id : str
             Identifier of the job to update.
         data : dict[str, Any]
             Fields to update on the job record.
-            
+
         Returns
         -------
         dict[str, Any]
@@ -224,7 +243,7 @@ class LocalJobDB(BaseJobDB):
 
     def log_metrics(self, job_id: str, metrics_list: List[Dict[str, Any]]) -> None:
         """Log metrics for a job by appending to its metrics file.
-        
+
         Parameters
         ----------
         job_id : str
@@ -258,7 +277,7 @@ class LocalJobDB(BaseJobDB):
         stacktrace: Optional[str] = None,
     ) -> Dict[str, Any]:
         """Record a failure event and mark the job as failed.
-        
+
         Parameters
         ----------
         job_id : str
@@ -269,7 +288,7 @@ class LocalJobDB(BaseJobDB):
             Human-readable error message.
         stacktrace : str, optional
             Stack trace to store for debugging.
-            
+
         Returns
         -------
         dict[str, Any]
@@ -294,12 +313,14 @@ class LocalJobDB(BaseJobDB):
             logger.error(f"Error recording failure for job {job_id}: {e}")
             return {"success": False, "message": str(e)}
 
-    def upload_artifact(self, job_id: str, local_path: str, remote_path_suffix: str) -> Dict[str, Any]:
+    def upload_artifact(
+        self, job_id: str, local_path: str, remote_path_suffix: str
+    ) -> Dict[str, Any]:
         """Upload an artifact file or directory to local storage.
-        
+
         Simulates cloud storage by copying artifacts to the local storage directory.
         Files are organized under run-specific directories.
-        
+
         Parameters
         ----------
         job_id : str
@@ -310,7 +331,7 @@ class LocalJobDB(BaseJobDB):
             Relative path where the artifact should be stored.
             If it contains '/' or no '.', it goes under artifacts/ subdirectory.
             Simple files like 'metrics.jsonl' go in the run root.
-            
+
         Returns
         -------
         dict[str, Any]
@@ -320,7 +341,7 @@ class LocalJobDB(BaseJobDB):
         if not local_path or ".." in local_path:
             logger.warning(f"Invalid local path provided: {local_path}")
             return {"success": False, "message": "Invalid local path"}
-            
+
         if not os.path.exists(local_path):
             logger.warning(f"Local artifact not found: {local_path}")
             return {"success": False, "message": "Local artifact not found"}
@@ -355,12 +376,12 @@ class LocalJobDB(BaseJobDB):
     # --- Helper/Additional methods that would be needed ---
     def get_job_details(self, job_id: str) -> Optional[Dict[str, Any]]:
         """Retrieve full details for a specific job.
-        
+
         Parameters
         ----------
         job_id : str
             Identifier of the job to fetch.
-            
+
         Returns
         -------
         dict[str, Any] | None
@@ -374,12 +395,12 @@ class LocalJobDB(BaseJobDB):
 
     def get_config_for_job(self, job_id: str) -> Optional[Dict[str, Any]]:
         """Return the configuration associated with a job.
-        
+
         Parameters
         ----------
         job_id : str
             Job identifier whose config should be fetched.
-            
+
         Returns
         -------
         dict[str, Any] | None
@@ -392,10 +413,14 @@ class LocalJobDB(BaseJobDB):
         return None
 
     def add_job(
-        self, job_config: Dict[str, Any], sweep_config_id: str, status: str = "queued", priority: int = 100
+        self,
+        job_config: Dict[str, Any],
+        sweep_config_id: str,
+        status: str = "queued",
+        priority: int = 100,
     ) -> Dict[str, Any]:
         """Add a new job entry to the database.
-        
+
         Parameters
         ----------
         job_config : dict[str, Any]
@@ -407,7 +432,7 @@ class LocalJobDB(BaseJobDB):
         priority : int, optional
             Job priority for queue ordering (0-1000), by default 100.
             Higher values indicate higher priority.
-            
+
         Returns
         -------
         dict[str, Any]
@@ -416,7 +441,7 @@ class LocalJobDB(BaseJobDB):
         job_id = str(uuid.uuid4())
         # Validate priority is in valid range
         priority = self._validate_priority(priority)
-        
+
         job_data = {
             "id": job_id,
             "config_id": sweep_config_id,  # This would be the ID of the entry in a sweep_configs table
@@ -445,7 +470,7 @@ class LocalJobDB(BaseJobDB):
         reason: Optional[str] = None,
     ) -> Dict[str, Any]:
         """Update the priority of a job.
-        
+
         Parameters
         ----------
         job_id : str
@@ -454,7 +479,7 @@ class LocalJobDB(BaseJobDB):
             New priority value (0-1000). Higher values indicate higher priority.
         reason : str, optional
             Optional reason for the priority change, for audit purposes.
-            
+
         Returns
         -------
         dict[str, Any]
@@ -462,7 +487,7 @@ class LocalJobDB(BaseJobDB):
         """
         # Validate priority is in valid range
         new_priority = self._validate_priority(new_priority)
-        
+
         job_file_path = os.path.join(self.jobs_dir, f"{job_id}.json")
         if not os.path.exists(job_file_path):
             return {"success": False, "message": "Job not found"}
@@ -474,25 +499,27 @@ class LocalJobDB(BaseJobDB):
 
                 old_priority = job_data.get("priority", 100)
                 job_data["priority"] = new_priority
-                
+
                 # Add audit trail
                 if "priority_changes" not in job_data:
                     job_data["priority_changes"] = []
-                
-                job_data["priority_changes"].append({
-                    "timestamp": datetime.now(UTC).isoformat() + "Z",
-                    "old_priority": old_priority,
-                    "new_priority": new_priority,
-                    "reason": reason
-                })
+
+                job_data["priority_changes"].append(
+                    {
+                        "timestamp": datetime.now(UTC).isoformat() + "Z",
+                        "old_priority": old_priority,
+                        "new_priority": new_priority,
+                        "reason": reason,
+                    }
+                )
 
                 self._atomic_write(job_file_path, json.dumps(job_data, indent=4))
-            
+
             return {
                 "success": True,
                 "old_priority": old_priority,
                 "new_priority": new_priority,
-                "message": f"Priority updated from {old_priority} to {new_priority}"
+                "message": f"Priority updated from {old_priority} to {new_priority}",
             }
         except Exception as e:
             return {"success": False, "message": str(e)}
@@ -503,7 +530,7 @@ class LocalJobDB(BaseJobDB):
         boost_amount: int = 100,
     ) -> Dict[str, Any]:
         """Boost the priority of a job by a specified amount.
-        
+
         Parameters
         ----------
         job_id : str
@@ -511,7 +538,7 @@ class LocalJobDB(BaseJobDB):
         boost_amount : int, optional
             Amount to add to the current priority, by default 100.
             Final priority will be clamped to valid range (0-1000).
-            
+
         Returns
         -------
         dict[str, Any]
@@ -529,27 +556,31 @@ class LocalJobDB(BaseJobDB):
                 old_priority = job_data.get("priority", 100)
                 new_priority = self._validate_priority(old_priority + boost_amount)
                 job_data["priority"] = new_priority
-                job_data["priority_boost_count"] = job_data.get("priority_boost_count", 0) + 1
-                
+                job_data["priority_boost_count"] = (
+                    job_data.get("priority_boost_count", 0) + 1
+                )
+
                 # Add audit trail
                 if "priority_changes" not in job_data:
                     job_data["priority_changes"] = []
-                
-                job_data["priority_changes"].append({
-                    "timestamp": datetime.now(UTC).isoformat() + "Z",
-                    "old_priority": old_priority,
-                    "new_priority": new_priority,
-                    "reason": f"Priority boost of +{boost_amount}"
-                })
+
+                job_data["priority_changes"].append(
+                    {
+                        "timestamp": datetime.now(UTC).isoformat() + "Z",
+                        "old_priority": old_priority,
+                        "new_priority": new_priority,
+                        "reason": f"Priority boost of +{boost_amount}",
+                    }
+                )
 
                 self._atomic_write(job_file_path, json.dumps(job_data, indent=4))
-            
+
             return {
                 "success": True,
                 "old_priority": old_priority,
                 "new_priority": new_priority,
                 "boost_amount": boost_amount,
-                "message": f"Priority boosted from {old_priority} to {new_priority}"
+                "message": f"Priority boosted from {old_priority} to {new_priority}",
             }
         except Exception as e:
             return {"success": False, "message": str(e)}
@@ -560,7 +591,7 @@ class LocalJobDB(BaseJobDB):
         limit: Optional[int] = None,
     ) -> List[Dict[str, Any]]:
         """List jobs ordered by priority (highest first).
-        
+
         Parameters
         ----------
         status_filter : list[str], optional
@@ -568,7 +599,7 @@ class LocalJobDB(BaseJobDB):
             If None, all jobs are returned.
         limit : int, optional
             Maximum number of jobs to return. If None, all matching jobs.
-            
+
         Returns
         -------
         list[dict[str, Any]]
@@ -576,35 +607,35 @@ class LocalJobDB(BaseJobDB):
             then by submission time (oldest first) for equal priorities.
         """
         jobs = self.list_jobs()
-        
+
         # Apply status filter
         if status_filter:
             jobs = [job for job in jobs if job.get("status") in status_filter]
-        
+
         # Sort by priority (highest first), then by age (oldest first)
         jobs.sort(
             key=lambda job: (
                 -job.get("priority", 100),  # Negative for descending priority
-                job.get("created_at", "")   # Older jobs first at same priority
+                job.get("created_at", ""),  # Older jobs first at same priority
             )
         )
-        
+
         # Apply limit
         if limit is not None:
             jobs = jobs[:limit]
-            
+
         return jobs
 
     # Job reservation methods
 
     def _is_reservation_expired(self, job_data: Dict[str, Any]) -> bool:
         """Check if a job reservation has expired.
-        
+
         Parameters
         ----------
         job_data : dict[str, Any]
             Job record to check.
-            
+
         Returns
         -------
         bool
@@ -613,10 +644,10 @@ class LocalJobDB(BaseJobDB):
         expires_at_str = job_data.get("reservation_expires_at")
         if not expires_at_str:
             return False  # No expiration set, never expires
-        
+
         try:
-            expires_at_str = expires_at_str.rstrip('Z')
-            expires_at = datetime.fromisoformat(expires_at_str.replace('Z', '+00:00'))
+            expires_at_str = expires_at_str.rstrip("Z")
+            expires_at = datetime.fromisoformat(expires_at_str.replace("Z", "+00:00"))
             return datetime.now(UTC) >= expires_at
         except (ValueError, TypeError):
             return True  # Invalid timestamp, consider expired
@@ -631,7 +662,7 @@ class LocalJobDB(BaseJobDB):
         status: str = "queued",
     ) -> Dict[str, Any]:
         """Add a new job entry reserved for a specific worker.
-        
+
         Parameters
         ----------
         job_config : dict[str, Any]
@@ -647,7 +678,7 @@ class LocalJobDB(BaseJobDB):
             Job priority for queue ordering (0-1000), by default 100.
         status : str, optional
             Initial job status, by default "queued".
-            
+
         Returns
         -------
         dict[str, Any]
@@ -656,7 +687,7 @@ class LocalJobDB(BaseJobDB):
         job_id = str(uuid.uuid4())
         # Validate priority is in valid range
         priority = self._validate_priority(priority)
-        
+
         job_data = {
             "id": job_id,
             "config_id": sweep_config_id,
@@ -669,16 +700,16 @@ class LocalJobDB(BaseJobDB):
             "created_at": datetime.now(UTC).isoformat() + "Z",
             "reserved_for_worker": reserved_for_worker,
         }
-        
+
         # Add expiration time if timeout is specified
         if reservation_timeout is not None:
             expires_at = datetime.now(UTC) + timedelta(seconds=reservation_timeout)
             job_data["reservation_expires_at"] = expires_at.isoformat() + "Z"
-        
+
         job_file_path = os.path.join(self.jobs_dir, f"{job_id}.json")
         with portalocker.Lock(job_file_path, mode="wb", flags=portalocker.LOCK_EX):
             self._atomic_write(job_file_path, json.dumps(job_data, indent=4))
-        
+
         logger.info(f"Added reserved job {job_id} for worker {reserved_for_worker}")
         return job_data
 
@@ -693,101 +724,105 @@ class LocalJobDB(BaseJobDB):
             for filename in os.listdir(self.jobs_dir):
                 if not filename.endswith(".json"):
                     continue
-                
+
                 job_file_path = os.path.join(self.jobs_dir, filename)
                 try:
                     with open(job_file_path, "r") as f:
                         job_data = json.load(f)
-                    
+
                     if job_data.get("status") == "running":
                         running_jobs.append(job_data)
-                        
+
                 except (json.JSONDecodeError, KeyError) as e:
                     logger.error(f"Error reading job file {filename}: {e}")
                     continue
-                    
+
         except FileNotFoundError:
             # Jobs directory doesn't exist yet
             pass
-        
+
         return running_jobs
 
     def get_stale_jobs(self, max_age_seconds: int) -> List[StaleJobInfo]:
         """Find jobs with heartbeats older than max_age_seconds."""
         stale_jobs = []
         now = datetime.now(UTC)
-        
+
         running_jobs = self.list_running_jobs()
-        
+
         for job in running_jobs:
             heartbeat_str = job.get("heartbeat")
             assigned_worker = job.get("assigned_worker")
             job_id = job.get("id")
-            
+
             if not heartbeat_str or not assigned_worker or not job_id:
                 continue
-            
+
             try:
                 # Parse heartbeat timestamp
                 heartbeat_time = datetime.fromisoformat(heartbeat_str.replace("Z", ""))
                 if heartbeat_time.tzinfo is None:
                     heartbeat_time = heartbeat_time.replace(tzinfo=UTC)
-                
+
                 # Calculate age
                 age = now - heartbeat_time
                 age_seconds = int(age.total_seconds())
-                
+
                 if age_seconds > max_age_seconds:
-                    stale_jobs.append(StaleJobInfo(
-                        job_id=job_id,
-                        assigned_worker=assigned_worker,
-                        last_heartbeat=heartbeat_time,
-                        age_seconds=age_seconds
-                    ))
-                    
+                    stale_jobs.append(
+                        StaleJobInfo(
+                            job_id=job_id,
+                            assigned_worker=assigned_worker,
+                            last_heartbeat=heartbeat_time,
+                            age_seconds=age_seconds,
+                        )
+                    )
+
             except (ValueError, TypeError) as e:
                 logger.error(f"Error parsing heartbeat for job {job_id}: {e}")
                 continue
-        
+
         return stale_jobs
 
     def mark_jobs_failed(
-        self, 
-        job_ids: List[str], 
-        reason: str = "worker_lost"
+        self, job_ids: List[str], reason: str = "worker_lost"
     ) -> Dict[str, bool]:
         """Mark multiple jobs as failed efficiently."""
         results = {}
         current_time = datetime.now(UTC).isoformat() + "Z"
-        
+
         for job_id in job_ids:
             try:
                 job_file_path = os.path.join(self.jobs_dir, f"{job_id}.json")
-                
+
                 # Read current job data
-                with portalocker.Lock(job_file_path, mode="r+b", flags=portalocker.LOCK_EX):
+                with portalocker.Lock(
+                    job_file_path, mode="r+b", flags=portalocker.LOCK_EX
+                ):
                     try:
                         with open(job_file_path, "r") as f:
                             job_data = json.load(f)
                     except (FileNotFoundError, json.JSONDecodeError):
                         results[job_id] = False
                         continue
-                    
+
                     # Update job status
-                    job_data.update({
-                        "status": "failed",
-                        "status_reason": reason,
-                        "end_time": current_time
-                    })
-                    
+                    job_data.update(
+                        {
+                            "status": "failed",
+                            "status_reason": reason,
+                            "end_time": current_time,
+                        }
+                    )
+
                     # Write updated data
                     self._atomic_write(job_file_path, json.dumps(job_data, indent=4))
                     results[job_id] = True
-                    
+
             except Exception as e:
                 logger.error(f"Error marking job {job_id} as failed: {e}")
                 results[job_id] = False
-        
+
         return results
 
     def has_queued_jobs(self) -> bool:
@@ -796,22 +831,22 @@ class LocalJobDB(BaseJobDB):
             for filename in os.listdir(self.jobs_dir):
                 if not filename.endswith(".json"):
                     continue
-                
+
                 job_file_path = os.path.join(self.jobs_dir, filename)
                 try:
                     with open(job_file_path, "r") as f:
                         job_data = json.load(f)
-                    
+
                     if job_data.get("status") == "queued":
                         return True
-                        
+
                 except (json.JSONDecodeError, KeyError):
                     continue
-                    
+
         except FileNotFoundError:
             # Jobs directory doesn't exist yet
             pass
-        
+
         return False
 
     def get_queue_summary(self, limit: int = 5) -> List[Dict[str, Any]]:
@@ -822,36 +857,38 @@ class LocalJobDB(BaseJobDB):
             for filename in os.listdir(self.jobs_dir):
                 if not filename.endswith(".json"):
                     continue
-                
+
                 job_file_path = os.path.join(self.jobs_dir, filename)
                 try:
                     with open(job_file_path, "r") as f:
                         job_data = json.load(f)
-                    
+
                     if job_data.get("status") == "queued":
-                        queued_jobs.append({
-                            "id": job_data.get("id"),
-                            "priority": job_data.get("priority", 100),
-                            "created_at": job_data.get("created_at", "")
-                        })
-                        
+                        queued_jobs.append(
+                            {
+                                "id": job_data.get("id"),
+                                "priority": job_data.get("priority", 100),
+                                "created_at": job_data.get("created_at", ""),
+                            }
+                        )
+
                 except (json.JSONDecodeError, KeyError):
                     continue
-            
+
             # Sort by priority (highest first), then by created_at (oldest first)
-            queued_jobs.sort(
-                key=lambda job: (-job["priority"], job["created_at"])
-            )
-            
+            queued_jobs.sort(key=lambda job: (-job["priority"], job["created_at"]))
+
             return queued_jobs[:limit]
-            
+
         except FileNotFoundError:
             # Jobs directory doesn't exist yet
             return []
 
-    def get_metrics(self, run_id: str, limit: Optional[int] = 500) -> List[Dict[str, Any]]:
+    def get_metrics(
+        self, run_id: str, limit: Optional[int] = 500
+    ) -> List[Dict[str, Any]]:
         """Get metrics for a specific run.
-        
+
         Parameters
         ----------
         run_id : str
@@ -859,35 +896,37 @@ class LocalJobDB(BaseJobDB):
         limit : int, optional
             Maximum number of recent metrics to return, by default 500.
             If None, returns all metrics.
-            
+
         Returns
         -------
         List[Dict[str, Any]]
             List of metrics records for the run.
-            
+
         Raises
         ------
         FileNotFoundError
             If metrics for the run do not exist.
         """
         metrics_path = os.path.join(self.storage_dir, f"run_{run_id}", "metrics.jsonl")
-        
+
         if not os.path.exists(metrics_path):
             raise FileNotFoundError(f"Metrics not found for run {run_id}")
-        
+
         metrics = []
         with open(metrics_path, "r") as f:
             for line in f:
                 if line.strip():
                     metrics.append(json.loads(line))
-        
+
         # Apply limit if specified
         if limit is not None and len(metrics) > limit:
             metrics = metrics[-limit:]
-            
+
         return metrics
 
-    def finalize_job(self, job_id: str, final_status: str, metadata: Dict[str, Any]) -> Dict[str, Any]:
+    def finalize_job(
+        self, job_id: str, final_status: str, metadata: Dict[str, Any]
+    ) -> Dict[str, Any]:
         """Finalize a job with the given status and metadata."""
         return self._default_finalize_job_logic(job_id, final_status, metadata)
 

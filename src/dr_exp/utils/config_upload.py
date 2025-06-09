@@ -86,7 +86,9 @@ def upload_configs(
             "code_version": code_version,
         }
         cfg_with_meta = {"config": cfg, "metadata": metadata}
-        job = client.add_job(cfg_with_meta, sweep_id, status="queued", priority=priority)
+        job = client.add_job(
+            cfg_with_meta, sweep_id, status="queued", priority=priority
+        )
         created_jobs.append(job)
     return created_jobs
 

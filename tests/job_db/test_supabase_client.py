@@ -61,7 +61,11 @@ def stub_client(monkeypatch):
 
 
 def test_directory_is_zipped(tmp_path, stub_client):
-    config = JobDBConfig(supabase_url="https://test.supabase.co", supabase_key="key", mode="supabase_remote")
+    config = JobDBConfig(
+        supabase_url="https://test.supabase.co",
+        supabase_key="key",
+        mode="supabase_remote",
+    )
     client = SupabaseJobDB(config)
     d = tmp_path / "artifacts"
     d.mkdir()
@@ -74,7 +78,11 @@ def test_directory_is_zipped(tmp_path, stub_client):
 
 
 def test_empty_suffix_zips_to_default(tmp_path, stub_client):
-    config = JobDBConfig(supabase_url="https://test.supabase.co", supabase_key="key", mode="supabase_remote")
+    config = JobDBConfig(
+        supabase_url="https://test.supabase.co",
+        supabase_key="key",
+        mode="supabase_remote",
+    )
     client = SupabaseJobDB(config)
     d = tmp_path / "artifacts2"
     d.mkdir()
@@ -87,7 +95,11 @@ def test_empty_suffix_zips_to_default(tmp_path, stub_client):
 
 
 def test_insert_helpers(monkeypatch, stub_client):
-    config = JobDBConfig(supabase_url="https://test.supabase.co", supabase_key="key", mode="supabase_remote")
+    config = JobDBConfig(
+        supabase_url="https://test.supabase.co",
+        supabase_key="key",
+        mode="supabase_remote",
+    )
     client = SupabaseJobDB(config)
 
     result = client.add_sweep_config_cluster("c1", description="d")
@@ -112,7 +124,7 @@ def test_write_finished_flag(tmp_path, stub_client):
         storage_path=str(tmp_path / "storage"),
         supabase_url="https://test.supabase.co",
         supabase_key="key",
-        mode="supabase_remote"
+        mode="supabase_remote",
     )
     client = SupabaseJobDB(config)
     job_id = "jid3"
