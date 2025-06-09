@@ -2,10 +2,23 @@ from __future__ import annotations
 
 import os
 import shutil
-from typing import Any
+from dr_exp.job_db import BaseJobDB
+from typing import List
+from pathlib import Path
 
 
-def cleanup_uploaded_runs(client: Any) -> int:
+def find_all_storage(client: BaseJobDB) -> List[Path]:
+    storage_dir = client.storage_dir
+    jobs_dir = client.jobs_dir
+    if not os.path.exists(jobs_dir) and not os.path.exists(storage_dir):
+        return []
+
+    # TODO: get all the paths that would be deleted and return
+    assert False, "finish impl by addressing TODO"
+    return []
+
+
+def cleanup_uploaded_runs(client: BaseJobDB) -> int:
     """Remove run directories with a ``finished.flag`` file.
 
     Parameters
