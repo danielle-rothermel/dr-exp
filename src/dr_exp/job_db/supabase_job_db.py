@@ -1079,36 +1079,36 @@ class SupabaseJobDB(BaseJobDB):
                     storage_path
                 )
 
-                if response:
-                    metrics = []
-                    # Parse the downloaded content line by line
-                    content = response.decode("utf-8")
-                    for line in content.strip().split("\n"):
-                        if line.strip():
-                            try:
-                                metrics.append(json.loads(line))
-                            except json.JSONDecodeError as e:
-                                logger.warning(
-                                    f"Failed to parse metrics line: {line[:100]}... Error: {e}"
-                                )
-                                continue
-
-                    # Apply limit if specified
-                    if limit is not None and len(metrics) > limit:
-                        metrics = metrics[-limit:]
-
-                    logger.info(
-                        f"Successfully downloaded {len(metrics)} metrics from Supabase storage for run {run_id}"
-                    )
-                    return metrics
-                else:
+                # Check response immediately - fail fast if no data
+                if not response:
                     raise FileNotFoundError(
                         f"Metrics file not found in Supabase storage for run {run_id}"
                     )
 
+                # Process successful response
+                metrics = []
+                content = response.decode("utf-8")
+                for line in content.strip().split("\n"):
+                    if line.strip():
+                        try:
+                            metrics.append(json.loads(line))
+                        except json.JSONDecodeError as e:
+                            logger.warning(
+                                f"Failed to parse metrics line: {line[:100]}... Error: {e}"
+                            )
+                            continue
+
+                # Apply limit if specified
+                if limit is not None and len(metrics) > limit:
+                    metrics = metrics[-limit:]
+
+                logger.info(
+                    f"Successfully downloaded {len(metrics)} metrics from Supabase storage for run {run_id}"
+                )
+                return metrics
+
             except Exception as e:
                 if attempt == max_retries - 1:
-                    # Last attempt failed
                     logger.error(
                         f"Error downloading metrics from Supabase storage for run {run_id} after {max_retries} attempts: {e}"
                     )
@@ -1119,7 +1119,11 @@ class SupabaseJobDB(BaseJobDB):
                     logger.warning(
                         f"Retry {attempt + 1}/{max_retries} for downloading metrics from Supabase storage for run {run_id}: {e}"
                     )
-                    continue
+
+        # Safety net (should never be reached)
+        raise FileNotFoundError(
+            f"Could not retrieve metrics from storage after {max_retries} attempts"
+        )
 
     def finalize_job(
         self, job_id: str, final_status: str, metadata: Dict[str, Any]

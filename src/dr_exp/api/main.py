@@ -835,8 +835,8 @@ def create_app(base_path: str = ".") -> FastAPI:
 
         return SuccessResponse(
             success=True,
-            message=f"Job {req.job_id} marked for termination", 
-            job_id=req.job_id
+            message=f"Job {req.job_id} marked for termination",
+            job_id=req.job_id,
         )
 
     @app.post(
