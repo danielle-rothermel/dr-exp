@@ -45,7 +45,5 @@ class SetPriorityCommand(BaseCommand):
                 print(f"Reason: {args.reason}")
             return 0
         else:
-            print(
-                f"Failed to update priority: {result['message']}"
-            )
+            print(f"Failed to update priority: {result['message']}")
             return 1

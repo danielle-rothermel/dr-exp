@@ -36,7 +36,10 @@ def train(cfg: Any, logger: Optional[BaseLogger] = None) -> TrainingResult:
             num_epochs = cfg["train"]["num_epochs"]
         else:
             import warnings
-            warnings.warn("No epoch configuration found - using default 10 epochs", stacklevel=2)
+
+            warnings.warn(
+                "No epoch configuration found - using default 10 epochs", stacklevel=2
+            )
     else:
         # Handle object-style configs
         if hasattr(cfg, "max_epochs"):
@@ -52,7 +55,10 @@ def train(cfg: Any, logger: Optional[BaseLogger] = None) -> TrainingResult:
             num_epochs = cfg.train["num_epochs"]
         else:
             import warnings
-            warnings.warn("No epoch configuration found - using default 10 epochs", stacklevel=2)
+
+            warnings.warn(
+                "No epoch configuration found - using default 10 epochs", stacklevel=2
+            )
 
     num_epochs = int(num_epochs)
 
@@ -63,12 +69,15 @@ def train(cfg: Any, logger: Optional[BaseLogger] = None) -> TrainingResult:
             log_dir = cfg.get("log_dir")
         else:
             log_dir = getattr(cfg, "log_dir", None)
-        
+
         if log_dir is None:
             log_dir = "./logs"
             import warnings
-            warnings.warn("No log_dir configuration found - using default './logs'", stacklevel=2)
-        
+
+            warnings.warn(
+                "No log_dir configuration found - using default './logs'", stacklevel=2
+            )
+
         logger = StructuredLogger(log_dir)
 
     final_train_loss = 0.0

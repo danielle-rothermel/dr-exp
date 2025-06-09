@@ -1,7 +1,7 @@
 """Priority system constants, classes, and utilities for job queue management."""
 
 from enum import Enum
-from typing import Dict, Any, Optional
+from typing import Dict, Any
 from datetime import datetime, UTC
 
 
@@ -68,7 +68,7 @@ class PriorityClass(Enum):
         -------
         PriorityClass
             The priority class containing this value.
-            
+
         Raises
         ------
         ValueError
@@ -77,7 +77,9 @@ class PriorityClass(Enum):
         for priority_class in cls:
             if priority_class.contains(priority):
                 return priority_class
-        raise ValueError(f"Invalid priority {priority}: must be between {cls.LOW.min_priority} and {cls.SYSTEM.max_priority}")
+        raise ValueError(
+            f"Invalid priority {priority}: must be between {cls.LOW.min_priority} and {cls.SYSTEM.max_priority}"
+        )
 
 
 def validate_priority(priority: int) -> int:

@@ -104,7 +104,9 @@ class TestMockProcessManager:
         manager = MockProcessManager()
 
         # restart_worker now raises exception for nonexistent workers
-        with pytest.raises(RuntimeError, match="Cannot restart worker nonexistent: worker not found"):
+        with pytest.raises(
+            RuntimeError, match="Cannot restart worker nonexistent: worker not found"
+        ):
             manager.restart_worker("nonexistent")
 
         assert manager.restart_count == 0
@@ -139,7 +141,9 @@ class TestProcessManager:
         manager = ProcessManager()
 
         # restart_worker now raises exception for nonexistent workers
-        with pytest.raises(RuntimeError, match="Cannot restart worker nonexistent: worker not found"):
+        with pytest.raises(
+            RuntimeError, match="Cannot restart worker nonexistent: worker not found"
+        ):
             manager.restart_worker("nonexistent")
 
     def test_interface_methods_exist(self):
@@ -178,9 +182,12 @@ class TestHelperFunctions:
     def test_run_worker_main_default_path(self, mock_run_worker):
         """Test run_worker_main requires DR_EXP_BASE_PATH environment variable."""
         # Should raise exception when DR_EXP_BASE_PATH is not set
-        with pytest.raises(RuntimeError, match="DR_EXP_BASE_PATH environment variable is required but not set"):
+        with pytest.raises(
+            RuntimeError,
+            match="DR_EXP_BASE_PATH environment variable is required but not set",
+        ):
             run_worker_main("worker1", "/work/dir")
-        
+
         # Should not have called run_worker
         mock_run_worker.assert_not_called()
 

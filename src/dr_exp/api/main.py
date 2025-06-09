@@ -117,7 +117,7 @@ def get_admin_key() -> str:
     -------
     str
         The value of ``ADMIN_API_KEY`` from the environment.
-        
+
     Raises
     ------
     RuntimeError
@@ -136,7 +136,7 @@ def get_reader_key() -> str:
     -------
     str
         The value of ``READER_API_KEY`` from the environment.
-        
+
     Raises
     ------
     RuntimeError
@@ -406,15 +406,11 @@ def filter_and_sort_jobs(
             reverse=reverse,  # Fail fast if priority missing
         )
     elif sort_by == "retry_index":
-        filtered_jobs.sort(
-            key=lambda job: job["retry_index"], reverse=reverse
-        )
+        filtered_jobs.sort(key=lambda job: job["retry_index"], reverse=reverse)
     elif sort_by == "status":
         filtered_jobs.sort(key=lambda job: job["status"], reverse=reverse)
     else:  # created_at
-        filtered_jobs.sort(
-            key=lambda job: job["created_at"], reverse=reverse
-        )
+        filtered_jobs.sort(key=lambda job: job["created_at"], reverse=reverse)
 
     return filtered_jobs
 
