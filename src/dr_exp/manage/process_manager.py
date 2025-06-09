@@ -11,10 +11,9 @@ from .worker import run_worker
 
 def run_worker_main(worker_id: str, work_dir: str) -> None:
     """Wrapper to execute the worker with base path from env."""
-    if "DR_EXP_BASE_PATH" not in os.environ:
-        raise RuntimeError(
-            "DR_EXP_BASE_PATH environment variable is required but not set"
-        )
+    assert "DR_EXP_BASE_PATH" in os.environ, (
+        "DR_EXP_BASE_PATH environment variable is required but not set"
+    )
     base_path = os.environ["DR_EXP_BASE_PATH"]
     run_worker(base_path=base_path, work_dir=work_dir, worker_id=worker_id)
 
@@ -114,10 +113,9 @@ class ProcessManager(BaseProcessManager):
             self.ctx = mp.get_context()
 
         # Extract base path from environment - fail fast if not configured
-        if "DR_EXP_BASE_PATH" not in os.environ:
-            raise RuntimeError(
-                "DR_EXP_BASE_PATH environment variable is required for process management"
-            )
+        assert "DR_EXP_BASE_PATH" in os.environ, (
+            "DR_EXP_BASE_PATH environment variable is required for process management"
+        )
         self.base_path = os.environ["DR_EXP_BASE_PATH"]
 
     def launch_worker(self, worker_id: str, gpu_id: str, base_dir: str) -> None:
@@ -235,8 +233,9 @@ class MockProcessManager(BaseProcessManager):
 
     def restart_worker(self, worker_id: str) -> None:
         """Mock restart worker."""
-        if worker_id not in self.workers:
-            raise RuntimeError(f"Cannot restart worker {worker_id}: worker not found")
+        assert worker_id in self.workers, (
+            f"Cannot restart worker {worker_id}: worker not found"
+        )
 
         self.restart_count += 1
         self.workers[worker_id]["alive"] = True
