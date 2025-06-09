@@ -23,11 +23,10 @@ class StatusCommand(BaseCommand):
         )
 
     def add_arguments(self, parser: ArgumentParser) -> None:
-        # No additional arguments needed
-        pass
+        self.add_common_arguments(parser)
 
     def run(self, args: Namespace) -> int:
-        system = self.create_system()
+        system = self.create_system_from_args(args)
         status = system.get_system_status()
 
         print("=== System Status ===")

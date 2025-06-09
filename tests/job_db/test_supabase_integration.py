@@ -29,7 +29,12 @@ def supabase_client(
     requires_local_supabase: None,
 ) -> Generator[SupabaseJobDB, None, None]:
     """Provide a SupabaseJobDB client with transaction rollback."""
-    config = JobDBConfig.from_env()
+    config = JobDBConfig(
+        base_path=os.getenv("DR_EXP_BASE_PATH", "./logs"),
+        mode="supabase_local",
+        storage_path=os.getenv("DR_EXP_STORAGE_PATH", "./storage"),
+        # Supabase credentials will be read from environment in validate()
+    )
     config.validate()
     client = SupabaseJobDB(config)
 
@@ -395,7 +400,11 @@ def test_factory_integration() -> None:
     if os.getenv("EXPMGR_MODE") != "supabase_local":
         pytest.skip("Requires EXPMGR_MODE=supabase_local")
 
-    client = get_job_db_client()
+    # Create config explicitly since we no longer read from environment in factory
+    from dr_exp.job_db.config import JobDBConfig
+
+    config = JobDBConfig(base_path="./logs", mode="supabase_local")
+    client = get_job_db_client(config)
     assert isinstance(client, SupabaseJobDB)
     assert client.config.mode == "supabase_local"
     assert client.config.supabase_url is not None

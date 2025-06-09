@@ -21,6 +21,7 @@ class RunWorkerCommand(BaseCommand):
         return "Execute a worker directly using run_worker_main"
 
     def add_arguments(self, parser: ArgumentParser) -> None:
+        self.add_common_arguments(parser)
         parser.add_argument("worker_id", help="Unique worker identifier")
         parser.add_argument("work_dir", help="Working directory for temporary files")
 
@@ -29,14 +30,18 @@ class RunWorkerCommand(BaseCommand):
         assert args.worker_id.strip(), "Worker ID cannot be empty"
         assert args.work_dir.strip(), "Work directory cannot be empty"
 
-        system = self.create_system()
+        system = self.create_system_from_args(args)
         status = system.run_worker(worker_id=args.worker_id, work_dir=args.work_dir)
-        
+
         # Provide helpful output based on status
         if status == "no_job_config_mismatch":
             print("Worker completed with status: no_job")
-            print("⚠️  Configuration mismatch detected - see log output above for details")
-            print("💡 Ensure DR_EXP_BASE_PATH is consistent between upload and worker commands")
+            print(
+                "⚠️  Configuration mismatch detected - see log output above for details"
+            )
+            print(
+                "💡 Ensure --base-path and --mode are consistent between upload and worker commands"
+            )
         elif status == "no_job_db_error":
             print("Worker completed with status: no_job")
             print("❌ Database error occurred - check connection and configuration")

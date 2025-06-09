@@ -21,7 +21,7 @@ class SystemConfig:
     def __init__(
         self,
         # Job database configuration
-        job_db_config: Optional[JobDBConfig] = None,
+        job_db_config: JobDBConfig,
         # Manager configuration
         gpus: Optional[List[str]] = None,
         gpus_per_node: Optional[
@@ -66,7 +66,7 @@ class SystemConfig:
         auto_detect_environment : bool, optional
             Whether to auto-detect environment-specific settings.
         """
-        self.job_db_config = job_db_config or JobDBConfig.from_env()
+        self.job_db_config = job_db_config
         self.gpus = gpus or self._discover_gpus(
             gpus_per_node or CLI_DEFAULTS.GPUS_PER_NODE
         )
@@ -163,7 +163,9 @@ class Factory:
         config : SystemConfig, optional
             System configuration. If None, creates default configuration.
         """
-        self.config = config or SystemConfig()
+        self.config = config or SystemConfig(
+            job_db_config=JobDBConfig(base_path="./logs", mode="files_local")
+        )
         self.config.validate()
 
         # Shared job database instance
@@ -182,7 +184,9 @@ class Factory:
         """Get or create shared process manager instance."""
         if self._process_manager is None:
             self._process_manager = ProcessManager(
-                start_method=self.config.multiprocessing_start_method
+                start_method=self.config.multiprocessing_start_method,
+                base_path=self.config.job_db_config.base_path,
+                mode=self.config.job_db_config.mode,
             )
         return self._process_manager
 

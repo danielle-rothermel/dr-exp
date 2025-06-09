@@ -46,3 +46,4 @@ package-lock.json # Or yarn.lock, depending on preference if you add package man
 # OS specific
 .DS_Store
 Thumbs.db
+work/

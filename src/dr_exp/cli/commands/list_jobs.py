@@ -23,6 +23,7 @@ class ListJobsCommand(BaseCommand):
         return "Display jobs in priority order with status filtering"
 
     def add_arguments(self, parser: ArgumentParser) -> None:
+        self.add_common_arguments(parser)
         parser.add_argument(
             "--status",
             nargs="*",
@@ -40,7 +41,7 @@ class ListJobsCommand(BaseCommand):
         validate_job_statuses(args.status)
         validate_positive_int(args.limit, "limit")
 
-        system = self.create_system()
+        system = self.create_system_from_args(args)
         client = system.job_db
         jobs = client.list_jobs_by_priority(status_filter=args.status, limit=args.limit)
 

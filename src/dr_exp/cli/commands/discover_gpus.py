@@ -24,6 +24,7 @@ class DiscoverGpusCommand(BaseCommand):
         return "Print GPU IDs that the manager would use"
 
     def add_arguments(self, parser: ArgumentParser) -> None:
+        self.add_common_arguments(parser)
         parser.add_argument(
             "--gpus-per-node",
             type=int,

@@ -15,7 +15,6 @@ from contextlib import contextmanager
 
 from dr_exp.logging.base_logger import BaseLogger
 from dr_exp.logging.structured_logger import StructuredLogger
-from dr_exp.utils.jobdb_factory import get_job_db_client
 from dr_exp.job_db.base_job_db import BaseJobDB
 from dr_exp.training.dummy_trainer import train as default_train
 from dr_exp.training import TrainingResult
@@ -383,13 +382,13 @@ class JobExecutor:
 
 
 def run_worker(
+    client: BaseJobDB,
     base_path: str = "./job_data",
     work_dir: Optional[str] = None,
     max_claim_attempts: int = 5,
     heartbeat_interval: float = 5.0,
     trainer_fn: Callable[[Any, BaseLogger], TrainingResult] = default_train,
     logger_cls: type[BaseLogger] = StructuredLogger,
-    client: Optional[BaseJobDB] = None,
     worker_id: str = "unassigned_worker",
     target_job_id: Optional[str] = None,
     respect_reservations: bool = True,
@@ -430,7 +429,6 @@ def run_worker(
     str
         Final status string: "completed", "failed", "no_job", "job_not_found", etc.
     """
-    client = client or get_job_db_client()
 
     # Claim a job
     job = _claim_job(
@@ -506,7 +504,7 @@ def _claim_job(
 def _diagnose_no_jobs(client: BaseJobDB) -> str:
     """Diagnose why no jobs were found and provide detailed status information."""
     logger = logging.getLogger(__name__)
-    
+
     # Get basic job statistics
     try:
         has_queued = client.has_queued_jobs()
@@ -515,53 +513,66 @@ def _diagnose_no_jobs(client: BaseJobDB) -> str:
     except Exception as e:
         logger.error(f"Failed to query job database: {e}")
         return "no_job_db_error"
-    
-    # Configuration information
-    from dr_exp.job_db.config import JobDBConfig
-    config = JobDBConfig.from_env()
-    jobs_dir = os.path.join(config.base_path, "job_data")
-    
+
+    # Configuration information from client
+    jobs_dir = client.jobs_dir  # BaseJobDB already constructs this path
+
     # File system diagnostics for files_local mode
     fs_diagnostics = ""
-    if config.mode == "files_local":
+    # Note: We can't easily determine mode from BaseJobDB, so check if we have LocalJobDB
+    from dr_exp.job_db.local_job_db import LocalJobDB
+
+    if isinstance(client, LocalJobDB):
         try:
             if os.path.exists(jobs_dir):
-                job_files = [f for f in os.listdir(jobs_dir) if f.endswith('.json')]
+                job_files = [f for f in os.listdir(jobs_dir) if f.endswith(".json")]
                 fs_diagnostics = f"Jobs directory: {jobs_dir} (exists: True, job files: {len(job_files)})"
-                
+
                 # Check for jobs in alternative locations
                 alternatives = _check_alternative_job_locations(jobs_dir)
                 if alternatives:
-                    fs_diagnostics += f"\nAlternative locations with jobs: {alternatives}"
+                    fs_diagnostics += (
+                        f"\nAlternative locations with jobs: {alternatives}"
+                    )
             else:
                 fs_diagnostics = f"Jobs directory: {jobs_dir} (exists: False)"
                 # Look for job_data directories elsewhere
                 alternatives = _find_job_data_directories()
                 if alternatives:
-                    fs_diagnostics += f"\nFound job_data directories elsewhere: {alternatives}"
+                    fs_diagnostics += (
+                        f"\nFound job_data directories elsewhere: {alternatives}"
+                    )
         except Exception as e:
             fs_diagnostics = f"Error checking file system: {e}"
-    
+
     # Log detailed diagnostics
     logger.info("=== Worker Job Claiming Diagnostics ===")
-    logger.info(f"Configuration: EXPMGR_MODE={config.mode}, DR_EXP_BASE_PATH={config.base_path}")
+    logger.info(
+        f"Configuration: Jobs directory={jobs_dir}, Base path={client.base_path}"
+    )
     logger.info(f"Queued jobs in database: {len(queue_summary)}")
     logger.info(f"Running jobs: {len(running_jobs)}")
     if fs_diagnostics:
         logger.info(f"File system: {fs_diagnostics}")
-    
+
     if queue_summary:
         logger.info("Top queued jobs:")
         for job in queue_summary[:3]:
-            logger.info(f"  - Job {job['id'][:8]}... Priority: {job['priority']} Status: {job['status']}")
-        
+            logger.info(
+                f"  - Job {job['id'][:8]}... Priority: {job['priority']} Status: {job['status']}"
+            )
+
         # Suggest configuration fix if jobs exist but can't be claimed
-        if config.mode == "files_local" and alternatives:
+        if isinstance(client, LocalJobDB) and alternatives:
             logger.warning("CONFIGURATION MISMATCH DETECTED:")
-            logger.warning("Jobs exist in database but file system shows jobs in different location.")
-            logger.warning("Ensure DR_EXP_BASE_PATH environment variable is consistent between upload and worker commands.")
+            logger.warning(
+                "Jobs exist in database but file system shows jobs in different location."
+            )
+            logger.warning(
+                "Ensure --base-path and --mode arguments are consistent between upload and worker commands."
+            )
             return "no_job_config_mismatch"
-    
+
     logger.info("=== End Diagnostics ===")
     return "no_job"
 
@@ -570,16 +581,16 @@ def _check_alternative_job_locations(current_jobs_dir: str) -> list[str]:
     """Check for job files in common alternative locations."""
     alternatives = []
     common_paths = ["./job_data", "./logs/job_data", "../job_data", "job_data"]
-    
+
     for alt_path in common_paths:
         if alt_path != current_jobs_dir and os.path.exists(alt_path):
             try:
-                job_files = [f for f in os.listdir(alt_path) if f.endswith('.json')]
+                job_files = [f for f in os.listdir(alt_path) if f.endswith(".json")]
                 if job_files:
                     alternatives.append(f"{alt_path} ({len(job_files)} jobs)")
             except (OSError, PermissionError):
                 continue
-    
+
     return alternatives
 
 
@@ -587,19 +598,21 @@ def _find_job_data_directories() -> list[str]:
     """Find job_data directories in current working directory and common locations."""
     found_dirs = []
     search_paths = [".", "./logs", "../", "logs"]
-    
+
     for search_path in search_paths:
         if os.path.exists(search_path):
             try:
                 for item in os.listdir(search_path):
                     full_path = os.path.join(search_path, item)
                     if os.path.isdir(full_path) and item == "job_data":
-                        job_files = [f for f in os.listdir(full_path) if f.endswith('.json')]
+                        job_files = [
+                            f for f in os.listdir(full_path) if f.endswith(".json")
+                        ]
                         if job_files:
                             found_dirs.append(f"{full_path} ({len(job_files)} jobs)")
             except (OSError, PermissionError):
                 continue
-    
+
     return found_dirs
 
 

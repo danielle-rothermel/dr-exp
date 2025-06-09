@@ -5,7 +5,6 @@ from pathlib import Path
 
 from dr_exp.cli.base_command import BaseCommand
 from dr_exp.utils import config_upload
-from dr_exp.utils.jobdb_factory import get_job_db_client
 
 
 class UploadConfigsCommand(BaseCommand):
@@ -24,6 +23,8 @@ class UploadConfigsCommand(BaseCommand):
         return "Generate configs and upload them using the database"
 
     def add_arguments(self, parser: ArgumentParser) -> None:
+        self.add_common_arguments(parser)
+
         # Get the project root directory (2 levels up from this file)
         project_root = Path(__file__).resolve().parents[4]
         default_config_path = str(project_root / "configs")
@@ -51,7 +52,8 @@ class UploadConfigsCommand(BaseCommand):
         )
 
     def run(self, args: Namespace) -> int:
-        client = get_job_db_client()
+        system = self.create_system_from_args(args)
+        client = system.job_db
 
         # Convert relative path to absolute path for Hydra
         base_config_path = Path(args.base_config_path).resolve()

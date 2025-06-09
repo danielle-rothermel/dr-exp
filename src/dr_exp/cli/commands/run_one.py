@@ -24,6 +24,7 @@ class RunOneCommand(BaseCommand):
         return "Create a reserved high-priority job and execute it immediately"
 
     def add_arguments(self, parser: ArgumentParser) -> None:
+        self.add_common_arguments(parser)
         parser.add_argument(
             "--overrides",
             default="",
@@ -50,7 +51,7 @@ class RunOneCommand(BaseCommand):
         validate_priority(args.priority)
         overrides = validate_config_overrides(args.overrides)
 
-        system = self.create_system()
+        system = self.create_system_from_args(args)
         client = system.job_db
 
         # Create job using proper config generation

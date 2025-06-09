@@ -93,7 +93,12 @@ def clean_supabase_client() -> SupabaseJobDB:
     if os.getenv("EXPMGR_MODE") != "supabase_local":
         pytest.skip("Requires EXPMGR_MODE=supabase_local")
 
-    config = JobDBConfig.from_env()
+    config = JobDBConfig(
+        base_path=os.getenv("DR_EXP_BASE_PATH", "./logs"),
+        mode="supabase_local",
+        storage_path=os.getenv("DR_EXP_STORAGE_PATH", "./storage"),
+        # Supabase credentials will be read from environment in validate()
+    )
     config.validate()
     return SupabaseJobDB(config)
 

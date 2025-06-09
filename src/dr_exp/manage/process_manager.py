@@ -9,23 +9,29 @@ from abc import ABC, abstractmethod
 from .worker import run_worker
 
 
-def run_worker_main(worker_id: str, work_dir: str) -> None:
-    """Wrapper to execute the worker with base path from env."""
-    assert "DR_EXP_BASE_PATH" in os.environ, (
-        "DR_EXP_BASE_PATH environment variable is required but not set"
+def run_worker_main(worker_id: str, work_dir: str, base_path: str, mode: str) -> None:
+    """Wrapper to execute the worker with explicit configuration."""
+    from dr_exp.job_db.config import JobDBConfig
+    from dr_exp.utils.jobdb_factory import get_job_db_client
+
+    # Create client with explicit configuration
+    config = JobDBConfig(base_path=base_path, mode=mode)
+    client = get_job_db_client(config)
+
+    run_worker(
+        client=client, base_path=base_path, work_dir=work_dir, worker_id=worker_id
     )
-    base_path = os.environ["DR_EXP_BASE_PATH"]
-    run_worker(base_path=base_path, work_dir=work_dir, worker_id=worker_id)
 
 
 def _worker_target(
-    base_path: str, worker_id: str, gpu_id: str, worker_dir: str
+    base_path: str, worker_id: str, gpu_id: str, worker_dir: str, mode: str
 ) -> None:
     """Entry point for spawned worker processes."""
     os.environ["CUDA_VISIBLE_DEVICES"] = gpu_id
-    os.environ["DR_EXP_BASE_PATH"] = base_path
     os.makedirs(worker_dir, exist_ok=True)
-    run_worker_main(worker_id=worker_id, work_dir=worker_dir)
+    run_worker_main(
+        worker_id=worker_id, work_dir=worker_dir, base_path=base_path, mode=mode
+    )
 
 
 class BaseProcessManager(ABC):
@@ -95,13 +101,22 @@ class BaseProcessManager(ABC):
 class ProcessManager(BaseProcessManager):
     """Default multiprocessing-based process manager."""
 
-    def __init__(self, start_method: Optional[str] = "fork") -> None:
+    def __init__(
+        self,
+        start_method: Optional[str] = "fork",
+        base_path: Optional[str] = None,
+        mode: Optional[str] = None,
+    ) -> None:
         """Initialize the process manager.
 
         Parameters
         ----------
         start_method : str, optional
             Multiprocessing start method. Defaults to "fork".
+        base_path : str, optional
+            Base path for job data. If None, reads from environment.
+        mode : str, optional
+            Database mode. If None, reads from environment.
         """
         self.workers: Dict[str, Dict[str, Any]] = {}
 
@@ -112,11 +127,9 @@ class ProcessManager(BaseProcessManager):
         except ValueError:
             self.ctx = mp.get_context()
 
-        # Extract base path from environment - fail fast if not configured
-        assert "DR_EXP_BASE_PATH" in os.environ, (
-            "DR_EXP_BASE_PATH environment variable is required for process management"
-        )
-        self.base_path = os.environ["DR_EXP_BASE_PATH"]
+        # Get configuration - prefer explicit parameters, fall back to environment
+        self.base_path = base_path or os.environ.get("DR_EXP_BASE_PATH", "./logs")
+        self.mode = mode or os.environ.get("EXPMGR_MODE", "files_local")
 
     def launch_worker(self, worker_id: str, gpu_id: str, base_dir: str) -> None:
         """Launch a worker process."""
@@ -124,7 +137,7 @@ class ProcessManager(BaseProcessManager):
             worker_dir = os.path.join(base_dir, worker_id)
             proc = self.ctx.Process(  # type: ignore[attr-defined]
                 target=_worker_target,
-                args=(self.base_path, worker_id, gpu_id, worker_dir),
+                args=(self.base_path, worker_id, gpu_id, worker_dir, self.mode),
             )
             proc.start()
 
@@ -176,7 +189,7 @@ class ProcessManager(BaseProcessManager):
             # Launch new process
             new_proc = self.ctx.Process(  # type: ignore[attr-defined]
                 target=_worker_target,
-                args=(self.base_path, worker_id, gpu_id, worker_dir),
+                args=(self.base_path, worker_id, gpu_id, worker_dir, self.mode),
             )
             new_proc.start()
 
