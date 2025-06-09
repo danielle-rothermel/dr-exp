@@ -6,6 +6,7 @@ command pattern architecture in dr_exp.cli.
 
 import sys
 from typing import Sequence
+from argparse import ArgumentParser
 
 from dr_exp.cli.main import main as cli_main
 
@@ -20,7 +21,7 @@ def main(argv: Sequence[str] | None = None) -> None:
     sys.exit(exit_code)
 
 
-def build_arg_parser():
+def build_arg_parser() -> ArgumentParser:
     """Deprecated: Use dr_exp.cli.main.build_parser instead."""
     from dr_exp.cli.main import build_parser
 
