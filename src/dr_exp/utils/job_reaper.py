@@ -7,18 +7,6 @@ from datetime import datetime, UTC, timedelta
 from typing import Any, Dict
 
 
-class JobValidationError(Exception):
-    """Raised when job data is invalid for staleness checking."""
-
-    pass
-
-
-class HeartbeatParseError(Exception):
-    """Raised when heartbeat timestamp cannot be parsed."""
-
-    pass
-
-
 logger = logging.getLogger(__name__)
 
 
@@ -48,10 +36,8 @@ def reap_stale_jobs(client: Any, max_age_mins: int) -> int:
             if _should_mark_job_stale(job, now, cutoff):
                 _mark_job_stale(client, job)
                 stale_count += 1
-        except JobValidationError as e:
+        except AssertionError as e:
             logger.warning(f"Skipping invalid job {job.get('id', 'unknown')}: {e}")
-        except HeartbeatParseError as e:
-            logger.error(f"Invalid heartbeat for job {job.get('id', 'unknown')}: {e}")
         except Exception as e:
             logger.error(f"Failed to process job {job.get('id', 'unknown')}: {e}")
 
@@ -87,28 +73,19 @@ def _should_mark_job_stale(
     -------
     bool
         True if job should be marked stale
-
-    Raises
-    ------
-    JobValidationError
-        If job data is invalid for processing
-    HeartbeatParseError
-        If heartbeat timestamp cannot be parsed
     """
     # Fail fast - validate job status
-    if job.get("status") != "running":
-        raise JobValidationError("Job is not in running status")
+    assert job.get("status") == "running", "Job is not in running status"
 
     # Fail fast - validate heartbeat exists
     hb_str = job.get("heartbeat")
-    if not hb_str:
-        raise JobValidationError("Job missing heartbeat timestamp")
+    assert hb_str, "Job missing heartbeat timestamp"
 
     # Parse heartbeat with specific error handling
     try:
         hb_time = datetime.fromisoformat(hb_str.replace("Z", ""))
     except ValueError as e:
-        raise HeartbeatParseError(f"Invalid timestamp format '{hb_str}': {e}") from e
+        assert False, f"Invalid timestamp format '{hb_str}': {e}"
 
     # Check staleness
     return now - hb_time > cutoff
@@ -127,4 +104,4 @@ def _mark_job_stale(client: Any, job: Dict[str, Any]) -> None:
     client.update_job(job["id"], {"status": "failed", "status_reason": "manager_died"})
 
 
-__all__ = ["reap_stale_jobs", "JobValidationError", "HeartbeatParseError"]
+__all__ = ["reap_stale_jobs"]

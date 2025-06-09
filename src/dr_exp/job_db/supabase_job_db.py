@@ -519,13 +519,13 @@ class SupabaseJobDB(BaseJobDB):
 
         Raises
         ------
-        ValueError
+        AssertionError
             If priority is invalid.
         RuntimeError
             If database insertion fails.
         """
         try:
-            # Validate priority is in valid range - this already raises ValueError
+            # Validate priority is in valid range - this already uses asserts
             priority = self._validate_priority(priority)
 
             data = {
@@ -541,8 +541,8 @@ class SupabaseJobDB(BaseJobDB):
             if not response.data:
                 raise RuntimeError("Database insertion returned no data")
             return cast(dict[str, Any], response.data[0])
-        except ValueError:
-            # Re-raise validation errors
+        except AssertionError:
+            # Re-raise assertion errors
             raise
         except Exception as e:
             logger.error(f"Critical database error adding job entry: {e}")
