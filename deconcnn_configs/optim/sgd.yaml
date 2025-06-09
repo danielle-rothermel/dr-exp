@@ -1,0 +1,5 @@
+name: sgdm
+weight_decay: 1e-4
+lr: 0.01
+momentum: 0.9
+nesterov: false

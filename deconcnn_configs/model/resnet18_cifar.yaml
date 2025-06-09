@@ -1,0 +1,8 @@
+source: deconcnn
+architecture: resnet18
+nonlinearity: relu
+norm_type: batchnorm
+dropout_prob: 0.0
+use_residual: true
+init_method: he
+use_imagenet_head: false  # CIFAR-optimized: 3x3 conv1, no maxpool

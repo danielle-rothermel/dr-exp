@@ -1,0 +1,9 @@
+source: custom
+name: resnet12
+architecture: CifarResNet12
+layers: 12
+nonlinearity: relu
+norm_type: batchnorm
+dropout_prob: 0.0
+use_residual: false
+init_method: he

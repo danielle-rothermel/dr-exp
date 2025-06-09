@@ -1,0 +1,17 @@
+rcc: True
+hflip: True
+randaug: True
+colorjitter: True
+mixup: True
+cutmix: True
+normalize_mean: [0.4914, 0.4822, 0.4465]
+normalize_std: [0.2023, 0.1994, 0.2010]
+rcc_scale_min: 1.0
+rcc_init_size: 32
+colorjitter_brightness: 0.2
+colorjitter_contrast: 0.2
+colorjitter_saturation: 0.2
+colorjitter_hue: 0.1
+label_smoothing: 0.1
+mixup_alpha: 1.0
+cutmix_alpha: 1.0
