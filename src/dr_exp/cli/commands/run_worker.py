@@ -31,7 +31,20 @@ class RunWorkerCommand(BaseCommand):
 
         system = self.create_system()
         status = system.run_worker(worker_id=args.worker_id, work_dir=args.work_dir)
-        print(f"Worker completed with status: {status}")
+        
+        # Provide helpful output based on status
+        if status == "no_job_config_mismatch":
+            print("Worker completed with status: no_job")
+            print("⚠️  Configuration mismatch detected - see log output above for details")
+            print("💡 Ensure DR_EXP_BASE_PATH is consistent between upload and worker commands")
+        elif status == "no_job_db_error":
+            print("Worker completed with status: no_job")
+            print("❌ Database error occurred - check connection and configuration")
+        elif status == "no_job":
+            print("Worker completed with status: no_job")
+            print("ℹ️  No jobs available - check log output above for diagnostics")
+        else:
+            print(f"Worker completed with status: {status}")
 
         # Set exit code based on status
         return 0 if status in ["completed", "success"] else 1
