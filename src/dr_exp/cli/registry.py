@@ -72,8 +72,7 @@ class CommandRegistry:
         KeyError
             If command is not found
         """
-        if name not in self._commands:
-            raise KeyError(f"Unknown command: {name}")
+        assert name in self._commands, f"Unknown command: {name}"
         return self._commands[name]
 
     def list_commands(self) -> Dict[str, str]:

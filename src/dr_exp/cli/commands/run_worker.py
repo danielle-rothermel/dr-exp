@@ -3,7 +3,6 @@
 from argparse import ArgumentParser, Namespace
 
 from dr_exp.cli.base_command import BaseCommand
-from dr_exp.utils.cli_validation import ValidationError
 
 
 class RunWorkerCommand(BaseCommand):
@@ -27,10 +26,8 @@ class RunWorkerCommand(BaseCommand):
 
     def run(self, args: Namespace) -> int:
         # Basic validation
-        if not args.worker_id.strip():
-            raise ValidationError("Worker ID cannot be empty")
-        if not args.work_dir.strip():
-            raise ValidationError("Work directory cannot be empty")
+        assert args.worker_id.strip(), "Worker ID cannot be empty"
+        assert args.work_dir.strip(), "Work directory cannot be empty"
 
         system = self.create_system()
         status = system.run_worker(worker_id=args.worker_id, work_dir=args.work_dir)
