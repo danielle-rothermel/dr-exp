@@ -1,0 +1,12 @@
+# Path configuration adapted from deconCNN
+data: ${machine.root_dir}/data
+logs: ${machine.root_dir}/logs
+
+# Project-specific paths
+my_data: ${paths.data}/${..proj_dir_name}
+my_logs: ${paths.logs}/${..proj_dir_name}
+
+# Run-specific paths
+run_dir: ${paths.my_logs}/${now:%Y-%m-%d-%H-%M-%S}
+dataset_cache_root: ${paths.data}/${data.name}/
+agg_results: ${paths.data}/run_results/

@@ -1,0 +1,54 @@
+defaults:
+  - _self_
+  - model: alexnet_cifar  # Use component config for AlexNet
+  - optim: adamw         # Use component config for AdamW
+  - machine: mac         # Use component config for local Mac
+  - paths: default       # Use component config for paths
+  - lrsched: cosine      # Use component config for cosine scheduler
+  - train_transforms: minimal  # Use component config for minimal transforms
+  - eval_transforms: minimal   # Use component config for minimal transforms
+
+# Configuration for deconCNN integration testing with proper Hydra composition
+# This config uses deconCNN's component structure for complete validation
+
+# Project identification
+project_name: "dr_exp_deconCNN_integration"
+experiment_name: "validation_testing_v1"
+
+# Core training parameters
+epochs: 1  # Single epoch for fast testing
+batch_size: 32
+seed: 42
+train: true
+eval: true
+log_every: 10
+
+# Data configuration - complete as required by deconCNN
+data:
+  name: cifar10
+  num_workers: 2
+  download: true
+  data_split_seed: 42
+  train_val_split_factor: 0.1
+  num_classes: 10
+
+# Hydra configuration for path resolution
+hydra:
+  run:
+    dir: ${paths.run_dir}
+  job_logging:
+    formatters:
+      simple:
+        format: "%(asctime)s - %(message)s"
+        datefmt: "%Y-%m-%d %H:%M:%S"
+
+# Logging and checkpointing
+load_checkpoint: null
+write_checkpoint: true
+
+# Loss and optimization settings
+loss: cross_entropy
+clip_grad_norm: null
+
+# dr_exp specific settings
+proj_dir_name: dr_exp_decon_integration

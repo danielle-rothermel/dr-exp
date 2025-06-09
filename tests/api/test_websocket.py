@@ -262,9 +262,10 @@ def test_websocket_concurrent_message_handling(client):
         assert len(errors) == 0, f"Errors occurred: {errors}"
         assert len(responses) == 5
         
-        # Each response should contain its corresponding message
-        for msg_id, response in responses:
-            assert f"concurrent_msg_{msg_id}" in response
+        # Each response should be an echo of some message (order may vary)
+        expected_messages = {f"concurrent_msg_{i}" for i in range(5)}
+        actual_messages = {response.replace("Echo: ", "") for _, response in responses}
+        assert actual_messages == expected_messages
 
 
 def test_websocket_message_size_limits(client):

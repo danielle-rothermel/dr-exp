@@ -18,8 +18,20 @@ from dr_exp.manage.worker import (
 
 
 def make_config():
-    """Create a test configuration."""
-    return {"train": {"num_epochs": 2}, "logging": {}}
+    """Create a test configuration in the wrapped format expected by the system."""
+    return {
+        "config": {
+            "train": {"num_epochs": 2}, 
+            "logging": {},
+            "max_epochs": 2  # Add top-level epochs for dummy_trainer compatibility
+        },
+        "metadata": {
+            "cluster_name": "test_cluster",
+            "description": "test config",
+            "interface_version": None,
+            "code_version": None
+        }
+    }
 
 
 @pytest.fixture

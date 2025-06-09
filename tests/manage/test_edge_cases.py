@@ -15,6 +15,7 @@ from pathlib import Path
 from dr_exp.manage.worker import run_worker
 from dr_exp.manage.manager import Manager
 from dr_exp.manage.process_manager import MockProcessManager
+from tests.conftest import make_wrapped_config
 
 
 class TestDatabaseErrorScenarios:
@@ -59,8 +60,7 @@ class TestDatabaseErrorScenarios:
         """Test worker behavior when job config cannot be fetched."""
         # Create a job
         job = integration_system.job_db.add_job(
-            {"test": "config_failure"}, "config_sweep", status="queued", priority=100
-        )
+            make_wrapped_config({"test": "config_failure"}), "config_sweep", status="queued", priority=100)
         
         # Mock config fetch to fail
         with patch.object(integration_system.job_db, 'get_config_for_job', return_value=None):
@@ -671,13 +671,11 @@ class TestRecoveryMechanisms:
         
         # Queued job
         jobs.append(integration_system.job_db.add_job(
-            {"test": "queued_job"}, "recovery_sweep", status="queued", priority=100
-        ))
+            make_wrapped_config({"test": "queued_job"}), "recovery_sweep", status="queued", priority=100))
         
         # Running job (should be detected as stale after restart)
         running_job = integration_system.job_db.add_job(
-            {"test": "running_job"}, "recovery_sweep", status="running", priority=200
-        )
+            make_wrapped_config({"test": "running_job"}), "recovery_sweep", status="running", priority=200)
         jobs.append(running_job)
         
         # Set old heartbeat for running job

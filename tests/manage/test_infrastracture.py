@@ -9,6 +9,7 @@ import threading
 from unittest.mock import patch
 
 from dr_exp.manage.worker import run_worker
+from tests.conftest import make_wrapped_config
 
 
 class TestEnhancedTimeFixtures:
@@ -121,8 +122,7 @@ class TestEventDrivenUtilities:
         
         # Add a job for the worker
         job = integration_system.job_db.add_job(
-            {"test": "coordination"}, "coord_sweep", status="queued", priority=100
-        )
+            make_wrapped_config({"test": "coordination"}), "coord_sweep", status="queued", priority=100)
         
         # Run worker in thread
         result = []
@@ -175,9 +175,7 @@ class TestEventDrivenUtilities:
         # Add jobs for workers
         for i, worker_id in enumerate(worker_ids):
             integration_system.job_db.add_job(
-                {"worker": worker_id, "job_num": i}, "multi_coord_sweep", 
-                status="queued", priority=100 + i
-            )
+            make_wrapped_config({"worker": worker_id, "job_num": i}), "multi_coord_sweep", status="queued", priority=100 + i)
         
         # Start all workers
         threads = []
@@ -232,8 +230,7 @@ class TestManageSpecificFixtures:
         """Test heartbeat monitoring utilities."""
         # Add a job
         job = integration_system.job_db.add_job(
-            {"test": "heartbeat_monitoring"}, "hb_sweep", status="queued", priority=100
-        )
+            make_wrapped_config({"test": "heartbeat_monitoring"}), "hb_sweep", status="queued", priority=100)
         
         # Start monitoring
         with heartbeat_monitor.start_monitoring(integration_system.job_db, required_count=2):

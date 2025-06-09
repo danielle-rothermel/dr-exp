@@ -1,0 +1,50 @@
+defaults:
+  - _self_
+  - model: resnet12_cifar  # Smallest model for testing (~1.8M params)
+  - optim: adamw
+  - machine: mac
+  - paths: default
+  - lrsched: cosine
+  - train_transforms: minimal
+  - eval_transforms: minimal
+
+# Project identification
+project_name: "dr_exp_deconCNN_integration_test"
+experiment_name: "local_testing_v1"
+
+# Hydra configuration
+hydra:
+  run:
+    dir: ${paths.run_dir}
+  job_logging:
+    formatters:
+      simple:
+        format: "%(asctime)s - %(message)s"
+        datefmt: "%Y-%m-%d %H:%M:%S"
+
+# Data configuration
+data:
+  name: cifar10
+  num_workers: 2  # Reduced for local testing
+  download: true
+  data_split_seed: 42
+  train_val_split_factor: 0.1
+
+# Training configuration - minimal for fast testing
+epochs: 2  # Very short for testing
+batch_size: 32  # Small batch for fast iteration
+seed: 42
+train: true
+eval: true
+
+# Logging and checkpointing
+log_every: 10  # Log more frequently for short runs
+load_checkpoint: null
+write_checkpoint: true
+
+# Optional debugging settings
+clip_grad_norm: null
+loss: cross_entropy
+
+# dr_exp specific settings
+proj_dir_name: dr_exp_deconCNN_test

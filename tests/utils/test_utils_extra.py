@@ -89,19 +89,20 @@ def test_metrics_loader(tmp_path):
     with open(metrics_file, "w") as f:
         for i in range(150):
             f.write(json.dumps({"step": i}) + "\n")
-    data = loader.load(run_id)
+    data = loader.load(run_id, limit=100)
     assert len(data) == 100
     assert data[-1]["step"] == 149
     # cached result should not change if file updated
     with open(metrics_file, "a") as f:
         f.write(json.dumps({"step": 999}) + "\n")
-    cached = loader.load(run_id)
+    cached = loader.load(run_id, limit=100)
     assert cached == data
     with pytest.raises(FileNotFoundError):
         loader.load("missing")
 
     class Real:
-        pass
+        def get_metrics(self, run_id, limit=None):
+            raise NotImplementedError()
 
     with pytest.raises(NotImplementedError):
         MetricsLoader(Real()).load("x")

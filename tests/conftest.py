@@ -15,6 +15,34 @@ from dr_exp.job_db import JobDBConfig, LocalJobDB, SupabaseJobDB
 from dr_exp.utils.factory import create_system, SystemConfig
 
 
+def make_wrapped_config(config_dict, metadata=None):
+    """
+    Create a properly wrapped config for tests that simulate the full upload workflow.
+    
+    This function creates the config structure that would normally be created
+    by the config upload process.
+    
+    Args:
+        config_dict: The training configuration dictionary
+        metadata: Optional metadata dict, defaults to test metadata
+        
+    Returns:
+        Dict with {"config": config_dict, "metadata": metadata} structure
+    """
+    if metadata is None:
+        metadata = {
+            "cluster_name": "test_cluster",
+            "description": "test config",
+            "interface_version": None,
+            "code_version": None
+        }
+    
+    return {
+        "config": config_dict,
+        "metadata": metadata
+    }
+
+
 @pytest.fixture
 def temp_job_db():
     """Provide a temporary LocalJobDB for testing."""
@@ -148,7 +176,9 @@ def isolated_job_db(tmp_path):
             if config_override:
                 config.update(config_override)
             
-            job = self.db.add_job(config, sweep_name, status=status, priority=priority, **kwargs)
+            # Wrap config for proper worker interface
+            wrapped_config = make_wrapped_config(config)
+            job = self.db.add_job(wrapped_config, sweep_name, status=status, priority=priority, **kwargs)
             return job
         
         def create_test_jobs(self, count=3, priority_range=(100, 900), status="queued"):
