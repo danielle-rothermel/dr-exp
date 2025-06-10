@@ -11,8 +11,9 @@ This phase deploys the API to Vercel for true remote access without SSH tunnelin
 
 ### Verify Phase 4 Completion
 ```bash
-# Run local API test
-python test_api_local.py  # Should pass
+# Ensure quality gates passed
+ckdr  # Should show "All checks passed!"
+pt tests/test_api_local.py  # Should pass
 
 # Verify Supabase is working
 # Check that your Supabase project has data
@@ -261,6 +262,7 @@ const API_URL = 'https://your-app-name.vercel.app';
 
 ## Validation Checklist
 
+- [ ] **ALL quality checks still pass**: `ckdr` shows "All checks passed!"
 - [ ] Vercel CLI is installed and you're logged in
 - [ ] Preparation script created demo data in Supabase
 - [ ] Deployment completed successfully
@@ -268,6 +270,24 @@ const API_URL = 'https://your-app-name.vercel.app';
 - [ ] API health check works
 - [ ] Can list and retrieve jobs
 - [ ] Frontend can connect to deployed API
+
+### Phase 5 Validation Gate
+
+Since this is an optional deployment phase, the validation is simpler:
+
+```bash
+# Ensure code quality maintained
+ckdr && echo "✓ Quality checks pass" || echo "✗ FIX CODE QUALITY FIRST"
+
+# Test the deployment (replace with your URL)
+uv run python test_vercel_deployment.py https://your-app.vercel.app
+```
+
+If deployment test fails:
+1. Check Vercel logs for errors
+2. Verify environment variables are set
+3. Ensure Supabase credentials are correct
+4. Check that demo data exists in Supabase
 
 ## Important Notes
 

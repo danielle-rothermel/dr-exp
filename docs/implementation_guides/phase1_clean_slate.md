@@ -420,9 +420,21 @@ Add these methods to the JobDB class for operational management:
         return updated
 ```
 
-## Step 4: Create Simple Test Script
+## Step 4: Install Dependencies
 
-Create `test_job_db.py`:
+Before testing, install required dependencies using uv:
+
+```bash
+# Add core dependencies
+uv add pydantic
+
+# Add development dependencies
+uv add --dev pytest pytest-cov pytest-xdist
+```
+
+## Step 5: Create Pytest Tests
+
+Create proper test file at `tests/test_job_db.py`:
 
 ```python
 #!/usr/bin/env python3
@@ -619,15 +631,37 @@ if __name__ == "__main__":
     test_concurrent_claims()
 ```
 
-## Step 5: Run Tests
+## Step 6: Run Tests with Quality Gates
+
+### Validation Gate
+Run these commands and fix ALL issues before proceeding:
 
 ```bash
-# Make sure you're in the project root
-cd /Users/daniellerothermel/drotherm/repos/gt_dr_exp/cleanup_run_data
+# 1. Code quality check
+ckdr
+# Expected: "All checks passed!"
+# If fails: Fix the code, not the rules
 
-# Run the test
-python test_job_db.py
+# 2. Run all tests
+pt
+# Expected: All tests pass, no skips
+# If fails: Fix implementation, not tests
+
+# 3. Verify JobDB tests specifically
+pt tests/test_job_db.py -v
+# Expected: Detailed passing output
 ```
+
+⚠️ **CRITICAL**: If any check fails:
+1. Read the FULL error message
+2. Understand what the test/check expects
+3. Fix YOUR CODE to meet expectations
+4. Do NOT modify tests/rules to pass
+
+Common fixes:
+- Type errors → Add proper type hints
+- Lint errors → Refactor code structure
+- Test failures → Implementation doesn't match spec
 
 ## Validation Checklist
 
@@ -635,7 +669,9 @@ Before proceeding to Phase 2, ensure:
 
 - [ ] All specified files and directories have been deleted
 - [ ] New `JobDB` class is implemented in `src/dr_exp/core/job_db.py`
-- [ ] Test script runs successfully
+- [ ] **ALL quality checks pass**: `ckdr` shows "All checks passed!"
+- [ ] **ALL tests pass**: `pt` shows all tests passing with no skips
+- [ ] Test coverage is adequate: `pt --cov=dr_exp.core.job_db`
 - [ ] No references to old classes remain:
   ```bash
   # This should return no results:
@@ -650,6 +686,32 @@ Before proceeding to Phase 2, ensure:
 3. **DO NOT** create abstract base classes or interfaces
 4. **DO NOT** add complex error handling - use assertions for fail-fast
 5. **DO NOT** implement Supabase syncing yet - that comes in Phase 3
+
+### ⚠️ Test Anti-Patterns to AVOID
+
+❌ **DO NOT modify tests to pass:**
+```python
+# WRONG - Don't change expected values
+assert job["priority"] == 500  # Changed from 900 to match bug
+```
+
+❌ **DO NOT skip failing tests:**
+```python
+# WRONG - Fix the implementation instead
+@pytest.mark.skip("This test is failing")
+def test_priority_ordering():
+```
+
+❌ **DO NOT catch exceptions to hide failures:**
+```python
+# WRONG - Let tests fail clearly
+try:
+    result = db.claim_next_job("worker")
+except Exception:
+    result = None  # Hiding the real issue
+```
+
+✅ **DO fix the implementation to match test expectations**
 
 ## DO NOT IMPLEMENT
 

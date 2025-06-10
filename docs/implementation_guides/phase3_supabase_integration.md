@@ -492,7 +492,7 @@ def get_metrics_remote(self, job_id: str) -> Optional[Path]:
 
 ## Step 6: Create Integration Test
 
-Create `test_supabase_integration.py`:
+Create `tests/test_supabase_integration.py`:
 
 ```python
 #!/usr/bin/env python3
@@ -602,26 +602,67 @@ if __name__ == "__main__":
     test_supabase_integration()
 ```
 
-## Step 7: Run Integration Test
+## Step 7: Run Tests with Quality Gates
+
+### Validation Gate
+Run these commands and fix ALL issues before proceeding:
 
 ```bash
-# Make sure .env file exists with your Supabase credentials
-cat .env  # Should show SUPABASE_URL and SUPABASE_KEY
+# 1. Code quality check
+ckdr
+# Expected: "All checks passed!"
+# If fails: Fix the code, not the rules
 
-# Run integration test
-python test_supabase_integration.py
+# 2. Run all tests
+pt
+# Expected: All tests pass, no skips (some may skip if no Supabase creds)
+# If fails: Fix implementation, not tests
+
+# 3. Run Supabase integration tests specifically
+pt tests/test_supabase_integration.py -v
+# Expected: Tests pass or skip gracefully if no credentials
 ```
+
+⚠️ **CRITICAL**: If any check fails:
+1. Read the FULL error message
+2. Understand what the test/check expects
+3. Fix YOUR CODE to meet expectations
+4. Do NOT modify tests/rules to pass
+
+Common fixes:
+- Missing credentials → Create .env file with Supabase credentials
+- Type errors → Add proper type hints to sync methods
+- Test failures → Sync implementation doesn't match spec
 
 ## Validation Checklist
 
 Before proceeding to Phase 4:
 
+- [ ] **ALL quality checks pass**: `ckdr` shows "All checks passed!"
+- [ ] **ALL tests pass**: `pt` shows all tests passing (or gracefully skipping)
+- [ ] Test coverage is adequate: `pt --cov=dr_exp.sync`
 - [ ] Supabase schema is created
 - [ ] `.env` file contains valid credentials
-- [ ] Integration test passes
+- [ ] Integration test passes: `pt tests/test_supabase_integration.py -v`
 - [ ] Jobs appear in Supabase dashboard
 - [ ] Files appear in Supabase storage bucket
 - [ ] Remote read functionality works
+
+### Phase 3 Validation Gate
+
+```bash
+# No proceeding until these ALL work:
+ckdr && echo "✓ Quality checks pass" || echo "✗ FIX CODE QUALITY FIRST"
+pt tests/test_supabase_integration.py && echo "✓ Supabase tests pass" || echo "✗ FIX IMPLEMENTATION"
+pt && echo "✓ All tests pass" || echo "✗ FIX ALL FAILURES"
+```
+
+If any check shows ✗:
+1. STOP
+2. Read the error carefully
+3. Fix the implementation (not the test)
+4. Run all checks again
+5. Only proceed when all show ✓
 
 ## Debugging Tips
 
@@ -644,6 +685,42 @@ Before proceeding to Phase 4:
 **Files not appearing in storage**
 - Check worker logs for upload errors
 - Verify bucket exists and has correct permissions
+
+## Common Test Anti-Patterns
+
+### ⚠️ DO NOT Mock Away Supabase
+
+❌ **WRONG - Don't fake the integration:**
+```python
+@patch('dr_exp.sync.supabase_client.SupabaseClient.upload_file')
+def test_sync(mock_upload):
+    mock_upload.return_value = True  # This doesn't test anything!
+```
+
+✅ **RIGHT - Test real integration or skip:**
+```python
+def test_sync():
+    if not os.getenv("SUPABASE_URL"):
+        pytest.skip("No Supabase credentials")
+    # Test real upload
+```
+
+### ⚠️ DO NOT Ignore Sync Failures
+
+❌ **WRONG - Don't hide sync errors:**
+```python
+try:
+    client.upload_file(path, remote)
+except Exception:
+    pass  # Hiding real problems
+```
+
+✅ **RIGHT - Handle errors properly:**
+```python
+success = client.upload_file(path, remote)
+if not success:
+    # Log error, retry later
+```
 
 ## Architecture Notes
 

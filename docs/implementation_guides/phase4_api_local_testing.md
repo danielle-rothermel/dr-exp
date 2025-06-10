@@ -352,11 +352,11 @@ if __name__ == "__main__":
 ## Step 3: Install API Dependencies
 
 ```bash
-# Install FastAPI and server
-pip install fastapi uvicorn
+# Install FastAPI and server using uv
+uv add fastapi uvicorn websockets
 
 # Install test dependencies
-pip install requests websocket-client
+uv add --dev httpx pytest-asyncio websocket-client
 ```
 
 ## Step 4: Create Simple Frontend Test
@@ -468,16 +468,48 @@ Create `test_frontend.html`:
 </html>
 ```
 
-## Step 5: Run Local Tests
+## Step 5: Run Tests with Quality Gates
+
+### Validation Gate
+Run these commands and fix ALL issues before proceeding:
+
+```bash
+# 1. Code quality check
+ckdr
+# Expected: "All checks passed!"
+# If fails: Fix the code, not the rules
+
+# 2. Run all tests
+pt
+# Expected: All tests pass, no skips
+# If fails: Fix implementation, not tests
+
+# 3. Run API tests specifically
+pt tests/test_api_local.py -v
+# Expected: All API tests pass
+```
+
+⚠️ **CRITICAL**: If any check fails:
+1. Read the FULL error message
+2. Understand what the test/check expects
+3. Fix YOUR CODE to meet expectations
+4. Do NOT modify tests/rules to pass
+
+Common fixes:
+- Import errors → Ensure FastAPI properly installed with `uv add fastapi`
+- Type errors → Add proper type hints to API endpoints
+- Test failures → API implementation doesn't match spec
+
+## Step 6: Run Local Integration Test
 
 ```bash
 # Terminal 1: Set environment and start API
 export DR_EXP_BASE_PATH=/tmp/test_experiments
 export DR_EXP_EXPERIMENT=my_test_experiment
-uvicorn dr_exp.api.simple_api:app --reload
+uv run uvicorn dr_exp.api.simple_api:app --reload
 
-# Terminal 2: Run API test
-python test_api_local.py
+# Terminal 2: Run pytest tests
+pt tests/test_api_local.py -v
 
 # Terminal 3: Open the HTML file in a browser
 # Just double-click test_frontend.html or:
@@ -489,11 +521,31 @@ xdg-open test_frontend.html  # Linux
 
 Before proceeding to cloud deployment:
 
-- [ ] API test script passes all tests
+- [ ] **ALL quality checks pass**: `ckdr` shows "All checks passed!"
+- [ ] **ALL tests pass**: `pt` shows all tests passing
+- [ ] Test coverage is adequate: `pt --cov=dr_exp.api`
+- [ ] API tests pass: `pt tests/test_api_local.py -v`
+- [ ] API server starts without errors
 - [ ] Frontend HTML can connect and display jobs
 - [ ] WebSocket connections work
 - [ ] API can read from both local files and Supabase
 - [ ] Metrics endpoint returns data for completed jobs
+
+### Phase 4 Validation Gate
+
+```bash
+# No proceeding until these ALL work:
+ckdr && echo "✓ Quality checks pass" || echo "✗ FIX CODE QUALITY FIRST"
+pt tests/test_api_local.py && echo "✓ API tests pass" || echo "✗ FIX IMPLEMENTATION"
+pt && echo "✓ All tests pass" || echo "✗ FIX ALL FAILURES"
+```
+
+If any check shows ✗:
+1. STOP
+2. Read the error carefully
+3. Fix the implementation (not the test)
+4. Run all checks again
+5. Only proceed when all show ✓
 
 ## Architecture Notes
 
@@ -518,6 +570,41 @@ Key design decisions for local API:
 - Verify jobs exist in the experiment directory
 - Check browser console for errors
 - Make sure CORS is configured correctly
+
+## Common Test Anti-Patterns
+
+### ⚠️ DO NOT Test with Real Servers
+
+❌ **WRONG - Don't spawn servers in tests:**
+```python
+# This is flaky and slow
+subprocess.Popen(["uvicorn", "app:app"])
+time.sleep(5)  # Hope it's ready?
+```
+
+✅ **RIGHT - Use TestClient:**
+```python
+from fastapi.testclient import TestClient
+client = TestClient(app)
+response = client.get("/api/jobs")
+```
+
+### ⚠️ DO NOT Mock What You're Testing
+
+❌ **WRONG - Don't mock the API logic:**
+```python
+@patch('dr_exp.api.simple_api.get_jobs')
+def test_api(mock_get_jobs):
+    mock_get_jobs.return_value = []  # Not testing anything!
+```
+
+✅ **RIGHT - Test with real JobDB:**
+```python
+def test_api(test_job_db):
+    # Use fixture that creates real JobDB
+    response = client.get("/api/jobs")
+    assert len(response.json()) == 3
+```
 
 ## Next Steps
 

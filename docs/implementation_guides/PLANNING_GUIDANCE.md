@@ -61,15 +61,13 @@ File locking (`fcntl`) in `claim_next_job()` handles everything. Multiple worker
 
 ### Completed:
 - Phase 1: Clean JobDB with operational methods
-- Phase 2: Worker with CLI interface
+- Phase 2: Worker with CLI interface, launcher for multi-worker deployment, and config submission commands
+- Phase 2.5: SLURM Integration with long-running launcher design
 - Phases 3-6: Basic structure defined
 - Integration pattern for deconCNN established
 
 ### Areas for Potential Refinement:
-1. **Config Upload Process**: Currently uses existing scripts - could be simplified to use CLI
-2. **Supabase Integration**: Phase 3 could be more prescriptive about error handling
-3. **Testing Strategy**: Could add more comprehensive integration tests
-4. **SLURM Integration**: Not yet covered - how to launch workers on cluster
+1. **Supabase Integration**: Phase 3 could be more prescriptive about error handling
 
 ## Guidelines for Future Planning
 
@@ -119,6 +117,136 @@ The implementation is successful when:
 4. Dead workers don't block jobs
 5. Users can monitor/control jobs via CLI
 6. No complex configuration needed
+
+## Development Tooling Standards
+
+### Dependency Management
+- ALL dependencies managed via `uv` (not pip)
+- Add dependencies: `uv add package` or `uv add --dev package`
+- Run scripts: `uv run python scripts/...` (aliased as `uvrp`)
+
+### Code Quality
+- After EVERY code change: Run `ckdr` (ruff check + format + mypy)
+- Type hints required on ALL functions
+- Follow existing import patterns
+
+### Testing
+- Use pytest for all tests (not standalone scripts)
+- Tests go in `tests/` directory mirroring `src/` structure
+- Run tests with `pt` (alias for `uv run pytest`)
+- Test files named `test_*.py`
+
+## Quality Gate Philosophy
+
+### NEVER Accept Broken Tests
+When `ckdr` or `pt` fails, you MUST:
+1. **Fix the root cause** - Don't modify tests to pass, fix the code
+2. **Understand why it failed** - Read the full error, understand the intent
+3. **Fix ALL issues** - Even "unrelated" failures often reveal integration problems
+4. **Preserve test intent** - Tests document expected behavior, don't weaken them
+
+### Common Anti-Patterns to AVOID
+❌ **DO NOT**:
+- Skip failing tests with `@pytest.mark.skip`
+- Modify assertions to match broken behavior
+- Add try/except to hide errors
+- Weaken type hints to avoid mypy errors
+- Disable ruff rules with `# noqa`
+- Change test data to make tests pass
+
+✅ **DO**:
+- Fix the implementation to match test expectations
+- Strengthen type hints when mypy complains
+- Refactor code when ruff identifies issues
+- Investigate why "unrelated" tests fail
+- Ask for clarification if test intent is unclear
+
+### The Quality Gate Rule
+**No code proceeds until ALL of these pass:**
+```bash
+ckdr  # Must show: "All checks passed!"
+pt    # Must show: "X passed" with no failures/skips
+```
+
+If you cannot make these pass by fixing the code properly, STOP and ask for help.
+
+## System Requirements and Constraints
+
+This section consolidates all requirements identified during planning, both from our SLURM integration discussion and from analyzing all implementation guides.
+
+### 1. HPC Environment Requirements
+- **Long-running GPU allocations**: System must hold GPUs for up to 47 hours
+- **Multiple workers per GPU**: Support 2-4 workers per GPU with CUDA MPS
+- **Rapid job turnaround**: New jobs should start within seconds when workers are idle
+- **SLURM compatibility**: Clean integration with SLURM job scheduler
+- **No artificial GPU keep-alive**: Respect other users, accept termination if underutilized
+- **Graceful shutdown**: Stop cleanly before SLURM time limits
+
+### 2. Scale and Performance Requirements  
+- **24 total GPUs**: System designed for clusters with ~24 GPUs available
+- **File locking**: `fcntl` must handle all concurrent access (no distributed systems)
+- **Independent workers**: No inter-worker communication, JobDB handles coordination
+- **Atomic operations**: Each job claim/update must be atomic
+- **Non-blocking sync**: Background uploads must not block job execution
+- **5-minute heartbeat timeout**: For automatic stale job recovery
+
+### 3. Operational Workflows
+- **Submit jobs anytime**: While launcher is running, jobs start immediately
+- **Long experiment cycles**: Experiments may run for days with continuous job submission
+- **Priority-based scheduling**: 0-1000 range, highest priority runs first
+- **Job control**: Kill, boost priority, or run specific jobs on demand
+- **Automatic recovery**: Dead workers restart if jobs pending, stale jobs recover
+- **Status monitoring**: Regular status logs every 5 minutes
+
+### 4. User Experience Requirements
+- **Single entry point**: One `sbatch` command starts everything
+- **Minimal configuration**: Just experiment name and worker count
+- **Clear status visibility**: Logs show jobs completed, workers alive, runtime
+- **No manual worker management**: Launcher handles all spawning/monitoring
+- **CLI for all operations**: Unified `dr_exp` command interface
+
+### 5. Technical Architecture
+- **Single JobDB implementation**: No abstract interfaces or multiple backends
+- **Hydra dispatch**: Jobs use `_target_` field for function routing  
+- **Local filesystem is truth**: All writes go to /scratch first
+- **Supabase as mirror**: Eventually consistent, read-only copy
+- **Fail fast philosophy**: Assertions not exceptions, no recovery logic
+
+### 6. Integration Requirements
+- **CUDA MPS support**: For efficient GPU sharing between workers
+- **Python 3.10+**: Use modern language features
+- **Mac/Linux only**: No Windows support needed
+- **ML library pattern**: Minimal changes to existing libraries via wrappers
+- **No complex dependencies**: Just essential packages
+
+### 7. Data Management
+- **Experiment isolation**: Single experiment per JobDB instance
+- **Clear directory structure**: `jobs/`, `storage/`, `sync_queue/` organization
+- **Storage categorization**: Metrics, logs, models tracked separately
+- **Interactive cleanup tools**: With dry-run and confirmation steps
+- **Sync queue management**: Track and retry failed uploads
+
+### 8. Reliability and Recovery
+- **Worker auto-restart**: When jobs are pending and worker dies
+- **Periodic maintenance**: Stale job recovery every 10 minutes
+- **Heartbeat monitoring**: Detect hung/dead workers via heartbeats
+- **Signal handling**: Graceful shutdown on SIGTERM/SIGINT
+- **Queue persistence**: Jobs survive worker/launcher restarts
+
+### 9. Deployment Constraints
+- **Single launcher process**: Not complex job arrays or distributed coordination
+- **47-hour runtime limit**: Leave buffer for cleanup before 48-hour SLURM limit
+- **Environment flexibility**: Support 1-3 GPU allocations dynamically
+- **Minimal SLURM configuration**: Reusable script with environment variables
+
+### 10. Design Philosophy Constraints
+- **Simplicity over features**: Every feature must be essential
+- **Explicit over implicit**: No hidden behavior or magic
+- **Direct over abstract**: Concrete implementations, not frameworks
+- **Fail fast over resilience**: Clear errors, not complex recovery
+- **Convention over configuration**: Sensible defaults, minimal options
+
+These requirements drive all implementation decisions and should be referenced when evaluating any proposed changes or additions to the system.
 
 ## Remember
 These docs are for **implementation**, not education. Every line should help an agent write correct code on the first try. When in doubt, be more explicit and prescriptive.

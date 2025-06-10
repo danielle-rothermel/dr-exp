@@ -798,7 +798,390 @@ if __name__ == "__main__":
     test_worker()
 ```
 
-## Step 7: Create CLI Interface
+## Step 7: Run Tests with Quality Gates
+
+### Validation Gate
+Run these commands and fix ALL issues before proceeding:
+
+```bash
+# 1. Code quality check
+ckdr
+# Expected: "All checks passed!"
+# If fails: Fix the code, not the rules
+
+# 2. Run all tests
+pt
+# Expected: All tests pass, no skips
+# If fails: Fix implementation, not tests
+
+# 3. Verify Worker tests specifically
+pt tests/test_worker.py -v
+# Expected: Detailed passing output
+```
+
+⚠️ **CRITICAL**: If any check fails:
+1. Read the FULL error message
+2. Understand what the test/check expects
+3. Fix YOUR CODE to meet expectations
+4. Do NOT modify tests/rules to pass
+
+Common fixes:
+- Import errors → Ensure all modules properly imported
+- Type errors → Add proper type hints to Worker methods
+- Test failures → Worker implementation doesn't match spec
+
+## Step 8: Create Launcher for Multi-Worker Deployment
+
+For production use, especially on HPC clusters, we need a launcher that spawns and monitors multiple workers. This is critical for GPU utilization and long-running allocations.
+
+Create `src/dr_exp/launcher.py`:
+
+```python
+"""Launcher for spawning and monitoring multiple workers."""
+
+import logging
+import signal
+import subprocess
+import time
+from pathlib import Path
+from typing import Dict, List, Optional
+from datetime import datetime, UTC
+import os
+import sys
+
+from dr_exp.core.job_db import JobDB
+
+logger = logging.getLogger(__name__)
+
+
+class WorkerLauncher:
+    """Spawns and monitors multiple workers for long-running HPC jobs.
+    
+    Designed for SLURM environments where you want to hold GPU allocations
+    for extended periods (e.g., 2 days) to enable rapid job submission without
+    waiting for new allocations.
+    
+    Key features:
+    - Spawns workers based on GPU availability
+    - Monitors and restarts failed workers
+    - Periodic stale job recovery
+    - Graceful shutdown before SLURM timeout
+    - No artificial GPU keep-alive (respects other users)
+    """
+    
+    def __init__(
+        self,
+        job_db: JobDB,
+        workers_per_gpu: int = 2,
+        max_runtime_hours: float = 47,  # Just under 2-day SLURM limit
+        heartbeat_timeout: int = 300,    # 5 minutes
+        worker_restart_delay: int = 30,  # 30 seconds
+    ):
+        """Initialize launcher.
+        
+        Args:
+            job_db: JobDB instance
+            workers_per_gpu: Number of workers to spawn per GPU
+            max_runtime_hours: Maximum runtime before graceful shutdown
+            heartbeat_timeout: Seconds before job is considered stale
+            worker_restart_delay: Seconds to wait before restarting dead worker
+        """
+        self.job_db = job_db
+        self.workers_per_gpu = workers_per_gpu
+        self.max_runtime_hours = max_runtime_hours
+        self.heartbeat_timeout = heartbeat_timeout
+        self.worker_restart_delay = worker_restart_delay
+        
+        self.start_time = time.time()
+        self.max_runtime_seconds = max_runtime_hours * 3600
+        self.workers: Dict[str, subprocess.Popen] = {}
+        self.worker_configs: Dict[str, Dict] = {}
+        self.shutdown_requested = False
+        
+        # Setup signal handlers for graceful shutdown
+        signal.signal(signal.SIGTERM, self._handle_shutdown)
+        signal.signal(signal.SIGINT, self._handle_shutdown)
+        
+        logger.info(f"Launcher initialized for experiment {job_db.experiment_name}")
+        logger.info(f"Will run for up to {max_runtime_hours} hours")
+    
+    def discover_gpus(self) -> List[int]:
+        """Discover available GPUs from CUDA_VISIBLE_DEVICES or nvidia-smi.
+        
+        Returns:
+            List of GPU IDs
+        """
+        # First check CUDA_VISIBLE_DEVICES
+        cuda_visible = os.environ.get('CUDA_VISIBLE_DEVICES')
+        if cuda_visible:
+            gpu_ids = [int(x) for x in cuda_visible.split(',')]
+            logger.info(f"Found {len(gpu_ids)} GPUs from CUDA_VISIBLE_DEVICES: {gpu_ids}")
+            return gpu_ids
+        
+        # Fall back to nvidia-smi
+        try:
+            result = subprocess.run(
+                ['nvidia-smi', '--query-gpu=index', '--format=csv,noheader'],
+                capture_output=True,
+                text=True,
+                check=True
+            )
+            gpu_ids = [int(x) for x in result.stdout.strip().split('\n')]
+            logger.info(f"Found {len(gpu_ids)} GPUs from nvidia-smi: {gpu_ids}")
+            return gpu_ids
+        except Exception as e:
+            logger.warning(f"Failed to detect GPUs: {e}")
+            return []
+    
+    def spawn_workers(self) -> None:
+        """Spawn workers based on GPU configuration."""
+        gpus = self.discover_gpus()
+        
+        if not gpus:
+            # CPU-only mode
+            logger.warning("No GPUs found, running in CPU mode")
+            for i in range(self.workers_per_gpu):
+                worker_id = f"cpu_worker_{i}"
+                self._spawn_worker(worker_id, gpu_id=None)
+        else:
+            # GPU mode
+            for gpu_id in gpus:
+                for i in range(self.workers_per_gpu):
+                    # Generate unique worker ID
+                    node_id = os.environ.get('SLURM_NODEID', 'node0')
+                    worker_id = f"{node_id}_gpu{gpu_id}_w{i}"
+                    self._spawn_worker(worker_id, gpu_id=gpu_id)
+        
+        logger.info(f"Spawned {len(self.workers)} workers")
+    
+    def _spawn_worker(self, worker_id: str, gpu_id: Optional[int]) -> None:
+        """Spawn a single worker process.
+        
+        Args:
+            worker_id: Unique worker identifier
+            gpu_id: GPU to assign (None for CPU mode)
+        """
+        # Build command
+        cmd = [
+            sys.executable,  # Use same Python interpreter
+            '-m', 'dr_exp.cli',
+            '--base-path', str(self.job_db.base_path),
+            '--experiment', self.job_db.experiment_name,
+            'worker',
+            '--worker-id', worker_id,
+            '--sync',  # Enable background sync
+        ]
+        
+        # Setup environment
+        env = os.environ.copy()
+        if gpu_id is not None:
+            env['CUDA_VISIBLE_DEVICES'] = str(gpu_id)
+        
+        # Store config for restart
+        self.worker_configs[worker_id] = {
+            'cmd': cmd,
+            'env': env,
+            'gpu_id': gpu_id,
+        }
+        
+        # Spawn worker
+        logger.info(f"Spawning worker {worker_id} on GPU {gpu_id}")
+        proc = subprocess.Popen(
+            cmd,
+            env=env,
+            stdout=subprocess.PIPE,
+            stderr=subprocess.PIPE,
+        )
+        self.workers[worker_id] = proc
+    
+    def monitor_workers(self) -> None:
+        """Check worker health and restart if needed."""
+        dead_workers = []
+        
+        for worker_id, proc in self.workers.items():
+            if proc.poll() is not None:
+                # Worker died
+                dead_workers.append(worker_id)
+                logger.warning(f"Worker {worker_id} died with code {proc.returncode}")
+        
+        # Restart dead workers if we're not shutting down
+        if dead_workers and not self.shutdown_requested:
+            # Check if we have pending jobs before restarting
+            has_work = bool(self.job_db.list_jobs(status="queued", limit=1))
+            
+            for worker_id in dead_workers:
+                del self.workers[worker_id]
+                
+                if has_work:
+                    logger.info(f"Restarting worker {worker_id} after {self.worker_restart_delay}s")
+                    time.sleep(self.worker_restart_delay)
+                    
+                    config = self.worker_configs[worker_id]
+                    proc = subprocess.Popen(
+                        config['cmd'],
+                        env=config['env'],
+                        stdout=subprocess.PIPE,
+                        stderr=subprocess.PIPE,
+                    )
+                    self.workers[worker_id] = proc
+                else:
+                    logger.info(f"Not restarting worker {worker_id} - no pending jobs")
+    
+    def recover_stale_jobs(self) -> None:
+        """Recover jobs from workers that missed heartbeats."""
+        recovered = self.job_db.recover_stale_jobs(self.heartbeat_timeout)
+        if recovered:
+            logger.info(f"Recovered {len(recovered)} stale jobs")
+            for job_id in recovered:
+                logger.debug(f"  - Recovered job {job_id}")
+    
+    def log_status(self) -> None:
+        """Log current system status."""
+        # Count job statuses
+        running = len(self.job_db.list_jobs(status="running"))
+        queued = len(self.job_db.list_jobs(status="queued", limit=100))
+        completed = len(self.job_db.list_jobs(status="completed", limit=1000))
+        failed = len(self.job_db.list_jobs(status="failed", limit=100))
+        
+        # Worker status
+        alive_workers = sum(1 for p in self.workers.values() if p.poll() is None)
+        
+        # Runtime
+        runtime_hours = (time.time() - self.start_time) / 3600
+        
+        logger.info(
+            f"Status: {alive_workers}/{len(self.workers)} workers alive | "
+            f"Jobs: {running} running, {queued} queued, {completed} completed, {failed} failed | "
+            f"Runtime: {runtime_hours:.1f}h"
+        )
+    
+    def exceeded_runtime(self) -> bool:
+        """Check if we've exceeded maximum runtime."""
+        return (time.time() - self.start_time) > self.max_runtime_seconds
+    
+    def _handle_shutdown(self, signum, frame):
+        """Handle shutdown signals gracefully."""
+        logger.info(f"Received signal {signum}, initiating graceful shutdown")
+        self.shutdown_requested = True
+    
+    def stop_all_workers(self) -> None:
+        """Stop all workers gracefully."""
+        logger.info("Stopping all workers...")
+        
+        # Send SIGTERM to all workers
+        for worker_id, proc in self.workers.items():
+            if proc.poll() is None:
+                logger.debug(f"Sending SIGTERM to worker {worker_id}")
+                proc.terminate()
+        
+        # Wait up to 30 seconds for graceful shutdown
+        wait_start = time.time()
+        while time.time() - wait_start < 30:
+            alive = sum(1 for p in self.workers.values() if p.poll() is None)
+            if alive == 0:
+                break
+            time.sleep(1)
+        
+        # Force kill any remaining
+        for worker_id, proc in self.workers.items():
+            if proc.poll() is None:
+                logger.warning(f"Force killing worker {worker_id}")
+                proc.kill()
+        
+        logger.info("All workers stopped")
+    
+    def run(self) -> None:
+        """Main launcher loop."""
+        logger.info("Starting launcher main loop")
+        
+        # Initial spawn
+        self.spawn_workers()
+        
+        # Status and maintenance intervals
+        last_status_log = time.time()
+        last_recovery = time.time()
+        status_interval = 300  # 5 minutes
+        recovery_interval = 600  # 10 minutes
+        
+        # Main monitoring loop
+        while not self.shutdown_requested and not self.exceeded_runtime():
+            # Monitor and restart workers
+            self.monitor_workers()
+            
+            # Periodic status log
+            if time.time() - last_status_log > status_interval:
+                self.log_status()
+                last_status_log = time.time()
+            
+            # Periodic stale job recovery
+            if time.time() - last_recovery > recovery_interval:
+                self.recover_stale_jobs()
+                last_recovery = time.time()
+            
+            # Sleep briefly
+            time.sleep(30)
+        
+        # Graceful shutdown
+        if self.exceeded_runtime():
+            logger.info("Maximum runtime reached, shutting down gracefully")
+        else:
+            logger.info("Shutdown requested, stopping gracefully")
+        
+        self.stop_all_workers()
+        
+        # Final status
+        self.log_status()
+        logger.info("Launcher stopped")
+
+
+def main():
+    """CLI entry point for launcher."""
+    import argparse
+    
+    parser = argparse.ArgumentParser(description="Launch multiple workers")
+    parser.add_argument('--base-path', required=True, help='Base directory for experiments')
+    parser.add_argument('--experiment', required=True, help='Experiment name')
+    parser.add_argument('--workers-per-gpu', type=int, default=2, help='Workers per GPU')
+    parser.add_argument('--max-hours', type=float, default=47, help='Maximum runtime hours')
+    parser.add_argument('--heartbeat-timeout', type=int, default=300, help='Job heartbeat timeout')
+    
+    args = parser.parse_args()
+    
+    # Setup logging
+    logging.basicConfig(
+        level=logging.INFO,
+        format='%(asctime)s [%(levelname)s] %(name)s: %(message)s'
+    )
+    
+    # Create JobDB
+    job_db = JobDB(base_path=args.base_path, experiment_name=args.experiment)
+    
+    # Create and run launcher
+    launcher = WorkerLauncher(
+        job_db=job_db,
+        workers_per_gpu=args.workers_per_gpu,
+        max_runtime_hours=args.max_hours,
+        heartbeat_timeout=args.heartbeat_timeout,
+    )
+    
+    try:
+        launcher.run()
+    except KeyboardInterrupt:
+        logger.info("Keyboard interrupt received")
+    except Exception as e:
+        logger.error(f"Launcher failed: {e}", exc_info=True)
+        raise
+    finally:
+        launcher.stop_all_workers()
+
+
+if __name__ == '__main__':
+    main()
+```
+
+## Step 8: Create CLI Interface
+
+Now update the CLI to include the launcher command.
 
 Create `src/dr_exp/cli.py` for a unified command-line interface:
 
@@ -953,7 +1336,10 @@ def run_one(db, job_id, worker_id, sync):
 @click.option('--sync/--no-sync', default=True, help='Enable background sync')
 @click.pass_obj
 def worker(db, worker_id, max_jobs, sync):
-    """Run a worker process."""
+    """Run a worker process.
+    
+    In production, use the 'launcher' command instead to spawn multiple workers.
+    """
     worker = Worker(
         worker_id=worker_id,
         job_db=db,
@@ -968,8 +1354,9 @@ def worker(db, worker_id, max_jobs, sync):
         while True:
             job_id = worker.run_next_job()
             if job_id is None:
-                click.echo("No jobs available, exiting")
-                break
+                # No jobs available - wait and retry
+                time.sleep(10)
+                continue
             
             jobs_run += 1
             click.echo(f"Completed job {job_id} ({jobs_run} total)")
@@ -980,6 +1367,37 @@ def worker(db, worker_id, max_jobs, sync):
     finally:
         worker.stop()
         click.echo(f"Worker {worker_id} stopped after {jobs_run} jobs")
+
+
+@cli.command()
+@click.option('--workers-per-gpu', default=2, help='Workers to spawn per GPU')
+@click.option('--max-hours', default=47, help='Maximum runtime in hours')
+@click.option('--heartbeat-timeout', default=300, help='Job heartbeat timeout seconds')
+@click.pass_obj
+def launcher(db, workers_per_gpu, max_hours, heartbeat_timeout):
+    """Launch and monitor multiple workers (recommended for production).
+    
+    Spawns workers based on available GPUs and monitors them for the specified
+    duration. Designed for long-running HPC allocations.
+    
+    Example:
+        dr_exp --base-path /scratch/exp --experiment my_exp launcher
+    """
+    from dr_exp.launcher import WorkerLauncher
+    
+    launcher = WorkerLauncher(
+        job_db=db,
+        workers_per_gpu=workers_per_gpu,
+        max_runtime_hours=max_hours,
+        heartbeat_timeout=heartbeat_timeout,
+    )
+    
+    try:
+        launcher.run()
+    except KeyboardInterrupt:
+        click.echo("\nShutdown requested")
+    finally:
+        launcher.stop_all_workers()
 
 
 if __name__ == '__main__':
@@ -1001,23 +1419,374 @@ chmod +x dr_exp
 # Add to your shell config or use pip install -e . to install properly
 ```
 
-## Step 8: Run Tests
+## Step 9: Add Config Submission Commands
+
+The CLI needs commands to submit jobs using Hydra configs. This replaces the old `upload_configs.py` script.
+
+### Add Hydra Config Support
+
+First, update `src/dr_exp/cli.py` to add config submission commands:
+
+```python
+# Add these imports at the top
+import tempfile
+from pathlib import Path
+from typing import List, Dict, Any
+import itertools
+
+import hydra
+from hydra.core.global_hydra import GlobalHydra
+from omegaconf import OmegaConf
+
+# Add these functions before the CLI commands
+
+def parse_sweep_params(params_str: str) -> Dict[str, List[str]]:
+    """Parse sweep parameters from string format.
+    
+    Example: "model=resnet18,resnet50 optim.lr=0.001,0.01"
+    Returns: {"model": ["resnet18", "resnet50"], "optim.lr": ["0.001", "0.01"]}
+    """
+    if not params_str:
+        return {}
+    
+    result = {}
+    # Split by whitespace to get individual param=values pairs
+    pairs = params_str.split()
+    for pair in pairs:
+        if '=' not in pair:
+            continue
+        key, values = pair.split('=', 1)
+        result[key] = [v.strip() for v in values.split(',')]
+    return result
+
+
+def generate_sweep_configs(
+    base_config: str,
+    sweep_params: Dict[str, List[str]]
+) -> List[Dict[str, Any]]:
+    """Generate all config combinations for a parameter sweep.
+    
+    Args:
+        base_config: Path to base Hydra config file
+        sweep_params: Parameters to sweep over
+        
+    Returns:
+        List of composed configs
+    """
+    if not sweep_params:
+        # No sweep, just load base config
+        return [load_hydra_config(base_config, [])]
+    
+    # Generate all combinations
+    keys = list(sweep_params.keys())
+    values = [sweep_params[k] for k in keys]
+    
+    configs = []
+    for combo in itertools.product(*values):
+        overrides = [f"{k}={v}" for k, v in zip(keys, combo)]
+        config = load_hydra_config(base_config, overrides)
+        configs.append(config)
+    
+    return configs
+
+
+def load_hydra_config(config_path: str, overrides: List[str]) -> Dict[str, Any]:
+    """Load and compose a Hydra config with overrides.
+    
+    Args:
+        config_path: Path to config file
+        overrides: List of override strings (e.g., ["model=resnet50", "lr=0.01"])
+        
+    Returns:
+        Composed config as dictionary
+    """
+    config_path = Path(config_path).resolve()
+    config_dir = config_path.parent
+    config_name = config_path.name
+    
+    # Clear any existing Hydra state
+    GlobalHydra.instance().clear()
+    
+    # Initialize and compose
+    with hydra.initialize_config_dir(config_dir=str(config_dir), version_base=None):
+        cfg = hydra.compose(config_name=config_name, overrides=overrides)
+        # Convert to regular dict and resolve
+        return OmegaConf.to_container(cfg, resolve=True, throw_on_missing=True)
+
+
+def validate_target(target: str) -> None:
+    """Validate that a target function is importable.
+    
+    Args:
+        target: Module path to function (e.g., "dr_exp.trainers.decon.train")
+        
+    Raises:
+        AssertionError: If target cannot be imported
+    """
+    try:
+        module_path, func_name = target.rsplit('.', 1)
+        import importlib
+        module = importlib.import_module(module_path)
+        assert hasattr(module, func_name), f"Function {func_name} not found in {module_path}"
+    except Exception as e:
+        assert False, f"Cannot import target {target}: {e}"
+
+
+# Now add the new CLI commands
+
+@cli.command()
+@click.argument('config_file', type=click.Path(exists=True))
+@click.option('--target', help='Training function target (e.g., dr_exp.trainers.decon_trainer.train)')
+@click.option('--priority', default=100, help='Job priority (0-1000)')
+@click.option('--dry-run', is_flag=True, help='Show what would be created without creating')
+@click.pass_obj
+def submit(db, config_file, target, priority, dry_run):
+    """Submit a job from Hydra config file.
+    
+    Examples:
+        dr_exp --base-path /scratch --experiment exp1 submit config.yaml --target my.module.train
+        dr_exp --base-path /scratch --experiment exp1 submit config.yaml --priority 500
+    """
+    # Load config
+    config = load_hydra_config(config_file, [])
+    
+    # Handle _target_ field
+    if target:
+        config['_target_'] = target
+    elif '_target_' not in config:
+        click.echo("Error: Config must include _target_ field or --target must be specified")
+        return
+    
+    # Validate
+    validate_target(config['_target_'])
+    assert 0 <= priority <= 1000, f"Priority must be 0-1000, got {priority}"
+    
+    if dry_run:
+        click.echo("Would create job with config:")
+        click.echo(json.dumps(config, indent=2))
+        click.echo(f"Priority: {priority}")
+        return
+    
+    # Create job
+    job_id = db.create_job(config, priority)
+    click.echo(f"Created job {job_id}")
+
+
+@cli.command()
+@click.argument('config_pattern')
+@click.option('--target', help='Training function target to use for all configs')
+@click.option('--priority', default=100, help='Job priority (0-1000) for all jobs')
+@click.option('--dry-run', is_flag=True, help='Show what would be created')
+@click.pass_obj
+def submit_batch(db, config_pattern, target, priority, dry_run):
+    """Submit multiple jobs from config files matching a pattern.
+    
+    Examples:
+        dr_exp --base-path /scratch --experiment exp1 submit-batch "configs/*.yaml" --target my.train
+        dr_exp --base-path /scratch --experiment exp1 submit-batch "configs/exp_*.yaml"
+    """
+    from glob import glob
+    
+    config_files = sorted(glob(config_pattern))
+    if not config_files:
+        click.echo(f"No files matching pattern: {config_pattern}")
+        return
+    
+    click.echo(f"Found {len(config_files)} config files")
+    
+    created = 0
+    for config_file in config_files:
+        try:
+            config = load_hydra_config(config_file, [])
+            
+            # Handle _target_
+            if target:
+                config['_target_'] = target
+            elif '_target_' not in config:
+                click.echo(f"Skipping {config_file}: No _target_ field and --target not specified")
+                continue
+            
+            validate_target(config['_target_'])
+            
+            if dry_run:
+                click.echo(f"\nWould create job from {config_file}")
+                click.echo(f"Target: {config['_target_']}")
+            else:
+                job_id = db.create_job(config, priority)
+                click.echo(f"Created job {job_id} from {config_file}")
+                created += 1
+                
+        except Exception as e:
+            click.echo(f"Error processing {config_file}: {e}")
+    
+    if not dry_run:
+        click.echo(f"\nCreated {created} jobs")
+
+
+@cli.command()
+@click.option('--config', required=True, help='Base Hydra config file')
+@click.option('--target', help='Training function target')
+@click.option('--params', required=True, help='Sweep parameters (e.g., "model=r18,r50 lr=0.01,0.001")')
+@click.option('--priority', default=100, help='Job priority (0-1000)')
+@click.option('--dry-run', is_flag=True, help='Show parameter combinations without creating jobs')
+@click.pass_obj
+def sweep(db, config, target, params, priority, dry_run):
+    """Submit a parameter sweep based on a config file.
+    
+    Examples:
+        dr_exp --base-path /scratch --experiment exp1 sweep \\
+            --config base.yaml \\
+            --params "model=resnet18,resnet50 optim.lr=0.001,0.01" \\
+            --target my.module.train
+    """
+    # Parse sweep parameters
+    sweep_params = parse_sweep_params(params)
+    
+    if not sweep_params:
+        click.echo("Error: No valid parameters found in sweep string")
+        return
+    
+    # Show what we're sweeping
+    click.echo("Sweep parameters:")
+    for key, values in sweep_params.items():
+        click.echo(f"  {key}: {values}")
+    
+    # Generate all configs
+    configs = generate_sweep_configs(config, sweep_params)
+    click.echo(f"\nGenerating {len(configs)} configurations")
+    
+    if dry_run:
+        for i, cfg in enumerate(configs):
+            click.echo(f"\n--- Config {i+1} ---")
+            # Show only the swept parameters
+            for key in sweep_params:
+                value = cfg
+                for part in key.split('.'):
+                    value = value.get(part, 'NOT FOUND')
+                click.echo(f"{key}: {value}")
+        return
+    
+    # Create all jobs
+    created = 0
+    for i, cfg in enumerate(configs):
+        try:
+            # Handle _target_
+            if target:
+                cfg['_target_'] = target
+            elif '_target_' not in cfg:
+                click.echo(f"Error: Config must include _target_ or --target must be specified")
+                return
+            
+            validate_target(cfg['_target_'])
+            
+            job_id = db.create_job(cfg, priority)
+            created += 1
+            
+            # Show progress for large sweeps
+            if (i + 1) % 10 == 0:
+                click.echo(f"Created {i + 1}/{len(configs)} jobs...")
+                
+        except Exception as e:
+            click.echo(f"Error creating job {i+1}: {e}")
+    
+    click.echo(f"\nCreated {created} jobs from sweep")
+```
+
+### Create Test Configs
+
+Create a test config file `test_configs/simple_test.yaml`:
+
+```yaml
+# Test config for CLI testing
+_target_: dr_exp.trainers.test_trainer.train_test
+
+epochs: 5
+model_name: test_model
+learning_rate: 0.001
+```
+
+Create a test config without target `test_configs/no_target.yaml`:
+
+```yaml
+# Test config that needs --target specified
+epochs: 10
+model_name: test_model_2
+batch_size: 32
+```
+
+### Update Test Script
+
+Update the end of `test_worker.py` to test config submission:
+
+```python
+        # ... existing worker tests ...
+        
+        # Test config submission
+        print("\nTesting config submission...")
+        
+        # Create test config file
+        test_config = {
+            "_target_": "dr_exp.trainers.test_trainer.train_test",
+            "epochs": 3,
+            "model_name": "config_test"
+        }
+        
+        import json
+        config_file = tmpdir / "test_config.json"
+        with open(config_file, 'w') as f:
+            json.dump(test_config, f)
+        
+        # Test single submission (would use CLI in practice)
+        job_id = db.create_job(test_config, priority=200)
+        assert db.get_job(job_id)["priority"] == 200
+        assert db.get_job(job_id)["config"]["_target_"] == test_config["_target_"]
+        print("✓ Config submission working")
+        
+        # Test sweep generation
+        from dr_exp.cli import parse_sweep_params
+        sweep_params = parse_sweep_params("epochs=1,2,3 model_name=a,b")
+        assert len(sweep_params) == 2
+        assert sweep_params["epochs"] == ["1", "2", "3"]
+        assert sweep_params["model_name"] == ["a", "b"]
+        print("✓ Sweep parsing working")
+    
+    print("\n✅ All tests passed!")
+```
+
+## Step 10: Run Complete Integration Tests
 
 ```bash
 # Run worker test
 python test_worker.py
 
-# Test CLI (after installation)
-dr_exp --base-path /tmp/test --experiment cli_test submit test_config.yaml
+# Test CLI submission commands (after installation)
+# Single config
+dr_exp --base-path /tmp/test --experiment cli_test submit test_configs/simple_test.yaml
+
+# Batch submission
+dr_exp --base-path /tmp/test --experiment cli_test submit-batch "test_configs/*.yaml" --target dr_exp.trainers.test_trainer.train_test
+
+# Parameter sweep
+dr_exp --base-path /tmp/test --experiment cli_test sweep \
+    --config test_configs/simple_test.yaml \
+    --params "epochs=5,10,20 learning_rate=0.001,0.01"
+
+# Verify jobs were created
 dr_exp --base-path /tmp/test --experiment cli_test list
-dr_exp --base-path /tmp/test --experiment cli_test worker --worker-id test_worker --max-jobs 1
+
+# Run a worker to process them
+dr_exp --base-path /tmp/test --experiment cli_test worker --worker-id test_worker --max-jobs 5
 ```
 
 ## Validation Checklist
 
 Before proceeding to Phase 3:
 
-- [ ] Worker test passes successfully
+- [ ] **ALL quality checks pass**: `ckdr` shows "All checks passed!"
+- [ ] **ALL tests pass**: `pt` shows all tests passing with no skips
+- [ ] Test coverage is adequate: `pt --cov=dr_exp.worker --cov=dr_exp.sync`
+- [ ] Worker test passes successfully: `pt tests/test_worker.py -v`
+- [ ] Integration tests pass: `pt tests/test_integration_phase2.py -v`
 - [ ] Background sync thread starts and processes items
 - [ ] Job outputs are created in correct locations
 - [ ] Heartbeat updates work during job execution
@@ -1026,6 +1795,22 @@ Before proceeding to Phase 3:
   grep -r "run_worker\|JobExecutor\|HeartbeatManager" src/
   ```
 
+### Phase 2 Validation Gate
+
+```bash
+# No proceeding until these ALL work:
+ckdr && echo "✓ Quality checks pass" || echo "✗ FIX CODE QUALITY FIRST"
+pt tests/test_worker.py tests/test_integration_phase2.py && echo "✓ Worker tests pass" || echo "✗ FIX IMPLEMENTATION"
+pt && echo "✓ All tests pass" || echo "✗ FIX ALL FAILURES"
+```
+
+If any check shows ✗:
+1. STOP
+2. Read the error carefully
+3. Fix the implementation (not the test)
+4. Run all checks again
+5. Only proceed when all show ✓
+
 ## Common Mistakes to Avoid
 
 1. **DO NOT** implement actual Supabase uploads yet - just queue them
@@ -1033,6 +1818,28 @@ Before proceeding to Phase 3:
 3. **DO NOT** create separate sync services - embed in worker
 4. **DO NOT** add configuration files - use constructor parameters
 5. **DO NOT** implement distributed locking - single worker per job
+
+### ⚠️ Test Anti-Patterns to AVOID
+
+❌ **DO NOT weaken tests to pass:**
+```python
+# WRONG - Don't remove assertions
+# assert worker.sync_thread.is_alive()  # Commented out because failing
+```
+
+❌ **DO NOT add sleeps to fix race conditions:**
+```python
+# WRONG - Fix the synchronization properly
+time.sleep(10)  # Added to make test pass
+```
+
+❌ **DO NOT mock away the functionality being tested:**
+```python
+# WRONG - Test the real implementation
+@patch('dr_exp.worker.base.Worker.run_job', return_value="success")
+```
+
+✅ **DO write tests that verify actual behavior**
 
 ## Architecture Notes
 
@@ -1047,8 +1854,8 @@ The key design decisions:
 
 ### Worker Failures
 - Jobs automatically recover after 5 minutes (default 300s heartbeat timeout)
-- Run `dr_exp recover` periodically (e.g., in cron) to reset stale jobs
-- Workers can be killed safely - jobs will return to queue
+- The launcher periodically calls recover_stale_jobs (every 10 minutes)
+- Workers can be killed safely - launcher will restart them if jobs are pending
 
 ### Priority Management
 - **Normal jobs**: 100-399 (default: 100)
@@ -1080,21 +1887,139 @@ dr_exp --base-path /scratch/exp --experiment my_exp boost job1 job2 job3 --prior
 ```
 
 ### Monitoring Health
-- Check for stale heartbeats: jobs running > 10 minutes with old heartbeat
+- Check launcher logs for worker status updates (every 5 minutes)
 - Monitor sync_queue size: large backlog indicates sync issues
 - Watch for repeated failures: same job failing multiple times
 
 ### Running at Scale
+
+#### Local Testing (Manual Workers)
 ```bash
 # Start multiple workers per node (e.g., 2 per GPU)
 for i in {0..3}; do
     dr_exp --base-path /scratch/exp --experiment my_exp worker \
         --worker-id node1_gpu${i/2}_worker${i} &
 done
-
-# Cron job for automatic recovery
-*/5 * * * * dr_exp --base-path /scratch/exp --experiment my_exp recover
 ```
+
+#### Production (Use Launcher)
+```bash
+# Start launcher which spawns all workers automatically
+dr_exp --base-path /scratch/exp --experiment my_exp launcher \
+    --workers-per-gpu 2 \
+    --max-hours 47
+```
+
+## SLURM Integration
+
+### Basic SLURM Script
+
+Create `launcher.sbatch`:
+
+```bash
+#!/bin/bash
+#SBATCH --job-name=dr_exp_launcher
+#SBATCH --output=/scratch/%u/logs/slurm/%x_%j.out
+#SBATCH --error=/scratch/%u/logs/slurm/%x_%j.err
+#SBATCH --time=47:00:00
+#SBATCH --gres=gpu:rtx8000:2
+#SBATCH --mem=80G
+#SBATCH --cpus-per-task=12
+
+set -euo pipefail
+
+# Configuration
+EXPERIMENT_NAME="${EXPERIMENT_NAME:-my_experiment}"
+WORKERS_PER_GPU="${WORKERS_PER_GPU:-2}"
+BASE_PATH="/scratch/${USER}/experiments"
+
+# Setup CUDA MPS
+export CUDA_MPS_PIPE_DIRECTORY="/tmp/nvidia-mps-${SLURM_JOB_ID}"
+export CUDA_MPS_LOG_DIRECTORY="/tmp/nvidia-log-${SLURM_JOB_ID}"
+mkdir -p "$CUDA_MPS_PIPE_DIRECTORY" "$CUDA_MPS_LOG_DIRECTORY"
+
+cleanup_mps() {
+    echo quit | nvidia-cuda-mps-control || true
+    rm -rf "$CUDA_MPS_PIPE_DIRECTORY" "$CUDA_MPS_LOG_DIRECTORY"
+}
+trap cleanup_mps EXIT
+
+# Start MPS
+nvidia-cuda-mps-control -d
+
+# Activate environment (adjust as needed)
+source /path/to/venv/bin/activate
+
+# Run launcher
+dr_exp --base-path "$BASE_PATH" --experiment "$EXPERIMENT_NAME" launcher \
+    --workers-per-gpu "$WORKERS_PER_GPU" \
+    --max-hours 46.5  # Leave buffer for cleanup
+```
+
+### Advanced SLURM Script (Multiple GPU Configurations)
+
+For flexibility with 1-3 GPUs:
+
+```bash
+#!/bin/bash
+#SBATCH --job-name=dr_exp_launcher
+#SBATCH --output=/scratch/%u/logs/slurm/%x_%j.out
+#SBATCH --error=/scratch/%u/logs/slurm/%x_%j.err
+#SBATCH --time=47:00:00
+#SBATCH --mem=80G
+#SBATCH --cpus-per-task=12
+
+# GPU configuration passed as argument
+# Usage: sbatch launcher.sbatch 2  # for 2 GPUs
+GPU_COUNT="${1:-2}"
+
+#SBATCH --gres=gpu:rtx8000:${GPU_COUNT}
+
+# Rest of script as above...
+```
+
+### Submitting Jobs
+
+```bash
+# Submit with 2 GPUs
+sbatch launcher.sbatch
+
+# Submit with different GPU counts
+sbatch --export=EXPERIMENT_NAME=resnet_sweep,WORKERS_PER_GPU=3 launcher.sbatch
+
+# Submit multiple experiments
+for exp in exp1 exp2 exp3; do
+    sbatch --export=EXPERIMENT_NAME=$exp launcher.sbatch
+done
+```
+
+### Monitoring SLURM Jobs
+
+```bash
+# Check job status
+squeue -u $USER
+
+# View launcher output
+tail -f /scratch/$USER/logs/slurm/dr_exp_launcher_*.out
+
+# Check GPU utilization
+ssh <node> nvidia-smi
+```
+
+### Key Design Decisions for SLURM
+
+1. **Single Launcher Process**: One SLURM job spawns all workers internally
+2. **MPS Enabled**: Better GPU sharing for multiple workers
+3. **Long Runtime**: 47 hours to maximize GPU allocation usage
+4. **Auto Recovery**: Launcher handles all worker restarts and job recovery
+5. **Graceful Shutdown**: Clean stop before SLURM time limit
+
+### Best Practices
+
+1. **Submit Jobs Anytime**: With launcher running, new jobs start immediately
+2. **Monitor via Logs**: Launcher logs status every 5 minutes
+3. **Let It Run**: Don't manually manage workers - launcher handles everything
+4. **Plan Experiments**: Submit all configs early to maximize GPU time
 
 ## Next Phase
 

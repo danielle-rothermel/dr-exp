@@ -306,3 +306,90 @@ python cleanup_experiments.py /scratch/users/jane/experiments
 - ✅ Easy to understand and modify
 
 The new system is intentionally simple. Resist the urge to add complexity!
+
+## Engineering Principles Enforcement
+
+### Why Tests Fail
+Tests fail for good reasons:
+1. **Implementation doesn't match specification**
+2. **Type safety is violated**  
+3. **Code quality standards not met**
+4. **Integration assumptions broken**
+
+### How to Fix Failures
+
+#### Type Errors (mypy)
+```bash
+# BAD: Weakening types
+def process(data: Any) -> Any:  # Don't do this!
+
+# GOOD: Proper types
+def process(data: dict[str, Job]) -> JobResult:
+```
+
+#### Test Failures
+```python
+# BAD: Changing test to pass
+assert result == 5  # Changed from 10 to match buggy code
+
+# GOOD: Fix the bug
+# If test expects 10, make code return 10
+```
+
+#### Lint Issues (ruff)
+```python
+# BAD: Disabling rule
+import os  # noqa: F401
+
+# GOOD: Remove unused import
+# Just delete the line
+```
+
+### The Golden Rule
+**Tests and linters are the specification.** Your code must meet their requirements, not the other way around.
+
+### ⚠️ COMMON MISTAKE ALERT
+Agents often see "KeyError: 'priority'" and add:
+```python
+# WRONG APPROACH
+if 'priority' in job_data:
+    priority = job_data['priority']
+else:
+    priority = 0  # BAD: Hiding the problem
+```
+
+The CORRECT approach:
+```python
+# RIGHT APPROACH
+# First, understand WHY 'priority' is missing
+# Then ensure it's ALWAYS present at job creation
+assert 'priority' in job_data, "Jobs must have priority"
+priority = job_data['priority']
+```
+
+### Development Workflow for Every Change
+
+1. **Make code changes**
+2. **Run quality checks**: `ckdr`
+   - If fails: Fix code issues, don't disable checks
+3. **Run tests**: `pt`
+   - If fails: Fix implementation, don't modify tests
+4. **Verify specific component**: `pt tests/test_<component>.py -v`
+5. **Only proceed when ALL checks pass**
+
+### Quality Gates at Each Phase
+
+Every phase includes validation gates that MUST pass:
+
+```bash
+# No proceeding until these ALL work:
+ckdr && echo "✓ Quality checks pass" || echo "✗ FIX CODE QUALITY FIRST"
+pt && echo "✓ All tests pass" || echo "✗ FIX ALL FAILURES"
+```
+
+If any check shows ✗:
+1. STOP
+2. Read the error carefully
+3. Fix the implementation (not the test)
+4. Run all checks again
+5. Only proceed when all show ✓

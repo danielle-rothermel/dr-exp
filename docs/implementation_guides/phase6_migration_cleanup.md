@@ -502,84 +502,217 @@ if __name__ == "__main__":
     main()
 ```
 
-## Step 4: Test Cleanup Tools
+## Step 4: Create Pytest Tests
 
-Create `test_cleanup_tools.py`:
+Create `tests/test_cleanup_tools.py`:
 
 ```python
-#!/usr/bin/env python3
-"""Test cleanup tools."""
+"""Test cleanup tools.
 
-import tempfile
+⚠️ These tests verify storage management functionality.
+If they fail, the cleanup tools have bugs.
+DO NOT modify tests - fix the implementation.
+"""
+
 import time
+import os
 from pathlib import Path
+import pytest
 
 from dr_exp.core.job_db import JobDB
 from dr_exp.tools.storage_scanner import StorageScanner
-from dr_exp.worker.training_worker import TrainingWorker
+from dr_exp.tools.cleanup import InteractiveCleaner
 
 
-def test_cleanup_tools():
-    """Test storage scanner and cleanup tools."""
-    print("Testing cleanup tools...")
+@pytest.fixture
+def cleanup_test_env(tmp_path):
+    """Create test environment with multiple experiments."""
+    base_path = tmp_path / "experiments"
+    base_path.mkdir()
     
-    with tempfile.TemporaryDirectory() as tmpdir:
-        base_path = Path(tmpdir) / "experiments"
+    # Create multiple test experiments
+    experiments = ["exp_old", "exp_recent", "exp_active"]
+    
+    for i, exp_name in enumerate(experiments):
+        db = JobDB(base_path=str(base_path), experiment_name=exp_name)
         
-        # Create multiple test experiments
-        experiments = ["exp_old", "exp_recent", "exp_active"]
-        
-        for i, exp_name in enumerate(experiments):
-            db = JobDB(base_path=str(base_path), experiment_name=exp_name)
+        # Create and run some jobs
+        for j in range(2):
+            job_id = db.create_job({
+                "_target_": "test.train",
+                "model": f"model_{j}"
+            }, priority=100)
             
-            # Create and run some jobs
-            for j in range(2):
-                job_id = db.create_job({"model": f"model_{j}"}, priority=100)
-                
-                # Create some fake outputs
-                storage_path = db.get_storage_path(job_id)
-                (storage_path / "metrics.jsonl").write_text('{"loss": 0.5}\n' * 10)
-                (storage_path / "model.pt").write_text("fake model data" * 1000)
-                (storage_path / "training.log").write_text("training log\n" * 100)
-                
-                # Update job status
-                if exp_name != "exp_active":  # Keep active exp with running jobs
-                    db.update_job(job_id, {"status": "completed"})
+            # Create some fake outputs
+            storage_path = db.get_storage_path(job_id)
+            (storage_path / "metrics.jsonl").write_text('{"loss": 0.5}\n' * 10)
+            (storage_path / "model.pt").write_text("fake model data" * 1000)
+            (storage_path / "training.log").write_text("training log\n" * 100)
             
-            # Make exp_old appear older
-            if exp_name == "exp_old":
-                old_time = time.time() - (10 * 86400)  # 10 days ago
-                for file in Path(db.experiment_path).rglob("*"):
-                    if file.is_file():
-                        os.utime(file, (old_time, old_time))
+            # Update job status
+            if exp_name != "exp_active":  # Keep active exp with running jobs
+                db.update_job(job_id, {"status": "completed"})
         
-        # Test scanner
-        print("\nTesting storage scanner...")
-        scanner = StorageScanner(str(base_path))
-        results = scanner.scan_all_experiments()
-        scanner.print_summary(results)
-        
-        assert len(results) == 3
-        for exp_name in experiments:
-            assert exp_name in results
-            assert results[exp_name]['job_count'] == 2
-            assert results[exp_name]['total_size'] > 0
-        
-        print("\n✅ Storage scanner test passed!")
-        
-        # Test cleanup in dry-run mode
-        print("\nTesting cleanup tool (dry-run)...")
-        from dr_exp.tools.cleanup import InteractiveCleaner
-        
-        cleaner = InteractiveCleaner(str(base_path), dry_run=True)
-        # Just verify it initializes correctly
-        assert cleaner.base_path == base_path
-        
-        print("✅ Cleanup tool test passed!")
+        # Make exp_old appear older
+        if exp_name == "exp_old":
+            old_time = time.time() - (10 * 86400)  # 10 days ago
+            for file in Path(db.experiment_path).rglob("*"):
+                if file.is_file():
+                    os.utime(file, (old_time, old_time))
+    
+    return base_path, experiments
 
 
-if __name__ == "__main__":
-    test_cleanup_tools()
+def test_storage_scanner(cleanup_test_env):
+    """Test storage scanner functionality."""
+    base_path, experiments = cleanup_test_env
+    
+    scanner = StorageScanner(str(base_path))
+    results = scanner.scan_all_experiments()
+    
+    # Verify all experiments found
+    assert len(results) == 3
+    for exp_name in experiments:
+        assert exp_name in results
+        assert results[exp_name]['job_count'] == 2
+        assert results[exp_name]['total_size'] > 0
+
+
+def test_storage_scanner_size_calculation(cleanup_test_env):
+    """Test accurate size calculation."""
+    base_path, _ = cleanup_test_env
+    
+    scanner = StorageScanner(str(base_path))
+    results = scanner.scan_all_experiments()
+    
+    # Each experiment should have predictable size
+    for exp_name, info in results.items():
+        # We created specific files with known sizes
+        assert info['total_size'] > 1000  # At least 1KB
+        assert 'metrics' in info['by_category']
+        assert 'models' in info['by_category']
+        assert 'logs' in info['by_category']
+
+
+def test_cleanup_dry_run(cleanup_test_env):
+    """Test cleanup in dry-run mode."""
+    base_path, experiments = cleanup_test_env
+    
+    cleaner = InteractiveCleaner(str(base_path), dry_run=True)
+    
+    # Get experiments older than 5 days
+    old_experiments = cleaner.get_experiments_older_than(5)
+    
+    # Should find exp_old (10 days old)
+    exp_names = [exp['name'] for exp in old_experiments]
+    assert "exp_old" in exp_names
+    assert "exp_recent" not in exp_names
+    assert "exp_active" not in exp_names
+
+
+def test_cleanup_completed_jobs(cleanup_test_env):
+    """Test cleaning completed jobs."""
+    base_path, _ = cleanup_test_env
+    
+    cleaner = InteractiveCleaner(str(base_path), dry_run=True)
+    
+    # Test finding completed experiments
+    completed = cleaner.get_completed_experiments()
+    
+    # exp_old and exp_recent have all completed jobs
+    exp_names = [exp['name'] for exp in completed]
+    assert "exp_old" in exp_names
+    assert "exp_recent" in exp_names
+    assert "exp_active" not in exp_names  # Has running jobs
+
+
+@pytest.mark.parametrize("days,expected_count", [
+    (15, 0),  # Nothing older than 15 days
+    (5, 1),   # Only exp_old
+    (0, 3),   # All experiments
+])
+def test_age_based_filtering(cleanup_test_env, days, expected_count):
+    """Test filtering experiments by age."""
+    base_path, _ = cleanup_test_env
+    
+    cleaner = InteractiveCleaner(str(base_path), dry_run=True)
+    old_experiments = cleaner.get_experiments_older_than(days)
+    
+    assert len(old_experiments) == expected_count
+
+
+def test_migration_dry_run(tmp_path):
+    """Test migration tool in dry-run mode.
+    
+    ⚠️ This test verifies migration logic.
+    Migration must preserve all job data.
+    """
+    # Create old-style experiment structure
+    old_path = tmp_path / "old_experiment"
+    old_jobs_dir = old_path / "job_data"
+    old_jobs_dir.mkdir(parents=True)
+    
+    # Create some old job files
+    for i in range(3):
+        job_data = {
+            "id": f"job_{i}",
+            "config": {"model": f"model_{i}"},
+            "priority": 100 + i * 100,
+            "status": "completed"
+        }
+        with open(old_jobs_dir / f"job_{i}.json", "w") as f:
+            json.dump(job_data, f)
+    
+    # Test migration
+    from dr_exp.tools.migrate import migrate_old_experiment
+    
+    new_base = tmp_path / "new_experiments"
+    new_base.mkdir()
+    
+    # Dry run first
+    migrate_old_experiment(
+        str(old_path),
+        str(new_base),
+        "migrated_exp",
+        dry_run=True
+    )
+    
+    # Should not create anything in dry run
+    assert not (new_base / "migrated_exp").exists()
+        
+```
+
+## Step 5: Run Tests with Quality Gates
+
+### Validation Gate
+Run these commands and fix ALL issues before proceeding:
+
+```bash
+# 1. Code quality check
+ckdr
+# Expected: "All checks passed!"
+# If fails: Fix the code, not the rules
+
+# 2. Run all tests
+pt
+# Expected: All tests pass, no skips
+# If fails: Fix implementation, not tests
+
+# 3. Run cleanup tests specifically
+pt tests/test_cleanup_tools.py -v
+# Expected: All cleanup tests pass
+```
+
+⚠️ **CRITICAL**: If any check fails:
+1. Read the FULL error message
+2. Understand what the test/check expects
+3. Fix YOUR CODE to meet expectations
+4. Do NOT modify tests/rules to pass
+
+Common fixes:
+- Import errors → Ensure cleanup modules properly imported
+- Type errors → Add proper type hints to cleanup methods
+- Test failures → Cleanup implementation doesn't match spec
 ```
 
 ## Usage Examples
@@ -625,6 +758,10 @@ python cleanup_experiments.py /scratch/users/jane/experiments --dry-run
 
 ## Final Validation Checklist
 
+- [ ] **ALL quality checks pass**: `ckdr` shows "All checks passed!"
+- [ ] **ALL tests pass**: `pt` shows all tests passing
+- [ ] Test coverage is adequate: `pt --cov=dr_exp.tools`
+- [ ] Cleanup tests pass: `pt tests/test_cleanup_tools.py -v`
 - [ ] Storage scanner correctly identifies all experiments
 - [ ] Size calculations are accurate
 - [ ] Interactive cleaner shows correct options
@@ -633,6 +770,56 @@ python cleanup_experiments.py /scratch/users/jane/experiments --dry-run
 - [ ] Old experiment detection works (by date)
 - [ ] Completed experiment detection works
 - [ ] Pending sync warnings are shown
+
+### Phase 6 Validation Gate
+
+```bash
+# No proceeding until these ALL work:
+ckdr && echo "✓ Quality checks pass" || echo "✗ FIX CODE QUALITY FIRST"
+pt tests/test_cleanup_tools.py && echo "✓ Cleanup tests pass" || echo "✗ FIX IMPLEMENTATION"
+pt && echo "✓ All tests pass" || echo "✗ FIX ALL FAILURES"
+```
+
+If any check shows ✗:
+1. STOP
+2. Read the error carefully
+3. Fix the implementation (not the test)
+4. Run all checks again
+5. Only proceed when all show ✓
+
+## Common Test Anti-Patterns
+
+### ⚠️ DO NOT Test Actual Deletions
+
+❌ **WRONG - Don't delete real files in tests:**
+```python
+# This could delete important data!
+cleaner = InteractiveCleaner("/real/path", dry_run=False)
+cleaner.delete_experiment("important_exp")
+```
+
+✅ **RIGHT - Always use temp directories:**
+```python
+def test_deletion(tmp_path):
+    cleaner = InteractiveCleaner(str(tmp_path), dry_run=False)
+    # Safe to delete in tmp_path
+```
+
+### ⚠️ DO NOT Skip Dry-Run Testing
+
+❌ **WRONG - Only testing actual operations:**
+```python
+def test_cleanup():
+    cleaner.delete_old_experiments()  # Dangerous!
+```
+
+✅ **RIGHT - Test dry-run first:**
+```python
+def test_cleanup_dry_run():
+    cleaner = InteractiveCleaner(path, dry_run=True)
+    to_delete = cleaner.get_old_experiments()
+    # Verify what would be deleted
+```
 
 ## Architecture Notes
 
