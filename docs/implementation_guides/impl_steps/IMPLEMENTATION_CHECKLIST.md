@@ -63,10 +63,10 @@ Use this checklist to track progress through the implementation steps.
   - [x] Tests pass: `pt tests/implementation/test_step_2_5.py -v`
   - [x] Code quality passes: `ckdr`
   
-- [ ] Step 2.6: Training Integration
-  - [ ] Training integration complete
-  - [ ] Tests pass: `pt tests/implementation/test_step_2_6.py -v`
-  - [ ] Code quality passes: `ckdr`
+- [x] Step 2.6: Training Integration
+  - [x] Training integration complete
+  - [x] Tests pass: `pt tests/implementation/test_step_2_6.py -v`
+  - [x] Code quality passes: `ckdr`
   
 - [ ] Step 2.7: Multi-Worker Launcher
   - [ ] Launcher implemented

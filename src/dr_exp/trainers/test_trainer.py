@@ -5,6 +5,8 @@ import random
 from pathlib import Path
 from typing import Dict, Any
 
+from ..logging.structured_logger import StructuredLogger
+
 
 def train(
     job_id: str,
@@ -27,50 +29,62 @@ def train(
     Returns:
         Dict with training results
     """
+    # Initialize structured logger
+    logger = StructuredLogger(storage_path, job_id, worker_id)
+
+    # Log configuration
+    config = {"epochs": epochs, "fail_rate": fail_rate, **kwargs}
+    logger.log_config(config)
+
     print(f"Test trainer started: job_id={job_id}, epochs={epochs}")
 
     # Simulate failure if requested
     if fail_rate > 0 and random.random() < fail_rate:
+        logger.log_event("training_failed", {"reason": "simulated_failure"})
         raise RuntimeError("Simulated training failure")
 
     # Create storage directory
     storage = Path(storage_path)
     storage.mkdir(parents=True, exist_ok=True)
 
+    # Start training
+    logger.log_event("training_start")
+
     # Simulate training with metrics
-    metrics = []
     for epoch in range(epochs):
         loss = 1.0 / (epoch + 1) + random.random() * 0.1
         accuracy = min(0.99, epoch / epochs + random.random() * 0.1)
 
-        metrics.append({"epoch": epoch, "loss": loss, "accuracy": accuracy})
+        # Log metrics using structured logger
+        metrics = {"epoch": epoch, "loss": loss, "accuracy": accuracy}
+        logger.log_metrics(metrics, step=epoch)
 
         # Simulate computation time
         time.sleep(0.01)
 
-        # Save metrics to file
-        metrics_file = storage / "metrics.jsonl"
-        with open(metrics_file, "a") as f:
-            import json
-
-            f.write(json.dumps(metrics[-1]) + "\n")
-
     # Save final model (dummy file)
     model_file = storage / "model_final.pt"
     model_file.write_text(f"Dummy model for job {job_id}")
+    logger.log_artifact(model_file, "model", {"job_id": job_id})
 
-    # Return final metrics
-    final_metrics = {
-        "final_loss": metrics[-1]["loss"],
-        "final_accuracy": metrics[-1]["accuracy"],
-        "total_epochs": epochs,
-    }
+    logger.log_event("training_complete")
+
+    # Get summary from logger
+    summary = logger.get_summary()
+    final_metrics = summary["final_metrics"]
 
     print(
-        f"Test trainer completed: final_accuracy={final_metrics['final_accuracy']:.3f}"
+        f"Test trainer completed: final_accuracy={final_metrics.get('accuracy', 0):.3f}"
     )
 
     return {
-        "metrics": final_metrics,
-        "artifacts": {"metrics_file": str(metrics_file), "model_file": str(model_file)},
+        "metrics": {
+            "final_loss": final_metrics.get("loss"),
+            "final_accuracy": final_metrics.get("accuracy"),
+            "total_epochs": epochs,
+        },
+        "artifacts": {
+            "metrics_file": str(logger.metrics_file),
+            "model_file": str(model_file),
+        },
     }

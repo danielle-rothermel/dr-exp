@@ -6,7 +6,7 @@ import threading
 import traceback
 from pathlib import Path
 from typing import Dict, Any, Optional, Callable
-from datetime import datetime
+from datetime import datetime, UTC
 
 import hydra
 from omegaconf import OmegaConf
@@ -215,6 +215,14 @@ class Worker:
                         ".pth",
                     ]:
                         file_type = "model"
+                    elif file_path.name in [
+                        "events.jsonl",
+                        "config.json",
+                        "metadata.json",
+                    ]:
+                        file_type = "logs"
+                    elif file_path.suffix == ".log" or "log" in file_path.name:
+                        file_type = "logs"
                     else:
                         file_type = "other"
 
@@ -226,7 +234,7 @@ class Worker:
             return {
                 "status": "success",
                 "result": result,
-                "completed_at": datetime.utcnow().isoformat(),
+                "completed_at": datetime.now(UTC).isoformat(),
             }
 
         except Exception as e:
@@ -246,7 +254,7 @@ class Worker:
                 "status": "failed",
                 "error": error_msg,
                 "traceback": tb,
-                "completed_at": datetime.utcnow().isoformat(),
+                "completed_at": datetime.now(UTC).isoformat(),
             }
 
         finally:
