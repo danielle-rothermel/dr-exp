@@ -31,11 +31,11 @@ Use this checklist to track progress through the implementation steps.
   - [x] Tests pass: `pt tests/implementation/test_step_1_3.py -v`
   - [x] Code quality passes: `ckdr`
   
-- [ ] Step 1.4: Operational Features
-  - [ ] All operational methods added
-  - [ ] Tests pass: `pt tests/implementation/test_step_1_4.py -v`
-  - [ ] Code quality passes: `ckdr`
-  - [ ] **Phase 1 Complete**: Can run `pt tests/implementation/test_step_1_*.py -v`
+- [x] Step 1.4: Operational Features
+  - [x] All operational methods added
+  - [x] Tests pass: `pt tests/implementation/test_step_1_4.py -v`
+  - [x] Code quality passes: `ckdr`
+  - [x] **Phase 1 Complete**: Can run `pt tests/implementation/test_step_1_*.py -v`
 
 ## Phase 2: Worker System
 - [ ] Step 2.1: Basic Worker Class

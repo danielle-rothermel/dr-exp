@@ -433,3 +433,83 @@ class JobDB:
                 (j.get("created_at") for j in jobs if j.get("created_at")), default=None
             ),
         }
+
+    def mark_job_failed(self, job_id: str, reason: str) -> bool:
+        """Mark a running job as failed (kill it).
+
+        Args:
+            job_id: Job identifier
+            reason: Reason for marking as failed
+
+        Returns:
+            True if job was marked failed, False if not found or not running
+        """
+        job = self.get_job(job_id)
+        if job and job["status"] == "running":
+            return self.update_job(
+                job_id,
+                {
+                    "status": "failed",
+                    "error": f"Killed: {reason}",
+                    "completed_at": datetime.now(UTC).isoformat(),
+                },
+            )
+        return False
+
+    def recover_stale_jobs(self, heartbeat_timeout: int = 300) -> List[str]:
+        """Reset jobs with stale heartbeats back to queued.
+
+        Args:
+            heartbeat_timeout: Seconds before considering heartbeat stale
+
+        Returns:
+            List of recovered job IDs
+        """
+        from datetime import timedelta
+
+        cutoff = datetime.now(UTC) - timedelta(seconds=heartbeat_timeout)
+        recovered = []
+
+        for job_file in self.jobs_dir.glob("*.json"):
+            with open(job_file, "r") as f:
+                job = json.load(f)
+
+            if job["status"] == "running":
+                heartbeat = job.get("last_heartbeat")
+                if not heartbeat or datetime.fromisoformat(heartbeat) < cutoff:
+                    # Reset to queued
+                    self.update_job(
+                        job["id"],
+                        {
+                            "status": "queued",
+                            "worker_id": None,
+                            "started_at": None,
+                            "last_heartbeat": None,
+                            "error": "Worker died - job reset to queue",
+                        },
+                    )
+                    recovered.append(job["id"])
+
+        return recovered
+
+    def boost_priority(self, job_ids: List[str], new_priority: int) -> int:
+        """Boost priority of multiple jobs.
+
+        Args:
+            job_ids: List of job IDs to boost
+            new_priority: New priority value (0-1000)
+
+        Returns:
+            Number of jobs updated
+        """
+        assert 0 <= new_priority <= 1000, f"Priority must be 0-1000, got {new_priority}"
+
+        updated = 0
+        for job_id in job_ids:
+            job = self.get_job(job_id)
+            if job and job["status"] == "queued":
+                self.update_job(job_id, {"priority": new_priority})
+                updated += 1
+                logger.info(f"Boosted job {job_id} to priority {new_priority}")
+
+        return updated
