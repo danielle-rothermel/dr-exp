@@ -2,6 +2,7 @@
 
 import fcntl
 import json
+import time
 import uuid
 import logging
 from datetime import datetime, UTC
@@ -277,3 +278,158 @@ class JobDB:
 
         except Exception:
             return False
+
+    def complete_job(
+        self, job_id: str, metrics: Optional[Dict[str, Any]] = None
+    ) -> bool:
+        """Mark a job as completed successfully.
+
+        Args:
+            job_id: Job to complete
+            metrics: Optional final metrics to store
+
+        Returns:
+            True if updated, False if job not found
+        """
+        updates: Dict[str, Any] = {
+            "status": "completed",
+            "completed_at": datetime.now(UTC).isoformat(),
+            "error": None,
+        }
+        if metrics:
+            updates["final_metrics"] = metrics
+
+        return self.update_job(job_id, updates)
+
+    def fail_job(self, job_id: str, error: str) -> bool:
+        """Mark a job as failed.
+
+        Args:
+            job_id: Job to fail
+            error: Error message
+
+        Returns:
+            True if updated, False if job not found
+        """
+        updates = {
+            "status": "failed",
+            "completed_at": datetime.now(UTC).isoformat(),
+            "error": error,
+        }
+
+        return self.update_job(job_id, updates)
+
+    def heartbeat(self, job_id: str) -> bool:
+        """Update job heartbeat timestamp.
+
+        Workers should call this periodically to indicate they're alive.
+
+        Args:
+            job_id: Job to heartbeat
+
+        Returns:
+            True if updated, False if job not found
+        """
+        updates = {"last_heartbeat": datetime.now(UTC).isoformat()}
+
+        return self.update_job(job_id, updates)
+
+    def list_jobs(self, status: Optional[str] = None) -> List[Dict[str, Any]]:
+        """List all jobs, optionally filtered by status.
+
+        Args:
+            status: Optional status filter (queued, running, completed, failed)
+
+        Returns:
+            List of job data dicts
+        """
+        jobs = []
+
+        for job_file in self.jobs_dir.glob("*.json"):
+            try:
+                with open(job_file, "r") as f:
+                    job_data = json.load(f)
+
+                    if status is None or job_data.get("status") == status:
+                        jobs.append(job_data)
+
+            except (json.JSONDecodeError, IOError):
+                # Skip corrupted files
+                continue
+
+        # Sort by creation time
+        jobs.sort(key=lambda x: x.get("created_at", ""))
+        return jobs
+
+    def get_sync_queue_path(self) -> Path:
+        """Get path to sync queue directory.
+
+        Returns:
+            Path to sync queue directory
+        """
+        return self.sync_queue_dir
+
+    def add_to_sync_queue(
+        self,
+        job_id: str,
+        file_path: str,
+        file_type: str,
+        metadata: Optional[Dict[str, Any]] = None,
+    ) -> str:
+        """Add a file to the sync queue.
+
+        Args:
+            job_id: Job that created this file
+            file_path: Path to file to sync
+            file_type: Type of file (metrics, logs, model, etc.)
+            metadata: Optional metadata about the file
+
+        Returns:
+            Sync item ID
+        """
+        sync_id = str(uuid.uuid4())
+        sync_item = {
+            "id": sync_id,
+            "job_id": job_id,
+            "file_path": file_path,
+            "file_type": file_type,
+            "metadata": metadata or {},
+            "created_at": datetime.now(UTC).isoformat(),
+            "status": "pending",
+            "attempts": 0,
+            "error": None,
+        }
+
+        # Write to sync queue with timestamp prefix for ordering
+        timestamp = int(time.time() * 1000000)  # Microseconds
+        sync_file = self.sync_queue_dir / f"{timestamp}_{sync_id}.json"
+
+        with open(sync_file, "w") as f:
+            json.dump(sync_item, f, indent=2)
+
+        return sync_id
+
+    def get_experiment_info(self) -> Dict[str, Any]:
+        """Get information about this experiment.
+
+        Returns:
+            Dict with experiment metadata
+        """
+        jobs = self.list_jobs()
+
+        # Count by status
+        status_counts: Dict[str, int] = {}
+        for job in jobs:
+            status = job.get("status", "unknown")
+            status_counts[status] = status_counts.get(status, 0) + 1
+
+        return {
+            "experiment_name": self.experiment_name,
+            "base_path": str(self.base_path),
+            "experiment_path": str(self.experiment_path),
+            "total_jobs": len(jobs),
+            "status_counts": status_counts,
+            "created_at": min(
+                (j.get("created_at") for j in jobs if j.get("created_at")), default=None
+            ),
+        }
