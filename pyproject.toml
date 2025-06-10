@@ -46,9 +46,6 @@ dev = [
     "types-pyyaml>=6.0.12.20250516",
 ]
 
-[tool.uv.sources]
-deconcnn = { git = "https://github.com/drothermel/deconCNN" }
-
 [tool.ruff]
 include = ["src/**/*.py", "scripts/**/*.py", "tests/**/*.py"]
 
@@ -106,3 +103,6 @@ addopts = [
 # Asyncio configuration
 asyncio_mode = "auto"
 asyncio_default_fixture_loop_scope = "function"
+
+[tool.uv.sources]
+deconcnn = { git = "https://github.com/drothermel/deconCNN" }
