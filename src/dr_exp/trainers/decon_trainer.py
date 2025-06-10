@@ -1,36 +1,30 @@
 """DeconCNN integration for dr_exp."""
 
 from pathlib import Path
-from typing import Dict, Any, Optional
+from typing import Dict, Any
+import traceback
+from omegaconf import OmegaConf
 
 from ..logging.structured_logger import StructuredLogger
+
+# Import from deconCNN
+from deconcnn import factory
+from deconcnn.callbacks import DrExpMetricsCallback
 
 
 def train_classification(
     job_id: str,
     worker_id: str,
     storage_path: str,
-    model: Dict[str, Any],
-    optim: Dict[str, Any],
-    epochs: int = 100,
-    batch_size: int = 128,
-    data_path: Optional[str] = None,
-    **kwargs: Any,
+    **config: Any,
 ) -> Dict[str, Any]:
     """Train a classification model using deconCNN.
 
-    This is a wrapper that adapts deconCNN's training to dr_exp's interface.
-
     Args:
         job_id: Job ID (injected by worker)
         worker_id: Worker ID (injected by worker)
         storage_path: Path to store artifacts (injected by worker)
-        model: Model configuration
-        optim: Optimizer configuration
-        epochs: Number of epochs
-        batch_size: Batch size
-        data_path: Path to dataset
-        **kwargs: Additional training arguments
+        **config: All config parameters for deconCNN
 
     Returns:
         Dictionary with training results
@@ -38,158 +32,70 @@ def train_classification(
     # Initialize logger
     logger = StructuredLogger(storage_path, job_id, worker_id)
 
-    # Log configuration
-    config = {
-        "model": model,
-        "optim": optim,
-        "epochs": epochs,
-        "batch_size": batch_size,
-        "data_path": data_path,
-        **kwargs,
-    }
+    # Log full configuration
     logger.log_config(config)
 
     try:
-        # Import deconCNN components (would be real imports in production)
-        # from deconCNN.models import build_model
-        # from deconCNN.data import build_dataloader
-        # from deconCNN.trainer import Trainer
+        # Convert config to DictConfig for deconCNN
+        cfg = OmegaConf.create(config)
 
-        # For testing, we'll simulate the training
-        print(f"DeconCNN trainer starting for job {job_id}")
-        print(f"Model: {model}")
-        print(f"Optimizer: {optim}")
-        print(f"Epochs: {epochs}, Batch size: {batch_size}")
+        # Set default_root_dir to storage_path
+        trainer_config = cfg.get("trainer", {})
+        trainer_config["default_root_dir"] = storage_path
+        cfg["trainer"] = trainer_config
 
-        # Simulate training with metrics
-        logger.log_event("training_start")
+        # Create all deconCNN components using factory
+        model, data_module, trainer = factory.create_training_components(
+            cfg,
+            dataset_name=cfg.get("dataset", "cifar10"),
+            num_classes=cfg.get("num_classes", 10),
+        )
 
-        best_accuracy = 0.0
-        for epoch in range(epochs):
-            # Simulate epoch metrics
-            train_loss = 1.0 / (epoch + 1) + 0.1
-            train_acc = min(0.99, epoch / epochs + 0.05)
-            val_loss = train_loss + 0.05
-            val_acc = train_acc - 0.02
+        # Add our metrics callback to the trainer
+        metrics_callback = DrExpMetricsCallback(logger)
+        trainer.callbacks.append(metrics_callback)  # type: ignore[attr-defined]
 
-            # Log metrics
-            metrics = {
-                "epoch": epoch,
-                "train_loss": train_loss,
-                "train_accuracy": train_acc,
-                "val_loss": val_loss,
-                "val_accuracy": val_acc,
-                "learning_rate": optim.get("lr", 0.001) * (0.95**epoch),
-            }
-            logger.log_metrics(metrics, step=epoch)
+        # Train the model
+        trainer.fit(model, data_module)
 
-            # Track best
-            if val_acc > best_accuracy:
-                best_accuracy = val_acc
-                # Save checkpoint
-                checkpoint_path = Path(storage_path) / f"checkpoint_epoch_{epoch}.pt"
-                checkpoint_path.write_text(f"Mock checkpoint at epoch {epoch}")
-                logger.log_artifact(
-                    checkpoint_path, "checkpoint", {"epoch": epoch, "val_acc": val_acc}
-                )
-
-        # Save final model
-        model_path = Path(storage_path) / "model_final.pt"
-        model_path.write_text(f"Mock final model for {model}")
-        logger.log_artifact(model_path, "model", {"epochs_trained": epochs})
-
-        logger.log_event("training_complete")
-
-        # Get summary
+        # Get final metrics from logger summary
         summary = logger.get_summary()
+        final_metrics = summary.get("final_metrics", {})
+
+        # Find best checkpoint path
+        best_ckpt_path = None
+        if trainer.checkpoint_callback and hasattr(
+            trainer.checkpoint_callback, "best_model_path"
+        ):
+            best_ckpt_path = trainer.checkpoint_callback.best_model_path
+
+        # Build artifacts dict
+        artifacts = {
+            "metrics_path": str(logger.metrics_file),
+            "config_path": str(logger.config_file),
+            "events_path": str(logger.events_file),
+        }
+
+        if best_ckpt_path:
+            artifacts["best_checkpoint"] = str(best_ckpt_path)
+
+        # Add any model files in storage_path
+        for p in Path(storage_path).glob("*.ckpt"):
+            artifacts[f"checkpoint_{p.stem}"] = str(p)
 
         return {
-            "metrics": {
-                "final_train_loss": summary["final_metrics"].get("train_loss"),
-                "final_train_accuracy": summary["final_metrics"].get("train_accuracy"),
-                "final_val_loss": summary["final_metrics"].get("val_loss"),
-                "final_val_accuracy": summary["final_metrics"].get("val_accuracy"),
-                "best_val_accuracy": best_accuracy,
-                "total_epochs": epochs,
-            },
-            "artifacts": {
-                "model_path": str(model_path),
-                "metrics_path": str(logger.metrics_file),
-                "config_path": str(logger.config_file),
-            },
+            "metrics": final_metrics,
+            "artifacts": artifacts,
         }
 
     except Exception as e:
-        logger.log_event("training_failed", {"error": str(e)})
+        # Log the error
+        logger.log_event(
+            "training_failed", {"error": str(e), "traceback": traceback.format_exc()}
+        )
+
+        # Save error details
+        error_file = Path(storage_path) / "error.txt"
+        error_file.write_text(f"{type(e).__name__}: {e}\n\n{traceback.format_exc()}")
+
         raise
-
-
-def train_autoencoder(
-    job_id: str,
-    worker_id: str,
-    storage_path: str,
-    model: Dict[str, Any],
-    optim: Dict[str, Any],
-    epochs: int = 100,
-    batch_size: int = 128,
-    reconstruction_weight: float = 1.0,
-    **kwargs: Any,
-) -> Dict[str, Any]:
-    """Train an autoencoder model using deconCNN.
-
-    Args:
-        job_id: Job ID (injected by worker)
-        worker_id: Worker ID (injected by worker)
-        storage_path: Path to store artifacts (injected by worker)
-        model: Model configuration
-        optim: Optimizer configuration
-        epochs: Number of epochs
-        batch_size: Batch size
-        reconstruction_weight: Weight for reconstruction loss
-        **kwargs: Additional training arguments
-
-    Returns:
-        Dictionary with training results
-    """
-    # Initialize logger
-    logger = StructuredLogger(storage_path, job_id, worker_id)
-
-    # Log configuration
-    config = {
-        "model": model,
-        "optim": optim,
-        "epochs": epochs,
-        "batch_size": batch_size,
-        "reconstruction_weight": reconstruction_weight,
-        **kwargs,
-    }
-    logger.log_config(config)
-
-    # Similar training loop but for autoencoder
-    logger.log_event("training_start", {"model_type": "autoencoder"})
-
-    for epoch in range(min(epochs, 5)):  # Limit for testing
-        metrics = {
-            "epoch": epoch,
-            "reconstruction_loss": 0.5 / (epoch + 1),
-            "latent_loss": 0.1 / (epoch + 1),
-            "total_loss": 0.6 / (epoch + 1),
-        }
-        logger.log_metrics(metrics, step=epoch)
-
-    # Save model
-    model_path = Path(storage_path) / "autoencoder_final.pt"
-    model_path.write_text("Mock autoencoder model")
-    logger.log_artifact(model_path, "model")
-
-    logger.log_event("training_complete")
-
-    summary = logger.get_summary()
-
-    return {
-        "metrics": summary["final_metrics"],
-        "artifacts": {
-            "model_path": str(model_path),
-            "metrics_path": str(logger.metrics_file),
-        },
-    }
