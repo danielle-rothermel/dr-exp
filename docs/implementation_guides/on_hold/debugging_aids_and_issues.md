@@ -4,106 +4,23 @@ This document consolidates all debugging aids needed and potential issues identi
 
 ## Implementation Status Summary
 
-### ✅ Completed (3 items)
+### ✅ Completed (8 items)
 1. **Verbose Submission Output** - Added `--verbose` flag to submit command with detailed validation
 2. **Worker Debug Logging** - Added `--log-level` parameter to worker command with configurable logging levels
 3. **Config Validation Command** - Added `validate config` subcommand with detailed parameter analysis
+4. **Detailed Job Listing** - Added `--verbose` flag to list command with comprehensive job information
+5. **Debug Mode for Single Job** - Added `--debug` and `--output-dir` flags to run_one command
+6. **Sync Status Command** - Added `sync status` command to show queue state
+7. **Force Sync Command** - Added `sync force` command for manual sync trigger
+8. **Sync History Command** - Added `sync history` command to track sync operations
 
-### 🔲 Open (15+ debugging aids remaining)
-- Detailed job listing
-- Debug mode for single job
-- Sync status/monitoring commands
+### 🔲 Open (10+ debugging aids remaining)
 - Job recovery dry-run
 - SLURM health checks
 - Experiment management tools
 - And more...
 
 ## Debugging Aids Still Needed
-
-### 3. Job Monitoring
-
-#### Detailed Job Listing 🔲 OPEN
-**Status**: Not yet implemented
-**Need**: More information in job listings
-```bash
-dr_exp list --status queued --verbose
-```
-**Expected output**:
-```
-Job ID: job_abc123
-  Status: queued
-  Priority: 500
-  Created: 2024-01-15 10:30:00
-  Config: dr_exp.trainers.decon_trainer.train
-  Full path: /scratch/.../resnet_sweep/jobs/job_abc123.json
-  Estimated memory: 4.2 GB
-  
-Job ID: job_def456
-  Status: queued
-  Priority: 450
-  ...
-```
-
-### 4. Worker Execution
-
-#### Debug Mode for Single Job
-**Status**: Open - Not yet implemented
-**Need**: Preserve debug outputs
-```bash
-dr_exp run_one job_abc123 --debug --output-dir ./debug_run/
-```
-**Expected output**:
-```
-Running job_abc123 in debug mode...
-Output directory: ./debug_run/job_abc123/
-Importing: dr_exp.trainers.decon_trainer.train
-[Full training output with stack traces if errors]
-Debug artifacts saved to: ./debug_run/job_abc123/
-  - config.yaml (exact config used)
-  - stdout.log
-  - stderr.log
-  - metrics.jsonl
-  - error_trace.txt (if failed)
-```
-
-### 5. Sync Monitoring
-
-#### Sync Status Command 🔲 OPEN
-**Status**: Not yet implemented
-**Need**: Visibility into sync queue
-```bash
-dr_exp sync status
-```
-**Expected output**:
-```
-Sync queue: /scratch/.../sync_queue/
-Pending uploads: 3
-  - 1705331400_job_abc123.json (2.3 MB, 5 min old, attempts: 0)
-  - 1705331500_job_def456.json (1.8 MB, 3 min old, attempts: 2, last error: Network timeout)
-  - 1705331600_job_ghi789.json (3.1 MB, 1 min old, attempts: 0)
-Last successful sync: 2024-01-15 10:35:00
-Supabase connection: ✓ OK
-Upload bandwidth: 15.2 MB/s (last 5 min avg)
-```
-
-#### Force Sync Command
-**Need**: Manual sync trigger
-```bash
-dr_exp sync force --job-id job_abc123
-```
-
-#### Sync History
-**Need**: Track sync success/failure
-```bash
-dr_exp sync history --limit 20
-```
-**Expected output**:
-```
-Sync History (last 20):
-✓ job_abc123 - 2024-01-15 10:35:00 - 2.3 MB in 1.2s
-✗ job_def456 - 2024-01-15 10:34:00 - Failed: Connection timeout
-✓ job_xyz789 - 2024-01-15 10:33:00 - 1.8 MB in 0.9s
-```
 
 ### 6. Job Recovery
 

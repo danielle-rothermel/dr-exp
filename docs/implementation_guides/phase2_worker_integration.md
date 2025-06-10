@@ -891,9 +891,9 @@ Common fixes:
 
 ## Step 7.5: Debugging Features
 
-The CLI now includes two important debugging features to help troubleshoot job submission and worker execution:
+The CLI now includes debugging features to help troubleshoot job submission and worker execution. This step covers job monitoring and execution debugging. See Step 7.6 for sync monitoring features.
 
-### Verbose Job Submission
+### 1. Verbose Job Submission
 
 Use the `--verbose` flag with the submit command to see detailed validation output:
 
@@ -917,7 +917,7 @@ This helps catch configuration issues early by:
 - Showing exactly where the job file was written
 - Confirming the priority level
 
-### Worker Debug Logging
+### 2. Worker Debug Logging
 
 Use the `--log-level DEBUG` flag with the worker command to see detailed execution logs:
 
@@ -973,7 +973,7 @@ This is especially useful for:
 - Monitoring heartbeat operation
 - Performance profiling of job execution
 
-### Config Validation Command
+### 3. Config Validation Command
 
 Use the `validate config` subcommand to check configuration files before submission:
 
@@ -1044,6 +1044,522 @@ This is especially useful when:
 - Debugging configuration issues
 - Validating configs before batch submission
 - Ensuring configs work across different environments
+
+### 4. Enhanced Job Monitoring
+
+Use the `--verbose` flag with the list command to see detailed job information:
+
+```bash
+# Basic job listing
+dr_exp --base-path /scratch/exp --experiment my_exp list
+
+# Detailed job listing with verbose output
+dr_exp --base-path /scratch/exp --experiment my_exp list --verbose
+
+# Filter by status with detailed output
+dr_exp --base-path /scratch/exp --experiment my_exp list --status queued --verbose
+```
+
+Expected verbose output:
+```
+Job ID: job_abc123
+  Status: queued
+  Priority: 500
+  Created: 2024-01-15T10:30:00
+  Config: dr_exp.trainers.decon_trainer.train
+  Full path: /scratch/exp/my_exp/jobs/job_abc123.json
+  Estimated memory: 4.2 GB
+
+Job ID: job_def456
+  Status: running
+  Priority: 450
+  Created: 2024-01-15T10:25:00
+  Config: dr_exp.trainers.test_trainer.train_test
+  Full path: /scratch/exp/my_exp/jobs/job_def456.json
+  Worker: slurm123_gpu0_w1
+  Started: 2024-01-15T10:35:00
+  Runtime: 0:05:23
+  Estimated memory: 2.1 GB
+```
+
+The verbose job listing provides:
+- Full job IDs (not truncated)
+- Exact timestamps for all state changes
+- Configuration target function
+- Full filesystem paths to job files
+- Worker assignment and runtime for running jobs
+- Error messages for failed jobs
+- Basic memory estimation based on model architecture and batch size
+
+This is especially useful for:
+- Understanding why certain jobs aren't being claimed
+- Tracking job progress and runtime
+- Debugging configuration issues
+- Monitoring resource usage patterns
+- Finding job files for manual inspection
+
+### 5. Debug Mode for Single Job Execution
+
+Use the `--debug` flag with the run_one command to preserve all outputs and get detailed execution information:
+
+```bash
+# Run a job with debug output saved to a directory
+dr_exp --base-path /scratch/exp --experiment my_exp run_one job_abc123 --debug --output-dir ./debug_run/
+
+# Run with debug logging but no output preservation
+dr_exp --base-path /scratch/exp --experiment my_exp run_one job_abc123 --debug
+```
+
+Expected debug output:
+```
+Running job_abc123 in debug mode...
+Output directory: ./debug_run/job_abc123/
+[DEBUG] dr_exp: Job created at: 2024-01-15T10:30:00
+[DEBUG] dr_exp: Job config target: dr_exp.trainers.decon_trainer.train
+[DEBUG] dr_exp: Saved config to ./debug_run/job_abc123/config.yaml
+[INFO] dr_exp: Starting execution of job job_abc123
+[DEBUG] dr_exp: Copied metrics.jsonl to debug directory
+[DEBUG] dr_exp: Copied training.log to debug directory
+Job job_abc123 completed successfully
+Debug artifacts saved to: ./debug_run/job_abc123/
+  - config.yaml (exact config used)
+  - stdout.log
+  - stderr.log
+  - metrics.jsonl
+  - error_trace.txt (if failed)
+```
+
+Debug mode provides:
+- Complete stdout/stderr capture
+- Exact configuration as YAML file
+- All job artifacts copied to debug directory
+- Full error traces with stack traces
+- Detailed execution logging
+- Preservation of all outputs for analysis
+
+The debug output directory contains:
+```
+debug_run/job_abc123/
+├── config.yaml      # Exact config used for the job
+├── stdout.log       # Complete stdout from execution
+├── stderr.log       # Complete stderr from execution
+├── metrics.jsonl    # Training metrics (if produced)
+├── training.log     # Training logs (if produced)
+├── model_final.pt   # Model checkpoint (if saved)
+├── summary.json     # Job summary (if created)
+└── error_trace.txt  # Full error trace (if job failed)
+```
+
+This is especially useful for:
+- Debugging training failures
+- Understanding import/configuration errors
+- Reproducing issues locally
+- Analyzing training behavior
+- Sharing debug information with others
+- Testing new training functions
+
+## Step 7.6: Sync Monitoring Commands
+
+The CLI includes sync monitoring commands to provide visibility into the background sync process. These commands help debug sync issues and track upload progress.
+
+### Implementation
+
+Add the following sync commands to `src/dr_exp/cli.py` after the existing commands:
+
+```python
+@cli.group()
+def sync():
+    """Sync queue monitoring and management commands."""
+    pass
+
+
+@sync.command('status')
+@click.pass_context
+def sync_status(ctx):
+    """Show current sync queue status.
+    
+    Displays pending uploads, failed items, and sync statistics.
+    """
+    db = get_db(ctx)
+    sync_queue_dir = db.sync_queue_dir
+    
+    if not sync_queue_dir.exists():
+        click.echo("No sync queue found")
+        return
+    
+    # Collect sync items
+    pending_items = []
+    failed_items = []
+    total_size = 0
+    
+    for sync_file in sync_queue_dir.glob("*.json"):
+        try:
+            with open(sync_file, 'r') as f:
+                item = json.load(f)
+            
+            status = item.get('status', 'pending')
+            local_path = Path(item.get('local_path', ''))
+            
+            # Get file size if it exists
+            file_size = 0
+            if local_path.exists():
+                file_size = local_path.stat().st_size
+                total_size += file_size
+            
+            # Calculate age
+            queued_at = item.get('queued_at', '')
+            age_str = 'unknown'
+            if queued_at:
+                try:
+                    from datetime import datetime, UTC
+                    queued_time = datetime.fromisoformat(queued_at.replace('Z', '+00:00'))
+                    age = datetime.now(UTC) - queued_time
+                    age_str = f"{int(age.total_seconds() / 60)} min"
+                except:
+                    pass
+            
+            item_info = {
+                'file': sync_file.name,
+                'local_path': str(local_path),
+                'remote_path': item.get('remote_path', ''),
+                'size': file_size,
+                'age': age_str,
+                'attempts': item.get('attempts', 0),
+                'last_error': item.get('last_error', '')
+            }
+            
+            if status == 'pending' or (status == 'failed' and item.get('attempts', 0) < 3):
+                pending_items.append(item_info)
+            else:
+                failed_items.append(item_info)
+                
+        except Exception as e:
+            click.echo(f"Warning: Could not read {sync_file}: {e}")
+    
+    # Display status
+    click.echo(f"Sync queue: {sync_queue_dir}")
+    click.echo(f"Pending uploads: {len(pending_items)}")
+    
+    if pending_items:
+        for item in pending_items[:5]:  # Show first 5
+            size_mb = item['size'] / (1024 * 1024)
+            click.echo(f"  - {item['file']} ({size_mb:.1f} MB, {item['age']} old, attempts: {item['attempts']})")
+            if item['last_error']:
+                click.echo(f"    Last error: {item['last_error']}")
+        if len(pending_items) > 5:
+            click.echo(f"  ... and {len(pending_items) - 5} more")
+    
+    if failed_items:
+        click.echo(f"\nFailed uploads: {len(failed_items)}")
+        for item in failed_items[:3]:
+            click.echo(f"  - {item['file']} (attempts: {item['attempts']})")
+            click.echo(f"    Error: {item['last_error']}")
+    
+    # Check for sync history
+    history_file = db.experiment_path / 'sync_history.jsonl'
+    if history_file.exists():
+        # Get last successful sync
+        last_sync = None
+        try:
+            with open(history_file, 'r') as f:
+                for line in f:
+                    entry = json.loads(line)
+                    if entry.get('status') == 'success':
+                        last_sync = entry
+        except:
+            pass
+        
+        if last_sync:
+            click.echo(f"\nLast successful sync: {last_sync.get('timestamp', 'unknown')}")
+    
+    # Total size
+    total_mb = total_size / (1024 * 1024)
+    click.echo(f"\nTotal pending size: {total_mb:.1f} MB")
+    
+    # Check Supabase connection (Phase 3 - stub for now)
+    click.echo("Supabase connection: ⚠ Not configured (Phase 3)")
+
+
+@sync.command('force')
+@click.argument('job_id')
+@click.pass_context
+def sync_force(ctx, job_id):
+    """Force sync for a specific job.
+    
+    Resets all sync items for the job to pending status.
+    """
+    db = get_db(ctx)
+    sync_queue_dir = db.sync_queue_dir
+    
+    if not sync_queue_dir.exists():
+        click.echo("No sync queue found")
+        return
+    
+    reset_count = 0
+    job_prefix = f"run_{job_id}"
+    
+    for sync_file in sync_queue_dir.glob("*.json"):
+        try:
+            with open(sync_file, 'r') as f:
+                item = json.load(f)
+            
+            # Check if this item belongs to the job
+            remote_path = item.get('remote_path', '')
+            if job_prefix in remote_path:
+                # Reset to pending
+                item['status'] = 'pending'
+                item['attempts'] = 0
+                item['force_sync'] = True
+                item['force_sync_at'] = datetime.now(UTC).isoformat()
+                
+                with open(sync_file, 'w') as f:
+                    json.dump(item, f, indent=2)
+                
+                reset_count += 1
+                
+        except Exception as e:
+            click.echo(f"Warning: Could not process {sync_file}: {e}")
+    
+    if reset_count > 0:
+        click.echo(f"Reset {reset_count} items for job {job_id} to pending")
+        click.echo("Items will be synced in the next sync cycle")
+    else:
+        click.echo(f"No sync items found for job {job_id}")
+
+
+@sync.command('history')
+@click.option('--limit', default=20, help='Number of entries to show')
+@click.pass_context
+def sync_history(ctx, limit):
+    """Show sync history.
+    
+    Displays recent successful and failed sync operations.
+    """
+    db = get_db(ctx)
+    history_file = db.experiment_path / 'sync_history.jsonl'
+    
+    if not history_file.exists():
+        click.echo("No sync history found")
+        return
+    
+    # Read history entries
+    entries = []
+    try:
+        with open(history_file, 'r') as f:
+            for line in f:
+                try:
+                    entry = json.loads(line)
+                    entries.append(entry)
+                except:
+                    continue
+    except Exception as e:
+        click.echo(f"Error reading history: {e}")
+        return
+    
+    # Show most recent entries
+    recent_entries = entries[-limit:] if len(entries) > limit else entries
+    recent_entries.reverse()  # Show newest first
+    
+    click.echo(f"Sync History (last {len(recent_entries)} entries):")
+    
+    for entry in recent_entries:
+        status = entry.get('status', 'unknown')
+        timestamp = entry.get('timestamp', 'unknown')
+        job_id = entry.get('job_id', 'unknown')
+        size_bytes = entry.get('size_bytes', 0)
+        duration = entry.get('duration_seconds', 0)
+        
+        # Format entry
+        status_icon = "✓" if status == "success" else "✗"
+        size_mb = size_bytes / (1024 * 1024)
+        
+        if status == "success":
+            click.echo(f"{status_icon} {job_id} - {timestamp} - {size_mb:.1f} MB in {duration:.1f}s")
+        else:
+            error = entry.get('error', 'Unknown error')
+            click.echo(f"{status_icon} {job_id} - {timestamp} - Failed: {error}")
+    
+    # Summary statistics
+    if entries:
+        success_count = sum(1 for e in entries if e.get('status') == 'success')
+        fail_count = len(entries) - success_count
+        success_rate = (success_count / len(entries)) * 100 if entries else 0
+        
+        click.echo(f"\nTotal syncs: {len(entries)} ({success_count} successful, {fail_count} failed)")
+        click.echo(f"Success rate: {success_rate:.1f}%")
+```
+
+### Update SyncQueue for History Tracking
+
+Modify the SyncQueue class in `src/dr_exp/sync/queue.py` to add history tracking:
+
+```python
+def mark_completed(self, sync_id: str, job_id: Optional[str] = None) -> None:
+    """Mark a sync item as completed and record in history.
+    
+    Args:
+        sync_id: ID of the sync item
+        job_id: Optional job ID for history tracking
+    """
+    queue_file = self.queue_dir / f"{sync_id}.json"
+    if queue_file.exists():
+        # Record in history before deleting
+        self._record_history(sync_id, 'success', job_id=job_id)
+        
+        # Delete completed item
+        queue_file.unlink()
+        logger.debug(f"Sync item {sync_id} completed and removed")
+
+def mark_failed(self, sync_id: str, error: str, job_id: Optional[str] = None) -> None:
+    """Mark a sync item as failed and record in history.
+    
+    Args:
+        sync_id: ID of the sync item
+        error: Error message
+        job_id: Optional job ID for history tracking
+    """
+    queue_file = self.queue_dir / f"{sync_id}.json"
+    if queue_file.exists():
+        with open(queue_file, 'r') as f:
+            data = json.load(f)
+        
+        data["status"] = "failed"
+        data["attempts"] = data.get("attempts", 0) + 1
+        data["last_error"] = error
+        data["last_attempt"] = datetime.now(UTC).isoformat()
+        
+        # Record history if max attempts reached
+        if data["attempts"] >= 3:
+            self._record_history(sync_id, 'failed', error=error, job_id=job_id)
+        
+        with open(queue_file, 'w') as f:
+            json.dump(data, f, indent=2)
+        
+        logger.debug(f"Sync item {sync_id} marked as failed: {error}")
+
+def _record_history(self, sync_id: str, status: str, error: Optional[str] = None, 
+                   job_id: Optional[str] = None) -> None:
+    """Record sync operation in history file.
+    
+    Args:
+        sync_id: Sync item ID
+        status: 'success' or 'failed'
+        error: Error message if failed
+        job_id: Job ID if known
+    """
+    history_file = self.queue_dir.parent / 'sync_history.jsonl'
+    
+    # Extract job_id from sync_id if not provided
+    if not job_id and '_run_' in sync_id:
+        try:
+            # sync_id format: timestamp_run_jobid_filename
+            parts = sync_id.split('_run_')
+            if len(parts) > 1:
+                job_id = parts[1].split('_')[0]
+        except:
+            pass
+    
+    history_entry = {
+        'timestamp': datetime.now(UTC).isoformat(),
+        'sync_id': sync_id,
+        'job_id': job_id or 'unknown',
+        'status': status,
+    }
+    
+    if error:
+        history_entry['error'] = error
+    
+    # Get file info if available
+    queue_file = self.queue_dir / f"{sync_id}.json"
+    if queue_file.exists():
+        try:
+            with open(queue_file, 'r') as f:
+                data = json.load(f)
+            local_path = Path(data.get('local_path', ''))
+            if local_path.exists():
+                history_entry['size_bytes'] = local_path.stat().st_size
+            
+            # Calculate duration
+            queued_at = data.get('queued_at', '')
+            if queued_at:
+                start_time = datetime.fromisoformat(queued_at.replace('Z', '+00:00'))
+                duration = (datetime.now(UTC) - start_time).total_seconds()
+                history_entry['duration_seconds'] = duration
+        except:
+            pass
+    
+    # Append to history
+    try:
+        with open(history_file, 'a') as f:
+            f.write(json.dumps(history_entry) + '\n')
+    except Exception as e:
+        logger.error(f"Failed to record sync history: {e}")
+```
+
+### Usage Examples
+
+```bash
+# Check sync queue status
+dr_exp --base-path /scratch/exp --experiment my_exp sync status
+
+# Force sync for a specific job
+dr_exp --base-path /scratch/exp --experiment my_exp sync force job_abc123
+
+# View sync history
+dr_exp --base-path /scratch/exp --experiment my_exp sync history
+dr_exp --base-path /scratch/exp --experiment my_exp sync history --limit 50
+```
+
+### Expected Outputs
+
+#### Sync Status Output
+```
+Sync queue: /scratch/exp/my_exp/sync_queue/
+Pending uploads: 3
+  - 1705331400_run_job_abc123_metrics.jsonl (2.3 MB, 5 min old, attempts: 0)
+  - 1705331500_run_job_def456_model.pt (156.8 MB, 3 min old, attempts: 2)
+    Last error: Network timeout
+  - 1705331600_run_job_ghi789_metrics.jsonl (1.1 MB, 1 min old, attempts: 0)
+
+Last successful sync: 2024-01-15T10:35:00+00:00
+
+Total pending size: 160.2 MB
+Supabase connection: ⚠ Not configured (Phase 3)
+```
+
+#### Force Sync Output
+```
+Reset 5 items for job job_abc123 to pending
+Items will be synced in the next sync cycle
+```
+
+#### Sync History Output
+```
+Sync History (last 20 entries):
+✓ job_abc123 - 2024-01-15T10:35:00+00:00 - 2.3 MB in 1.2s
+✗ job_def456 - 2024-01-15T10:34:00+00:00 - Failed: Connection timeout
+✓ job_xyz789 - 2024-01-15T10:33:00+00:00 - 1.8 MB in 0.9s
+✓ job_abc123 - 2024-01-15T10:32:00+00:00 - 156.8 MB in 45.3s
+
+Total syncs: 156 (148 successful, 8 failed)
+Success rate: 94.9%
+```
+
+### Benefits
+
+These sync monitoring commands provide:
+- **Visibility**: See what's pending, failed, and completed
+- **Debugging**: Understand why syncs are failing
+- **Control**: Force retry of failed syncs
+- **Metrics**: Track sync performance and success rates
+- **History**: Audit trail of all sync operations
+
+This is especially useful for:
+- Monitoring background sync health
+- Debugging network or storage issues
+- Ensuring important results are uploaded
+- Tracking sync performance over time
+- Manual intervention when automatic sync fails
 
 ## Step 8: Create Launcher for Multi-Worker Deployment
 
@@ -1971,9 +2487,16 @@ def submit(ctx, config_file, priority, verbose):
 @cli.command()
 @click.option('--status', help='Filter by status (queued, running, completed, failed)')
 @click.option('--limit', default=50, help='Maximum jobs to show')
+@click.option('--verbose', is_flag=True, help='Show detailed job information')
 @click.pass_context
-def list(ctx, status, limit):
-    """List jobs."""
+def list(ctx, status, limit, verbose):
+    """List jobs with optional detailed information.
+    
+    Examples:
+        dr_exp list                    # Show all jobs (basic format)
+        dr_exp list --status queued    # Show only queued jobs
+        dr_exp list --verbose          # Show detailed job information
+    """
     db = get_db(ctx)
     jobs = db.list_jobs(status=status)[:limit]
     
@@ -1981,18 +2504,75 @@ def list(ctx, status, limit):
         click.echo("No jobs found")
         return
     
-    # Header
-    click.echo(f"{'ID':8} {'Status':10} {'Pri':4} {'Worker':15} {'Created'}")
-    click.echo("-" * 60)
-    
-    for job in jobs:
-        job_id_short = job['id'][:8]
-        status = job['status']
-        priority = job['priority']
-        worker = job.get('assigned_worker', '')[:15]
-        created = job['created_at'].split('T')[0]
+    if verbose:
+        # Detailed verbose output
+        for i, job in enumerate(jobs):
+            if i > 0:
+                click.echo()  # Blank line between jobs
+            
+            click.echo(f"Job ID: {job['id']}")
+            click.echo(f"  Status: {job['status']}")
+            click.echo(f"  Priority: {job['priority']}")
+            click.echo(f"  Created: {job['created_at']}")
+            
+            # Show config target
+            config = job.get('config', {})
+            target = config.get('_target_', 'N/A')
+            click.echo(f"  Config: {target}")
+            
+            # Show full path
+            job_path = db.jobs_dir / f"{job['id']}.json"
+            click.echo(f"  Full path: {job_path}")
+            
+            # Show worker info if running
+            if job['status'] == 'running':
+                worker = job.get('assigned_worker', 'unknown')
+                started = job.get('started_at', 'unknown')
+                click.echo(f"  Worker: {worker}")
+                click.echo(f"  Started: {started}")
+                
+                # Calculate runtime if possible
+                if started != 'unknown':
+                    from datetime import datetime, UTC
+                    try:
+                        start_time = datetime.fromisoformat(started.replace('Z', '+00:00'))
+                        runtime = datetime.now(UTC) - start_time
+                        click.echo(f"  Runtime: {runtime}")
+                    except:
+                        pass
+            
+            # Show completion info if completed/failed
+            if job['status'] in ['completed', 'failed']:
+                completed = job.get('completed_at', 'unknown')
+                click.echo(f"  Completed: {completed}")
+                if job['status'] == 'failed' and 'error' in job:
+                    click.echo(f"  Error: {job['error']}")
+            
+            # Estimate memory usage (basic heuristic)
+            batch_size = config.get('batch_size', 128)
+            model = config.get('model', {})
+            if isinstance(model, dict):
+                arch = model.get('architecture', 'unknown')
+                # Simple estimates based on common architectures
+                memory_mb = {
+                    'resnet18': batch_size * 10,
+                    'resnet50': batch_size * 20,
+                    'vit_base': batch_size * 30,
+                }.get(arch, batch_size * 15)  # Default estimate
+                click.echo(f"  Estimated memory: {memory_mb / 1024:.1f} GB")
+    else:
+        # Standard compact output
+        click.echo(f"{'ID':8} {'Status':10} {'Pri':4} {'Worker':15} {'Created'}")
+        click.echo("-" * 60)
         
-        click.echo(f"{job_id_short} {status:10} {priority:4} {worker:15} {created}")
+        for job in jobs:
+            job_id_short = job['id'][:8]
+            status = job['status']
+            priority = job['priority']
+            worker = job.get('assigned_worker', '')[:15]
+            created = job['created_at'].split('T')[0]
+            
+            click.echo(f"{job_id_short} {status:10} {priority:4} {worker:15} {created}")
 
 
 @cli.command()
@@ -2053,10 +2633,48 @@ def recover(db, timeout):
 @click.argument('job_id')
 @click.option('--worker-id', default='cli_worker', help='Worker ID to use')
 @click.option('--sync/--no-sync', default=False, help='Enable background sync')
+@click.option('--debug', is_flag=True, help='Enable debug mode with detailed output')
+@click.option('--output-dir', type=click.Path(), help='Directory to save debug outputs')
 @click.pass_obj
-def run_one(db, job_id, worker_id, sync):
-    """Run a single job immediately."""
-    # Create a temporary worker
+def run_one(db, job_id, worker_id, sync, debug, output_dir):
+    """Run a single job immediately with optional debug mode.
+    
+    In debug mode, all outputs are preserved in the specified directory.
+    
+    Examples:
+        dr_exp run_one job_abc123
+        dr_exp run_one job_abc123 --debug --output-dir ./debug_run/
+    """
+    # Setup debug logging if requested
+    if debug:
+        import logging
+        logging.basicConfig(
+            level=logging.DEBUG,
+            format='[%(levelname)s] %(name)s: %(message)s',
+            force=True
+        )
+        logger = logging.getLogger('dr_exp')
+        click.echo(f"Running job {job_id} in debug mode...")
+        
+        # Create debug output directory if specified
+        if output_dir:
+            debug_path = Path(output_dir) / f"job_{job_id}"
+            debug_path.mkdir(parents=True, exist_ok=True)
+            click.echo(f"Output directory: {debug_path}")
+    
+    # Get job details for debug output
+    job = db.get_job(job_id)
+    if not job:
+        click.echo(f"Error: Job {job_id} not found")
+        return
+    
+    if debug:
+        config = job.get('config', {})
+        target = config.get('_target_', 'unknown')
+        logger.debug(f"Job created at: {job.get('created_at', 'unknown')}")
+        logger.debug(f"Job config target: {target}")
+    
+    # Create a temporary worker with debug settings
     worker = Worker(
         worker_id=worker_id,
         job_db=db,
@@ -2066,12 +2684,98 @@ def run_one(db, job_id, worker_id, sync):
     if sync:
         worker.start()
     
+    # Capture outputs if in debug mode
+    import sys
+    import io
+    stdout_capture = io.StringIO() if debug and output_dir else None
+    stderr_capture = io.StringIO() if debug and output_dir else None
+    
+    original_stdout = sys.stdout
+    original_stderr = sys.stderr
+    
     try:
+        if debug and output_dir:
+            # Save exact config used
+            config_path = debug_path / 'config.yaml'
+            with open(config_path, 'w') as f:
+                yaml.dump(job['config'], f)
+            logger.debug(f"Saved config to {config_path}")
+            
+            # Redirect stdout/stderr for capture
+            sys.stdout = io.StringIO()
+            sys.stderr = io.StringIO()
+        
+        # Run the job
         result = worker.run_specific_job(job_id)
+        
+        if debug and output_dir:
+            # Restore stdout/stderr
+            stdout_content = sys.stdout.getvalue()
+            stderr_content = sys.stderr.getvalue()
+            sys.stdout = original_stdout
+            sys.stderr = original_stderr
+            
+            # Save captured outputs
+            with open(debug_path / 'stdout.log', 'w') as f:
+                f.write(stdout_content)
+            with open(debug_path / 'stderr.log', 'w') as f:
+                f.write(stderr_content)
+            
+            # Copy job storage outputs
+            storage_path = db.get_storage_path(job_id)
+            if storage_path.exists():
+                import shutil
+                for item in storage_path.iterdir():
+                    if item.is_file():
+                        shutil.copy2(item, debug_path / item.name)
+                        logger.debug(f"Copied {item.name} to debug directory")
+            
+            # Save error trace if job failed
+            if not result:
+                job_after = db.get_job(job_id)
+                if job_after and 'error' in job_after:
+                    with open(debug_path / 'error_trace.txt', 'w') as f:
+                        f.write(f"Error: {job_after['error']}\n")
+                        if stderr_content:
+                            f.write("\nStderr output:\n")
+                            f.write(stderr_content)
+        else:
+            # Restore stdout/stderr if they were redirected
+            sys.stdout = original_stdout
+            sys.stderr = original_stderr
+        
         if result:
             click.echo(f"Job {job_id} completed successfully")
+            if debug and output_dir:
+                click.echo(f"Debug artifacts saved to: {debug_path}/")
+                click.echo("  - config.yaml (exact config used)")
+                click.echo("  - stdout.log")
+                click.echo("  - stderr.log")
+                click.echo("  - metrics.jsonl")
+                if (debug_path / 'error_trace.txt').exists():
+                    click.echo("  - error_trace.txt (if failed)")
         else:
             click.echo(f"Job {job_id} failed")
+            if debug:
+                job_after = db.get_job(job_id)
+                if job_after and 'error' in job_after:
+                    click.echo(f"Error: {job_after['error']}")
+    
+    except Exception as e:
+        # Restore stdout/stderr on any exception
+        sys.stdout = original_stdout
+        sys.stderr = original_stderr
+        
+        if debug:
+            logger.error(f"Exception during job execution: {e}", exc_info=True)
+            if output_dir:
+                # Save the exception trace
+                import traceback
+                with open(debug_path / 'error_trace.txt', 'w') as f:
+                    f.write(f"Exception: {str(e)}\n\n")
+                    f.write(traceback.format_exc())
+        raise
+    
     finally:
         if sync:
             worker.stop()
@@ -2567,6 +3271,12 @@ Before proceeding to Phase 3:
 - [ ] Background sync thread starts and processes items
 - [ ] Job outputs are created in correct locations
 - [ ] Heartbeat updates work during job execution
+- [ ] Verbose job listing works: `dr_exp list --verbose`
+- [ ] Debug execution preserves outputs: `dr_exp run_one <job_id> --debug --output-dir ./debug/`
+- [ ] Sync status command shows queue state: `dr_exp sync status`
+- [ ] Force sync resets items: `dr_exp sync force <job_id>`
+- [ ] Sync history tracks operations: `dr_exp sync history`
+- [ ] All debugging features documented in Steps 7.5 and 7.6 work correctly
 - [ ] No references to old worker code remain:
   ```bash
   grep -r "run_worker\|JobExecutor\|HeartbeatManager" src/
@@ -2595,6 +3305,12 @@ If any check shows ✗:
 3. **DO NOT** create separate sync services - embed in worker
 4. **DO NOT** add configuration files - use constructor parameters
 5. **DO NOT** implement distributed locking - single worker per job
+6. **DO NOT** over-engineer debug features - keep them simple and direct
+7. **DO NOT** add complex memory tracking - basic estimates are sufficient
+8. **DO NOT** add database fields for debug state - use filesystem only
+9. **DO NOT** implement actual sync uploads in Phase 2 - only queue and monitor
+10. **DO NOT** add complex sync retry mechanisms - simple attempt counter is enough
+11. **DO NOT** create separate sync database - use JSON files in sync_queue
 
 ### ⚠️ Test Anti-Patterns to AVOID
 
