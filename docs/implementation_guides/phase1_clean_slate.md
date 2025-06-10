@@ -432,6 +432,60 @@ uv add pydantic
 uv add --dev pytest pytest-cov pytest-xdist
 ```
 
+## Step 4.5: Create Init Command Support
+
+Update JobDB to support validation and add init command to create proper structure.
+
+### Update JobDB Constructor
+
+Add validation parameter to `src/dr_exp/core/job_db.py`:
+
+```python
+def __init__(self, base_path: str, experiment_name: str, validate: bool = True):
+    """Initialize JobDB.
+    
+    Args:
+        base_path: Base directory for experiments
+        experiment_name: Name of this experiment
+        validate: Whether to validate directory structure exists
+    """
+    self.base_path = Path(base_path)
+    self.experiment_name = experiment_name
+    self.experiment_path = self.base_path / experiment_name
+    
+    # Define expected directories
+    self.jobs_dir = self.experiment_path / "jobs"
+    self.storage_dir = self.experiment_path / "storage"  
+    self.sync_queue_dir = self.experiment_path / "sync_queue"
+    self.logs_dir = self.experiment_path / "logs"
+    self.control_dir = self.experiment_path / "control"
+    
+    if validate:
+        # Check that experiment is initialized
+        required_dirs = [
+            self.jobs_dir,
+            self.storage_dir,
+            self.sync_queue_dir,
+            self.logs_dir,
+            self.control_dir
+        ]
+        
+        missing = [d for d in required_dirs if not d.exists()]
+        if missing:
+            missing_names = [d.name for d in missing]
+            raise RuntimeError(
+                f"Experiment not initialized. Missing directories: {missing_names}\n"
+                f"Run: dr_exp --base-path {base_path} --experiment {experiment_name} init"
+            )
+    else:
+        # Create directories if they don't exist (for init command)
+        self.jobs_dir.mkdir(parents=True, exist_ok=True)
+        self.storage_dir.mkdir(parents=True, exist_ok=True)
+        self.sync_queue_dir.mkdir(parents=True, exist_ok=True)
+```
+
+This ensures experiments are properly initialized before use. The init command (implemented in Phase 2) will create these directories with proper structure.
+
 ## Step 5: Create Pytest Tests
 
 Create proper test file at `tests/test_job_db.py`:

@@ -96,6 +96,19 @@ python cleanup_experiments.py /scratch/users/jane/experiments
 
 ## Quick Command Reference
 
+### Setup Commands
+
+```bash
+# Initialize new experiment
+dr_exp --base-path /scratch/exp --experiment my_exp init
+
+# Initialize with example configs
+dr_exp --base-path /scratch/exp --experiment my_exp init --with-examples
+
+# Validate existing experiment
+dr_exp --base-path /scratch/exp --experiment my_exp validate
+```
+
 ### CLI Commands
 
 ```bash
@@ -126,6 +139,31 @@ export DR_EXP_EXPERIMENT=test_exp
 uvicorn dr_exp.api.simple_api:app --reload
 ```
 
+### SLURM Commands
+
+```bash
+# Submit SLURM job
+sbatch scripts/dr_exp_slurm.sbatch
+
+# Submit with custom parameters
+sbatch --export=BASE_PATH=/scratch/exp,EXPERIMENT=my_exp,WORKERS_PER_GPU=3 scripts/dr_exp_slurm.sbatch
+
+# Check SLURM job status
+dr_exp --base-path /scratch/exp --experiment my_exp slurm status
+
+# View aggregated errors
+dr_exp --base-path /scratch/exp --experiment my_exp slurm errors 123456
+
+# Graceful shutdown after current jobs
+dr_exp --base-path /scratch/exp --experiment my_exp slurm control 123456 --finish-current
+
+# Immediate shutdown
+dr_exp --base-path /scratch/exp --experiment my_exp slurm control 123456 --stop-now
+
+# View worker logs
+dr_exp --base-path /scratch/exp --experiment my_exp slurm logs 123456 --worker slurm123456_node042_gpu0_w1
+```
+
 ### Operational Commands
 
 ```bash
@@ -153,8 +191,20 @@ python cleanup_experiments.py /scratch/users/jane/experiments --dry-run
     │   │   ├── training.log
     │   │   └── model_final.pt
     │   └── run_job_uuid2/
-    └── sync_queue/               # Pending uploads
-        └── timestamp_file.json
+    ├── sync_queue/               # Pending uploads
+    │   └── timestamp_file.json
+    ├── logs/                     # Operational logs (NEW)
+    │   ├── slurm_123456/        # Per SLURM job
+    │   │   ├── launcher.log
+    │   │   ├── workers/
+    │   │   │   └── slurm123456_node042_gpu0_w0.log
+    │   │   ├── errors.log       # Aggregated errors
+    │   │   └── status.json      # Current status
+    │   └── slurm_123457/
+    ├── control/                  # Control files (NEW)
+    │   └── slurm_123456.control
+    └── slurm_logs/              # SLURM outputs (NEW)
+        └── slurm-123456.out
 ```
 
 ## Config Structure
@@ -196,6 +246,23 @@ SUPABASE_KEY=xxx                      # For remote features
 ```
 
 ## Common Operations
+
+### Initialize New Experiment
+
+```bash
+# 1. Create and initialize experiment
+dr_exp --base-path /scratch/users/jane/experiments \
+       --experiment hyperparameter_search_v1 \
+       init --with-examples
+
+# 2. Verify setup
+dr_exp --base-path /scratch/users/jane/experiments \
+       --experiment hyperparameter_search_v1 \
+       validate
+
+# 3. Review example configs
+ls /scratch/users/jane/experiments/hyperparameter_search_v1/example_configs/
+```
 
 ### Create and Run Experiment
 
@@ -276,6 +343,21 @@ python cleanup_experiments.py /scratch/users/jane/experiments
 - Verify DR_EXP_BASE_PATH and DR_EXP_EXPERIMENT environment variables
 - Check that JobDB was initialized with enable_remote_read=True
 - Ensure jobs have been synced to Supabase (check sync_queue/)
+
+### Multiple SLURM jobs conflicting
+- Worker IDs now include SLURM job ID to prevent conflicts
+- Check logs under `logs/slurm_{job_id}/` for each job
+- Use `slurm status` command to see all active jobs
+
+### Worker died but not restarting
+- Check `logs/slurm_{job_id}/errors.log` for aggregated errors
+- Verify jobs are queued: launcher only restarts if work available
+- Check memory limits: workers may be OOM killed
+
+### Can't stop SLURM job gracefully
+- Ensure control directory exists: `{experiment}/control/`
+- Use `slurm control {job_id} --finish-current` for clean stop
+- Check `status.json` to verify command was received
 
 ## Design Principles to Maintain
 

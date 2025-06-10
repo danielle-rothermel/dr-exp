@@ -152,6 +152,157 @@ ckdr
 # Expected: "All checks passed!"
 ```
 
+## Init Command Tests
+
+Create `tests/test_init_command.py`:
+
+```python
+import pytest
+from pathlib import Path
+from click.testing import CliRunner
+from dr_exp.cli import cli
+
+def test_init_creates_directories(tmp_path):
+    """Test init creates all required directories."""
+    runner = CliRunner()
+    result = runner.invoke(cli, [
+        '--base-path', str(tmp_path),
+        '--experiment', 'test_exp',
+        'init'
+    ])
+    
+    assert result.exit_code == 0
+    assert (tmp_path / 'test_exp' / 'jobs').exists()
+    assert (tmp_path / 'test_exp' / 'storage').exists()
+    assert (tmp_path / 'test_exp' / 'sync_queue').exists()
+    assert (tmp_path / 'test_exp' / 'logs').exists()
+    assert (tmp_path / 'test_exp' / 'control').exists()
+    assert (tmp_path / 'test_exp' / 'slurm_logs').exists()
+    assert (tmp_path / 'test_exp' / '.gitignore').exists()
+    assert (tmp_path / 'test_exp' / 'README.md').exists()
+
+def test_init_already_exists(tmp_path):
+    """Test init detects existing experiment."""
+    exp_path = tmp_path / 'test_exp'
+    exp_path.mkdir(parents=True)
+    # Create all required directories
+    for dir_name in ['jobs', 'storage', 'sync_queue', 'logs', 'control']:
+        (exp_path / dir_name).mkdir()
+    
+    runner = CliRunner()
+    result = runner.invoke(cli, [
+        '--base-path', str(tmp_path),
+        '--experiment', 'test_exp',
+        'init'
+    ])
+    
+    assert result.exit_code == 0
+    assert '✓ Experiment already initialized' in result.output
+
+def test_init_force_overwrites(tmp_path):
+    """Test --force flag overwrites existing experiment."""
+    exp_path = tmp_path / 'test_exp'
+    exp_path.mkdir(parents=True)
+    old_file = exp_path / 'old_file.txt'
+    old_file.write_text('old content')
+    
+    runner = CliRunner()
+    result = runner.invoke(cli, [
+        '--base-path', str(tmp_path),
+        '--experiment', 'test_exp',
+        'init',
+        '--force'
+    ])
+    
+    assert result.exit_code == 0
+    assert '✅ Experiment initialized successfully!' in result.output
+    # Old file should still exist (we don't delete, just create missing)
+    assert old_file.exists()
+
+def test_init_with_examples(tmp_path):
+    """Test --with-examples creates sample configs."""
+    runner = CliRunner()
+    result = runner.invoke(cli, [
+        '--base-path', str(tmp_path),
+        '--experiment', 'test_exp',
+        'init',
+        '--with-examples'
+    ])
+    
+    assert result.exit_code == 0
+    assert (tmp_path / 'test_exp' / 'example_configs' / 'test_simple.yaml').exists()
+    assert (tmp_path / 'test_exp' / 'example_configs' / 'decon_example.yaml').exists()
+    
+def test_init_validates_permissions(tmp_path, monkeypatch):
+    """Test init checks write permissions."""
+    # This test would need to mock permission errors
+    # Implementation depends on OS-specific permission handling
+    pass
+
+def test_validate_command_success(tmp_path):
+    """Test validate command on properly initialized experiment."""
+    # First init
+    runner = CliRunner()
+    result = runner.invoke(cli, [
+        '--base-path', str(tmp_path),
+        '--experiment', 'test_exp',
+        'init'
+    ])
+    assert result.exit_code == 0
+    
+    # Then validate
+    result = runner.invoke(cli, [
+        '--base-path', str(tmp_path),
+        '--experiment', 'test_exp',
+        'validate'
+    ])
+    
+    assert result.exit_code == 0
+    assert '✅ All checks passed!' in result.output
+
+def test_validate_command_missing_dirs(tmp_path):
+    """Test validate command detects missing directories."""
+    # Create partial structure
+    exp_path = tmp_path / 'test_exp'
+    exp_path.mkdir(parents=True)
+    (exp_path / 'jobs').mkdir()
+    # Missing other directories
+    
+    runner = CliRunner()
+    result = runner.invoke(cli, [
+        '--base-path', str(tmp_path),
+        '--experiment', 'test_exp',
+        'validate'
+    ])
+    
+    assert result.exit_code == 0
+    assert '❌ Validation failed' in result.output
+    assert 'Missing directory' in result.output
+
+def test_init_then_submit(tmp_path):
+    """Test full workflow from init to job submission."""
+    runner = CliRunner()
+    
+    # Init with examples
+    result = runner.invoke(cli, [
+        '--base-path', str(tmp_path),
+        '--experiment', 'test_exp',
+        'init',
+        '--with-examples'
+    ])
+    assert result.exit_code == 0
+    
+    # Submit job using example config
+    result = runner.invoke(cli, [
+        '--base-path', str(tmp_path),
+        '--experiment', 'test_exp',
+        'submit',
+        str(tmp_path / 'test_exp' / 'example_configs' / 'test_simple.yaml')
+    ])
+    assert result.exit_code == 0
+    assert 'Created job' in result.output
+```
+
 ## Common Testing Mistakes to Avoid
 
 ### ❌ Bad: Modifying Tests to Pass

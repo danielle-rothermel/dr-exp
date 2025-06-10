@@ -197,6 +197,10 @@ This section consolidates all requirements identified during planning, both from
 - **Job control**: Kill, boost priority, or run specific jobs on demand
 - **Automatic recovery**: Dead workers restart if jobs pending, stale jobs recover
 - **Status monitoring**: Regular status logs every 5 minutes
+- **Multiple SLURM jobs**: Support concurrent jobs via unique worker IDs (slurm{job_id}_{node}_{gpu}_{worker})
+- **Centralized logging**: All logs under `{experiment}/logs/slurm_{job_id}/`
+- **Graceful shutdown**: Control files for finish-current and stop-now commands
+- **Error aggregation**: Collected errors in centralized error log per SLURM job
 
 ### 4. User Experience Requirements
 - **Single entry point**: One `sbatch` command starts everything
@@ -211,6 +215,7 @@ This section consolidates all requirements identified during planning, both from
 - **Local filesystem is truth**: All writes go to /scratch first
 - **Supabase as mirror**: Eventually consistent, read-only copy
 - **Fail fast philosophy**: Assertions not exceptions, no recovery logic
+- **Experiment initialization**: Experiments require explicit initialization via `dr_exp init` to ensure proper directory structure
 
 ### 6. Integration Requirements
 - **CUDA MPS support**: For efficient GPU sharing between workers
