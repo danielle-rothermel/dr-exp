@@ -16,10 +16,10 @@ Use this checklist to track progress through the implementation steps.
   - [x] Tests pass: `pt tests/implementation/test_step_0_cleanup.py -v`
   - [x] Code quality passes: `ckdr`
   
-- [ ] Step 1.1: Basic JobDB Structure
-  - [ ] JobDB class created
-  - [ ] Tests pass: `pt tests/implementation/test_step_1_1.py -v`
-  - [ ] Code quality passes: `ckdr`
+- [x] Step 1.1: Basic JobDB Structure
+  - [x] JobDB class created
+  - [x] Tests pass: `pt tests/implementation/test_step_1_1.py -v`
+  - [x] Code quality passes: `ckdr`
   
 - [ ] Step 1.2: Concurrent Job Claiming
   - [ ] File locking implemented

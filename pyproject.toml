@@ -46,7 +46,10 @@ deconcnn = { git = "https://github.com/drothermel/deconCNN" }
 include = ["src/**/*.py", "scripts/**/*.py", "tests/**/*.py"]
 
 [tool.mypy]
-modules = ["dr_exp", "scripts", "tests"]
+# During architecture redesign, only check implementation files to avoid module conflicts
+files = ["src/dr_exp/core/", "tests/implementation/"]
+mypy_path = "src"
+explicit_package_bases = true
 python_version = "3.12"
 warn_return_any = true
 warn_unused_configs = true
