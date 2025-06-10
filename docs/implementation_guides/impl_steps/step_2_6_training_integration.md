@@ -4,9 +4,24 @@
 Create training adapters for test and DeconCNN trainers with StructuredLogger integration for metrics tracking.
 
 ## Prerequisites
-- [ ] Step 2.5 completed and validated
-- [ ] Worker and CLI fully functional
-- [ ] test_step_2_5.py passes
+- [x] Step 2.5 completed and validated
+- [x] Worker and CLI fully functional
+- [x] test_step_2_5.py passes
+
+## ADAPTATION NOTES
+
+This step has been adapted to work with the existing codebase:
+
+1. **StructuredLogger** - Already exists with a more sophisticated implementation using BaseLogger abstraction
+2. **DeconCNN trainer** - Already exists in `src/dr_exp/training/decon_trainer.py` with full integration
+3. **Test trainer** - Updated to use StructuredLogger and return TrainingResult objects
+4. **Worker integration** - Updated to handle TrainingResult objects from trainers
+
+Key changes made:
+- Updated `test_trainer.py` to use StructuredLogger and return TrainingResult
+- Modified Worker's `execute_job` to handle TrainingResult objects
+- Added `final_metrics` property to TrainingResult for easy access
+- Created comprehensive tests that validate the existing implementations
 
 ## Implementation
 
@@ -21,14 +36,14 @@ Create training adapters for test and DeconCNN trainers with StructuredLogger in
 import json
 from pathlib import Path
 from typing import Dict, Any, Optional, Union
-from datetime import datetime
+from datetime import datetime, UTC
 from contextlib import contextmanager
 
 
 class StructuredLogger:
     """Logger that writes structured data (metrics, configs, etc.) to files."""
     
-    def __init__(self, log_dir: Union[str, Path], job_id: str, worker_id: str):
+    def __init__(self, log_dir: Union[str, Path], job_id: str, worker_id: str) -> None:
         """Initialize structured logger.
         
         Args:
@@ -52,19 +67,19 @@ class StructuredLogger:
         # Write initial metadata
         self._write_metadata()
     
-    def _write_metadata(self):
+    def _write_metadata(self) -> None:
         """Write job metadata."""
         metadata = {
             "job_id": self.job_id,
             "worker_id": self.worker_id,
-            "started_at": datetime.utcnow().isoformat(),
+            "started_at": datetime.now(UTC).isoformat(),
             "log_version": "1.0"
         }
         
         with open(self.metadata_file, "w") as f:
             json.dump(metadata, f, indent=2)
     
-    def log_config(self, config: Dict[str, Any]):
+    def log_config(self, config: Dict[str, Any]) -> None:
         """Log the configuration used for this run.
         
         Args:
@@ -73,7 +88,7 @@ class StructuredLogger:
         with open(self.config_file, "w") as f:
             json.dump(config, f, indent=2)
     
-    def log_metrics(self, metrics: Dict[str, Any], step: Optional[int] = None):
+    def log_metrics(self, metrics: Dict[str, Any], step: Optional[int] = None) -> None:
         """Log metrics for a training step.
         
         Args:
@@ -81,7 +96,7 @@ class StructuredLogger:
             step: Optional step number (epoch, iteration, etc.)
         """
         entry = {
-            "timestamp": datetime.utcnow().isoformat(),
+            "timestamp": datetime.now(UTC).isoformat(),
             "step": step,
             "metrics": metrics
         }
@@ -89,7 +104,7 @@ class StructuredLogger:
         with open(self.metrics_file, "a") as f:
             f.write(json.dumps(entry) + "\n")
     
-    def log_event(self, event_type: str, data: Optional[Dict[str, Any]] = None):
+    def log_event(self, event_type: str, data: Optional[Dict[str, Any]] = None) -> None:
         """Log a training event (start, end, checkpoint, etc.).
         
         Args:
@@ -97,7 +112,7 @@ class StructuredLogger:
             data: Optional event data
         """
         entry = {
-            "timestamp": datetime.utcnow().isoformat(),
+            "timestamp": datetime.now(UTC).isoformat(),
             "event_type": event_type,
             "data": data or {}
         }
@@ -106,7 +121,7 @@ class StructuredLogger:
             f.write(json.dumps(entry) + "\n")
     
     def log_artifact(self, artifact_path: Path, artifact_type: str, 
-                    metadata: Optional[Dict[str, Any]] = None):
+                    metadata: Optional[Dict[str, Any]] = None) -> None:
         """Log that an artifact was created.
         
         Args:
@@ -367,13 +382,14 @@ import tempfile
 import json
 import pytest
 from pathlib import Path
+from typing import Dict, Any, Optional
 
 from src.dr_exp.core.job_db import JobDB
 from src.dr_exp.worker.base import Worker
 from src.dr_exp.logging.structured_logger import StructuredLogger
 
 
-def test_structured_logger():
+def test_structured_logger() -> None:
     """Test structured logger functionality."""
     with tempfile.TemporaryDirectory() as tmpdir:
         logger = StructuredLogger(tmpdir, "test_job", "test_worker")
@@ -435,11 +451,11 @@ def test_structured_logger():
         
 
 
-def test_decon_classification_trainer():
+def test_decon_classification_trainer() -> None:
     """Test deconCNN classification trainer."""
     with tempfile.TemporaryDirectory() as tmpdir:
         # Create job
-        job_db = JobDB(base_path=tmpdir, experiment_name="test_exp")
+        job_db = JobDB(base_path=tmpdir, experiment_name="test_exp", validate=False)
         
         config = {
             "_target_": "src.dr_exp.trainers.decon_trainer.train_classification",
@@ -493,10 +509,10 @@ def test_decon_classification_trainer():
         
 
 
-def test_decon_autoencoder_trainer():
+def test_decon_autoencoder_trainer() -> None:
     """Test deconCNN autoencoder trainer."""
     with tempfile.TemporaryDirectory() as tmpdir:
-        job_db = JobDB(base_path=tmpdir, experiment_name="test_exp")
+        job_db = JobDB(base_path=tmpdir, experiment_name="test_exp", validate=False)
         
         config = {
             "_target_": "src.dr_exp.trainers.decon_trainer.train_autoencoder",
@@ -532,10 +548,10 @@ def test_decon_autoencoder_trainer():
         
 
 
-def test_trainer_error_handling():
+def test_trainer_error_handling() -> None:
     """Test trainer error handling and logging."""
     with tempfile.TemporaryDirectory() as tmpdir:
-        job_db = JobDB(base_path=tmpdir, experiment_name="test_exp")
+        job_db = JobDB(base_path=tmpdir, experiment_name="test_exp", validate=False)
         
         # Create a config that will cause an error
         config = {
@@ -567,10 +583,10 @@ def test_trainer_error_handling():
         
 
 
-def test_worker_artifact_discovery():
+def test_worker_artifact_discovery() -> None:
     """Test that worker discovers and queues all artifacts."""
     with tempfile.TemporaryDirectory() as tmpdir:
-        job_db = JobDB(base_path=tmpdir, experiment_name="test_exp")
+        job_db = JobDB(base_path=tmpdir, experiment_name="test_exp", validate=False)
         
         config = {
             "_target_": "src.dr_exp.trainers.decon_trainer.train_classification",
@@ -586,7 +602,7 @@ def test_worker_artifact_discovery():
         
         # Custom worker that tracks sync queue
         class TrackingWorker(Worker):
-            def add_artifact_to_sync(self, job_id, file_path, file_type, metadata=None):
+            def add_artifact_to_sync(self, job_id: str, file_path: str, file_type: str, metadata: Optional[Dict[str, Any]] = None) -> None:
                 queued_files.append((Path(file_path).name, file_type))
                 super().add_artifact_to_sync(job_id, file_path, file_type, metadata)
         
@@ -607,7 +623,7 @@ def test_worker_artifact_discovery():
         
 
 
-def test_full_integration():
+def test_full_integration() -> None:
     """Test complete integration from job submission to completion."""
     with tempfile.TemporaryDirectory() as tmpdir:
         from click.testing import CliRunner
@@ -677,7 +693,7 @@ batch_size: 256
         assert job_id in result.output
         
         # Validate artifacts exist
-        job_db = JobDB(base_path=tmpdir, experiment_name='integration_test')
+        job_db = JobDB(base_path=tmpdir, experiment_name='integration_test', validate=False)
         storage_path = job_db.get_storage_path(job_id)
         
         expected_files = [

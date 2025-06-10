@@ -1,7 +1,7 @@
 # Step 3.3: Database Operations
 
 ## Goal (1 sentence)
-Add database operations to the Supabase client for creating experiments, syncing job data, and tracking sync status.
+Add database operations to the Supabase client for creating experiments, syncing job data, and tracking sync status with proper type annotations and UTC datetime handling.
 
 ## Prerequisites
 - [ ] Step 3.2 completed with file upload working
@@ -13,6 +13,9 @@ Add database operations to the Supabase client for creating experiments, syncing
 ### 1. Update src/dr_exp/sync/supabase_client.py
 Add these methods to the SupabaseClient class:
 ```python
+from typing import Dict, Any, Optional, List
+from datetime import datetime, UTC
+import hashlib
     def get_or_create_experiment(
         self, 
         experiment_name: str, 
@@ -142,7 +145,7 @@ Add these methods to the SupabaseClient class:
                 "size_bytes": size_bytes,
                 "storage_url": storage_url,
                 "status": "completed",
-                "completed_at": datetime.utcnow().isoformat(),
+                "completed_at": datetime.now(UTC).isoformat(),
                 "metadata": metadata or {}
             }
             
@@ -175,15 +178,15 @@ Add these methods to the SupabaseClient class:
         try:
             data = {
                 "status": status,
-                "updated_at": datetime.utcnow().isoformat()
+                "updated_at": datetime.now(UTC).isoformat()
             }
             
             if error:
                 data["error"] = error
-                data["last_attempt"] = datetime.utcnow().isoformat()
+                data["last_attempt"] = datetime.now(UTC).isoformat()
             
             if status == "completed":
-                data["completed_at"] = datetime.utcnow().isoformat()
+                data["completed_at"] = datetime.now(UTC).isoformat()
             
             response = self.client.table("sync_status").update(data).eq(
                 "id", sync_id
@@ -199,7 +202,7 @@ Add these methods to the SupabaseClient class:
         experiment_id: str,
         status: Optional[str] = None,
         limit: int = 100
-    ) -> list[Dict[str, Any]]:
+    ) -> List[Dict[str, Any]]:
         """Get jobs for an experiment.
         
         Args:
@@ -262,7 +265,7 @@ Add these methods to the SupabaseClient class:
         except Exception as e:
             raise Exception(f"Failed to get experiment stats: {str(e)}")
     
-    def get_job_sync_status(self, job_id: str) -> list[Dict[str, Any]]:
+    def get_job_sync_status(self, job_id: str) -> List[Dict[str, Any]]:
         """Get sync status for all files from a job.
         
         Args:
@@ -283,7 +286,7 @@ Add these methods to the SupabaseClient class:
     
     def batch_sync_jobs(
         self,
-        jobs: list[Dict[str, Any]],
+        jobs: List[Dict[str, Any]],
         experiment_id: str
     ) -> Dict[str, int]:
         """Sync multiple jobs in batch.
@@ -315,15 +318,17 @@ Add these methods to the SupabaseClient class:
 import os
 import tempfile
 import uuid
+import json
 import pytest
 from pathlib import Path
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, UTC
+from typing import Dict, Any, List
 from dotenv import load_dotenv
 
 from src.dr_exp.sync.supabase_client import SupabaseClient
 
 
-def setup_test_env():
+def setup_test_env() -> None:
     """Load test environment variables."""
     env_file = Path(".env.test")
     if env_file.exists():
@@ -333,14 +338,14 @@ def setup_test_env():
         os.environ["SUPABASE_KEY"] = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZS1kZW1vIiwicm9sZSI6InNlcnZpY2Vfcm9sZSIsImV4cCI6MTk4MzgxMjk5Nn0.EGIM96RAZx35lJzdJsyH-qQwv8Hdp7fsn3W0YpN81IU"
 
 
-def test_experiment_operations():
+def test_experiment_operations() -> str:
     """Test experiment creation and retrieval."""
     setup_test_env()
     
     client = SupabaseClient()
     
     # Create new experiment
-    exp_name = f"test_exp_{int(datetime.now().timestamp())}"
+    exp_name = f"test_exp_{int(datetime.now(UTC).timestamp())}"
     base_path = "/tmp/test"
     metadata = {"created_by": "test", "purpose": "testing"}
     
@@ -359,14 +364,14 @@ def test_experiment_operations():
     return exp_id
 
 
-def test_job_sync():
+def test_job_sync() -> tuple[str, str]:
     """Test syncing jobs to database."""
     setup_test_env()
     
     client = SupabaseClient()
     
     # Create experiment
-    exp_name = f"job_sync_test_{int(datetime.now().timestamp())}"
+    exp_name = f"job_sync_test_{int(datetime.now(UTC).timestamp())}"
     exp_id = client.get_or_create_experiment(exp_name, "/tmp/test")
     
     # Create job data (mimicking local JobDB format)
@@ -380,8 +385,8 @@ def test_job_sync():
         },
         "priority": 500,
         "status": "queued",
-        "created_at": datetime.utcnow().isoformat(),
-        "updated_at": datetime.utcnow().isoformat(),
+        "created_at": datetime.now(UTC).isoformat(),
+        "updated_at": datetime.now(UTC).isoformat(),
         "attempts": 0
     }
     
@@ -392,15 +397,15 @@ def test_job_sync():
     # Update job and sync again
     job_data["status"] = "running"
     job_data["worker_id"] = "test_worker"
-    job_data["started_at"] = datetime.utcnow().isoformat()
-    job_data["last_heartbeat"] = datetime.utcnow().isoformat()
+    job_data["started_at"] = datetime.now(UTC).isoformat()
+    job_data["last_heartbeat"] = datetime.now(UTC).isoformat()
     
     success = client.sync_job(job_data, exp_id)
     assert success
     
     # Complete job
     job_data["status"] = "completed"
-    job_data["completed_at"] = datetime.utcnow().isoformat()
+    job_data["completed_at"] = datetime.now(UTC).isoformat()
     job_data["final_metrics"] = {
         "accuracy": 0.95,
         "loss": 0.15
@@ -412,14 +417,14 @@ def test_job_sync():
     return exp_id, job_id
 
 
-def test_sync_status():
+def test_sync_status() -> None:
     """Test sync status tracking."""
     setup_test_env()
     
     client = SupabaseClient()
     
     # Create experiment and job
-    exp_name = f"sync_status_test_{int(datetime.now().timestamp())}"
+    exp_name = f"sync_status_test_{int(datetime.now(UTC).timestamp())}"
     exp_id = client.get_or_create_experiment(exp_name, "/tmp/test")
     
     job_id = str(uuid.uuid4())
@@ -428,8 +433,8 @@ def test_sync_status():
         "config": {"_target_": "test.train"},
         "priority": 100,
         "status": "running",
-        "created_at": datetime.utcnow().isoformat(),
-        "updated_at": datetime.utcnow().isoformat()
+        "created_at": datetime.now(UTC).isoformat(),
+        "updated_at": datetime.now(UTC).isoformat()
     }
     client.sync_job(job_data, exp_id)
     
@@ -453,14 +458,14 @@ def test_sync_status():
     assert sync_records[0]["status"] == "completed"
 
 
-def test_experiment_stats():
+def test_experiment_stats() -> None:
     """Test getting experiment statistics."""
     setup_test_env()
     
     client = SupabaseClient()
     
     # Create experiment with multiple jobs
-    exp_name = f"stats_test_{int(datetime.now().timestamp())}"
+    exp_name = f"stats_test_{int(datetime.now(UTC).timestamp())}"
     exp_id = client.get_or_create_experiment(exp_name, "/tmp/test")
     
     # Create jobs in different states
@@ -485,13 +490,13 @@ def test_experiment_stats():
         # Add status-specific fields
         if config["status"] == "running":
             job_data["worker_id"] = config["worker_id"]
-            job_data["started_at"] = datetime.utcnow().isoformat()
+            job_data["started_at"] = datetime.now(UTC).isoformat()
         elif config["status"] == "completed":
-            job_data["completed_at"] = datetime.utcnow().isoformat()
+            job_data["completed_at"] = datetime.now(UTC).isoformat()
             job_data["final_metrics"] = config["final_metrics"]
         elif config["status"] == "failed":
             job_data["error"] = config["error"]
-            job_data["completed_at"] = datetime.utcnow().isoformat()
+            job_data["completed_at"] = datetime.now(UTC).isoformat()
         
         client.sync_job(job_data, exp_id)
     
@@ -505,14 +510,14 @@ def test_experiment_stats():
     assert stats["failed_jobs"] == 1
 
 
-def test_batch_operations():
+def test_batch_operations() -> None:
     """Test batch syncing of jobs."""
     setup_test_env()
     
     client = SupabaseClient()
     
     # Create experiment
-    exp_name = f"batch_test_{int(datetime.now().timestamp())}"
+    exp_name = f"batch_test_{int(datetime.now(UTC).timestamp())}"
     exp_id = client.get_or_create_experiment(exp_name, "/tmp/test")
     
     # Create multiple jobs
@@ -526,8 +531,8 @@ def test_batch_operations():
             },
             "priority": i * 100,
             "status": "queued",
-            "created_at": (datetime.utcnow() - timedelta(minutes=i)).isoformat(),
-            "updated_at": datetime.utcnow().isoformat()
+            "created_at": (datetime.now(UTC) - timedelta(minutes=i)).isoformat(),
+            "updated_at": datetime.now(UTC).isoformat()
         }
         jobs.append(job)
     
@@ -545,14 +550,14 @@ def test_batch_operations():
     assert db_jobs[0]["config"]["index"] == 0  # Most recent
 
 
-def test_job_queries():
+def test_job_queries() -> None:
     """Test querying jobs with filters."""
     setup_test_env()
     
     client = SupabaseClient()
     
     # Create experiment
-    exp_name = f"query_test_{int(datetime.now().timestamp())}"
+    exp_name = f"query_test_{int(datetime.now(UTC).timestamp())}"
     exp_id = client.get_or_create_experiment(exp_name, "/tmp/test")
     
     # Create jobs with different statuses
@@ -587,7 +592,7 @@ def test_job_queries():
     assert len(limited_jobs) == 3
 
 
-def test_full_sync_workflow():
+def test_full_sync_workflow() -> None:
     """Test complete sync workflow from file upload to status tracking."""
     setup_test_env()
     
@@ -595,7 +600,7 @@ def test_full_sync_workflow():
     
     with tempfile.TemporaryDirectory() as tmpdir:
         # Create experiment
-        exp_name = f"workflow_test_{int(datetime.now().timestamp())}"
+        exp_name = f"workflow_test_{int(datetime.now(UTC).timestamp())}"
         exp_id = client.get_or_create_experiment(exp_name, tmpdir)
         
         # Create and sync job
@@ -609,9 +614,9 @@ def test_full_sync_workflow():
             "priority": 800,
             "status": "running",
             "worker_id": "workflow_worker",
-            "created_at": datetime.utcnow().isoformat(),
-            "updated_at": datetime.utcnow().isoformat(),
-            "started_at": datetime.utcnow().isoformat()
+            "created_at": datetime.now(UTC).isoformat(),
+            "updated_at": datetime.now(UTC).isoformat(),
+            "started_at": datetime.now(UTC).isoformat()
         }
         
         client.sync_job(job_data, exp_id)
@@ -639,7 +644,7 @@ def test_full_sync_workflow():
         
         # Complete the job
         job_data["status"] = "completed"
-        job_data["completed_at"] = datetime.utcnow().isoformat()
+        job_data["completed_at"] = datetime.now(UTC).isoformat()
         job_data["final_metrics"] = {"accuracy": 0.92, "loss": 0.23}
         
         client.sync_job(job_data, exp_id)

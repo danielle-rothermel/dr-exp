@@ -17,7 +17,7 @@ import os
 import hashlib
 from pathlib import Path
 from typing import Dict, Any, Optional, Tuple
-from datetime import datetime
+from datetime import datetime, UTC
 import mimetypes
 
 from supabase import create_client, Client
@@ -26,7 +26,7 @@ from supabase import create_client, Client
 class SupabaseClient:
     """Client for interacting with Supabase storage and database."""
     
-    def __init__(self, url: Optional[str] = None, key: Optional[str] = None):
+    def __init__(self, url: Optional[str] = None, key: Optional[str] = None) -> None:
         """Initialize Supabase client.
         
         Args:
@@ -282,7 +282,7 @@ from dotenv import load_dotenv
 from src.dr_exp.sync.supabase_client import SupabaseClient
 
 
-def setup_test_env():
+def setup_test_env() -> None:
     """Load test environment variables."""
     # Load from .env.test if it exists
     env_file = Path(".env.test")
@@ -294,7 +294,7 @@ def setup_test_env():
         os.environ["SUPABASE_KEY"] = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZS1kZW1vIiwicm9sZSI6InNlcnZpY2Vfcm9sZSIsImV4cCI6MTk4MzgxMjk5Nn0.EGIM96RAZx35lJzdJsyH-qQwv8Hdp7fsn3W0YpN81IU"
 
 
-def test_supabase_connection():
+def test_supabase_connection() -> None:
     """Test basic connection to Supabase."""
     setup_test_env()
     
@@ -308,7 +308,7 @@ def test_supabase_connection():
     assert client.bucket_name == "experiments"
 
 
-def test_file_upload():
+def test_file_upload() -> list[tuple[str, str, str]]:
     """Test uploading files to Supabase storage."""
     setup_test_env()
     
@@ -372,7 +372,7 @@ def test_file_upload():
         return uploaded
 
 
-def test_file_download():
+def test_file_download() -> None:
     """Test downloading files from Supabase storage."""
     setup_test_env()
     
@@ -409,7 +409,7 @@ def test_file_download():
         assert downloaded_checksum == checksum
 
 
-def test_file_listing():
+def test_file_listing() -> None:
     """Test listing files in storage."""
     setup_test_env()
     
@@ -441,7 +441,7 @@ def test_file_listing():
         assert isinstance(files, list)
 
 
-def test_signed_urls():
+def test_signed_urls() -> None:
     """Test generating signed URLs for temporary access."""
     setup_test_env()
     
@@ -468,7 +468,7 @@ def test_signed_urls():
         assert storage_path in signed_url
 
 
-def test_error_handling():
+def test_error_handling() -> None:
     """Test error handling in Supabase client."""
     setup_test_env()
     
@@ -508,7 +508,7 @@ def test_error_handling():
         pass  # Expected to fail with invalid credentials
 
 
-def test_checksum_calculation():
+def test_checksum_calculation() -> None:
     """Test checksum calculation."""
     setup_test_env()
     
@@ -535,7 +535,7 @@ def test_checksum_calculation():
         assert checksum1 == checksum3  # Same content
 
 
-def test_mime_type_detection():
+def test_mime_type_detection() -> None:
     """Test MIME type detection for different file types."""
     setup_test_env()
     

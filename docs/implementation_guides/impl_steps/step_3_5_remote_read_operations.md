@@ -13,7 +13,8 @@ Add remote read capabilities to JobDB and update the API to support reading job 
 ### 1. Update src/dr_exp/core/job_db.py
 Add these imports at the top:
 ```python
-from typing import Tuple
+from typing import Tuple, List, Dict, Any, Optional
+from pathlib import Path
 ```
 
 Add these methods to the JobDB class:
@@ -412,7 +413,7 @@ async def health_check():
             # Test remote connection
             job_db.remote_client.test_connection()
             health["remote_connection"] = True
-        except:
+        except Exception:
             health["remote_connection"] = False
     
     return health
@@ -425,7 +426,12 @@ import os
 import tempfile
 import asyncio
 import pytest
+import json
+import shutil
+import time
 from pathlib import Path
+from typing import Dict, Any, List, Optional
+from datetime import datetime, UTC
 from dotenv import load_dotenv
 
 from fastapi.testclient import TestClient
@@ -435,7 +441,7 @@ from src.dr_exp.worker.base import Worker
 from src.dr_exp.api.simple_api import app, job_db as api_job_db
 
 
-def setup_test_env():
+def setup_test_env() -> None:
     """Load test environment variables."""
     env_file = Path(".env.test")
     if env_file.exists():
@@ -445,13 +451,13 @@ def setup_test_env():
         os.environ["SUPABASE_KEY"] = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZS1kZW1vIiwicm9sZSI6InNlcnZpY2Vfcm9sZSIsImV4cCI6MTk4MzgxMjk5Nn0.EGIM96RAZx35lJzdJsyH-qQwv8Hdp7fsn3W0YpN81IU"
 
 
-def test_remote_read_operations():
+def test_remote_read_operations() -> None:
     """Test JobDB remote read functionality."""
     setup_test_env()
     
     with tempfile.TemporaryDirectory() as tmpdir:
         # Create JobDB and enable remote
-        job_db = JobDB(base_path=tmpdir, experiment_name="remote_read_test")
+        job_db = JobDB(base_path=tmpdir, experiment_name="remote_read_test", validate=False)
         
         success = job_db.enable_remote_read()
         assert success
@@ -472,7 +478,6 @@ def test_remote_read_operations():
         worker.run(max_jobs=1)
         
         # Wait for sync
-        import time
         time.sleep(3)
         
         # Test remote list
@@ -480,14 +485,10 @@ def test_remote_read_operations():
         assert len(remote_jobs) > 0
         assert any(j["id"] == job_id for j in remote_jobs)
         
-        assert len(remote_jobs) > 0
-        
         # Test remote get
         remote_job = job_db.get_job_remote(job_id)
         assert remote_job is not None
         assert remote_job["id"] == job_id
-        assert remote_job["status"] == "completed"
-        
         assert remote_job["status"] == "completed"
         
         # Test remote experiment info
@@ -496,21 +497,17 @@ def test_remote_read_operations():
         assert remote_info["status_counts"]["completed"] >= 1
         assert remote_info["remote"] is True
         
-        assert remote_info["remote"] is True
-        
         # Test sync mode
         assert job_db.sync_mode() == "remote"
-        
-        assert job_db.sync_mode() == "remote"
 
 
-def test_artifact_download():
+def test_artifact_download() -> None:
     """Test downloading artifacts from remote storage."""
     setup_test_env()
     
     with tempfile.TemporaryDirectory() as tmpdir:
         # Setup and run a job
-        job_db = JobDB(base_path=tmpdir, experiment_name="download_test")
+        job_db = JobDB(base_path=tmpdir, experiment_name="download_test", validate=False)
         job_db.enable_remote_read()
         
         config = {
@@ -525,12 +522,10 @@ def test_artifact_download():
         worker = Worker(job_db=job_db, worker_id="download_worker", sync_enabled=True)
         worker.run(max_jobs=1)
         
-        import time
         time.sleep(5)  # Wait for sync
         
         # Clear local storage to test download
         storage_path = job_db.get_storage_path(job_id)
-        import shutil
         if storage_path.exists():
             shutil.rmtree(storage_path)
         
@@ -551,7 +546,7 @@ def test_artifact_download():
             assert any(expected in name for name in downloaded_names)
 
 
-def test_api_endpoints():
+def test_api_endpoints() -> None:
     """Test API endpoints with remote data."""
     setup_test_env()
     
@@ -561,7 +556,7 @@ def test_api_endpoints():
         os.environ["DR_EXP_EXPERIMENT"] = "api_test"
         
         # Create test data
-        job_db = JobDB(base_path=tmpdir, experiment_name="api_test")
+        job_db = JobDB(base_path=tmpdir, experiment_name="api_test", validate=False)
         job_db.enable_remote_read()
         
         # Create jobs
@@ -575,7 +570,6 @@ def test_api_endpoints():
         worker = Worker(job_db=job_db, worker_id="api_worker", sync_enabled=True)
         worker.run(max_jobs=1)
         
-        import time
         time.sleep(3)
         
         # Initialize API
@@ -592,15 +586,11 @@ def test_api_endpoints():
         assert data["experiment"] == "api_test"
         assert data["sync_mode"] == "remote"
         
-        assert data["sync_mode"] == "remote"
-        
         # Test experiment info
         response = client.get("/experiment/info")
         assert response.status_code == 200
         info = response.json()
         assert info["experiment_name"] == "api_test"
-        assert info["total_jobs"] >= 3
-        
         assert info["total_jobs"] >= 3
         
         # Test job listing
@@ -610,14 +600,10 @@ def test_api_endpoints():
         assert data["count"] >= 3
         assert data["source"] == "remote"
         
-        assert data["source"] == "remote"
-        
         # Test specific job
         response = client.get(f"/jobs/{job_ids[0]}")
         assert response.status_code == 200
         job = response.json()
-        assert job["id"] == job_ids[0]
-        
         assert job["id"] == job_ids[0]
         
         # Test queue stats
@@ -627,25 +613,21 @@ def test_api_endpoints():
         assert stats["total_jobs"] >= 3
         assert "by_status" in stats
         
-        assert "by_status" in stats
-        
         # Test health check
         response = client.get("/health")
         assert response.status_code == 200
         health = response.json()
         assert health["status"] == "healthy"
         assert health["remote_enabled"] is True
-        
-        assert health["remote_enabled"] is True
 
 
-def test_fallback_to_local():
+def test_fallback_to_local() -> None:
     """Test fallback to local data when remote unavailable."""
     setup_test_env()
     
     with tempfile.TemporaryDirectory() as tmpdir:
         # Create JobDB without remote
-        job_db = JobDB(base_path=tmpdir, experiment_name="fallback_test")
+        job_db = JobDB(base_path=tmpdir, experiment_name="fallback_test", validate=False)
         
         # Try to enable with bad credentials
         success = job_db.enable_remote_read(
@@ -671,16 +653,14 @@ def test_fallback_to_local():
         assert "remote" not in info or not info["remote"]
         
         assert job_db.sync_mode() == "local"
-        
-        assert job_db.sync_mode() == "local"
 
 
-def test_remote_status_filter():
+def test_remote_status_filter() -> None:
     """Test filtering remote jobs by status."""
     setup_test_env()
     
     with tempfile.TemporaryDirectory() as tmpdir:
-        job_db = JobDB(base_path=tmpdir, experiment_name="filter_test")
+        job_db = JobDB(base_path=tmpdir, experiment_name="filter_test", validate=False)
         job_db.enable_remote_read()
         
         # Create jobs with different statuses
@@ -718,11 +698,9 @@ def test_remote_status_filter():
         
         completed = job_db.list_jobs_remote(status="completed")
         assert len(completed) == 1
-        
-        assert len(completed) == 1
 
 
-def test_full_remote_workflow():
+def test_full_remote_workflow() -> None:
     """Test complete workflow with remote operations."""
     setup_test_env()
     
@@ -772,7 +750,7 @@ epochs: 3
         assert result.exit_code == 0
         
         # Now test remote read via API
-        job_db = JobDB(base_path=".", experiment_name="remote_workflow")
+        job_db = JobDB(base_path=".", experiment_name="remote_workflow", validate=False)
         job_db.enable_remote_read()
         
         # Should see jobs in remote
@@ -786,8 +764,6 @@ epochs: 3
         # Download artifacts for completed job
         completed = [j for j in remote_jobs if j["status"] == "completed"][0]
         downloaded = job_db.download_job_artifacts(completed["id"])
-        assert len(downloaded) > 0
-        
         assert len(downloaded) > 0
 
 

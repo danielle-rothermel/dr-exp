@@ -14,7 +14,7 @@ Update the worker to use real Supabase sync instead of mock functions, with prop
 ```python
 """Sync handler that connects sync queue to Supabase."""
 from pathlib import Path
-from typing import Optional
+from typing import Optional, Dict, Any
 import os
 
 from .queue import SyncItem
@@ -99,7 +99,7 @@ class SyncHandler:
         
         print(f"[SyncHandler] Uploaded {file_path.name} ({item.file_type})")
     
-    def sync_job_data(self, job_data: dict) -> bool:
+    def sync_job_data(self, job_data: Dict[str, Any]) -> bool:
         """Sync job metadata to Supabase.
         
         Args:
@@ -128,14 +128,18 @@ class SyncHandler:
         
         try:
             return self.client.test_connection()
-        except:
+        except Exception:
             return False
 ```
 
 ### 2. Update src/dr_exp/worker/base.py
 Add this import at the top:
 ```python
+from typing import Optional, Dict, Any
+import threading
+from pathlib import Path
 from ..sync.sync_handler import SyncHandler
+from ..sync.queue import SyncQueue
 ```
 
 Replace the `__init__` method with:
@@ -210,7 +214,7 @@ Replace the `__init__` method with:
 
 Add this method after `run_one_job`:
 ```python
-    def _sync_job_on_completion(self, job_id: str):
+    def _sync_job_on_completion(self, job_id: str) -> None:
         """Sync job data to Supabase after completion.
         
         Args:
@@ -252,6 +256,9 @@ Update the `run_one_job` method to call sync after job completion:
 ### 3. Update src/dr_exp/cli/main.py
 Update the worker command to support Supabase credentials:
 ```python
+import sys
+import click
+from typing import Optional
 @cli.command()
 @click.option('--worker-id', required=True, help='Unique worker ID')
 @click.option('--working-dir', help='Working directory for job execution')
@@ -260,9 +267,9 @@ Update the worker command to support Supabase credentials:
 @click.option('--supabase-url', envvar='SUPABASE_URL', help='Supabase URL')
 @click.option('--supabase-key', envvar='SUPABASE_KEY', help='Supabase service key')
 @click.pass_context
-def worker(ctx, worker_id: str, working_dir: Optional[str], 
+def worker(ctx: click.Context, worker_id: str, working_dir: Optional[str], 
            max_jobs: Optional[int], no_sync: bool,
-           supabase_url: Optional[str], supabase_key: Optional[str]):
+           supabase_url: Optional[str], supabase_key: Optional[str]) -> None:
     """Run a worker to process jobs."""
     job_db = ctx.obj['job_db']
     
@@ -312,8 +319,11 @@ def worker(ctx, worker_id: str, working_dir: Optional[str],
 import tempfile
 import time
 import os
+import json
 import pytest
 from pathlib import Path
+from typing import Dict, Any, List, Optional, Tuple
+from datetime import datetime, UTC
 from dotenv import load_dotenv
 
 from src.dr_exp.core.job_db import JobDB
@@ -321,7 +331,7 @@ from src.dr_exp.worker.base import Worker
 from src.dr_exp.sync.supabase_client import SupabaseClient
 
 
-def setup_test_env():
+def setup_test_env() -> None:
     """Load test environment variables."""
     env_file = Path(".env.test")
     if env_file.exists():
@@ -331,13 +341,13 @@ def setup_test_env():
         os.environ["SUPABASE_KEY"] = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZS1kZW1vIiwicm9sZSI6InNlcnZpY2Vfcm9sZSIsImV4cCI6MTk4MzgxMjk5Nn0.EGIM96RAZx35lJzdJsyH-qQwv8Hdp7fsn3W0YpN81IU"
 
 
-def test_worker_with_supabase_sync():
+def test_worker_with_supabase_sync() -> None:
     """Test worker with real Supabase sync."""
     setup_test_env()
     
     with tempfile.TemporaryDirectory() as tmpdir:
         # Initialize JobDB
-        job_db = JobDB(base_path=tmpdir, experiment_name="worker_sync_test")
+        job_db = JobDB(base_path=tmpdir, experiment_name="worker_sync_test", validate=False)
         
         # Create a test job
         config = {
@@ -359,8 +369,6 @@ def test_worker_with_supabase_sync():
         assert worker.sync_handler.enabled
         assert worker.sync_handler.experiment_id is not None
         
-        assert worker.sync_handler.experiment_id is not None
-        
         # Run the job
         stats = worker.run(max_jobs=1)
         assert stats["completed"] == 1
@@ -377,8 +385,6 @@ def test_worker_with_supabase_sync():
         assert jobs[0]["id"] == job_id
         assert jobs[0]["status"] == "completed"
         
-        assert jobs[0]["status"] == "completed"
-        
         # Check files were synced
         sync_records = client.get_job_sync_status(job_id)
         assert len(sync_records) > 0
@@ -387,22 +393,18 @@ def test_worker_with_supabase_sync():
         synced_types = {record["file_type"] for record in sync_records}
         assert "metrics" in synced_types or "model" in synced_types
         
-        assert len(sync_records) > 0
-        
         # Verify sync queue is processed
         sync_stats = worker.sync_queue.get_stats()
         assert sync_stats["completed"] > 0
         assert sync_stats["pending"] == 0  # All processed
-        
-        assert sync_stats["pending"] == 0  # All processed
 
 
-def test_worker_sync_failure_handling():
+def test_worker_sync_failure_handling() -> None:
     """Test worker handles sync failures gracefully."""
     setup_test_env()
     
     with tempfile.TemporaryDirectory() as tmpdir:
-        job_db = JobDB(base_path=tmpdir, experiment_name="sync_failure_test")
+        job_db = JobDB(base_path=tmpdir, experiment_name="sync_failure_test", validate=False)
         
         # Create job
         config = {
@@ -430,16 +432,14 @@ def test_worker_sync_failure_handling():
         # Job should complete locally
         job = job_db.get_job(job_id)
         assert job["status"] == "completed"
-        
-        assert job["status"] == "completed"
 
 
-def test_worker_without_sync():
+def test_worker_without_sync() -> None:
     """Test worker with sync explicitly disabled."""
     setup_test_env()
     
     with tempfile.TemporaryDirectory() as tmpdir:
-        job_db = JobDB(base_path=tmpdir, experiment_name="no_sync_test")
+        job_db = JobDB(base_path=tmpdir, experiment_name="no_sync_test", validate=False)
         
         # Create job
         config = {
@@ -467,16 +467,14 @@ def test_worker_without_sync():
         sync_stats = worker.sync_queue.get_stats()
         assert sync_stats["pending"] > 0  # Files queued
         assert sync_stats["completed"] == 0  # Nothing synced
-        
-        assert sync_stats["completed"] == 0  # Nothing synced
 
 
-def test_sync_retry_logic():
+def test_sync_retry_logic() -> None:
     """Test that sync retries failed uploads."""
     setup_test_env()
     
     with tempfile.TemporaryDirectory() as tmpdir:
-        job_db = JobDB(base_path=tmpdir, experiment_name="retry_test")
+        job_db = JobDB(base_path=tmpdir, experiment_name="retry_test", validate=False)
         
         # Create a job that produces files
         config = {
@@ -528,14 +526,14 @@ def test_sync_retry_logic():
             assert failed_items[0].attempts > 0
 
 
-def test_experiment_isolation():
+def test_experiment_isolation() -> None:
     """Test that different experiments are isolated."""
     setup_test_env()
     
     with tempfile.TemporaryDirectory() as tmpdir:
         # Create two experiments
-        job_db1 = JobDB(base_path=tmpdir, experiment_name="exp1")
-        job_db2 = JobDB(base_path=tmpdir, experiment_name="exp2")
+        job_db1 = JobDB(base_path=tmpdir, experiment_name="exp1", validate=False)
+        job_db2 = JobDB(base_path=tmpdir, experiment_name="exp2", validate=False)
         
         # Create jobs in each
         config = {"_target_": "src.dr_exp.trainers.test_trainer.train", "epochs": 1}
@@ -564,11 +562,9 @@ def test_experiment_isolation():
         assert len(exp2_jobs) == 1
         assert exp1_jobs[0]["id"] == job1
         assert exp2_jobs[0]["id"] == job2
-        
-        assert exp2_jobs[0]["id"] == job2
 
 
-def test_cli_integration():
+def test_cli_integration() -> None:
     """Test CLI with Supabase sync."""
     setup_test_env()
     
@@ -614,8 +610,6 @@ epochs: 2
         
         assert result.exit_code == 0
         assert 'Sync: enabled (Supabase connected)' in result.output
-        assert "'completed': 1" in result.output
-        
         assert "'completed': 1" in result.output
 
 

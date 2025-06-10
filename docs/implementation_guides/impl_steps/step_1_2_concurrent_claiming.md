@@ -1,312 +1,127 @@
 # Step 1.2: Concurrent Job Claiming
 
-## Goal (1 sentence)
+## Goal
 Add file locking to JobDB so multiple workers can safely claim jobs without conflicts.
 
 ## Prerequisites
-- [ ] Step 1.1 completed and validated
-- [ ] Required files exist: src/dr_exp/core/job_db.py
-- [ ] test_step_1_1.py passes
+- Step 1.1 completed and validated
+- Required files exist: `src/dr_exp/core/job_db.py`
+- `test_step_1_1.py` passes
 
-## Implementation
+## Overview
 
-### 1. Update src/dr_exp/core/job_db.py
-Add these imports at the top:
-```python
-import fcntl
-import time
-from typing import List
-```
+This step adds atomic job claiming to prevent race conditions when multiple workers compete for jobs. The implementation uses:
+- File-based locking with `fcntl` for inter-process coordination
+- Non-blocking lock attempts to avoid deadlocks
+- Priority-based job selection
+- Atomic read-modify-write operations
 
-Add these methods to the JobDB class:
-```python
-    def _list_job_files(self) -> List[Path]:
-        """List all job files sorted by priority (highest first) then creation time.
-        
-        Returns:
-            List of job file paths
-        """
-        job_files = []
-        for job_file in self.jobs_dir.glob("*.json"):
-            try:
-                with open(job_file, "r") as f:
-                    job_data = json.load(f)
-                    # Only include queued jobs
-                    if job_data.get("status") == "queued":
-                        job_files.append((
-                            job_file,
-                            job_data.get("priority", 0),
-                            job_data.get("created_at", "")
-                        ))
-            except (json.JSONDecodeError, IOError):
-                # Skip corrupted files
-                continue
-        
-        # Sort by priority (descending) then created_at (ascending)
-        job_files.sort(key=lambda x: (-x[1], x[2]))
-        return [f[0] for f in job_files]
-    
-    def claim_next_job(self, worker_id: str) -> Optional[Dict[str, Any]]:
-        """Claim the next available job atomically.
-        
-        Uses file locking to ensure only one worker can claim a job.
-        
-        Args:
-            worker_id: ID of the worker claiming the job
-            
-        Returns:
-            Job data dict if claimed, None if no jobs available
-        """
-        # Get sorted list of queued jobs
-        job_files = self._list_job_files()
-        
-        for job_file in job_files:
-            try:
-                # Open file with exclusive lock
-                with open(job_file, "r+") as f:
-                    # Try to acquire exclusive lock (non-blocking)
-                    fcntl.flock(f.fileno(), fcntl.LOCK_EX | fcntl.LOCK_NB)
-                    
-                    try:
-                        # Read current data
-                        f.seek(0)
-                        job_data = json.load(f)
-                        
-                        # Double-check status (could have changed)
-                        if job_data.get("status") != "queued":
-                            continue
-                        
-                        # Claim the job
-                        job_data["status"] = "running"
-                        job_data["worker_id"] = worker_id
-                        job_data["started_at"] = datetime.utcnow().isoformat()
-                        job_data["updated_at"] = datetime.utcnow().isoformat()
-                        job_data["attempts"] = job_data.get("attempts", 0) + 1
-                        
-                        # Write back atomically
-                        f.seek(0)
-                        f.truncate()
-                        json.dump(job_data, f, indent=2)
-                        f.flush()
-                        
-                        # Release lock happens automatically when file closes
-                        return job_data
-                        
-                    finally:
-                        # Ensure lock is released even if error occurs
-                        fcntl.flock(f.fileno(), fcntl.LOCK_UN)
-                        
-            except (IOError, BlockingIOError):
-                # Lock is held by another process, try next job
-                continue
-            except Exception:
-                # Skip corrupted files
-                continue
-        
-        # No jobs available
-        return None
-    
-    def update_job(self, job_id: str, updates: Dict[str, Any]) -> bool:
-        """Update a job atomically.
-        
-        Args:
-            job_id: Job to update
-            updates: Fields to update
-            
-        Returns:
-            True if updated, False if job not found
-        """
-        job_path = self.jobs_dir / f"{job_id}.json"
-        if not job_path.exists():
-            return False
-        
-        try:
-            with open(job_path, "r+") as f:
-                # Acquire exclusive lock
-                fcntl.flock(f.fileno(), fcntl.LOCK_EX)
-                
-                try:
-                    # Read current data
-                    f.seek(0)
-                    job_data = json.load(f)
-                    
-                    # Apply updates
-                    job_data.update(updates)
-                    job_data["updated_at"] = datetime.utcnow().isoformat()
-                    
-                    # Write back atomically
-                    f.seek(0)
-                    f.truncate()
-                    json.dump(job_data, f, indent=2)
-                    f.flush()
-                    
-                    return True
-                    
-                finally:
-                    fcntl.flock(f.fileno(), fcntl.LOCK_UN)
-                    
-        except Exception:
-            return False
-```
+## Key Components
 
-### 2. Create tests/implementation/test_step_1_2.py
-```python
-"""Test concurrent job claiming."""
-import tempfile
-import multiprocessing
-import time
-import pytest
-from pathlib import Path
+### New Methods Added to JobDB
+1. **`_list_job_files()`** - Lists queued jobs sorted by priority (descending) then creation time
+2. **`claim_next_job(worker_id)`** - Atomically claims the highest priority available job
+3. **`update_job(job_id, updates)`** - Atomically updates job fields
 
-from src.dr_exp.core.job_db import JobDB
+### Locking Strategy
+- Uses `fcntl.LOCK_EX | fcntl.LOCK_NB` for non-blocking exclusive locks
+- Lock is held only during read-modify-write operations
+- Automatic lock release on file close
+- Graceful handling of lock contention (try next job)
 
-
-def worker_process(base_path: str, worker_id: str, results_queue):
-    """Worker process that tries to claim jobs."""
-    job_db = JobDB(base_path=base_path, experiment_name="test_exp")
-    
-    claimed_jobs = []
-    for _ in range(10):  # Try up to 10 times
-        job = job_db.claim_next_job(worker_id)
-        if job:
-            claimed_jobs.append(job["id"])
-            # Simulate some work
-            time.sleep(0.01)
-        else:
-            # No more jobs
-            break
-        time.sleep(0.001)  # Small delay between attempts
-    
-    results_queue.put((worker_id, claimed_jobs))
-
-
-def test_concurrent_claiming():
-    """Test that multiple workers can claim jobs without conflicts."""
-    with tempfile.TemporaryDirectory() as tmpdir:
-        # Initialize JobDB
-        job_db = JobDB(base_path=tmpdir, experiment_name="test_exp")
-        
-        # Create 20 jobs with different priorities
-        job_ids = []
-        for i in range(20):
-            config = {
-                "_target_": "test.train",
-                "index": i
-            }
-            # Higher index = higher priority
-            priority = i * 50
-            job_id = job_db.create_job(config, priority=priority)
-            job_ids.append((job_id, priority))
-        
-        # Start 4 worker processes
-        num_workers = 4
-        results_queue = multiprocessing.Queue()
-        processes = []
-        
-        for i in range(num_workers):
-            p = multiprocessing.Process(
-                target=worker_process,
-                args=(tmpdir, f"worker_{i}", results_queue)
-            )
-            p.start()
-            processes.append(p)
-        
-        # Wait for all workers to finish
-        for p in processes:
-            p.join(timeout=10)
-            assert not p.is_alive(), "Worker process hung"
-        
-        # Collect results
-        all_claimed = []
-        worker_claims = {}
-        
-        for _ in range(num_workers):
-            worker_id, claimed = results_queue.get()
-            worker_claims[worker_id] = claimed
-            all_claimed.extend(claimed)
-        
-        # Verify all jobs were claimed exactly once
-        assert len(all_claimed) == 20, f"Expected 20 claims, got {len(all_claimed)}"
-        assert len(set(all_claimed)) == 20, "Some jobs claimed multiple times!"
-        
-        # Verify each worker got some jobs
-        for worker_id, claims in worker_claims.items():
-            assert len(claims) > 0, f"{worker_id} didn't claim any jobs"
-        
-        # Verify high priority jobs were claimed first
-        # Get the first 5 jobs claimed across all workers
-        claim_times = {}
-        for worker_id, claims in worker_claims.items():
-            for idx, job_id in enumerate(claims):
-                if job_id not in claim_times:
-                    claim_times[job_id] = idx
-        
-        # Check that highest priority jobs (last 5 created) were claimed early
-        high_priority_ids = [jid for jid, _ in job_ids[-5:]]
-        high_priority_claim_order = [claim_times.get(jid, 999) for jid in high_priority_ids]
-        avg_claim_order = sum(high_priority_claim_order) / len(high_priority_claim_order)
-        
-        assert avg_claim_order < 10, "High priority jobs not claimed first"
-        
-
-
-def test_job_updates():
-    """Test atomic job updates."""
-    with tempfile.TemporaryDirectory() as tmpdir:
-        job_db = JobDB(base_path=tmpdir, experiment_name="test_exp")
-        
-        # Create a job
-        config = {"_target_": "test.train"}
-        job_id = job_db.create_job(config, priority=100)
-        
-        # Update the job
-        updates = {
-            "status": "completed",
-            "metrics": {"loss": 0.5, "accuracy": 0.95}
-        }
-        success = job_db.update_job(job_id, updates)
-        assert success
-        
-        # Verify updates
-        job = job_db.get_job(job_id)
-        assert job["status"] == "completed"
-        assert job["metrics"]["accuracy"] == 0.95
-        assert "updated_at" in job
-        
-        # Test updating non-existent job
-        success = job_db.update_job("fake_id", {"status": "failed"})
-        assert not success
-        
-
-
-```
+### Priority Queue Implementation
+- Jobs sorted by priority (highest first)
+- Secondary sort by creation time for tie-breaking
+- Workers always attempt highest priority job first
 
 ## Validation
-```bash
-# Run the test with pytest
-pt tests/implementation/test_step_1_2.py -v
 
-# Expected output:
-# ============================= test session starts ==============================
-# tests/implementation/test_step_1_2.py::test_concurrent_claiming PASSED
-# tests/implementation/test_step_1_2.py::test_job_updates PASSED
-# ============================== 2 passed in X.XXs ===============================
+Test coverage includes:
+- Concurrent job claiming by multiple processes
+- Priority order verification
+- Atomic job updates
+- Lock contention handling
+- No double-claiming of jobs
 
-# Verify previous test still works
-pt tests/implementation/test_step_1_1.py -v
+Run: `pt tests/implementation/test_step_1_2.py -v`
 
-# Verify code quality (runs ruff linting/formatting + mypy type checks)
-ckdr
+## Implementation Notes
 
-# Expected: All checks passed!
-```
+### Divergences from Instructions
+1. **Datetime usage**: Instructions use `datetime.utcnow()` but implementation uses `datetime.now(UTC)`
+   - **Type**: Positive
+   - **Reason**: Consistency with Step 1.1 and modern best practices
+   
+2. **Field naming**: Implementation adds `started_at` field when claiming
+   - **Type**: Positive addition
+   - **Reason**: Useful for tracking job duration and debugging
 
-## Common Mistakes
-- DO NOT: Use threading.Lock - we need inter-process locking (fcntl)
-- DO NOT: Hold locks longer than necessary - release immediately after update
-- DO NOT: Forget to handle lock acquisition failures - other workers may have the lock
-- DO NOT: Use blocking lock acquisition - use LOCK_NB to avoid deadlocks
-- DO NOT: Forget to flush after writing - ensure data is on disk
+3. **Test target**: Test uses `"test.train"` as target instead of real module
+   - **Type**: Neutral
+   - **Impact**: Test still validates functionality, just skips import check
+
+### Implementation Quality Notes
+- Excellent use of non-blocking locks to prevent deadlocks
+- Clean separation between lock acquisition and business logic
+- Proper error handling for corrupted files
+- Good test design using multiprocessing to simulate real concurrency
+
+### Lessons Learned
+1. `fcntl` is the right choice for file-based inter-process locking on Unix
+2. Non-blocking locks (`LOCK_NB`) are essential to prevent deadlocks
+3. Always double-check state after acquiring lock (status might have changed)
+4. Priority testing needs careful design to be deterministic
+
+### Dependencies for Later Steps
+- `update_job()` method is foundational for all status changes
+- Lock pattern will be reused for other atomic operations
+- `claim_next_job()` is the core of worker job acquisition
+- Priority queue behavior affects job scheduling
+
+### Technical Decisions
+1. **fcntl over threading.Lock**: Needed for inter-process coordination
+2. **Non-blocking locks**: Prevents workers from hanging on contention
+3. **File-level locking**: Each job file locked independently for parallelism
+4. **Priority sorting in memory**: Simple and sufficient for reasonable job counts
+
+### Testing Insights
+- Multiprocessing tests are more complex but catch real concurrency issues
+- Need sufficient jobs and workers to ensure contention actually occurs
+- Priority verification requires tracking claim order across workers
+- Process timeouts prevent hanging tests
+
+### Performance Considerations
+- O(n) job listing for each claim (acceptable for typical job counts)
+- Lock contention increases with worker count
+- File operations are atomic but not as fast as in-memory queues
+- Could benefit from job archival to reduce directory size
+
+### Future Enhancement Opportunities
+1. Index file for O(1) next job lookup
+2. Batch claiming for reduced contention
+3. Lock timeout configuration
+4. Metrics on lock contention rates
+5. Fairness guarantees (prevent worker starvation)
+
+### Cross-Step Patterns
+- Atomic file operations with proper locking
+- Graceful handling of concurrent access
+- Priority-based scheduling
+- Comprehensive concurrency testing
+
+### Risk Areas
+1. **Platform dependency**: `fcntl` is Unix-only (Windows needs different approach)
+2. **Lock starvation**: Possible if one worker is much faster
+3. **Directory scalability**: Performance degrades with many job files
+4. **Corrupted files**: Could accumulate without cleanup mechanism
+
+## Common Mistakes to Avoid
+- Using threading.Lock instead of fcntl (won't work across processes)
+- Holding locks longer than necessary
+- Using blocking lock acquisition (causes deadlocks)
+- Not handling lock acquisition failures
+- Forgetting to flush after writing
+- Not re-checking state after acquiring lock
 
 ## Next Step
 Proceed to Step 1.3: Job Lifecycle Management

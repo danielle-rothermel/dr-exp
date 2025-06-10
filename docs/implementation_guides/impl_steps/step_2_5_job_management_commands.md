@@ -11,14 +11,31 @@ Add CLI commands for killing jobs, boosting priority, recovering stale jobs, and
 ## Implementation
 
 ### 1. Update src/dr_exp/cli/main.py
-Add these commands after the existing ones:
+Add these imports at the top of the file:
+```python
+import time
+import sys
+import os
+from pathlib import Path
+from typing import Optional, Tuple
+from datetime import datetime, UTC
+
+from ..sync.queue import SyncItem
+```
+
+Then add these commands after the existing ones:
 ```python
 @cli.command()
 @click.argument('job_ids', nargs=-1, required=True)
 @click.pass_context
-def kill(ctx, job_ids):
+def kill(ctx: click.Context, job_ids: Tuple[str, ...]) -> None:
     """Kill one or more jobs."""
-    job_db = ctx.obj['job_db']
+    # Create JobDB instance for this command
+    from ..core.job_db import JobDB
+    job_db = JobDB(
+        base_path=ctx.obj['base_path'],
+        experiment_name=ctx.obj['experiment']
+    )
     
     killed = 0
     for job_id in job_ids:
@@ -33,7 +50,7 @@ def kill(ctx, job_ids):
                 click.echo(f"  {job['id']}", err=True)
         else:
             full_job_id = matching_jobs[0]['id']
-            if job_db.kill_job(full_job_id):
+            if job_db.mark_job_failed(full_job_id, "User requested kill"):
                 click.echo(f"Killed job: {full_job_id}")
                 killed += 1
             else:
@@ -49,9 +66,14 @@ def kill(ctx, job_ids):
 @click.argument('job_ids', nargs=-1, required=True)
 @click.option('--priority', type=int, required=True, help='New priority (0-1000)')
 @click.pass_context
-def boost(ctx, job_ids, priority: int):
+def boost(ctx: click.Context, job_ids: Tuple[str, ...], priority: int) -> None:
     """Boost priority of one or more jobs."""
-    job_db = ctx.obj['job_db']
+    # Create JobDB instance for this command
+    from ..core.job_db import JobDB
+    job_db = JobDB(
+        base_path=ctx.obj['base_path'],
+        experiment_name=ctx.obj['experiment']
+    )
     
     boosted = 0
     for job_id in job_ids:
@@ -68,7 +90,8 @@ def boost(ctx, job_ids, priority: int):
             full_job_id = matching_jobs[0]['id']
             old_priority = matching_jobs[0].get('priority', 0)
             
-            if job_db.boost_priority(full_job_id, priority):
+            # boost_priority expects a list
+            if job_db.boost_priority([full_job_id], priority) > 0:
                 click.echo(f"Boosted job: {full_job_id} ({old_priority} → {priority})")
                 boosted += 1
             else:
@@ -84,14 +107,19 @@ def boost(ctx, job_ids, priority: int):
 @click.option('--threshold', type=int, default=300, help='Seconds before considering job stale')
 @click.option('--dry-run', is_flag=True, help='Show what would be recovered without doing it')
 @click.pass_context
-def recover(ctx, threshold: int, dry_run: bool):
+def recover(ctx: click.Context, threshold: int, dry_run: bool) -> None:
     """Recover stale jobs that have stopped heartbeating."""
-    job_db = ctx.obj['job_db']
+    # Create JobDB instance for this command
+    from ..core.job_db import JobDB
+    job_db = JobDB(
+        base_path=ctx.obj['base_path'],
+        experiment_name=ctx.obj['experiment']
+    )
     
     if dry_run:
         # Get stale jobs manually
-        from datetime import datetime, timedelta
-        now = datetime.utcnow()
+        from datetime import datetime, timedelta, UTC
+        now = datetime.now(UTC)
         
         stale_jobs = []
         for job in job_db.list_jobs(status='running'):
@@ -125,7 +153,7 @@ def recover(ctx, threshold: int, dry_run: bool):
 @cli.command()
 @click.option('--verbose', is_flag=True, help='Show detailed sync information')
 @click.pass_context
-def sync_status(ctx, verbose: bool):
+def sync_status(ctx: click.Context, verbose: bool) -> None:
     """Show sync queue status."""
     from ..sync.queue import SyncQueue
     
@@ -163,9 +191,14 @@ def sync_status(ctx, verbose: bool):
 @click.option('--no-sync', is_flag=True, help='Disable sync for debugging')
 @click.option('--working-dir', help='Working directory for execution')
 @click.pass_context
-def run_one(ctx, job_id: str, no_sync: bool, working_dir: Optional[str]):
+def run_one(ctx: click.Context, job_id: str, no_sync: bool, working_dir: Optional[str]) -> None:
     """Run a specific job immediately (for debugging)."""
-    job_db = ctx.obj['job_db']
+    # Create JobDB instance for this command
+    from ..core.job_db import JobDB
+    job_db = JobDB(
+        base_path=ctx.obj['base_path'],
+        experiment_name=ctx.obj['experiment']
+    )
     
     # Find the job
     matching_jobs = [j for j in job_db.list_jobs() if j['id'].startswith(job_id)]
@@ -208,7 +241,7 @@ def run_one(ctx, job_id: str, no_sync: bool, working_dir: Optional[str]):
     )
     
     # Simple sync function
-    def print_sync(item):
+    def print_sync(item: SyncItem) -> None:
         print(f"[SYNC] Would upload: {item.file_type} - {Path(item.file_path).name}")
     
     worker.sync_fn = print_sync
@@ -244,9 +277,14 @@ def run_one(ctx, job_id: str, no_sync: bool, working_dir: Optional[str]):
 
 @cli.command()
 @click.pass_context
-def validate(ctx):
+def validate(ctx: click.Context) -> None:
     """Validate experiment setup and configuration."""
-    job_db = ctx.obj['job_db']
+    # Create JobDB instance for this command
+    from ..core.job_db import JobDB
+    job_db = JobDB(
+        base_path=ctx.obj['base_path'],
+        experiment_name=ctx.obj['experiment']
+    )
     exp_path = Path(ctx.obj['base_path']) / ctx.obj['experiment']
     
     issues = []
@@ -272,8 +310,7 @@ def validate(ctx):
             # Check job health
             running_jobs = [j for j in jobs if j['status'] == 'running']
             if running_jobs:
-                from datetime import datetime
-                now = datetime.utcnow()
+                now = datetime.now(UTC)
                 
                 for job in running_jobs:
                     last_heartbeat = job.get('last_heartbeat')
@@ -308,8 +345,6 @@ def validate(ctx):
     sys.exit(1 if issues else 0)
 
 
-# Add this import at the top of the file
-import time
 ```
 
 ### 2. Create tests/implementation/test_step_2_5.py
@@ -319,20 +354,21 @@ import tempfile
 import time
 import pytest
 from pathlib import Path
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, UTC
 from click.testing import CliRunner
+import json
 
 from src.dr_exp.cli.main import cli
 from src.dr_exp.core.job_db import JobDB
 
 
-def test_cli_kill():
+def test_cli_kill() -> None:
     """Test killing jobs."""
     runner = CliRunner()
     
     with tempfile.TemporaryDirectory() as tmpdir:
         # Create jobs
-        job_db = JobDB(base_path=tmpdir, experiment_name='test_exp')
+        job_db = JobDB(base_path=tmpdir, experiment_name='test_exp', validate=False)
         config = {'_target_': 'test.train'}
         
         job1 = job_db.create_job(config)
@@ -349,9 +385,10 @@ def test_cli_kill():
         assert result.exit_code == 0
         assert f'Killed job: {job1}' in result.output
         
-        # Verify job is killed
+        # Verify job is failed (killed)
         job = job_db.get_job(job1)
-        assert job['status'] == 'killed'
+        assert job['status'] == 'failed'
+        assert 'Killed' in job.get('error', '')
         
         # Kill running job
         result = runner.invoke(cli, [
@@ -374,13 +411,13 @@ def test_cli_kill():
         
 
 
-def test_cli_boost():
+def test_cli_boost() -> None:
     """Test boosting job priority."""
     runner = CliRunner()
     
     with tempfile.TemporaryDirectory() as tmpdir:
         # Create jobs
-        job_db = JobDB(base_path=tmpdir, experiment_name='test_exp')
+        job_db = JobDB(base_path=tmpdir, experiment_name='test_exp', validate=False)
         config = {'_target_': 'test.train'}
         
         job1 = job_db.create_job(config, priority=100)
@@ -414,20 +451,20 @@ def test_cli_boost():
         
 
 
-def test_cli_recover():
+def test_cli_recover() -> None:
     """Test recovering stale jobs."""
     runner = CliRunner()
     
     with tempfile.TemporaryDirectory() as tmpdir:
         # Create stale job
-        job_db = JobDB(base_path=tmpdir, experiment_name='test_exp')
+        job_db = JobDB(base_path=tmpdir, experiment_name='test_exp', validate=False)
         config = {'_target_': 'test.train'}
         
         job_id = job_db.create_job(config)
         job_db.claim_next_job('worker')
         
         # Make it stale by backdating
-        old_time = (datetime.utcnow() - timedelta(minutes=10)).isoformat()
+        old_time = (datetime.now(UTC) - timedelta(minutes=10)).isoformat()
         job_db.update_job(job_id, {'started_at': old_time})
         
         # Test dry run
@@ -460,13 +497,13 @@ def test_cli_recover():
         
 
 
-def test_cli_sync_status():
+def test_cli_sync_status() -> None:
     """Test sync status command."""
     runner = CliRunner()
     
     with tempfile.TemporaryDirectory() as tmpdir:
         # Create experiment with sync items
-        job_db = JobDB(base_path=tmpdir, experiment_name='test_exp')
+        job_db = JobDB(base_path=tmpdir, experiment_name='test_exp', validate=False)
         
         # Add some sync items
         from src.dr_exp.sync.queue import SyncQueue, SyncItem
@@ -479,7 +516,7 @@ def test_cli_sync_status():
             file_path='/tmp/file1.txt',
             file_type='metrics',
             metadata={},
-            created_at=datetime.utcnow().isoformat()
+            created_at=datetime.now(UTC).isoformat()
         )
         sync_queue.add_item(item1)
         
@@ -490,7 +527,7 @@ def test_cli_sync_status():
             file_path='/tmp/file2.txt',
             file_type='model',
             metadata={},
-            created_at=datetime.utcnow().isoformat()
+            created_at=datetime.now(UTC).isoformat()
         )
         sync_queue.add_item(item2)
         sync_queue.mark_attempt('sync2', 'Network error')
@@ -522,13 +559,13 @@ def test_cli_sync_status():
         
 
 
-def test_cli_run_one():
+def test_cli_run_one() -> None:
     """Test running a single job."""
     runner = CliRunner()
     
     with tempfile.TemporaryDirectory() as tmpdir:
         # Create a job
-        job_db = JobDB(base_path=tmpdir, experiment_name='test_exp')
+        job_db = JobDB(base_path=tmpdir, experiment_name='test_exp', validate=False)
         config = {
             '_target_': 'src.dr_exp.trainers.test_trainer.train',
             'epochs': 2
@@ -567,7 +604,7 @@ def test_cli_run_one():
         
 
 
-def test_cli_validate():
+def test_cli_validate() -> None:
     """Test experiment validation."""
     runner = CliRunner()
     
@@ -602,13 +639,13 @@ def test_cli_validate():
         assert 'No jobs found' in result.output  # Warning
         
         # Add a stale job
-        job_db = JobDB(base_path=tmpdir, experiment_name='good_exp')
+        job_db = JobDB(base_path=tmpdir, experiment_name='good_exp', validate=False)
         config = {'_target_': 'test.train'}
         job_id = job_db.create_job(config)
         job_db.claim_next_job('worker')
         
         # Backdate to make stale
-        old_time = (datetime.utcnow() - timedelta(minutes=10)).isoformat()
+        old_time = (datetime.now(UTC) - timedelta(minutes=10)).isoformat()
         job_db.update_job(job_id, {'last_heartbeat': old_time})
         
         # Validate with stale job
@@ -623,13 +660,13 @@ def test_cli_validate():
         
 
 
-def test_cli_partial_id_matching():
+def test_cli_partial_id_matching() -> None:
     """Test partial job ID matching."""
     runner = CliRunner()
     
     with tempfile.TemporaryDirectory() as tmpdir:
         # Create jobs with similar IDs
-        job_db = JobDB(base_path=tmpdir, experiment_name='test_exp')
+        job_db = JobDB(base_path=tmpdir, experiment_name='test_exp', validate=False)
         config = {'_target_': 'test.train'}
         
         # Create multiple jobs

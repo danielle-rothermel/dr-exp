@@ -86,20 +86,25 @@ echo "SLURM job completed at $(date)"
 import json
 import click
 from pathlib import Path
-from datetime import datetime
+from datetime import datetime, UTC
 
 
 @click.group()
-def slurm():
+def slurm() -> None:
     """SLURM job management commands."""
     pass
 
 
 @slurm.command()
 @click.pass_context
-def status(ctx):
+def status(ctx) -> None:
     """Show status of all SLURM jobs for this experiment."""
-    job_db = ctx.obj['job_db']
+    # Create JobDB instance for this command
+    from dr_exp.core.job_db import JobDB
+    job_db = JobDB(
+        base_path=ctx.obj['base_path'],
+        experiment_name=ctx.obj['experiment']
+    )
     logs_dir = job_db.logs_dir
     
     if not logs_dir.exists():
@@ -147,9 +152,14 @@ def status(ctx):
 @click.option('--finish-current', is_flag=True, help='Finish current jobs then stop')
 @click.option('--stop-now', is_flag=True, help='Stop immediately')
 @click.pass_context
-def control(ctx, job_id: str, finish_current: bool, stop_now: bool):
+def control(ctx, job_id: str, finish_current: bool, stop_now: bool) -> None:
     """Send control commands to a SLURM job."""
-    job_db = ctx.obj['job_db']
+    # Create JobDB instance for this command
+    from dr_exp.core.job_db import JobDB
+    job_db = JobDB(
+        base_path=ctx.obj['base_path'],
+        experiment_name=ctx.obj['experiment']
+    )
     
     if finish_current:
         control_file = job_db.control_dir / f'finish_current_{job_id}'
@@ -167,9 +177,14 @@ def control(ctx, job_id: str, finish_current: bool, stop_now: bool):
 @click.argument('job_id')
 @click.option('--tail', default=50, help='Number of lines to show')
 @click.pass_context
-def errors(ctx, job_id: str, tail: int):
+def errors(ctx, job_id: str, tail: int) -> None:
     """View aggregated errors from a SLURM job."""
-    job_db = ctx.obj['job_db']
+    # Create JobDB instance for this command
+    from dr_exp.core.job_db import JobDB
+    job_db = JobDB(
+        base_path=ctx.obj['base_path'],
+        experiment_name=ctx.obj['experiment']
+    )
     error_log = job_db.logs_dir / f'slurm_{job_id}' / 'errors.log'
     
     if not error_log.exists():
@@ -185,12 +200,17 @@ def errors(ctx, job_id: str, tail: int):
 
 @slurm.command()  
 @click.argument('job_id')
-@click.option('--worker', help='Specific worker ID')
+@click.option('--worker', default=None, help='Specific worker ID')
 @click.option('--tail', default=50, help='Number of lines to show')
 @click.pass_context
-def logs(ctx, job_id: str, worker: str, tail: int):
+def logs(ctx, job_id: str, worker: str, tail: int) -> None:
     """View logs from a SLURM job."""
-    job_db = ctx.obj['job_db']
+    # Create JobDB instance for this command
+    from dr_exp.core.job_db import JobDB
+    job_db = JobDB(
+        base_path=ctx.obj['base_path'],
+        experiment_name=ctx.obj['experiment']
+    )
     
     if worker:
         # Specific worker log
@@ -289,7 +309,7 @@ from src.dr_exp.core.job_db import JobDB
 from src.dr_exp.cli.main import cli
 
 
-def test_slurm_status_command():
+def test_slurm_status_command() -> None:
     """Test SLURM status command."""
     with tempfile.TemporaryDirectory() as tmpdir:
         job_db = JobDB(base_path=tmpdir, experiment_name="test_exp", validate=False)
@@ -339,7 +359,7 @@ def test_slurm_status_command():
         
 
 
-def test_slurm_control_commands():
+def test_slurm_control_commands() -> None:
     """Test SLURM control commands."""
     with tempfile.TemporaryDirectory() as tmpdir:
         job_db = JobDB(base_path=tmpdir, experiment_name="test_exp", validate=False)
@@ -372,7 +392,7 @@ def test_slurm_control_commands():
         
 
 
-def test_slurm_error_logs():
+def test_slurm_error_logs() -> None:
     """Test SLURM error log viewing."""
     with tempfile.TemporaryDirectory() as tmpdir:
         job_db = JobDB(base_path=tmpdir, experiment_name="test_exp", validate=False)
@@ -411,7 +431,7 @@ RuntimeError: CUDA out of memory
         
 
 
-def test_slurm_worker_logs():
+def test_slurm_worker_logs() -> None:
     """Test SLURM worker log viewing."""
     with tempfile.TemporaryDirectory() as tmpdir:
         job_db = JobDB(base_path=tmpdir, experiment_name="test_exp", validate=False)
@@ -469,7 +489,7 @@ def test_slurm_worker_logs():
         
 
 
-def test_slurm_environment_handling():
+def test_slurm_environment_handling() -> None:
     """Test SLURM environment variable handling."""
     # Set mock SLURM environment
     with patch.dict(os.environ, {
@@ -501,7 +521,7 @@ def test_slurm_environment_handling():
         
 
 
-def test_batch_script_generation():
+def test_batch_script_generation() -> None:
     """Test that batch script handles parameters correctly."""
     batch_script = Path(__file__).parent.parent / "scripts" / "dr_exp_slurm.sbatch"
     

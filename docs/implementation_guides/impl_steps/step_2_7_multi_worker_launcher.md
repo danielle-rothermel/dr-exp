@@ -22,7 +22,7 @@ import time
 import json
 from pathlib import Path
 from datetime import datetime, UTC
-from typing import List, Dict, Optional, Tuple
+from typing import List, Dict, Optional, Tuple, Any
 import logging
 
 logger = logging.getLogger(__name__)
@@ -39,7 +39,7 @@ class WorkerLauncher:
         workers_per_gpu: int = 2,
         restart_on_failure: bool = True,
         max_runtime_hours: float = 47  # Leave buffer before 48h SLURM limit
-    ):
+    ) -> None:
         """Initialize launcher.
         
         Args:
@@ -214,7 +214,7 @@ class WorkerLauncher:
         
         return None
     
-    def write_status(self):
+    def write_status(self) -> None:
         """Write launcher status to file."""
         worker_status = self.check_worker_health()
         
@@ -240,7 +240,7 @@ class WorkerLauncher:
         with open(status_file, 'w') as f:
             json.dump(status_data, f, indent=2)
     
-    def aggregate_errors(self):
+    def aggregate_errors(self) -> None:
         """Aggregate errors from worker logs."""
         error_file = self.log_dir / "errors.log"
         
@@ -262,7 +262,7 @@ class WorkerLauncher:
                                 errors_found = True
                             err_out.write(line)
     
-    def run(self):
+    def run(self) -> None:
         """Run the launcher main loop."""
         self.running = True
         logger.info(f"Starting launcher on node {self.slurm_node_name}")
@@ -326,7 +326,7 @@ class WorkerLauncher:
         # Final cleanup
         self.cleanup()
     
-    def maintenance(self):
+    def maintenance(self) -> None:
         """Run periodic maintenance tasks."""
         logger.info("Running maintenance")
         
@@ -343,7 +343,7 @@ class WorkerLauncher:
         logger.info(f"Jobs queued: {len(self.job_db.list_jobs(status='queued'))}")
         logger.info(f"Runtime: {(time.time() - self.start_time) / 3600:.1f} hours")
     
-    def stop(self):
+    def stop(self) -> None:
         """Stop all workers immediately."""
         self.running = False
         logger.info("Stopping all workers")
@@ -368,7 +368,7 @@ class WorkerLauncher:
                 except ProcessLookupError:
                     pass
     
-    def finish_current(self):
+    def finish_current(self) -> None:
         """Let workers finish current jobs then stop."""
         self.running = False
         logger.info("Finishing current jobs then stopping")
@@ -389,7 +389,7 @@ class WorkerLauncher:
             
             time.sleep(5)
     
-    def cleanup(self):
+    def cleanup(self) -> None:
         """Final cleanup tasks."""
         logger.info("Running final cleanup")
         
@@ -411,7 +411,7 @@ class WorkerLauncher:
         
         logger.info("Launcher shutdown complete")
     
-    def _handle_signal(self, signum, frame):
+    def _handle_signal(self, signum: int, frame: Any) -> None:
         """Handle shutdown signals."""
         logger.info(f"Received signal {signum}")
         self.stop()
@@ -429,10 +429,15 @@ from dr_exp.worker.launcher import WorkerLauncher
 @click.option('--workers-per-gpu', default=2, help='Workers per GPU')
 @click.option('--max-hours', default=47, help='Maximum runtime in hours')
 @click.pass_context
-def launcher(ctx, workers_per_gpu: int, max_hours: float):
+def launcher(ctx, workers_per_gpu: int, max_hours: float) -> None:
     """Run multi-worker launcher for SLURM jobs."""
-    job_db = ctx.obj['job_db']
-    experiment_name = ctx.obj['experiment_name']
+    # Create JobDB instance for this command
+    from dr_exp.core.job_db import JobDB
+    job_db = JobDB(
+        base_path=ctx.obj['base_path'],
+        experiment_name=ctx.obj['experiment']
+    )
+    experiment_name = ctx.obj['experiment']
     
     # Use logs directory under experiment
     log_dir = job_db.logs_dir
@@ -454,6 +459,7 @@ def launcher(ctx, workers_per_gpu: int, max_hours: float):
 """Send control commands to running launchers."""
 import click
 from pathlib import Path
+from typing import Optional
 
 
 @click.command()
@@ -461,7 +467,7 @@ from pathlib import Path
 @click.option('--base-path', required=True, help='Base experiment path')
 @click.option('--experiment', required=True, help='Experiment name')
 @click.option('--job-id', help='SLURM job ID (defaults to all)')
-def main(command: str, base_path: str, experiment: str, job_id: str = None):
+def main(command: str, base_path: str, experiment: str, job_id: Optional[str] = None) -> None:
     """Send control commands to launcher."""
     control_dir = Path(base_path) / experiment / "control"
     
@@ -514,7 +520,7 @@ from src.dr_exp.core.job_db import JobDB
 from src.dr_exp.worker.launcher import WorkerLauncher
 
 
-def test_launcher_init():
+def test_launcher_init() -> None:
     """Test launcher initialization."""
     with tempfile.TemporaryDirectory() as tmpdir:
         job_db = JobDB(base_path=tmpdir, experiment_name="test_exp", validate=False)
@@ -532,7 +538,7 @@ def test_launcher_init():
         
 
 
-def test_gpu_discovery():
+def test_gpu_discovery() -> None:
     """Test GPU discovery methods."""
     with tempfile.TemporaryDirectory() as tmpdir:
         job_db = JobDB(base_path=tmpdir, experiment_name="test_exp", validate=False)
@@ -557,7 +563,7 @@ def test_gpu_discovery():
         
 
 
-def test_worker_spawning():
+def test_worker_spawning() -> None:
     """Test spawning worker processes."""
     with tempfile.TemporaryDirectory() as tmpdir:
         job_db = JobDB(base_path=tmpdir, experiment_name="test_exp", validate=False)
@@ -589,7 +595,7 @@ def test_worker_spawning():
         
 
 
-def test_health_monitoring():
+def test_health_monitoring() -> None:
     """Test worker health monitoring and restart."""
     with tempfile.TemporaryDirectory() as tmpdir:
         job_db = JobDB(base_path=tmpdir, experiment_name="test_exp", validate=False)
@@ -621,7 +627,7 @@ def test_health_monitoring():
         
 
 
-def test_control_files():
+def test_control_files() -> None:
     """Test control file handling."""
     with tempfile.TemporaryDirectory() as tmpdir:
         job_db = JobDB(base_path=tmpdir, experiment_name="test_exp", validate=False)
@@ -645,7 +651,7 @@ def test_control_files():
         
 
 
-def test_status_writing():
+def test_status_writing() -> None:
     """Test status file generation."""
     with tempfile.TemporaryDirectory() as tmpdir:
         job_db = JobDB(base_path=tmpdir, experiment_name="test_exp", validate=False)
@@ -677,7 +683,7 @@ def test_status_writing():
         
 
 
-def test_graceful_shutdown():
+def test_graceful_shutdown() -> None:
     """Test graceful shutdown behavior."""
     with tempfile.TemporaryDirectory() as tmpdir:
         job_db = JobDB(base_path=tmpdir, experiment_name="test_exp", validate=False)
@@ -711,7 +717,7 @@ def test_graceful_shutdown():
         
 
 
-def test_runtime_limits():
+def test_runtime_limits() -> None:
     """Test runtime limit enforcement."""
     with tempfile.TemporaryDirectory() as tmpdir:
         job_db = JobDB(base_path=tmpdir, experiment_name="test_exp", validate=False)

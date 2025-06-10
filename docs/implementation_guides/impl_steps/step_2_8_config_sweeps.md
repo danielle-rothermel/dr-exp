@@ -144,7 +144,7 @@ from dr_exp.cli.sweep_utils import (
 @click.option('--dry-run', is_flag=True, help='Show configs without creating jobs')
 @click.option('--verbose', is_flag=True, help='Show detailed config information')
 @click.pass_context
-def sweep(ctx, config: str, params: str, priority: int, target: str, dry_run: bool, verbose: bool):
+def sweep(ctx, config: str, params: str, priority: int, target: str, dry_run: bool, verbose: bool) -> None:
     """Submit a parameter sweep based on a config file.
     
     Examples:
@@ -165,7 +165,12 @@ def sweep(ctx, config: str, params: str, priority: int, target: str, dry_run: bo
             --params "batch_size=32,64,128 lr=0.001,0.01" \\
             --dry-run
     """
-    job_db = ctx.obj['job_db']
+    # Create JobDB instance for this command
+    from dr_exp.core.job_db import JobDB
+    job_db = JobDB(
+        base_path=ctx.obj['base_path'],
+        experiment_name=ctx.obj['experiment']
+    )
     
     # Parse sweep parameters
     sweep_params = parse_sweep_params(params)
@@ -285,7 +290,7 @@ from src.dr_exp.cli.sweep_utils import (
 from src.dr_exp.cli.main import cli
 
 
-def test_parse_sweep_params():
+def test_parse_sweep_params() -> None:
     """Test parsing sweep parameter strings."""
     # Basic parsing
     params = parse_sweep_params("model=resnet18,resnet50 lr=0.001,0.01")
@@ -315,7 +320,7 @@ def test_parse_sweep_params():
     
 
 
-def test_generate_configs():
+def test_generate_configs() -> None:
     """Test config generation from sweeps."""
     with tempfile.TemporaryDirectory() as tmpdir:
         # Create test config
@@ -353,7 +358,7 @@ epochs: 10
         
 
 
-def test_validate_config():
+def test_validate_config() -> None:
     """Test config validation."""
     # Valid config
     config = {
@@ -378,7 +383,7 @@ def test_validate_config():
     
 
 
-def test_sweep_cli_dry_run():
+def test_sweep_cli_dry_run() -> None:
     """Test sweep CLI command in dry-run mode."""
     with tempfile.TemporaryDirectory() as tmpdir:
         # Setup
@@ -416,7 +421,7 @@ epochs: 10
         
 
 
-def test_sweep_cli_create_jobs():
+def test_sweep_cli_create_jobs() -> None:
     """Test sweep CLI command creating actual jobs."""
     with tempfile.TemporaryDirectory() as tmpdir:
         # Setup
@@ -457,7 +462,7 @@ batch_size: 32
         
 
 
-def test_sweep_with_target_override():
+def test_sweep_with_target_override() -> None:
     """Test sweep with target override."""
     with tempfile.TemporaryDirectory() as tmpdir:
         job_db = JobDB(base_path=tmpdir, experiment_name="test_exp", validate=False)
@@ -491,7 +496,7 @@ lr: 0.001
         
 
 
-def test_large_sweep_progress():
+def test_large_sweep_progress() -> None:
     """Test progress reporting for large sweeps."""
     with tempfile.TemporaryDirectory() as tmpdir:
         job_db = JobDB(base_path=tmpdir, experiment_name="test_exp", validate=False)

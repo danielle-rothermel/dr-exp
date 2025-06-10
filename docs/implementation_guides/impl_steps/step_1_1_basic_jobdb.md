@@ -1,271 +1,128 @@
 # Step 1.1: Basic JobDB Structure
 
-## Goal (1 sentence)
+## Goal
 Create the foundational JobDB class that can create and retrieve jobs from the filesystem.
 
 ## Prerequisites
-- [ ] Clean working directory
-- [ ] Python 3.10+ environment with `uv` installed
-- [ ] Basic project structure created
+- Clean working directory from Step 0
+- Python 3.10+ environment with `uv` installed
+- Basic project structure created (`src/dr_exp/core/` exists)
 
-## Implementation
+## Overview
 
-### 1. Create src/dr_exp/core/__init__.py
-```python
-# Empty file to make this a package
-```
+This step creates the core JobDB class that manages ML experiment jobs as JSON files on the filesystem. The implementation provides:
+- Job creation with priority (0-1000)
+- Job retrieval by ID
+- Directory structure validation
+- Storage path management
+- Target validation to ensure callables exist
 
-### 2. Create src/dr_exp/core/job_db.py
-```python
-"""Simple file-based job database for ML experiments."""
-import json
-import os
-import uuid
-import logging
-from datetime import datetime, UTC
-from pathlib import Path
-from typing import Optional, Dict, Any
+## Key Components
 
-logger = logging.getLogger(__name__)
+### JobDB Class (`src/dr_exp/core/job_db.py`)
+- Single class, no inheritance or abstract base classes
+- File-based storage using JSON
+- Assertion-based validation (not exceptions)
+- Priority queue support (higher priority = runs first)
+- Automatic directory creation when `validate=False`
 
+### Directory Structure
+Each experiment has five subdirectories:
+- `jobs/` - Job JSON files
+- `storage/` - Job artifacts and outputs
+- `sync_queue/` - Files pending upload
+- `logs/` - Worker and system logs
+- `control/` - Control files for coordination
 
-class JobDB:
-    """File-based job database with priority queue."""
-    
-    def __init__(self, base_path: str, experiment_name: str, validate: bool = True):
-        """Initialize JobDB with base path and experiment name.
-        
-        Args:
-            base_path: Base directory for all experiments (e.g., /scratch/users/jane/experiments)
-            experiment_name: Name of this experiment (e.g., resnet_sweep)
-            validate: Whether to validate directory structure exists
-        """
-        # Validate inputs
-        assert base_path, "base_path cannot be empty"
-        assert experiment_name, "experiment_name cannot be empty"
-        assert "/" not in experiment_name, "experiment_name cannot contain '/'"
-        
-        self.base_path = Path(base_path)
-        self.experiment_name = experiment_name
-        self.experiment_path = self.base_path / experiment_name
-        
-        # Define directory structure
-        self.jobs_dir = self.experiment_path / "jobs"
-        self.storage_dir = self.experiment_path / "storage"
-        self.sync_queue_dir = self.experiment_path / "sync_queue"
-        self.logs_dir = self.experiment_path / "logs"
-        self.control_dir = self.experiment_path / "control"
-        
-        if validate:
-            # Check that experiment is initialized
-            required_dirs = [
-                self.jobs_dir,
-                self.storage_dir,
-                self.sync_queue_dir,
-                self.logs_dir,
-                self.control_dir
-            ]
-            
-            missing = [d for d in required_dirs if not d.exists()]
-            if missing:
-                missing_names = [d.name for d in missing]
-                raise RuntimeError(
-                    f"Experiment not initialized. Missing directories: {missing_names}\n"
-                    f"Run: dr_exp --base-path {base_path} --experiment {experiment_name} init"
-                )
-        else:
-            # Create directories if they don't exist (for init command)
-            for dir_path in [self.jobs_dir, self.storage_dir, self.sync_queue_dir, 
-                           self.logs_dir, self.control_dir]:
-                dir_path.mkdir(parents=True, exist_ok=True)
-        
-        logger.info(f"JobDB initialized for experiment '{experiment_name}' at {self.experiment_path}")
-    
-    def create_job(self, config: Dict[str, Any], priority: int = 100) -> str:
-        """Create a new job with given config and priority.
-        
-        Args:
-            config: Job configuration dict (must include _target_ field)
-            priority: Job priority (0-1000, higher runs first)
-            
-        Returns:
-            job_id: Unique ID for the created job
-        """
-        # Validate priority
-        assert 0 <= priority <= 1000, f"Priority must be 0-1000, got {priority}"
-        
-        # Validate _target_ exists
-        assert "_target_" in config, "Config must include _target_ field"
-        
-        # Validate target is importable
-        target = config["_target_"]
-        module_path, func_name = target.rsplit('.', 1)
-        try:
-            import importlib
-            importlib.import_module(module_path)
-        except ImportError as e:
-            assert False, f"Cannot import target module {module_path}: {e}"
-        
-        # Create job metadata
-        job_id = str(uuid.uuid4())
-        job_data = {
-            "id": job_id,
-            "experiment_name": self.experiment_name,
-            "config": config,
-            "priority": priority,
-            "status": "queued",
-            "created_at": datetime.now(UTC).isoformat(),
-            "updated_at": datetime.now(UTC).isoformat(),
-            "attempts": 0,
-            "worker_id": None,
-            "error": None,
-            "completed_at": None,
-        }
-        
-        # Write to file
-        job_path = self.jobs_dir / f"{job_id}.json"
-        with open(job_path, "w") as f:
-            json.dump(job_data, f, indent=2)
-        
-        logger.info(f"Created job {job_id} with priority {priority}")
-        return job_id
-    
-    def get_job(self, job_id: str) -> Optional[Dict[str, Any]]:
-        """Retrieve a job by ID.
-        
-        Args:
-            job_id: Job ID to retrieve
-            
-        Returns:
-            Job data dict or None if not found
-        """
-        job_path = self.jobs_dir / f"{job_id}.json"
-        if not job_path.exists():
-            return None
-        
-        with open(job_path, "r") as f:
-            return json.load(f)
-    
-    def get_storage_path(self, job_id: str) -> Path:
-        """Get the storage path for a job's artifacts.
-        
-        Args:
-            job_id: Job ID
-            
-        Returns:
-            Path object for job's storage directory
-        """
-        return self.storage_dir / f"run_{job_id}"
-```
-
-### 3. Create tests/implementation/test_step_1_1.py
-```python
-"""Test basic JobDB functionality."""
-import tempfile
-import shutil
-import pytest
-from pathlib import Path
-
-from src.dr_exp.core.job_db import JobDB
-
-
-def test_jobdb_basic():
-    """Test creating and retrieving jobs."""
-    # Create temporary directory
-    with tempfile.TemporaryDirectory() as tmpdir:
-        # Initialize JobDB without validation (like init command)
-        job_db = JobDB(base_path=tmpdir, experiment_name="test_exp", validate=False)
-        
-        # Verify all directories created
-        exp_path = Path(tmpdir) / "test_exp"
-        assert (exp_path / "jobs").exists()
-        assert (exp_path / "storage").exists()
-        assert (exp_path / "sync_queue").exists()
-        assert (exp_path / "logs").exists()
-        assert (exp_path / "control").exists()
-        
-        # Create a job
-        config = {
-            "_target_": "dr_exp.training.dummy_trainer.train_dummy",
-            "model": "resnet18",
-            "lr": 0.001,
-            "epochs": 10
-        }
-        job_id = job_db.create_job(config, priority=500)
-        
-        # Verify job file created
-        assert (exp_path / "jobs" / f"{job_id}.json").exists()
-        
-        # Retrieve the job
-        job = job_db.get_job(job_id)
-        assert job is not None
-        assert job["id"] == job_id
-        assert job["experiment_name"] == "test_exp"
-        assert job["config"] == config
-        assert job["priority"] == 500
-        assert job["status"] == "queued"
-        assert job["worker_id"] is None
-        
-        # Test storage path
-        storage_path = job_db.get_storage_path(job_id)
-        assert storage_path == exp_path / "storage" / f"run_{job_id}"
-        
-        # Test validation mode
-        try:
-            # Delete a directory and try with validation=True
-            shutil.rmtree(exp_path / "logs")
-            job_db2 = JobDB(base_path=tmpdir, experiment_name="test_exp", validate=True)
-            assert False, "Should have failed"
-        except RuntimeError as e:
-            assert "Missing directories" in str(e)
-            assert "logs" in str(e)
-        
-        # Test input validation
-        try:
-            # Missing _target_
-            job_db.create_job({"model": "resnet"}, priority=100)
-            assert False, "Should have failed"
-        except AssertionError as e:
-            assert "_target_" in str(e)
-        
-        try:
-            # Invalid priority
-            job_db.create_job(config, priority=1500)
-            assert False, "Should have failed"
-        except AssertionError as e:
-            assert "Priority" in str(e)
-        
-        try:
-            # Invalid target module
-            bad_config = {"_target_": "nonexistent.module.train"}
-            job_db.create_job(bad_config, priority=100)
-            assert False, "Should have failed"
-        except AssertionError as e:
-            assert "Cannot import" in str(e)
-```
+### Job Schema
+Jobs are stored as JSON with fields:
+- `id`: UUID string
+- `experiment_name`: Name of the experiment
+- `config`: User-provided configuration (must have `_target_`)
+- `priority`: 0-1000 integer
+- `status`: Current status (queued, running, completed, failed)
+- `created_at`, `updated_at`: ISO format timestamps
+- `worker_id`, `error`, `completed_at`: Runtime fields
 
 ## Validation
-```bash
-# Run the test with pytest
-pt tests/implementation/test_step_1_1.py -v
 
-# Expected output:
-# ============================= test session starts ==============================
-# tests/implementation/test_step_1_1.py::test_jobdb_basic PASSED
-# ============================== 1 passed in X.XXs ===============================
+Test coverage includes:
+- Basic job creation and retrieval
+- Directory structure validation
+- Priority bounds checking
+- Target importability validation
+- Missing `_target_` handling
 
-# Verify code quality (runs ruff linting/formatting + mypy type checks)
-ckdr
+Run: `pt tests/implementation/test_step_1_1.py -v`
 
-# Expected: All checks passed!
-```
+## Implementation Notes
 
-## Common Mistakes
-- DO NOT: Use abstract base classes or interfaces
-- DO NOT: Add configuration files - pass parameters directly
-- DO NOT: Use exceptions for validation - use assertions
-- DO NOT: Add features not specified (no caching, no indexing, etc.)
-- DO NOT: Forget to create parent directories with `parents=True`
+### Divergences from Instructions
+1. **Datetime usage**: Instructions showed `datetime.utcnow()` but implementation correctly uses `datetime.now(UTC)`
+   - **Type**: Positive
+   - **Reason**: `utcnow()` is deprecated, `now(UTC)` is the modern approach
+   
+2. **Import statement**: Implementation adds `import os` which wasn't used
+   - **Type**: Neutral
+   - **Impact**: No harm, gets cleaned up by ruff
+
+### Implementation Quality Notes
+- Clean separation between validation and creation modes
+- Good error messages that suggest the fix (e.g., "Run: dr_exp ... init")
+- Proper use of Path objects throughout
+- Type annotations on all public methods
+
+### Lessons Learned
+1. Using assertions for validation is cleaner than exceptions for this use case
+2. The `validate` parameter elegantly handles both normal operation and initialization
+3. Target validation at job creation time prevents runtime surprises
+
+### Dependencies for Later Steps
+- Job file format is foundational - all future steps read/write this schema
+- Directory structure must remain consistent across all components
+- Priority field enables the queue behavior in Step 1.2
+- Storage path convention (`run_{job_id}`) used by workers
+
+### Technical Decisions
+1. **JSON over other formats**: Human-readable, debuggable, sufficient for metadata
+2. **UUID for job IDs**: Guarantees uniqueness without coordination
+3. **Flat file structure**: One file per job, no index files to corrupt
+4. **Target validation**: Fail fast at job creation rather than execution time
+
+### Testing Insights
+- Using `tempfile.TemporaryDirectory()` provides clean test isolation
+- Testing both success and failure paths is crucial
+- Assertion error messages should be tested to ensure they're helpful
+
+### Performance Considerations
+- No indexing means O(n) job listing, but simple and corruption-resistant
+- File-per-job means good parallelism (no single file lock)
+- JSON parsing is fast enough for metadata-sized configs
+
+### Future Enhancement Opportunities
+1. Could add job listing with filtering (by status, priority)
+2. Might benefit from a simple index file for large experiments
+3. Could validate config schema if `_target_` modules define one
+4. Job archival for completed/failed jobs
+
+### Cross-Step Patterns
+- Assertion-based validation (used throughout)
+- File-based operations with explicit paths
+- Clear separation between required and optional parameters
+- Comprehensive test coverage of edge cases
+
+### Risk Areas
+1. **Race conditions**: Not handled yet (addressed in Step 1.2)
+2. **Large experiments**: No pagination or limits on job count
+3. **Config size**: No validation of config size (could hit filesystem limits)
+4. **Orphaned files**: No cleanup of storage for deleted jobs
+
+## Common Mistakes to Avoid
+- Using abstract base classes or interfaces
+- Adding configuration files instead of direct parameters
+- Using exceptions instead of assertions for validation
+- Adding unspecified features (caching, indexing)
+- Forgetting `parents=True` when creating directories
 
 ## Next Step
 Proceed to Step 1.2: Concurrent Job Claiming

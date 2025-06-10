@@ -227,9 +227,10 @@ import os
 import time
 import pytest
 from pathlib import Path
+from typing import Tuple
 
 
-def test_local_supabase():
+def test_local_supabase() -> tuple[str, str]:
     """Test local Supabase setup."""
     # Check if Supabase is installed
     result = subprocess.run(['supabase', '--version'], capture_output=True, text=True)
@@ -253,6 +254,10 @@ def test_local_supabase():
     print(result.stdout)
     
     # Extract connection info
+    api_url = ''
+    anon_key = ''
+    service_key = ''
+    
     lines = result.stdout.strip().split('\n')
     for line in lines:
         if 'API URL:' in line:
@@ -270,7 +275,7 @@ def test_local_supabase():
     return api_url, service_key
 
 
-def test_database_schema():
+def test_database_schema() -> None:
     """Test database schema with psycopg2."""
     try:
         import psycopg2
@@ -381,7 +386,7 @@ def test_database_schema():
         conn.close()
 
 
-def test_storage_bucket():
+def test_storage_bucket() -> None:
     """Test storage bucket configuration."""
     import psycopg2
     
@@ -437,7 +442,7 @@ def test_storage_bucket():
         conn.close()
 
 
-def test_migrations():
+def test_migrations() -> None:
     """Test that migrations are valid."""
     # Check migration files exist
     migration_dir = Path("supabase/migrations")
@@ -464,7 +469,7 @@ def test_migrations():
     
 
 
-def test_database_operations():
+def test_database_operations() -> None:
     """Test common database operations."""
     import psycopg2
     import json
