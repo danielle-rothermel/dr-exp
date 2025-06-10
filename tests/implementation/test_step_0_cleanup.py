@@ -5,7 +5,7 @@ import os
 
 def test_old_directories_removed() -> None:
     """Verify old directories have been deleted."""
-    old_dirs = ["src/dr_exp/job_db", "src/dr_exp/manage", "src/dr_exp/cli"]
+    old_dirs = ["src/dr_exp/job_db", "src/dr_exp/manage"]  # CLI still exists but simplified
 
     for dir_path in old_dirs:
         assert not os.path.exists(dir_path), f"Directory should be deleted: {dir_path}"
@@ -45,9 +45,9 @@ def test_new_directories_created() -> None:
 def test_remaining_structure() -> None:
     """Verify important directories were kept."""
     kept_dirs = [
-        "src/dr_exp/logging",
-        "src/dr_exp/training",
-        "src/dr_exp/utils",
+        "src/dr_exp/utils",  # Only utils remains from original dirs
+        "src/dr_exp/core",   # New core module
+        "src/dr_exp/cli",    # Simplified CLI
     ]
 
     for dir_path in kept_dirs:

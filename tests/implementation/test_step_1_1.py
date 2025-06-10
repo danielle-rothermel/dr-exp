@@ -24,7 +24,7 @@ def test_jobdb_basic() -> None:
 
         # Create a job
         config = {
-            "_target_": "dr_exp.training.dummy_trainer.train_dummy",
+            "_target_": "dr_exp.trainers.test_trainer.train",
             "model": "resnet18",
             "lr": 0.001,
             "epochs": 10,

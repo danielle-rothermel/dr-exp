@@ -13,7 +13,7 @@ def test_mark_job_failed():
         job_db = JobDB(base_path=tmpdir, experiment_name="test_exp", validate=False)
 
         # Create jobs in different states
-        config = {"_target_": "dr_exp.training.dummy_trainer.train_dummy"}
+        config = {"_target_": "dr_exp.trainers.test_trainer.train"}
 
         # Running job (high priority so it gets claimed first)
         running_id = job_db.create_job(config, priority=200)
@@ -60,7 +60,7 @@ def test_boost_priority():
     with tempfile.TemporaryDirectory() as tmpdir:
         job_db = JobDB(base_path=tmpdir, experiment_name="test_exp", validate=False)
 
-        config = {"_target_": "dr_exp.training.dummy_trainer.train_dummy"}
+        config = {"_target_": "dr_exp.trainers.test_trainer.train"}
 
         # Create low priority jobs
         job1_id = job_db.create_job(config, priority=100)
@@ -104,7 +104,7 @@ def test_recover_stale_jobs():
     with tempfile.TemporaryDirectory() as tmpdir:
         job_db = JobDB(base_path=tmpdir, experiment_name="test_exp", validate=False)
 
-        config = {"_target_": "dr_exp.training.dummy_trainer.train_dummy"}
+        config = {"_target_": "dr_exp.trainers.test_trainer.train"}
 
         # Create and claim jobs
         fresh_id = job_db.create_job(config)
@@ -147,7 +147,7 @@ def test_complete_jobdb():
 
         # Simulate a complete workflow
         config = {
-            "_target_": "dr_exp.training.dummy_trainer.train_dummy",
+            "_target_": "dr_exp.trainers.test_trainer.train",
             "model": "resnet50",
             "epochs": 100,
         }
