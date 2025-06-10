@@ -2,12 +2,13 @@
 
 import sys
 from pathlib import Path
-from typing import Optional, Any
+from typing import Optional
 
 import click
 
 from ..core.job_db import JobDB
 from ..worker.base import Worker
+from ..sync.queue import SyncItem
 
 
 @click.group()
@@ -49,7 +50,7 @@ def worker(
     )
 
     # Simple sync function that just prints
-    def print_sync(item: Any) -> None:
+    def print_sync(item: SyncItem) -> None:
         print(f"[SYNC] Would upload: {item.file_type} - {Path(item.file_path).name}")
 
     worker_instance.sync_fn = print_sync

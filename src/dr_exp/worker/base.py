@@ -198,11 +198,6 @@ class Worker:
             storage_path = Path(config.storage_path)
             storage_path.mkdir(parents=True, exist_ok=True)
 
-            # Create a log file for this job
-            log_file = storage_path / "training.log"
-            log_file.write_text(f"Training log for job {job_id}\n")
-            self.add_artifact_to_sync(job_id, str(log_file), "logs")
-
             # Execute using Hydra's call mechanism
             print(
                 f"[{self.worker_id}] Executing job {job_id} with _target_={config._target_}"
