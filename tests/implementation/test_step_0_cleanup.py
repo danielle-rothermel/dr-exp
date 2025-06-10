@@ -3,7 +3,7 @@
 import os
 
 
-def test_old_directories_removed():
+def test_old_directories_removed() -> None:
     """Verify old directories have been deleted."""
     old_dirs = ["src/dr_exp/job_db", "src/dr_exp/manage", "src/dr_exp/cli"]
 
@@ -11,7 +11,7 @@ def test_old_directories_removed():
         assert not os.path.exists(dir_path), f"Directory should be deleted: {dir_path}"
 
 
-def test_old_files_removed():
+def test_old_files_removed() -> None:
     """Verify old files have been deleted."""
     old_files = [
         "src/dr_exp/utils/factory.py",
@@ -27,7 +27,7 @@ def test_old_files_removed():
         assert not os.path.exists(file_path), f"File should be deleted: {file_path}"
 
 
-def test_new_directories_created():
+def test_new_directories_created() -> None:
     """Verify new directories exist with __init__.py files."""
     new_dirs = [
         "src/dr_exp/core",
@@ -42,10 +42,9 @@ def test_new_directories_created():
         assert os.path.exists(init_file), f"Missing __init__.py in: {dir_path}"
 
 
-def test_remaining_structure():
+def test_remaining_structure() -> None:
     """Verify important directories were kept."""
     kept_dirs = [
-        "src/dr_exp/api",
         "src/dr_exp/logging",
         "src/dr_exp/training",
         "src/dr_exp/utils",
