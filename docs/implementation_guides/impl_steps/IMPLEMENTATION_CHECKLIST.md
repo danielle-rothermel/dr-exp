@@ -58,10 +58,10 @@ Use this checklist to track progress through the implementation steps.
   - [x] Tests pass: `pt tests/implementation/test_step_2_4.py -v`
   - [x] Code quality passes: `ckdr`
   
-- [ ] Step 2.5: Job Management Commands
-  - [ ] All management commands added
-  - [ ] Tests pass: `pt tests/implementation/test_step_2_5.py -v`
-  - [ ] Code quality passes: `ckdr`
+- [x] Step 2.5: Job Management Commands
+  - [x] All management commands added
+  - [x] Tests pass: `pt tests/implementation/test_step_2_5.py -v`
+  - [x] Code quality passes: `ckdr`
   
 - [ ] Step 2.6: Training Integration
   - [ ] Training integration complete
@@ -137,6 +137,16 @@ Use this space to track any issues, deviations from the plan, or important decis
 
 
 ### Phase 2 Notes:
+
+**Step 2.5 Completed:** Job management commands implemented successfully.
+- Added kill command with support for both queued and running jobs
+- Added boost command for changing job priorities
+- Added recover command for recovering stale jobs (with dry-run option)
+- Added sync_status command to view sync queue status
+- Added run_one command for debugging specific jobs
+- Added validate command for experiment health checks
+- All commands support partial job ID matching for convenience
+- Proper error handling and user feedback throughout
 
 
 ### Phase 3 Notes:
