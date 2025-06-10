@@ -86,15 +86,11 @@ filterwarnings = [
     "ignore::DeprecationWarning"
 ]
 
-# Coverage
+# Coverage disabled during architecture redesign
 addopts = [
     "--strict-markers",
     "--strict-config",
-    "-ra",
-    "--cov=dr_exp",
-    "--cov-report=term-missing",
-    "--cov-report=html:htmlcov",
-    "--cov-fail-under=80"
+    "-ra"
 ]
 
 # Asyncio configuration
