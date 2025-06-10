@@ -1,0 +1,9 @@
+# Test job configuration
+_target_: src.dr_exp.trainers.test_trainer.train
+
+# Training parameters
+epochs: 5
+batch_size: 32
+
+# Test parameters
+fail_rate: 0.0  # Set to 0.0-1.0 to test failures

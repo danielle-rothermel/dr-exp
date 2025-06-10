@@ -53,10 +53,10 @@ Use this checklist to track progress through the implementation steps.
   - [x] Tests pass: `pt tests/implementation/test_step_2_3.py -v`
   - [x] Code quality passes: `ckdr`
   
-- [ ] Step 2.4: CLI Framework
-  - [ ] Basic CLI structure created
-  - [ ] Tests pass: `pt tests/implementation/test_step_2_4.py -v`
-  - [ ] Code quality passes: `ckdr`
+- [x] Step 2.4: CLI Framework
+  - [x] Basic CLI structure created
+  - [x] Tests pass: `pt tests/implementation/test_step_2_4.py -v`
+  - [x] Code quality passes: `ckdr`
   
 - [ ] Step 2.5: Job Management Commands
   - [ ] All management commands added
