@@ -21,10 +21,10 @@ Use this checklist to track progress through the implementation steps.
   - [x] Tests pass: `pt tests/implementation/test_step_1_1.py -v`
   - [x] Code quality passes: `ckdr`
   
-- [ ] Step 1.2: Concurrent Job Claiming
-  - [ ] File locking implemented
-  - [ ] Tests pass: `pt tests/implementation/test_step_1_2.py -v`
-  - [ ] Code quality passes: `ckdr`
+- [x] Step 1.2: Concurrent Job Claiming
+  - [x] File locking implemented
+  - [x] Tests pass: `pt tests/implementation/test_step_1_2.py -v`
+  - [x] Code quality passes: `ckdr`
   
 - [ ] Step 1.3: Job Lifecycle Management
   - [ ] All lifecycle methods added
