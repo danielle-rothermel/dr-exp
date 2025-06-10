@@ -513,3 +513,74 @@ class JobDB:
                 logger.info(f"Boosted job {job_id} to priority {new_priority}")
 
         return updated
+
+    def reserve_job(self, job_id: str, worker_id: str) -> bool:
+        """Reserve a specific job for a worker.
+
+        This is used for special operations like run_one where we want to
+        run a specific job immediately, bypassing the queue order.
+
+        Args:
+            job_id: Job to reserve
+            worker_id: Worker that will run the job
+
+        Returns:
+            True if reserved successfully
+        """
+        job = self.get_job(job_id)
+        if not job:
+            return False
+
+        # Only reserve if job is queued or failed
+        if job["status"] not in ["queued", "failed"]:
+            return False
+
+        # Mark as reserved by updating with special fields
+        return self.update_job(
+            job_id,
+            {
+                "reserved_for": worker_id,
+                "reservation_time": datetime.now(UTC).isoformat(),
+            },
+        )
+
+    def claim_reserved_job(
+        self, job_id: str, worker_id: str
+    ) -> Optional[Dict[str, Any]]:
+        """Claim a previously reserved job.
+
+        Args:
+            job_id: Job to claim
+            worker_id: Worker claiming the job (must match reservation)
+
+        Returns:
+            Job data if claimed successfully, None otherwise
+        """
+        job = self.get_job(job_id)
+        if not job:
+            return None
+
+        # Check if reserved for this worker
+        if job.get("reserved_for") != worker_id:
+            return None
+
+        # Check if still in claimable state
+        if job["status"] not in ["queued", "failed"]:
+            return None
+
+        # Claim the job
+        success = self.update_job(
+            job_id,
+            {
+                "status": "running",
+                "worker_id": worker_id,
+                "started_at": datetime.now(UTC).isoformat(),
+                "last_heartbeat": datetime.now(UTC).isoformat(),
+                "reserved_for": None,  # Clear reservation
+                "reservation_time": None,
+            },
+        )
+
+        if success:
+            return self.get_job(job_id)
+        return None
