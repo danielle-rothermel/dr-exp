@@ -1,6 +1,7 @@
 """Base worker implementation for job execution."""
 
 import os
+import sys
 import time
 import threading
 import traceback
@@ -23,6 +24,7 @@ class Worker:
         job_db: JobDB,
         worker_id: str,
         working_dir: Optional[str] = None,
+        experiment_path: Optional[str] = None,
         sync_interval: int = 30,
         heartbeat_interval: int = 60,
         sync_enabled: bool = True,
@@ -33,6 +35,7 @@ class Worker:
             job_db: JobDB instance to get jobs from
             worker_id: Unique identifier for this worker
             working_dir: Directory to run jobs in (defaults to current dir)
+            experiment_path: Path to experiment directory for logs (optional)
             sync_interval: Seconds between sync attempts
             heartbeat_interval: Seconds between heartbeats
             sync_enabled: Whether to enable background sync
@@ -49,6 +52,28 @@ class Worker:
 
         # Ensure working directory exists
         self.working_dir.mkdir(parents=True, exist_ok=True)
+
+        # Set up file logging
+        self.log_file = None
+        self._original_stdout = None
+        self._original_stderr = None
+        if experiment_path:
+            log_dir = Path(experiment_path) / "logs"
+            log_dir.mkdir(exist_ok=True)
+            log_path = log_dir / f"worker_{worker_id}.log"
+            self.log_file = open(log_path, "a", buffering=1)  # Line buffered
+            
+            # Redirect stdout and stderr
+            self._original_stdout = sys.stdout
+            self._original_stderr = sys.stderr
+            sys.stdout = self.log_file
+            sys.stderr = self.log_file
+            
+            # Write header
+            print(f"=== Worker {worker_id} started at {datetime.now(UTC).isoformat()} ===")
+            print(f"Experiment: {Path(experiment_path).name}")
+            print(f"Sync: {'enabled' if sync_enabled else 'disabled'}")
+            print(f"=" * 60)
 
         # Initialize sync queue
         self.sync_queue = SyncQueue(job_db.get_sync_queue_path())
@@ -334,6 +359,25 @@ class Worker:
         finally:
             # Stop background threads
             self.stop_background_threads()
+            
+            # Ensure log cleanup even on unexpected exit
+            if self.log_file and not self.log_file.closed:
+                sys.stdout = getattr(self, '_original_stdout', sys.__stdout__)
+                sys.stderr = getattr(self, '_original_stderr', sys.__stderr__)
+                self.log_file.close()
 
         print(f"[{self.worker_id}] Worker finished: {stats}")
         return stats
+
+    def shutdown(self, reason: str = "signal") -> None:
+        """Shutdown worker gracefully."""
+        print(f"\n=== Worker {self.worker_id} shutting down: {reason} ===")
+        
+        if self.log_file:
+            # Restore original stdout/stderr
+            if self._original_stdout:
+                sys.stdout = self._original_stdout
+            if self._original_stderr:
+                sys.stderr = self._original_stderr
+            self.log_file.close()
+            self.log_file = None
