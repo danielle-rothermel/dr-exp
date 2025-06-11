@@ -62,18 +62,20 @@ class Worker:
             log_dir.mkdir(exist_ok=True)
             log_path = log_dir / f"worker_{worker_id}.log"
             self.log_file = open(log_path, "a", buffering=1)  # Line buffered
-            
+
             # Redirect stdout and stderr
             self._original_stdout = sys.stdout
             self._original_stderr = sys.stderr
             sys.stdout = self.log_file
             sys.stderr = self.log_file
-            
+
             # Write header
-            print(f"=== Worker {worker_id} started at {datetime.now(UTC).isoformat()} ===")
+            print(
+                f"=== Worker {worker_id} started at {datetime.now(UTC).isoformat()} ==="
+            )
             print(f"Experiment: {Path(experiment_path).name}")
             print(f"Sync: {'enabled' if sync_enabled else 'disabled'}")
-            print(f"=" * 60)
+            print("=" * 60)
 
         # Initialize sync queue
         self.sync_queue = SyncQueue(job_db.get_sync_queue_path())
@@ -359,11 +361,11 @@ class Worker:
         finally:
             # Stop background threads
             self.stop_background_threads()
-            
+
             # Ensure log cleanup even on unexpected exit
             if self.log_file and not self.log_file.closed:
-                sys.stdout = getattr(self, '_original_stdout', sys.__stdout__)
-                sys.stderr = getattr(self, '_original_stderr', sys.__stderr__)
+                sys.stdout = getattr(self, "_original_stdout", sys.__stdout__)
+                sys.stderr = getattr(self, "_original_stderr", sys.__stderr__)
                 self.log_file.close()
 
         print(f"[{self.worker_id}] Worker finished: {stats}")
@@ -372,7 +374,7 @@ class Worker:
     def shutdown(self, reason: str = "signal") -> None:
         """Shutdown worker gracefully."""
         print(f"\n=== Worker {self.worker_id} shutting down: {reason} ===")
-        
+
         if self.log_file:
             # Restore original stdout/stderr
             if self._original_stdout:

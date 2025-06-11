@@ -1,11 +1,12 @@
 """Main CLI entry point for dr_exp."""
 
+import importlib
 import os
 import sys
 import time
 from datetime import UTC, datetime
 from pathlib import Path
-from typing import Optional, Tuple
+from typing import Optional, Tuple, Dict, Any, cast
 
 import click
 
@@ -19,7 +20,11 @@ from ..worker.base import Worker
 @click.option("--experiment", required=True, help="Experiment name")
 @click.pass_context
 def cli(ctx: click.Context, base_path: str, experiment: str) -> None:
-    """dr_exp - ML experiment manager."""
+    """dr_exp - ML experiment manager.
+
+    Example:
+        dr_exp --base-path ./experiments --experiment my_exp submit --config-name train
+    """
     # Store JobDB config in context for subcommands
     ctx.ensure_object(dict)
     ctx.obj["base_path"] = base_path
@@ -75,46 +80,80 @@ def worker(
 
 
 @cli.command()
-@click.argument("config_file", type=click.Path(exists=True))
-@click.option("--priority", type=int, default=100, help="Job priority (0-1000)")
+@click.option("--config-path", default="configs", help="Path to config directory")
+@click.option(
+    "--config-name", required=True, help="Name of config file (without .yaml)"
+)
+@click.option("--priority", default=100, help="Job priority (0-1000)")
+@click.option("--tag", help="Job tag")
+@click.option("--overrides", help="Hydra overrides (key=value,key2=value2)")
 @click.pass_context
-def submit(ctx: click.Context, config_file: str, priority: int) -> None:
-    """Submit a job from a config file."""
+def submit(
+    ctx: click.Context,
+    config_path: str,
+    config_name: str,
+    priority: int,
+    tag: Optional[str],
+    overrides: Optional[str],
+) -> None:
+    """Submit a job using Hydra config composition."""
+    from hydra import compose, initialize_config_dir
+    from hydra.core.global_hydra import GlobalHydra
+    from omegaconf import OmegaConf
+    import os
+
+    # Clear any existing Hydra instance
+    GlobalHydra.instance().clear()
+
+    # Convert config path to absolute
+    if not os.path.isabs(config_path):
+        config_path = os.path.abspath(config_path)
+
+    # Prepare overrides list
+    override_list = []
+    if overrides:
+        override_list = [o.strip() for o in overrides.split(",")]
+
+    try:
+        # Initialize Hydra with config path
+        with initialize_config_dir(config_dir=config_path, version_base="1.3"):
+            # Compose configuration
+            cfg = compose(config_name=config_name, overrides=override_list)
+
+            # Convert to plain dict for storage
+            config_dict = OmegaConf.to_container(cfg, resolve=True)
+            assert isinstance(config_dict, dict), "Config must be a dictionary"
+            config_dict = cast(Dict[str, Any], config_dict)
+    except Exception as e:
+        click.echo(f"Error composing config: {e}", err=True)
+        ctx.exit(1)
+
+    # Validate _target_ exists
+    if "_target_" not in config_dict:
+        click.echo("Error: Config must contain '_target_' field", err=True)
+        ctx.exit(1)
+
+    # Validate target is importable
+    target = config_dict["_target_"]
+    module_path = target.rsplit(".", 1)[0]
+    try:
+        importlib.import_module(module_path)
+    except ImportError as e:
+        click.echo(f"Error: Cannot import target module {module_path}: {e}", err=True)
+        ctx.exit(1)
+
+    # Create job
     job_db = JobDB(
         base_path=ctx.obj["base_path"], experiment_name=ctx.obj["experiment"]
     )
+    job_id = job_db.create_job(
+        config=config_dict,
+        priority=priority,
+    )
 
-    # Load config file
-    config_path = Path(config_file)
-
-    if config_path.suffix == ".yaml":
-        import yaml
-
-        with open(config_path) as f:
-            config = yaml.safe_load(f)
-    elif config_path.suffix == ".json":
-        import json
-
-        with open(config_path) as f:
-            config = json.load(f)
-    else:
-        click.echo(f"Error: Unsupported config format: {config_path.suffix}", err=True)
-        sys.exit(1)
-
-    # Validate config
-    if "_target_" not in config:
-        click.echo("Error: Config must contain '_target_' field", err=True)
-        sys.exit(1)
-
-    # Create job
-    try:
-        job_id = job_db.create_job(config, priority=priority)
-        click.echo(f"Created job: {job_id}")
-        click.echo(f"Priority: {priority}")
-        click.echo(f"Target: {config['_target_']}")
-    except Exception as e:
-        click.echo(f"Error creating job: {e}", err=True)
-        sys.exit(1)
+    click.echo(f"Created job: {job_id}")
+    click.echo(f"Priority: {priority}")
+    click.echo(f"Target: {target}")
 
 
 @cli.command()
@@ -206,7 +245,9 @@ optimizer:
     click.echo(f"Created: {example_config}")
 
     click.echo("\nExperiment initialized successfully!")
-    click.echo(f"\nTo submit a job: dr_exp --base-path {ctx.obj['base_path']} --experiment {ctx.obj['experiment']} submit --config-path configs --config-name your_config")
+    click.echo(
+        f"\nTo submit a job: dr_exp --base-path {ctx.obj['base_path']} --experiment {ctx.obj['experiment']} submit --config-path configs --config-name your_config"
+    )
 
 
 @cli.command()
@@ -441,7 +482,7 @@ def run_one(
     ctx: click.Context, job_id: str, no_sync: bool, working_dir: Optional[str]
 ) -> None:
     """Run a specific job immediately by job ID.
-    
+
     Example:
         dr_exp --base-path ./exp --experiment test run-one 7c9a0e51-5a7a-4d46-a7f2
     """
