@@ -5,6 +5,8 @@ job_data/
 storage/
 test_experiment/
 .coverage
+chronological_ablation/
+high_regularization_ablation/
 
 mock_db/*.json
 mock_db/*.jsonl

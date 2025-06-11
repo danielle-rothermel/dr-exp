@@ -1,60 +1,88 @@
-#!/bin/bash
-# Helper script to submit multiple experiments
+#!/usr/bin/env python3
+"""Submit all ablation experiments with 3 seeds each."""
 
-set -e
+import subprocess
+from pathlib import Path
 
-# Default values
-BASE_PATH="${BASE_PATH:-/scratch/users/$USER/experiments}"
-WORKERS_PER_GPU="${WORKERS_PER_GPU:-2}"
-SLURM_SCRIPT="scripts/dr_exp_slurm.sbatch"
+# Configuration
+EXP_DIR = "/scratch/ddr8143/repos/dr_exp/chronological_ablation"
+EXPERIMENT = "main"
+SEEDS = [0, 1, 2]
+CONFIG_PATH = "exp_configs"
 
-# Function to submit a single experiment
-submit_experiment() {
-    local exp_name=$1
-    local priority=${2:-100}
-    
-    echo "Submitting experiment: $exp_name (priority: $priority)"
-    
-    # Create experiment directory
-    mkdir -p "$BASE_PATH/$exp_name"
-    
-    # Submit SLURM job
-    job_id=$(sbatch \
-        --export=BASE_PATH="$BASE_PATH",EXPERIMENT="$exp_name",WORKERS_PER_GPU="$WORKERS_PER_GPU" \
-        --job-name="dr_exp_$exp_name" \
-        "$SLURM_SCRIPT" | awk '{print $NF}')
-    
-    echo "  Submitted SLURM job: $job_id"
-    
-    # Create a tracking file
-    echo "$job_id" > "$BASE_PATH/$exp_name/.slurm_job_id"
-}
+# All step configs in order (higher priority for later steps to see results sooner)
+STEPS = [
+    "step00_baseline",
+    "step01_sgd", 
+    "step02_no_randaug",
+    "step03_no_cutmix",
+    "step04_no_mixup",
+    "step05_no_warmup",
+    "step06_steplr",
+    "step07_no_residual",
+    "step08_lrn_dropout",
+    "step09_xavier",
+    "step10_no_lrn",
+    "step11_resnet12",
+    "step12_alexnet",
+    "step13_no_dropout",
+    "step14_tanh",
+    "step15_no_colorjitter",
+    "step16_no_rrc",
+    "step17_no_hflip",
+]
 
-# Check arguments
-if [ $# -eq 0 ]; then
-    echo "Usage: $0 experiment1 [experiment2 ...]"
-    echo "  or: $0 -f experiments.txt"
-    exit 1
-fi
-
-# Process arguments
-if [ "$1" = "-f" ]; then
-    # Read from file
-    if [ ! -f "$2" ]; then
-        echo "Error: File $2 not found"
-        exit 1
-    fi
+def submit_job(config_name, seed, priority):
+    """Submit a single job."""
+    cmd = [
+        "uv", "run", "dr_exp",
+        "--base-path", EXP_DIR,
+        "--experiment", EXPERIMENT,
+        "job", "submit",
+        "--config-path", CONFIG_PATH,
+        "--config-name", f"{config_name}",
+        "--overrides", f"seed={seed}",
+        "--priority", str(priority)
+    ]
     
-    while IFS= read -r exp_name; do
-        [ -z "$exp_name" ] && continue  # Skip empty lines
-        [[ "$exp_name" =~ ^# ]] && continue  # Skip comments
-        submit_experiment "$exp_name"
-    done < "$2"
-else
-    # Submit each argument as experiment
-    for exp_name in "$@"; do
-        submit_experiment "$exp_name"
-    done
-fi
+    result = subprocess.run(cmd, capture_output=True, text=True)
+    if result.returncode == 0:
+        # Extract job ID from output
+        for line in result.stdout.split('\n'):
+            if line.startswith("Created job:"):
+                job_id = line.split(": ")[1]
+                return job_id
+    else:
+        print(f"Error submitting {config_name} seed={seed}: {result.stderr}")
+        return None
 
-echo "All experiments submitted"
+# Submit all jobs
+total_jobs = len(STEPS) * len(SEEDS)
+job_count = 0
+
+print(f"Submitting {total_jobs} jobs (18 experiments × 3 seeds)...")
+print("=" * 60)
+
+for step_idx, step_name in enumerate(STEPS):
+    for seed_idx, seed in enumerate(SEEDS):
+        # Priority: later steps get higher priority to see degradation sooner
+        # Also prioritize seed 0 slightly to get one complete run per config faster
+        # Scale to fit within 0-1000 range
+        priority = (len(STEPS) - step_idx) * 50 + (2 - seed_idx) * 5
+        priority = min(priority, 1000)  # Ensure within limits
+        
+        job_id = submit_job(step_name, seed, priority)
+        job_count += 1
+        
+        if job_id:
+            print(f"[{job_count:3d}/{total_jobs}] {step_name} seed={seed} priority={priority} -> {job_id}")
+        else:
+            print(f"[{job_count:3d}/{total_jobs}] {step_name} seed={seed} -> FAILED")
+
+print("=" * 60)
+print(f"Submitted {job_count} jobs to experiment: {EXPERIMENT}")
+print(f"Base path: {EXP_DIR}")
+print("\nTo monitor status:")
+print(f"  uv run dr_exp --base-path {EXP_DIR} --experiment {EXPERIMENT} status")
+print("\nTo launch workers (6 workers on 1 GPU):")
+print(f"  uv run dr_exp --base-path {EXP_DIR} --experiment {EXPERIMENT} launcher --workers-per-gpu 6")
