@@ -2,6 +2,7 @@
 
 import fcntl
 import json
+import random
 import time
 import uuid
 import logging
@@ -178,64 +179,78 @@ class JobDB:
         return [f[0] for f in job_files]
 
     def claim_next_job(self, worker_id: str) -> Optional[Dict[str, Any]]:
-        """Claim the next available job atomically.
+        """Claim the highest priority unclaimed job with enhanced locking."""
+        # Use a lock file to ensure atomic priority scanning
+        lock_file = self.jobs_dir / ".claim_lock"
+        lock_file.touch(exist_ok=True)
 
-        Uses file locking to ensure only one worker can claim a job.
+        with open(lock_file, "w") as lock_fd:
+            # Exclusive lock with small random backoff to reduce contention
+            max_attempts = 5
+            for attempt in range(max_attempts):
+                try:
+                    fcntl.flock(lock_fd, fcntl.LOCK_EX | fcntl.LOCK_NB)
+                    break
+                except BlockingIOError:
+                    if attempt < max_attempts - 1:
+                        time.sleep(0.001 * random.uniform(0.5, 1.5))  # 0.5-1.5ms
+                    else:
+                        return None
 
-        Args:
-            worker_id: ID of the worker claiming the job
-
-        Returns:
-            Job data dict if claimed, None if no jobs available
-        """
-        # Get sorted list of queued jobs
-        job_files = self._list_job_files()
-
-        for job_file in job_files:
             try:
-                # Open file with exclusive lock
-                with open(job_file, "r+") as f:
-                    # Try to acquire exclusive lock (non-blocking)
-                    fcntl.flock(f.fileno(), fcntl.LOCK_EX | fcntl.LOCK_NB)
+                # Find highest priority unclaimed job
+                best_job = None
+                best_priority = -1
+
+                for job_file in self.jobs_dir.glob("*.json"):
+                    if job_file.name == ".claim_lock":
+                        continue
 
                     try:
-                        # Read current data
-                        f.seek(0)
-                        job_data: Dict[str, Any] = json.load(f)
+                        with open(job_file, "r") as f:
+                            job_data = json.load(f)
 
-                        # Double-check status (could have changed)
-                        if job_data.get("status") != "queued":
-                            continue
+                        if (
+                            job_data["status"] == "queued"
+                            and job_data["priority"] > best_priority
+                        ):
+                            best_job = job_data
+                            best_priority = job_data["priority"]
 
-                        # Claim the job
-                        job_data["status"] = "running"
-                        job_data["worker_id"] = worker_id
-                        job_data["started_at"] = datetime.now(UTC).isoformat()
-                        job_data["updated_at"] = datetime.now(UTC).isoformat()
-                        job_data["attempts"] = job_data.get("attempts", 0) + 1
+                    except (json.JSONDecodeError, KeyError):
+                        continue
 
-                        # Write back atomically
-                        f.seek(0)
-                        f.truncate()
-                        json.dump(job_data, f, indent=2)
-                        f.flush()
+                if not best_job:
+                    return None
 
-                        # Release lock happens automatically when file closes
-                        return job_data
+                # Claim the best job
+                job_file = self.jobs_dir / f"{best_job['id']}.json"
 
-                    finally:
-                        # Ensure lock is released even if error occurs
-                        fcntl.flock(f.fileno(), fcntl.LOCK_UN)
+                # Re-read and update atomically
+                with open(job_file, "r") as f:
+                    current_job: Dict[str, Any] = json.load(f)
 
-            except (IOError, BlockingIOError):
-                # Lock is held by another process, try next job
-                continue
-            except Exception:
-                # Skip corrupted files
-                continue
+                # Double-check status
+                if current_job["status"] != "queued":
+                    return None
 
-        # No jobs available
-        return None
+                # Update job
+                current_job["status"] = "running"
+                current_job["worker_id"] = worker_id
+                current_job["started_at"] = datetime.now(UTC).isoformat()
+                current_job["updated_at"] = datetime.now(UTC).isoformat()
+                current_job["attempts"] = current_job.get("attempts", 0) + 1
+
+                # Write atomically
+                temp_file = job_file.with_suffix(".tmp")
+                with open(temp_file, "w") as f:
+                    json.dump(current_job, f, indent=2)
+                temp_file.replace(job_file)
+
+                return current_job
+
+            finally:
+                fcntl.flock(lock_fd, fcntl.LOCK_UN)
 
     def update_job(self, job_id: str, updates: Dict[str, Any]) -> bool:
         """Update a job atomically.
