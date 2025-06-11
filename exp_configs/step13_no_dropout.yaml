@@ -1,0 +1,9 @@
+# Step 13: Remove dropout (the one introduced in step 8)
+# Building on step12, removing dropout regularization
+
+defaults:
+  - step12_alexnet
+  - _self_
+
+model:
+  dropout_prob: 0.0  # Remove dropout

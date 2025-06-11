@@ -1,0 +1,9 @@
+# Step 14: Switch from ReLU to Tanh nonlinearity
+# Building on step13, switching to older activation function
+
+defaults:
+  - step13_no_dropout
+  - _self_
+
+model:
+  nonlinearity: tanh  # Switch from relu to tanh

@@ -1,0 +1,9 @@
+# Step 17: Remove Horizontal Flip augmentation
+# Final step - removing the last augmentation
+
+defaults:
+  - step16_no_rrc
+  - _self_
+
+train_transforms:
+  hflip: false  # Remove Horizontal Flip

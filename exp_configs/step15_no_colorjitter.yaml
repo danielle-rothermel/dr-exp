@@ -1,0 +1,9 @@
+# Step 15: Remove Color Jitter augmentation
+# Building on step14, removing color augmentation
+
+defaults:
+  - step14_tanh
+  - _self_
+
+train_transforms:
+  colorjitter: false  # Remove Color Jitter

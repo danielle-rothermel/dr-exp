@@ -1,0 +1,9 @@
+# Step 10: Remove LRN
+# Building on step09, removing Local Response Normalization
+
+defaults:
+  - step09_xavier
+  - _self_
+
+model:
+  norm_type: none  # Remove LRN, leaving only dropout

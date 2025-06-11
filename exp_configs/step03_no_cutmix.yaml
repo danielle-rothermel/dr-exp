@@ -1,0 +1,9 @@
+# Step 03: Remove CutMix (2019)
+# Building on step02, removing CutMix augmentation
+
+defaults:
+  - step02_no_randaug
+  - _self_
+
+train_transforms:
+  cutmix: false  # Removed CutMix

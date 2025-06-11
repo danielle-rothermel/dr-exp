@@ -231,7 +231,7 @@ wheels = [
 [[package]]
 name = "deconcnn"
 version = "0.1.0"
-source = { git = "ssh://git@github.com/drothermel/deconCNN.git#0eefe0b47a05f763621c5dcebc0dbd55fedb5f39" }
+source = { git = "ssh://git@github.com/drothermel/deconCNN.git#fdbc54062822750e96340ca7d415943b0e55262b" }
 dependencies = [
     { name = "hydra-core" },
     { name = "lightning" },

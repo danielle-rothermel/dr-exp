@@ -1,0 +1,9 @@
+# Step 02: Remove RandAugment (2019)
+# Building on step01, removing modern augmentation technique
+
+defaults:
+  - step01_sgd
+  - _self_
+
+train_transforms:
+  randaug: false  # Removed RandAugment

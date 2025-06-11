@@ -1,0 +1,15 @@
+# Step 11: Reduce to 12 layers deep
+# Building on step10, switching from ResNet18 to ResNet12
+
+defaults:
+  - step10_no_lrn
+  - override /model: resnet12_cifar  # Switch to 12-layer ResNet
+  - _self_
+
+model:
+  source: deconcnn  # Override source back to deconcnn
+  architecture: resnet12  # Explicitly set architecture
+  use_residual: false  # Keep residual connections disabled
+  norm_type: none  # Keep normalization disabled
+  dropout_prob: 0.4  # Keep dropout
+  init_method: xavier  # Keep xavier initialization

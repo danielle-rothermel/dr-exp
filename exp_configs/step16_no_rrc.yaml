@@ -1,0 +1,9 @@
+# Step 16: Remove RRC (Random Resized Crop) augmentation
+# Building on step15, removing spatial augmentation
+
+defaults:
+  - step15_no_colorjitter
+  - _self_
+
+train_transforms:
+  rcc: false  # Remove Random Resized Crop

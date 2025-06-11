@@ -1,0 +1,9 @@
+# Step 07: Remove residual connections
+# Building on step06, creating "PlainNet18" by removing skip connections
+
+defaults:
+  - step06_steplr
+  - _self_
+
+model:
+  use_residual: false  # Removed residual connections

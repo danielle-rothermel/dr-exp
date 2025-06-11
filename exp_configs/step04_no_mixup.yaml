@@ -1,0 +1,9 @@
+# Step 04: Remove Mixup (2018)
+# Building on step03, removing Mixup augmentation
+
+defaults:
+  - step03_no_cutmix
+  - _self_
+
+train_transforms:
+  mixup: false  # Removed Mixup

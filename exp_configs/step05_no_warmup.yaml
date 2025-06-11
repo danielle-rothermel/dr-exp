@@ -1,0 +1,9 @@
+# Step 05: Remove warmup
+# Building on step04, removing learning rate warmup
+
+defaults:
+  - step04_no_mixup
+  - _self_
+
+lrsched:
+  warmup_epochs: 0  # Removed warmup

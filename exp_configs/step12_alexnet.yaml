@@ -1,0 +1,14 @@
+# Step 12: Reduce to 8 layers deep (5 CNN, 3 fully connected - AlexNet-like)
+# Building on step11, switching to AlexNet-style architecture
+
+defaults:
+  - step11_resnet12
+  - override /model: alexnet_cifar  # Switch to 8-layer AlexNet-style
+  - _self_
+
+model:
+  source: deconcnn  # Override source back to deconcnn
+  architecture: alexnet  # Explicitly set architecture  
+  norm_type: none  # Keep normalization disabled
+  dropout_prob: 0.4  # Keep dropout at 0.4 (will remove in step 13)
+  init_method: xavier  # Keep xavier initialization

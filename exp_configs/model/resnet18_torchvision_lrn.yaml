@@ -1,0 +1,12 @@
+source: torchvision
+name: resnet18
+weights: DEFAULT
+nonlinearity: relu
+norm_type: lrn
+dropout_prob: 0.0
+use_residual: true
+init_method: he
+lrn_size: 5
+lrn_alpha: 1e-4
+lrn_beta: 0.75
+lrn_k: 2.0
