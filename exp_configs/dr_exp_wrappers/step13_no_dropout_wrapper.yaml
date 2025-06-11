@@ -1,8 +1,0 @@
-_target_: "dr_exp.trainers.decon_trainer.train_classification"
-defaults:
-  - ../step13_no_dropout
-  - _self_
-
-# Full training for sweep
-epochs: 200
-batch_size: 128
