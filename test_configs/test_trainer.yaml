@@ -1,0 +1,16 @@
+_target_: dr_exp.trainers.test_trainer.train
+
+# Quick test - runs fast
+epochs: 1
+batch_size: 16
+steps_per_epoch: 5
+
+# Generate some output files
+save_checkpoint: true
+save_metrics: true
+log_interval: 1
+
+# Model config
+model:
+  name: test_model
+  hidden_size: 64
