@@ -14,6 +14,7 @@ from ..core.job_db import JobDB
 from ..sync.queue import SyncItem, SyncQueue
 from ..worker.base import Worker
 from .commands.sweep import sweep
+from .commands.slurm import slurm
 
 
 @click.group()
@@ -88,7 +89,14 @@ def run(
         sys.exit(1)
 
 
-@worker.command()
+@cli.group()
+@click.pass_context
+def system(ctx: click.Context) -> None:
+    """System and launcher commands."""
+    pass
+
+
+@system.command()
 @click.option("--workers-per-gpu", default=2, help="Workers per GPU")
 @click.option("--max-hours", default=47, help="Maximum runtime in hours")
 @click.pass_context
@@ -125,6 +133,9 @@ def job(ctx: click.Context) -> None:
 
 # Add sweep command to job group
 job.add_command(sweep)
+
+# Add SLURM command group
+cli.add_command(slurm)
 
 
 @job.command()

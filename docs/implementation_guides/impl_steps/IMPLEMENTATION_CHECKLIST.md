@@ -78,11 +78,11 @@ Use this checklist to track progress through the implementation steps.
   - [x] Tests pass: `pt tests/implementation/test_step_2_8.py -v`
   - [x] Code quality passes: `ckdr`
   
-- [ ] Step 2.9: SLURM Integration
-  - [ ] SLURM scripts and commands added
-  - [ ] Tests pass: `pt tests/implementation/test_step_2_9.py -v`
-  - [ ] Code quality passes: `ckdr`
-  - [ ] **Phase 2 Complete**: Can run `pt tests/implementation/test_step_2_*.py -v`
+- [x] Step 2.9: SLURM Integration
+  - [x] SLURM scripts and commands added
+  - [x] Tests pass: `pt tests/implementation/test_step_2_9.py -v`
+  - [x] Code quality passes: `ckdr`
+  - [x] **Phase 2 Complete**: Can run `pt tests/implementation/test_step_2_*.py -v`
 
 ## Phase 3: Supabase Integration
 - [ ] Step 3.1: Database Schema
