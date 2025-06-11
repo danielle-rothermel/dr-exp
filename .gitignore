@@ -2,6 +2,7 @@
 temp.patch
 job_data/
 storage/
+test_experiment/
 .coverage
 
 mock_db/*.json

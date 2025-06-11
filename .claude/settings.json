@@ -1,0 +1,8 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(uv run python -m dr_exp.cli.main --base-path $(pwd)/test_experiment --experiment test_run run-one test_experiment/test_run/example_config.yaml)"
+    ],
+    "deny": []
+  }
+}

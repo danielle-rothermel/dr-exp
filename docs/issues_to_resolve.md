@@ -93,6 +93,26 @@ This document tracks issues discovered during the quick start guide testing on 2
 - **Impact**: Pollutes repository with test artifacts
 - **Root Cause**: Tests likely using relative paths without proper temp directory setup
 
+## Major Issues
+
+### 1. Boost Command Misleading Name
+- **Issue**: Command name suggests relative boost but sets absolute priority
+- **Expected Behavior**: `boost job_id --amount 200` to increase priority by 200
+- **Actual Behavior**: `boost job_id --priority 800` sets priority to exactly 800
+- **User Impact**: Confusion about how to use the command effectively
+- **Suggestion**: Either rename to `set-priority` or change to relative boost behavior
+
+### 2. Validate Command Limited Scope
+- **Issue**: Only validates directory structure, not experiment health
+- **Current Checks**: Directory existence only
+- **Missing Checks**:
+  - Job file integrity (valid JSON, required fields)
+  - Config validity (can they be loaded?)
+  - Orphaned storage directories
+  - Sync queue health
+  - Worker state consistency
+- **Impact**: Users may think experiment is healthy when it has data issues
+
 ## Suggested Improvements
 
 ### 1. Move Worker Temporary Directory Under Experiment
@@ -177,9 +197,37 @@ This document tracks issues discovered during the quick start guide testing on 2
 - **Impact**: Minor - helpful but unexpected file creation
 - **Location**: Created at `{base_path}/{experiment}/example_config.yaml`
 
+### 4. Worker File Logging Not Implemented
+- **Issue**: Workers do not create log files as documented
+- **Expected**: Log files at `logs/worker_<worker_id>.log`
+- **Actual**: Workers only output to stdout/stderr
+- **Impact**: Cannot monitor worker activity with `tail -f` as shown in guide
+- **Documentation Claims**: Quick Start guide shows monitoring with `tail -f $(pwd)/debug_experiment/test_run/logs/worker_debug_worker.log`
+
+### 5. run-one Command Documentation Error
+- **Issue**: Quick Start guide shows incorrect syntax for run-one
+- **Documentation Shows**: `run-one configs/test_job.yaml`
+- **Actual Syntax**: `run-one <job_id> [--working-dir <path>]`
+- **Impact**: Users following guide will get "No job found" error
+- **Workaround**: Must submit job first to get ID, then use run-one
+
+### 6. Error File Format Discrepancy
+- **Issue**: Documentation mentions `error.json` but system creates `error.txt`
+- **Documentation**: "View error details: cat .../error.json | jq ."
+- **Reality**: Error details saved as plain text in `error.txt`
+- **Impact**: Minor - just a documentation inconsistency
+
+### 7. Sync Queue Items Not Being Processed
+- **Issue**: Sync queue items accumulate but are never processed
+- **Symptom**: After running a worker, 5 sync items remain pending indefinitely
+- **Example**: `sync-status` shows "Pending: 5" even after job completion
+- **Impact**: Could lead to unbounded growth and eventual disk space issues
+- **Root Cause**: Unknown - sync processing mechanism may not be implemented
+
 ## Testing Environment
 
 - Platform: macOS Darwin 24.3.0
 - Python: 3.12 (via uv)
 - Working Directory: `/Users/daniellerothermel/drotherm/repos/dr_exp`
 - Test Date: 2025-06-10
+- Additional Testing Results: See `/docs/testing_results_2025-06-10.md`
