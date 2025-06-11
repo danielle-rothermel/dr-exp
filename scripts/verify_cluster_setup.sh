@@ -1,6 +1,15 @@
 #!/bin/bash
 # Verification script for dr_exp cluster setup
 
+# Load .env file if it exists
+if [ -f .env ]; then
+    echo "Loading .env file..."
+    set -a  # Export all variables
+    source .env
+    set +a
+    echo ""
+fi
+
 echo "🔍 Verifying dr_exp Cluster Setup"
 echo "================================="
 echo "Hostname: $(hostname)"

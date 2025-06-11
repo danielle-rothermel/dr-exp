@@ -46,6 +46,28 @@ EOF
 - Never commit `.env` to git
 - Set restrictive permissions: `chmod 600 .env`
 
+**Important**: The `.env` file is NOT automatically loaded by shell scripts. You have three options:
+
+1. **Source it manually before running commands**:
+   ```bash
+   source .env  # or `. .env`
+   uv run dr_exp --base-path ./exp --experiment test worker --worker-id w1
+   ```
+
+2. **Export in your shell session**:
+   ```bash
+   export $(cat .env | grep -v '^#' | xargs)
+   ```
+
+3. **Let Python load it** (dr_exp uses python-dotenv automatically):
+   ```bash
+   # Python scripts will load .env automatically
+   uv run python scripts/test_remote_supabase.py
+   
+   # dr_exp CLI also loads .env automatically
+   uv run dr_exp --base-path ./exp --experiment test worker --worker-id w1
+   ```
+
 ### 2. Verify Network Connectivity
 
 Clusters often have restricted internet access. Test connectivity:
@@ -126,12 +148,19 @@ For SLURM clusters, use the launcher with proper module loading:
 module load python/3.10
 module load cuda/11.8
 
-# Activate environment (if using venv instead of uv)
-source /path/to/dr_exp/.venv/bin/activate
+# Change to project directory
+cd /path/to/dr_exp
 
-# Export credentials
-export SUPABASE_URL="https://yfawygsfsuwrqvohsayp.supabase.co"
-export SUPABASE_KEY="your-key-here"
+# Load environment variables from .env file
+if [ -f .env ]; then
+    set -a
+    source .env
+    set +a
+fi
+
+# OR explicitly export credentials
+# export SUPABASE_URL="https://yfawygsfsuwrqvohsayp.supabase.co"
+# export SUPABASE_KEY="your-key-here"
 
 # Run worker
 uv run dr_exp --base-path /scratch/experiments --experiment my_exp \
