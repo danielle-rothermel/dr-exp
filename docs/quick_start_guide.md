@@ -207,9 +207,93 @@ uv run python -m dr_exp.cli.main \
 cat $(pwd)/debug_experiment/test_run/storage/run_<job_id>/error.txt
 ```
 
+## Advanced Features (New in Phase 2.7-2.9)
+
+### Running Parameter Sweeps
+
+Submit multiple jobs with different parameters in one command:
+
+```bash
+# Dry run to preview configurations
+uv run python -m dr_exp.cli.main \
+  --base-path $(pwd)/debug_experiment \
+  --experiment test_run \
+  sweep \
+  --config configs/test_job.yaml \
+  --params "epochs=1,2,3 fail_rate=0.0,0.5" \
+  --priority 500 \
+  --dry-run
+
+# Submit the sweep (creates 6 jobs: 3 epochs × 2 fail_rates)
+uv run python -m dr_exp.cli.main \
+  --base-path $(pwd)/debug_experiment \
+  --experiment test_run \
+  sweep \
+  --config configs/test_job.yaml \
+  --params "epochs=1,2,3 fail_rate=0.0,0.5" \
+  --priority 500
+
+# Process all sweep jobs
+uv run python -m dr_exp.cli.main \
+  --base-path $(pwd)/debug_experiment \
+  --experiment test_run \
+  worker \
+  --worker-id sweep_worker \
+  --working-dir $(pwd)/work
+```
+
+### Testing Multi-Worker Launcher (CPU Mode)
+
+Even without GPUs, you can test the launcher locally:
+
+```bash
+# Launch 2 CPU workers for 1 minute
+uv run python -m dr_exp.cli.main \
+  --base-path $(pwd)/debug_experiment \
+  --experiment test_run \
+  launcher \
+  --workers-per-gpu 2 \
+  --max-hours 0.017  # ~1 minute
+
+# In another terminal, submit jobs for workers to process
+for i in {1..10}; do
+  uv run python -m dr_exp.cli.main \
+    --base-path $(pwd)/debug_experiment \
+    --experiment test_run \
+    submit \
+    --config-path configs \
+    --config-name test_job \
+    --priority $((100 + i))
+done
+
+# Control the launcher
+echo "finish-current" > debug_experiment/test_run/control/launcher_control_local.txt
+```
+
+### SLURM Integration (Local Testing)
+
+Test SLURM commands work even without a cluster:
+
+```bash
+# Check for SLURM jobs (will be empty locally)
+uv run python -m dr_exp.cli.main \
+  --base-path $(pwd)/debug_experiment \
+  --experiment test_run \
+  slurm status
+
+# Create control files (useful for understanding the system)
+uv run python -m dr_exp.cli.main \
+  --base-path $(pwd)/debug_experiment \
+  --experiment test_run \
+  slurm control --finish-current
+
+# View launcher status files
+ls -la debug_experiment/test_run/launcher_status_*.json
+```
+
 ## Next Steps
 
-- Run multiple workers: Use different `--worker-id` values
-- Submit parameter sweeps: Use comma-separated values in overrides
-- Monitor long runs: Workers log status every 30 seconds
-- SLURM integration: See `scripts/slurm_job.sbatch` for cluster usage
+- **Cluster deployment**: Use `scripts/dr_exp_slurm.sbatch` for real SLURM jobs
+- **GPU testing**: Launcher will detect and assign GPUs automatically
+- **Large sweeps**: Combine sweeps with launcher for parallel processing
+- **Production runs**: Set `--max-hours 47` for long-running experiments

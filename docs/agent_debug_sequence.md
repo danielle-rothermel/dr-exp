@@ -206,6 +206,70 @@ Expected: No results (logs should be in experiment storage)
 Command: `ls -la test_experiment/test_run/storage/`
 Expected: All job outputs contained here
 
+### Config Sweep Testing (New in 2.8)
+
+#### Step 26: Test Basic Parameter Sweep (Dry Run)
+Command: `uv run python -m dr_exp.cli.main --base-path $(pwd)/test_experiment --experiment test_run sweep --config configs/test_job.yaml --params "epochs=1,2,3" --priority 600 --dry-run`
+Expected: Shows 3 configurations with different epoch values
+Verify: Each config should have different epochs value (1, 2, 3)
+Status Criteria:
+- ✅ PASS if shows 3 configs with correct values
+- ❌ FAIL if config generation fails
+
+#### Step 27: Submit Multi-Parameter Sweep
+Command: `uv run python -m dr_exp.cli.main --base-path $(pwd)/test_experiment --experiment test_run sweep --config configs/test_job.yaml --params "epochs=2,3 fail_rate=0.0,0.5" --priority 700`
+Expected: Creates 4 jobs (2×2 grid: 2 epochs × 2 fail_rates)
+Capture: Job IDs from output
+Status Criteria:
+- ✅ PASS if creates exactly 4 jobs
+- ❌ FAIL if wrong number of jobs or submission errors
+
+#### Step 28: Verify Sweep Jobs Created
+Command: `uv run python -m dr_exp.cli.main --base-path $(pwd)/test_experiment --experiment test_run list | grep "priority=700"`
+Expected: Shows 4 jobs with priority 700
+Verify: Each job has unique parameter combination
+
+### Multi-Worker Launcher Testing (New in 2.7)
+
+#### Step 29: Test Launcher in CPU Mode
+Command: `timeout 30 uv run python -m dr_exp.cli.main --base-path $(pwd)/test_experiment --experiment test_run launcher --workers-per-gpu 2 --max-hours 0.001 2>&1 | tee launcher.log`
+Expected: Launches 2 CPU workers (no GPUs on Mac), exits after ~3.6 seconds
+Verify: Log shows "No GPUs detected, running in CPU mode"
+Note: Uses timeout to ensure launcher stops
+Status Criteria:
+- ✅ PASS if spawns 2 workers in CPU mode
+- ⚠️ UNEXPECTED if finds GPUs on Mac
+- ❌ FAIL if crashes or hangs
+
+#### Step 30: Check Launcher Status File
+Command: `cat test_experiment/test_run/launcher_status_local.json | jq .`
+Expected: JSON with workers info, start time, GPUs (empty), status
+Verify: Shows 2 CPU workers were spawned
+
+#### Step 31: Test Launcher Control File
+Command: `echo "finish-current" > test_experiment/test_run/control/launcher_control_local.txt`
+Command: `timeout 30 uv run python -m dr_exp.cli.main --base-path $(pwd)/test_experiment --experiment test_run launcher --workers-per-gpu 1`
+Expected: Launcher detects control file and stops gracefully
+Verify: Log shows "Control file detected: finish-current"
+
+### SLURM Command Testing (New in 2.9)
+
+#### Step 32: Test SLURM Status (No Jobs)
+Command: `uv run python -m dr_exp.cli.main --base-path $(pwd)/test_experiment --experiment test_run slurm status`
+Expected: Shows "No active SLURM launcher jobs found"
+Status Criteria:
+- ✅ PASS if command runs without error
+- ❌ FAIL if command crashes
+
+#### Step 33: Test SLURM Control Commands
+Command: `uv run python -m dr_exp.cli.main --base-path $(pwd)/test_experiment --experiment test_run slurm control --stop-now --job-id 12345`
+Expected: Creates control file for job 12345
+Verify: Check control file exists: `ls test_experiment/test_run/control/launcher_control_12345.txt`
+
+#### Step 34: Test SLURM Error Viewing
+Command: `uv run python -m dr_exp.cli.main --base-path $(pwd)/test_experiment --experiment test_run slurm errors`
+Expected: Shows "No SLURM error logs found" (since no SLURM jobs ran)
+
 ## Synthesis Instructions
 
 After completing all steps, create a synthesis section with:
@@ -241,6 +305,7 @@ Group issues by severity:
 - Passed: [count] ([percentage]%)
 - Failed: [count] ([percentage]%)
 - Unexpected: [count] ([percentage]%)
+- New Features Tested: Config sweeps (3 steps), Launcher (3 steps), SLURM (3 steps)
 
 ### 5. Overall System Assessment
 Brief paragraph on system health, what works well, and what needs attention.
