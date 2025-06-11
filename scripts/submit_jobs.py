@@ -110,6 +110,8 @@ Examples:
                       help="Seeds to use with --configs (default: 0,1,2 for chrono; 0-4 for high-reg)")
     parser.add_argument("--priority", type=int, default=None,
                       help="Priority for submitted jobs (default: use predefined priorities)")
+    parser.add_argument("--overrides", type=str, default=None,
+                      help="Additional Hydra overrides (e.g., 'machine=mac,epochs=2')")
     parser.add_argument("--retry-failed", action="store_true",
                       help="Retry failed jobs from the most recent submission")
     parser.add_argument("--no-confirm", action="store_true",
@@ -274,7 +276,7 @@ Examples:
     for i, (config, seed, priority) in enumerate(filtered_jobs, 1):
         print(f"[{i}/{len(filtered_jobs)}] {config} seed={seed}", end=" ")
         
-        success, job_id = submitter.submit_job(f"{config}.yaml", seed, priority)
+        success, job_id = submitter.submit_job(f"{config}.yaml", seed, priority, extra_overrides=args.overrides)
         
         if success:
             print(f"✓ {job_id if job_id else ''}")

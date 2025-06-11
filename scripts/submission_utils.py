@@ -69,7 +69,7 @@ class JobSubmitter:
         try:
             result = subprocess.run(
                 ["dr_exp", "--base-path", str(self.base_path), 
-                 "--experiment", self.experiment, "list", "--status", "all"],
+                 "--experiment", self.experiment, "job", "list", "--status", "all"],
                 capture_output=True, text=True
             )
             
@@ -122,28 +122,31 @@ class JobSubmitter:
         return False
     
     def submit_job(self, config: str, seed: int, priority: int = 0, 
-                   extra_args: Optional[List[str]] = None) -> Tuple[bool, Optional[str]]:
+                   extra_overrides: Optional[str] = None) -> Tuple[bool, Optional[str]]:
         """Submit a single job. Returns (success, job_id)."""
         
         if self.dry_run:
             print(f"[DRY RUN] Would submit: config={config}, seed={seed}, priority={priority}")
             return True, "dry-run-job-id"
         
+        # Build overrides string
+        overrides = [f"seed={seed}"]
+        if extra_overrides:
+            overrides.append(extra_overrides)
+        
         cmd = [
             "dr_exp",
             "--base-path", str(self.base_path),
             "--experiment", self.experiment,
+            "job",
             "submit",
             "--config-path", "exp_configs",
             "--config-name", config,
-            f"seed={seed}"
+            "--overrides", ",".join(overrides)
         ]
         
         if priority > 0:
             cmd.extend(["--priority", str(priority)])
-        
-        if extra_args:
-            cmd.extend(extra_args)
         
         try:
             result = subprocess.run(cmd, capture_output=True, text=True)
