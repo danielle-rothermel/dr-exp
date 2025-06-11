@@ -12,7 +12,7 @@ def slurm() -> None:
 
 @slurm.command()
 @click.pass_context
-def status(ctx) -> None:
+def status(ctx: click.Context) -> None:
     """Show status of all SLURM jobs for this experiment."""
     # Create JobDB instance for this command
     from dr_exp.core.job_db import JobDB
@@ -69,7 +69,9 @@ def status(ctx) -> None:
 @click.option("--finish-current", is_flag=True, help="Finish current jobs then stop")
 @click.option("--stop-now", is_flag=True, help="Stop immediately")
 @click.pass_context
-def control(ctx, job_id: str, finish_current: bool, stop_now: bool) -> None:
+def control(
+    ctx: click.Context, job_id: str, finish_current: bool, stop_now: bool
+) -> None:
     """Send control commands to a SLURM job."""
     # Create JobDB instance for this command
     from dr_exp.core.job_db import JobDB
@@ -94,7 +96,7 @@ def control(ctx, job_id: str, finish_current: bool, stop_now: bool) -> None:
 @click.argument("job_id")
 @click.option("--tail", default=50, help="Number of lines to show")
 @click.pass_context
-def errors(ctx, job_id: str, tail: int) -> None:
+def errors(ctx: click.Context, job_id: str, tail: int) -> None:
     """View aggregated errors from a SLURM job."""
     # Create JobDB instance for this command
     from dr_exp.core.job_db import JobDB
@@ -120,7 +122,7 @@ def errors(ctx, job_id: str, tail: int) -> None:
 @click.option("--worker", default=None, help="Specific worker ID")
 @click.option("--tail", default=50, help="Number of lines to show")
 @click.pass_context
-def logs(ctx, job_id: str, worker: str, tail: int) -> None:
+def logs(ctx: click.Context, job_id: str, worker: str | None, tail: int) -> None:
     """View logs from a SLURM job."""
     # Create JobDB instance for this command
     from dr_exp.core.job_db import JobDB
