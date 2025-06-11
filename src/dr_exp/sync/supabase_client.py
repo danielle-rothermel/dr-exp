@@ -4,8 +4,9 @@ import os
 import hashlib
 import time
 from pathlib import Path
-from typing import Dict, Any, Optional, Tuple
+from typing import Dict, Any, Optional, Tuple, List
 import mimetypes
+from datetime import datetime, UTC
 
 from supabase import create_client, Client
 
@@ -268,6 +269,299 @@ class SupabaseClient:
 
         except Exception as e:
             raise Exception(f"Failed to create signed URL: {str(e)}")
+
+    def get_or_create_experiment(
+        self,
+        experiment_name: str,
+        base_path: str,
+        metadata: Optional[Dict[str, Any]] = None,
+    ) -> str:
+        """Get or create an experiment in the database.
+
+        Args:
+            experiment_name: Name of the experiment
+            base_path: Base path for the experiment
+            metadata: Optional metadata
+
+        Returns:
+            Experiment ID (UUID string)
+        """
+        try:
+            # Try to get existing experiment
+            response = (
+                self.client.table("experiments")
+                .select("id")
+                .eq("experiment_name", experiment_name)
+                .eq("base_path", base_path)
+                .execute()
+            )
+
+            if response.data and len(response.data) > 0:
+                return str(response.data[0]["id"])
+
+            # Create new experiment
+            data = {
+                "experiment_name": experiment_name,
+                "base_path": base_path,
+                "metadata": metadata or {},
+            }
+
+            response = self.client.table("experiments").insert(data).execute()
+
+            if response.data and len(response.data) > 0:
+                return str(response.data[0]["id"])
+            else:
+                raise Exception("Failed to create experiment")
+
+        except Exception as e:
+            raise Exception(f"Failed to get/create experiment: {str(e)}")
+
+    def sync_job(self, job_data: Dict[str, Any], experiment_id: str) -> bool:
+        """Sync a job to the database.
+
+        Args:
+            job_data: Job data from local JobDB
+            experiment_id: Experiment ID
+
+        Returns:
+            True if synced successfully
+        """
+        try:
+            # Prepare job data for database
+            db_job = {
+                "id": job_data["id"],
+                "experiment_id": experiment_id,
+                "config": job_data["config"],
+                "priority": job_data.get("priority", 100),
+                "status": job_data["status"],
+                "worker_id": job_data.get("worker_id"),
+                "created_at": job_data.get("created_at"),
+                "updated_at": job_data.get("updated_at"),
+                "started_at": job_data.get("started_at"),
+                "completed_at": job_data.get("completed_at"),
+                "last_heartbeat": job_data.get("last_heartbeat"),
+                "attempts": job_data.get("attempts", 0),
+                "error": job_data.get("error"),
+                "final_metrics": job_data.get("final_metrics"),
+                "reserved_for": job_data.get("reserved_for"),
+                "reservation_time": job_data.get("reservation_time"),
+                "priority_boosted": job_data.get("priority_boosted", False),
+                "recovery_count": job_data.get("recovery_count", 0),
+                "last_recovery": job_data.get("last_recovery"),
+            }
+
+            # Remove None values
+            db_job = {k: v for k, v in db_job.items() if v is not None}
+
+            # Upsert job (insert or update)
+            response = (
+                self.client.table("jobs").upsert(db_job, on_conflict="id").execute()
+            )
+
+            return response.data is not None
+
+        except Exception as e:
+            raise Exception(f"Failed to sync job {job_data.get('id')}: {str(e)}")
+
+    def create_sync_status(
+        self,
+        job_id: str,
+        file_path: str,
+        file_type: str,
+        checksum: str,
+        size_bytes: int,
+        storage_url: str,
+        metadata: Optional[Dict[str, Any]] = None,
+    ) -> str:
+        """Create a sync status record.
+
+        Args:
+            job_id: Job that created the file
+            file_path: Original file path
+            file_type: Type of file
+            checksum: File checksum
+            size_bytes: File size
+            storage_url: URL in storage
+            metadata: Optional metadata
+
+        Returns:
+            Sync status ID
+        """
+        try:
+            data = {
+                "job_id": job_id,
+                "file_path": file_path,
+                "file_type": file_type,
+                "checksum": checksum,
+                "size_bytes": size_bytes,
+                "storage_url": storage_url,
+                "status": "completed",
+                "completed_at": datetime.now(UTC).isoformat(),
+                "metadata": metadata or {},
+            }
+
+            response = self.client.table("sync_status").insert(data).execute()
+
+            if response.data and len(response.data) > 0:
+                return str(response.data[0]["id"])
+            else:
+                raise Exception("Failed to create sync status")
+
+        except Exception as e:
+            raise Exception(f"Failed to create sync status: {str(e)}")
+
+    def update_sync_status(
+        self, sync_id: str, status: str, error: Optional[str] = None
+    ) -> bool:
+        """Update sync status for a file.
+
+        Args:
+            sync_id: Sync status ID
+            status: New status
+            error: Optional error message
+
+        Returns:
+            True if updated successfully
+        """
+        try:
+            data = {"status": status, "updated_at": datetime.now(UTC).isoformat()}
+
+            if error:
+                data["error"] = error
+                data["last_attempt"] = datetime.now(UTC).isoformat()
+
+            if status == "completed":
+                data["completed_at"] = datetime.now(UTC).isoformat()
+
+            response = (
+                self.client.table("sync_status")
+                .update(data)
+                .eq("id", sync_id)
+                .execute()
+            )
+
+            return response.data is not None
+
+        except Exception as e:
+            raise Exception(f"Failed to update sync status: {str(e)}")
+
+    def get_experiment_jobs(
+        self, experiment_id: str, status: Optional[str] = None, limit: int = 100
+    ) -> List[Dict[str, Any]]:
+        """Get jobs for an experiment.
+
+        Args:
+            experiment_id: Experiment ID
+            status: Optional status filter
+            limit: Maximum number of jobs
+
+        Returns:
+            List of job records
+        """
+        try:
+            query = (
+                self.client.table("jobs")
+                .select("*")
+                .eq("experiment_id", experiment_id)
+                .order("created_at", desc=True)
+                .limit(limit)
+            )
+
+            if status:
+                query = query.eq("status", status)
+
+            response = query.execute()
+
+            return response.data or []
+
+        except Exception as e:
+            raise Exception(f"Failed to get experiment jobs: {str(e)}")
+
+    def get_experiment_stats(self, experiment_id: str) -> Dict[str, Any]:
+        """Get statistics for an experiment.
+
+        Args:
+            experiment_id: Experiment ID
+
+        Returns:
+            Dictionary with experiment statistics
+        """
+        try:
+            # Use the experiment_stats view
+            response = (
+                self.client.table("experiment_stats")
+                .select("*")
+                .eq("id", experiment_id)
+                .execute()
+            )
+
+            if response.data and len(response.data) > 0:
+                return dict(response.data[0])
+
+            # Fallback to manual calculation
+            jobs = self.get_experiment_jobs(experiment_id, limit=1000)
+
+            stats = {
+                "total_jobs": len(jobs),
+                "queued_jobs": len([j for j in jobs if j["status"] == "queued"]),
+                "running_jobs": len([j for j in jobs if j["status"] == "running"]),
+                "completed_jobs": len([j for j in jobs if j["status"] == "completed"]),
+                "failed_jobs": len([j for j in jobs if j["status"] == "failed"]),
+                "killed_jobs": len([j for j in jobs if j["status"] == "killed"]),
+            }
+
+            return stats
+
+        except Exception as e:
+            raise Exception(f"Failed to get experiment stats: {str(e)}")
+
+    def get_job_sync_status(self, job_id: str) -> List[Dict[str, Any]]:
+        """Get sync status for all files from a job.
+
+        Args:
+            job_id: Job ID
+
+        Returns:
+            List of sync status records
+        """
+        try:
+            response = (
+                self.client.table("sync_status")
+                .select("*")
+                .eq("job_id", job_id)
+                .order("created_at", desc=True)
+                .execute()
+            )
+
+            return response.data or []
+
+        except Exception as e:
+            raise Exception(f"Failed to get job sync status: {str(e)}")
+
+    def batch_sync_jobs(
+        self, jobs: List[Dict[str, Any]], experiment_id: str
+    ) -> Dict[str, int]:
+        """Sync multiple jobs in batch.
+
+        Args:
+            jobs: List of job data dictionaries
+            experiment_id: Experiment ID
+
+        Returns:
+            Dictionary with success/failed counts
+        """
+        results = {"success": 0, "failed": 0}
+
+        for job_data in jobs:
+            try:
+                if self.sync_job(job_data, experiment_id):
+                    results["success"] += 1
+                else:
+                    results["failed"] += 1
+            except Exception:
+                results["failed"] += 1
+
+        return results
 
     def test_connection(self) -> bool:
         """Test connection to Supabase.
