@@ -85,10 +85,10 @@ Use this checklist to track progress through the implementation steps.
   - [x] **Phase 2 Complete**: Can run `pt tests/implementation/test_step_2_*.py -v`
 
 ## Phase 3: Supabase Integration
-- [ ] Step 3.1: Database Schema
-  - [ ] SQL migrations created
-  - [ ] Tests pass: `pt tests/implementation/test_step_3_1.py -v`
-  - [ ] Code quality passes: `ckdr`
+- [x] Step 3.1: Database Schema
+  - [x] SQL migrations created
+  - [x] Tests pass: `pt tests/implementation/test_step_3_1.py -v`
+  - [x] Code quality passes: `ckdr`
   
 - [ ] Step 3.2: Supabase Client Basics
   - [ ] Client class created
