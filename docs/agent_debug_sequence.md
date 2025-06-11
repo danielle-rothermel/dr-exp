@@ -3,12 +3,21 @@
 ## Instructions for Agent
 
 Execute each step sequentially and record results in a new file: `/docs/debug_results_YYYY-MM-DD_HHMMSS.md`
+Example filename: `debug_results_2025-06-10_143022.md` (use 24-hour time format)
 
 For each step:
 1. Run the command exactly as shown
 2. Record the result using the format below
 3. If a command fails, try up to 3 alternative approaches before moving on
 4. Continue through all steps regardless of failures
+
+### Alternative Approach Examples
+When a command fails, try these types of alternatives:
+- **File not found**: Use `find . -name "filename"` to locate it, check different directories
+- **Command syntax error**: Run with `--help` flag, check similar commands, review error message
+- **Permission denied**: Check file ownership with `ls -la`, try different paths
+- **Config issues**: Create minimal test config, check for required fields
+- **No output**: Add verbose flags (-v, --debug), check exit codes with `echo $?`
 
 ### Result Recording Format
 ```
@@ -69,7 +78,13 @@ Verify: Output shows "completed": 1
 #### Step 7: Check Worker Logs
 Command: `ls -la $(pwd)/test_experiment/test_run/logs/`
 Expected: Contains file `worker_debug_worker.log`
-Note: Documentation says this should exist
+Alternative if not found:
+1. Check if logs written elsewhere: `find test_experiment -name "*.log" -type f`
+2. Check worker output for log location mentions
+3. Verify logs directory exists and has write permissions
+Status Criteria:
+- ✅ PASS if log file exists
+- ❌ FAIL if no log file (document as known issue)
 
 #### Step 8: Check Completed Jobs
 Command: `uv run python -m dr_exp.cli.main --base-path $(pwd)/test_experiment --experiment test_run list --status completed`
@@ -84,7 +99,13 @@ Verify: File exists and contains valid JSON lines
 #### Step 10: Test run-one (Documentation Version)
 Command: `uv run python -m dr_exp.cli.main --base-path $(pwd)/test_experiment --experiment test_run run-one configs/test_job.yaml`
 Expected: Runs job immediately bypassing queue
-Note: Documentation shows this syntax
+Alternative approaches when this fails:
+1. Try with job ID instead: `run-one <job-id>`
+2. Check help: `run-one --help`
+3. Try different config file paths
+Status Criteria:
+- ✅ PASS if job runs (unlikely based on known issue)
+- ❌ FAIL if "No job found" error (expected - document as doc bug)
 
 #### Step 11: Test run-one (Correct Version)
 Command: `uv run python -m dr_exp.cli.main --base-path $(pwd)/test_experiment --experiment test_run submit configs/test_job.yaml`
@@ -123,7 +144,12 @@ Capture: All job IDs
 #### Step 17: Run Concurrent Workers
 Command: `for i in {1..3}; do uv run python -m dr_exp.cli.main --base-path $(pwd)/test_experiment --experiment test_run worker --worker-id worker_$i --working-dir $(pwd)/work_$i --max-jobs 2 & done; wait`
 Expected: 3 workers process jobs concurrently, highest priority first
-Verify: Jobs claimed in priority order (500, 400, 300, 200, 100)
+Verify During Execution: Run `ps aux | grep "worker_"` in another terminal to confirm 3 concurrent processes
+Verify After: Check job claim order matches priority (500, 400, 300, 200, 100)
+Status Criteria: 
+- ✅ PASS if all jobs processed and priority order maintained
+- ⚠️ UNEXPECTED if jobs processed but priority order wrong
+- ❌ FAIL if workers don't run concurrently or jobs fail
 
 ### Additional CLI Commands
 
@@ -142,14 +168,26 @@ Command: `uv run python -m dr_exp.cli.main --base-path $(pwd)/test_experiment --
 Expected: Shows "Boosted job: [ID] (100 → 800)"
 
 #### Step 21: Test Recovery
+##### Step 21a: Create Stale Job (Optional)
+Command: `uv run python -c "import json, datetime; job_file = 'test_experiment/test_run/jobs/9136a8ec-3dc7-4803-a142-c54bb462d690.json'; data = json.load(open(job_file)); data['status'] = 'running'; data['heartbeat'] = (datetime.datetime.now(datetime.timezone.utc) - datetime.timedelta(minutes=10)).isoformat(); json.dump(data, open(job_file, 'w'), indent=2)"`
+Expected: Modifies job to appear stale (if job exists)
+Note: Skip if no queued job available
+
+##### Step 21b: Run Recovery
 Command: `uv run python -m dr_exp.cli.main --base-path $(pwd)/test_experiment --experiment test_run recover`
-Expected: No stale jobs found (or recovers any found)
-Note: Hard to test without manually creating stale job
+Expected: Either "No stale jobs found" or "Recovered X stale job(s)"
+Status Criteria:
+- ✅ PASS if command runs without error
+- Verify recovered jobs listed if any found
 
 #### Step 22: Check Sync Status
 Command: `uv run python -m dr_exp.cli.main --base-path $(pwd)/test_experiment --experiment test_run sync-status`
 Expected: Shows pending/failed/completed counts
-Note: Check if pending items accumulate
+Status Criteria:
+- ✅ PASS if shows counts (even if non-zero)
+- ⚠️ UNEXPECTED if pending count > 10 (indicates sync backlog)
+- ❌ FAIL if command errors
+Note: High pending count suggests sync processing issue
 
 #### Step 23: Check Experiment Status
 Command: `uv run python -m dr_exp.cli.main --base-path $(pwd)/test_experiment --experiment test_run status`
@@ -160,7 +198,13 @@ Expected: Shows job counts and sync queue status
 #### Step 24: Test Hydra Config
 Command: `uv run python -m dr_exp.cli.main --base-path $(pwd)/test_experiment --experiment test_run submit configs/decon_config.yaml`
 Expected: Creates job with DeconCNN trainer
-Note: This uses Hydra config composition
+Alternative approaches when this fails:
+1. Check error message for missing fields
+2. Create minimal config with `_target_` field: `echo '_target_: "deconcnn.trainers.decon_trainer.train"\nepochs: 1' > test_config.yaml`
+3. Try submitting the minimal config
+Status Criteria:
+- ✅ PASS if creates job (tests Hydra composition)
+- ❌ FAIL if missing _target_ error (known issue - config composition broken)
 
 #### Step 25: Verify Storage Locations
 Command: `find . -name "lightning_logs" -type d 2>/dev/null`
@@ -173,24 +217,38 @@ Expected: All job outputs contained here
 After completing all steps, create a synthesis section with:
 
 ### 1. Failures Table
-| Step | Command | Expected | Actual | Root Cause |
-|------|---------|----------|--------|------------|
-| List all ❌ FAIL results |
+Create a table with all ❌ FAIL results:
+| Step | Command Summary | Expected | Actual | Root Cause |
+|------|-----------------|----------|--------|------------|
+| 7 | Check worker logs | Log file exists | No log file | Feature not implemented |
+| (add all failures) |
 
 ### 2. Unexpected Behaviors
-| Step | Description | Impact |
-|------|-------------|--------|
-| List all ⚠️ UNEXPECTED results |
+Create a table with all ⚠️ UNEXPECTED results:
+| Step | Description | Impact | Recommendation |
+|------|-------------|--------|----------------|
+| 15 | Error format .txt not .json | Minor - docs wrong | Update documentation |
+| (add all unexpected) |
 
 ### 3. Prioritized Issues List
-1. **Critical**: [Issues blocking core functionality]
-2. **Major**: [Issues affecting user experience]
-3. **Minor**: [Documentation or cosmetic issues]
+Group issues by severity:
+
+**Critical** (Blocks core functionality):
+- Issue name: Description and impact
+
+**Major** (Affects user experience):
+- Issue name: Description and impact
+
+**Minor** (Documentation/cosmetic):
+- Issue name: Description and impact
 
 ### 4. Summary Statistics
-- Total Steps: X
-- Passed: X (X%)
-- Failed: X (X%)
-- Unexpected: X (X%)
+- Total Steps: [count]
+- Passed: [count] ([percentage]%)
+- Failed: [count] ([percentage]%)
+- Unexpected: [count] ([percentage]%)
+
+### 5. Overall System Assessment
+Brief paragraph on system health, what works well, and what needs attention.
 
 Present the completed debug results file for review.
