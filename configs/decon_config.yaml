@@ -1,4 +1,4 @@
-_target_: "src.dr_exp.trainers.decon_trainer.train_decon"
+_target_: "dr_exp.trainers.decon_trainer.train_decon"
 defaults:
     - machine: cluster
     - paths: default
