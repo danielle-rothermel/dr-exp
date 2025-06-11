@@ -90,10 +90,10 @@ Use this checklist to track progress through the implementation steps.
   - [x] Tests pass: `pt tests/implementation/test_step_3_1.py -v`
   - [x] Code quality passes: `ckdr`
   
-- [ ] Step 3.2: Supabase Client Basics
-  - [ ] Client class created
-  - [ ] Tests pass: `pt tests/implementation/test_step_3_2.py -v`
-  - [ ] Code quality passes: `ckdr`
+- [x] Step 3.2: Supabase Client Basics
+  - [x] Client class created
+  - [x] Tests pass: `pt tests/implementation/test_step_3_2.py -v`
+  - [x] Code quality passes: `ckdr`
   
 - [ ] Step 3.3: Database Operations
   - [ ] Database operations implemented
