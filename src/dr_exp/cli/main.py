@@ -13,6 +13,7 @@ import click
 from ..core.job_db import JobDB
 from ..sync.queue import SyncItem, SyncQueue
 from ..worker.base import Worker
+from .commands.sweep import sweep
 
 
 @click.group()
@@ -115,7 +116,18 @@ def launcher(ctx: click.Context, workers_per_gpu: int, max_hours: float) -> None
     launcher_instance.run()
 
 
-@cli.command()
+@cli.group()
+@click.pass_context
+def job(ctx: click.Context) -> None:
+    """Job management commands."""
+    pass
+
+
+# Add sweep command to job group
+job.add_command(sweep)
+
+
+@job.command()
 @click.option("--config-path", default="configs", help="Path to config directory")
 @click.option(
     "--config-name", required=True, help="Name of config file (without .yaml)"
@@ -192,7 +204,7 @@ def submit(
     click.echo(f"Target: {target}")
 
 
-@cli.command()
+@job.command()
 @click.option("--status", help="Filter by status (queued, running, completed, failed)")
 @click.pass_context
 def list(ctx: click.Context, status: Optional[str]) -> None:
@@ -335,7 +347,7 @@ def status(ctx: click.Context) -> None:
             click.echo(f"  Completed: {sync_stats['completed']}")
 
 
-@cli.command()
+@job.command()
 @click.argument("job_ids", nargs=-1, required=True)
 @click.pass_context
 def kill(ctx: click.Context, job_ids: Tuple[str, ...]) -> None:
@@ -385,7 +397,7 @@ def kill(ctx: click.Context, job_ids: Tuple[str, ...]) -> None:
         sys.exit(1)
 
 
-@cli.command()
+@job.command()
 @click.argument("job_ids", nargs=-1, required=True)
 @click.option("--priority", type=int, required=True, help="New priority (0-1000)")
 @click.pass_context
@@ -426,7 +438,7 @@ def boost(ctx: click.Context, job_ids: Tuple[str, ...], priority: int) -> None:
         sys.exit(1)
 
 
-@cli.command()
+@job.command()
 @click.option(
     "--threshold", type=int, default=300, help="Seconds before considering job stale"
 )
@@ -474,7 +486,7 @@ def recover(ctx: click.Context, threshold: int, dry_run: bool) -> None:
             click.echo("No stale jobs found")
 
 
-@cli.command()
+@job.command()
 @click.option("--verbose", is_flag=True, help="Show detailed sync information")
 @click.pass_context
 def sync_status(ctx: click.Context, verbose: bool) -> None:
@@ -509,7 +521,7 @@ def sync_status(ctx: click.Context, verbose: bool) -> None:
                 click.echo(f"    Last error: {item.error}")
 
 
-@cli.command()
+@job.command()
 @click.argument("job_id")
 @click.option("--no-sync", is_flag=True, help="Disable sync for debugging")
 @click.option("--working-dir", help="Working directory for execution")

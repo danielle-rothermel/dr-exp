@@ -1,0 +1,17 @@
+# Test config for parameter sweeps
+_target_: dr_exp.training.dummy_trainer.train_dummy
+
+# Model config
+model:
+  name: resnet18
+  num_classes: 10
+
+# Training config  
+epochs: 10
+batch_size: 32
+lr: 0.001
+
+# Data config
+data:
+  dataset: cifar10
+  augment: true
