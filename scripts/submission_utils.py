@@ -122,7 +122,7 @@ class JobSubmitter:
         return False
     
     def submit_job(self, config: str, seed: int, priority: int = 0, 
-                   extra_overrides: Optional[str] = None) -> Tuple[bool, Optional[str]]:
+                   extra_overrides: Optional[str] = None, tags: Optional[List[str]] = None) -> Tuple[bool, Optional[str]]:
         """Submit a single job. Returns (success, job_id)."""
         
         if self.dry_run:
@@ -147,6 +147,9 @@ class JobSubmitter:
         
         if priority > 0:
             cmd.extend(["--priority", str(priority)])
+        
+        if tags:
+            cmd.extend(["--tags", ",".join(tags)])
         
         try:
             result = subprocess.run(cmd, capture_output=True, text=True)

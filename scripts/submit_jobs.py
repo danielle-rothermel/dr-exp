@@ -112,6 +112,8 @@ Examples:
                       help="Priority for submitted jobs (default: use predefined priorities)")
     parser.add_argument("--overrides", type=str, default=None,
                       help="Additional Hydra overrides (e.g., 'machine=mac,epochs=2')")
+    parser.add_argument("--tags", type=str, default=None,
+                      help="Comma-separated tags to apply to all jobs (e.g., 'baseline,gpu-test')")
     parser.add_argument("--retry-failed", action="store_true",
                       help="Retry failed jobs from the most recent submission")
     parser.add_argument("--no-confirm", action="store_true",
@@ -276,7 +278,16 @@ Examples:
     for i, (config, seed, priority) in enumerate(filtered_jobs, 1):
         print(f"[{i}/{len(filtered_jobs)}] {config} seed={seed}", end=" ")
         
-        success, job_id = submitter.submit_job(f"{config}.yaml", seed, priority, extra_overrides=args.overrides)
+        # Parse tags if provided
+        tag_list = []
+        if args.tags:
+            tag_list = [t.strip() for t in args.tags.split(",") if t.strip()]
+        
+        success, job_id = submitter.submit_job(
+            f"{config}.yaml", seed, priority, 
+            extra_overrides=args.overrides, 
+            tags=tag_list
+        )
         
         if success:
             print(f"✓ {job_id if job_id else ''}")

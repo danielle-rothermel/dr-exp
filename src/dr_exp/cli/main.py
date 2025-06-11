@@ -164,7 +164,7 @@ cli.add_command(slurm)
     "--config-name", required=True, help="Name of config file (without .yaml)"
 )
 @click.option("--priority", default=100, help="Job priority (0-1000)")
-@click.option("--tag", help="Job tag")
+@click.option("--tags", help="Comma-separated job tags (e.g., 'baseline,gpu-test,ablation')")
 @click.option("--overrides", help="Hydra overrides (key=value,key2=value2)")
 @click.pass_context
 def submit(
@@ -172,7 +172,7 @@ def submit(
     config_path: str,
     config_name: str,
     priority: int,
-    tag: Optional[str],
+    tags: Optional[str],
     overrides: Optional[str],
 ) -> None:
     """Submit a job using Hydra config composition."""
@@ -221,6 +221,11 @@ def submit(
         click.echo(f"Error: Cannot import target module {module_path}: {e}", err=True)
         ctx.exit(1)
 
+    # Parse tags
+    tag_list = []
+    if tags:
+        tag_list = [t.strip() for t in tags.split(",") if t.strip()]
+    
     # Create job
     job_db = JobDB(
         base_path=ctx.obj["base_path"], experiment_name=ctx.obj["experiment"]
@@ -228,17 +233,21 @@ def submit(
     job_id = job_db.create_job(
         config=config_dict,
         priority=priority,
+        tags=tag_list,
     )
 
     click.echo(f"Created job: {job_id}")
     click.echo(f"Priority: {priority}")
     click.echo(f"Target: {target}")
+    if tag_list:
+        click.echo(f"Tags: {', '.join(tag_list)}")
 
 
 @job.command()
 @click.option("--status", help="Filter by status (queued, running, completed, failed)")
+@click.option("--tag", help="Filter by tag")
 @click.pass_context
-def list(ctx: click.Context, status: Optional[str]) -> None:
+def list(ctx: click.Context, status: Optional[str], tag: Optional[str]) -> None:
     """List jobs in the experiment."""
     job_db = JobDB(
         base_path=ctx.obj["base_path"], experiment_name=ctx.obj["experiment"]
@@ -246,6 +255,10 @@ def list(ctx: click.Context, status: Optional[str]) -> None:
 
     # Get jobs
     jobs = job_db.list_jobs(status=status)
+    
+    # Filter by tag if specified
+    if tag:
+        jobs = [job for job in jobs if tag in job.get("tags", [])]
 
     if not jobs:
         click.echo("No jobs found")
@@ -268,7 +281,12 @@ def list(ctx: click.Context, status: Optional[str]) -> None:
         config = job.get("config", {})
         run_name = config.get("run_name", "unknown")
         seed = config.get("seed", "?")
+        job_tags = job.get("tags", [])
+        
+        # Build description with tags
         description = f"{run_name}/seed_{seed}"
+        if job_tags:
+            description += f" [{','.join(job_tags)}]"
         
         # Truncate description if too long
         if len(description) > 30:

@@ -77,12 +77,13 @@ class JobDB:
             f"JobDB initialized for experiment '{experiment_name}' at {self.experiment_path}"
         )
 
-    def create_job(self, config: Dict[str, Any], priority: int = 100) -> str:
+    def create_job(self, config: Dict[str, Any], priority: int = 100, tags: Optional[List[str]] = None) -> str:
         """Create a new job with given config and priority.
 
         Args:
             config: Job configuration dict (must include _target_ field)
             priority: Job priority (0-1000, higher runs first)
+            tags: Optional list of tags for the job
 
         Returns:
             job_id: Unique ID for the created job
@@ -110,6 +111,7 @@ class JobDB:
             "experiment_name": self.experiment_name,
             "config": config,
             "priority": priority,
+            "tags": tags or [],
             "status": "queued",
             "created_at": datetime.now(UTC).isoformat(),
             "updated_at": datetime.now(UTC).isoformat(),
