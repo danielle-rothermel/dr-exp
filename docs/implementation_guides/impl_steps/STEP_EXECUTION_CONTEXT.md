@@ -112,6 +112,18 @@ Every implementation must:
 3. Always specify encoding when opening files
 4. Close files properly or use context managers
 
+## Known Implementation Gaps
+
+These features are documented but not yet implemented:
+1. **Worker file logging**: Workers output to stdout only, no log files created in `logs/`
+2. **Sync queue processing**: Items accumulate but are not processed
+3. **.jobdb metadata file**: Referenced in docs but not created or used
+
+These behaviors differ from documentation:
+1. **run-one command**: Requires job ID, not config file path
+2. **Error files**: Saved as `error.txt` not `error.json`
+3. **Submit command**: Uses Hydra-style `--config-path` and `--config-name`, not file paths
+
 ## Remember
 
 - The step guides are complete - follow them exactly

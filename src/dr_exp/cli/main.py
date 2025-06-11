@@ -206,10 +206,7 @@ optimizer:
     click.echo(f"Created: {example_config}")
 
     click.echo("\nExperiment initialized successfully!")
-    click.echo(
-        f"\nTo submit a job: dr_exp --base-path {ctx.obj['base_path']} "
-        f"--experiment {ctx.obj['experiment']} submit example_config.yaml"
-    )
+    click.echo(f"\nTo submit a job: dr_exp --base-path {ctx.obj['base_path']} --experiment {ctx.obj['experiment']} submit --config-path configs --config-name your_config")
 
 
 @cli.command()
@@ -443,7 +440,11 @@ def sync_status(ctx: click.Context, verbose: bool) -> None:
 def run_one(
     ctx: click.Context, job_id: str, no_sync: bool, working_dir: Optional[str]
 ) -> None:
-    """Run a specific job immediately (for debugging)."""
+    """Run a specific job immediately by job ID.
+    
+    Example:
+        dr_exp --base-path ./exp --experiment test run-one 7c9a0e51-5a7a-4d46-a7f2
+    """
     # Create JobDB instance for this command
     job_db = JobDB(
         base_path=ctx.obj["base_path"], experiment_name=ctx.obj["experiment"]

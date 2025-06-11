@@ -59,7 +59,8 @@ uv run python -m dr_exp.cli.main \
   --base-path $(pwd)/debug_experiment \
   --experiment test_run \
   submit \
-  configs/test_job.yaml \
+  --config-path configs \
+  --config-name test_job \
   --priority 500
 ```
 
@@ -163,17 +164,34 @@ cat $(pwd)/debug_experiment/test_run/jobs/<job_id>.json | jq .final_metrics
 
 **Run specific job immediately** (bypasses queue):
 ```bash
+# First submit a job to get ID
+JOB_ID=$(uv run python -m dr_exp.cli.main \
+  --base-path $(pwd)/debug_experiment \
+  --experiment test_run \
+  submit \
+  --config-path configs \
+  --config-name test_job | grep "Created job:" | cut -d' ' -f3)
+
+# Then run it immediately
 uv run python -m dr_exp.cli.main \
   --base-path $(pwd)/debug_experiment \
   --experiment test_run \
   run-one \
-  configs/test_job.yaml
+  $JOB_ID \
+  --working-dir $(pwd)/work
 ```
 
 **Monitor worker activity**:
+Worker output goes to stdout/stderr. To capture it:
 ```bash
-# Worker logs show detailed execution
-tail -f $(pwd)/debug_experiment/test_run/logs/worker_debug_worker.log
+# Run worker with output redirection
+uv run python -m dr_exp.cli.main \
+  --base-path $(pwd)/debug_experiment \
+  --experiment test_run \
+  worker \
+  --worker-id debug_worker \
+  --working-dir $(pwd)/work \
+  2>&1 | tee worker.log
 ```
 
 **Check for errors**:
@@ -186,7 +204,7 @@ uv run python -m dr_exp.cli.main \
   --status failed
 
 # View error details
-cat $(pwd)/debug_experiment/test_run/storage/run_<job_id>/error.json | jq .
+cat $(pwd)/debug_experiment/test_run/storage/run_<job_id>/error.txt
 ```
 
 ## Next Steps

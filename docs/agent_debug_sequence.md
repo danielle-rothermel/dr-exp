@@ -96,16 +96,14 @@ Command: `cat $(pwd)/test_experiment/test_run/storage/run_*/metrics.jsonl | head
 Expected: JSONL format metrics with epoch, loss, accuracy
 Verify: File exists and contains valid JSON lines
 
-#### Step 10: Test run-one (Documentation Version)
-Command: `uv run python -m dr_exp.cli.main --base-path $(pwd)/test_experiment --experiment test_run run-one configs/test_job.yaml`
-Expected: Runs job immediately bypassing queue
-Alternative approaches when this fails:
-1. Try with job ID instead: `run-one <job-id>`
-2. Check help: `run-one --help`
-3. Try different config file paths
+#### Step 10: Test run-one with Job ID
+Command: First get a job ID from a previous submission or create new job
+Command: `uv run python -m dr_exp.cli.main --base-path $(pwd)/test_experiment --experiment test_run run-one <JOB_ID> --working-dir $(pwd)/work`
+Expected: Executes specific job immediately, bypassing queue
 Status Criteria:
-- ✅ PASS if job runs (unlikely based on known issue)
-- ❌ FAIL if "No job found" error (expected - document as doc bug)
+- ✅ PASS if job executes and shows "COMPLETED"
+- ❌ FAIL if job not found or execution fails
+Note: run-one requires job ID, not config file
 
 #### Step 11: Test run-one (Correct Version)
 Command: `uv run python -m dr_exp.cli.main --base-path $(pwd)/test_experiment --experiment test_run submit configs/test_job.yaml`
