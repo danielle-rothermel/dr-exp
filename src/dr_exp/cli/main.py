@@ -31,16 +31,23 @@ def cli(ctx: click.Context, base_path: str, experiment: str) -> None:
     ctx.obj["experiment"] = experiment
 
 
-@cli.command()
+@cli.group()
+@click.pass_context
+def worker(ctx: click.Context) -> None:
+    """Worker management commands."""
+    pass
+
+
+@worker.command()
 @click.option("--worker-id", required=True, help="Unique worker ID")
-@click.option("--working-dir", help="Working directory for job execution")
+@click.option("--work-dir", help="Working directory for job execution")
 @click.option("--max-jobs", type=int, help="Maximum jobs to run")
 @click.option("--no-sync", is_flag=True, help="Disable background sync")
 @click.pass_context
-def worker(
+def run(
     ctx: click.Context,
     worker_id: str,
-    working_dir: Optional[str],
+    work_dir: Optional[str],
     max_jobs: Optional[int],
     no_sync: bool,
 ) -> None:
@@ -53,7 +60,7 @@ def worker(
     worker_instance = Worker(
         job_db=job_db,
         worker_id=worker_id,
-        working_dir=working_dir,
+        working_dir=work_dir,
         experiment_path=str(job_db.experiment_path),
         sync_enabled=not no_sync,
     )
@@ -78,6 +85,34 @@ def worker(
     # Exit with error if any jobs failed
     if stats["failed"] > 0:
         sys.exit(1)
+
+
+@worker.command()
+@click.option("--workers-per-gpu", default=2, help="Workers per GPU")
+@click.option("--max-hours", default=47, help="Maximum runtime in hours")
+@click.pass_context
+def launcher(ctx: click.Context, workers_per_gpu: int, max_hours: float) -> None:
+    """Run multi-worker launcher for SLURM jobs."""
+    from ..worker.launcher import WorkerLauncher
+
+    # Create JobDB instance for this command
+    job_db = JobDB(
+        base_path=ctx.obj["base_path"], experiment_name=ctx.obj["experiment"]
+    )
+    experiment_name = ctx.obj["experiment"]
+
+    # Use logs directory under experiment
+    log_dir = job_db.logs_dir
+
+    launcher_instance = WorkerLauncher(
+        job_db=job_db,
+        experiment_name=experiment_name,
+        base_log_dir=log_dir,
+        workers_per_gpu=workers_per_gpu,
+        max_runtime_hours=max_hours,
+    )
+
+    launcher_instance.run()
 
 
 @cli.command()
