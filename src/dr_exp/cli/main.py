@@ -11,7 +11,7 @@ from typing import Optional, Tuple, Dict, Any, cast
 import click
 
 from ..core.job_db import JobDB
-from ..sync.queue import SyncItem, SyncQueue
+from ..sync.queue import SyncQueue
 from ..worker.base import Worker
 from .commands.sweep import sweep
 from .commands.slurm import slurm
@@ -33,25 +33,22 @@ def cli(ctx: click.Context, base_path: str, experiment: str) -> None:
     ctx.obj["experiment"] = experiment
 
 
-@cli.group()
-@click.pass_context
-def worker(ctx: click.Context) -> None:
-    """Worker management commands."""
-    pass
-
-
-@worker.command()
+@cli.command()
 @click.option("--worker-id", required=True, help="Unique worker ID")
-@click.option("--work-dir", help="Working directory for job execution")
+@click.option("--working-dir", help="Working directory for job execution")
 @click.option("--max-jobs", type=int, help="Maximum jobs to run")
 @click.option("--no-sync", is_flag=True, help="Disable background sync")
+@click.option("--supabase-url", envvar="SUPABASE_URL", help="Supabase URL")
+@click.option("--supabase-key", envvar="SUPABASE_KEY", help="Supabase service key")
 @click.pass_context
-def run(
+def worker(
     ctx: click.Context,
     worker_id: str,
-    work_dir: Optional[str],
+    working_dir: Optional[str],
     max_jobs: Optional[int],
     no_sync: bool,
+    supabase_url: Optional[str],
+    supabase_key: Optional[str],
 ) -> None:
     """Run a worker to process jobs."""
     job_db = JobDB(
@@ -62,27 +59,50 @@ def run(
     worker_instance = Worker(
         job_db=job_db,
         worker_id=worker_id,
-        working_dir=work_dir,
-        experiment_path=str(job_db.experiment_path),
+        working_dir=working_dir,
         sync_enabled=not no_sync,
+        supabase_url=supabase_url,
+        supabase_key=supabase_key,
     )
 
-    # Simple sync function that just prints
-    def print_sync(item: SyncItem) -> None:
-        print(f"[SYNC] Would upload: {item.file_type} - {Path(item.file_path).name}")
+    # Check sync status
+    if not no_sync:
+        if worker_instance.sync_handler and worker_instance.sync_handler.enabled:
+            print("Sync: enabled (Supabase connected)")
+        else:
+            print("Sync: enabled (Supabase not available - queue only)")
+    else:
+        print("Sync: disabled")
 
-    worker_instance.sync_fn = print_sync
-
-    # Run worker
     print(f"Starting worker {worker_id}")
     print(f"Experiment: {ctx.obj['experiment']} at {ctx.obj['base_path']}")
-    print(f"Sync: {'disabled' if no_sync else 'enabled'}")
     print("-" * 60)
 
     stats = worker_instance.run(max_jobs=max_jobs)
 
     print("-" * 60)
     print(f"Worker completed: {stats}")
+
+    # Show sync queue status
+    if not no_sync:
+        sync_stats = worker_instance.sync_queue.get_stats()
+        if sync_stats["total"] > 0:
+            print(
+                f"Sync queue: {sync_stats['completed']} completed, "
+                f"{sync_stats['pending']} pending, {sync_stats['failed']} failed"
+            )
+
+        # Show sync metrics
+        metrics = worker_instance.sync_metrics
+        files_synced = metrics.get("files_synced", 0)
+        if files_synced > 0:
+            bytes_uploaded = metrics.get("bytes_uploaded", 0)
+            mb_uploaded = bytes_uploaded / (1024 * 1024) if bytes_uploaded else 0
+            sync_errors = metrics.get("sync_errors", 0)
+            print(
+                f"Sync metrics: {files_synced} files, "
+                f"{mb_uploaded:.1f} MB uploaded, {sync_errors} errors"
+            )
 
     # Exit with error if any jobs failed
     if stats["failed"] > 0:
@@ -588,15 +608,8 @@ def run_one(
         job_db=job_db,
         worker_id=worker_id,
         working_dir=working_dir,
-        experiment_path=str(job_db.experiment_path),
         sync_enabled=not no_sync,
     )
-
-    # Simple sync function
-    def print_sync(item: SyncItem) -> None:
-        print(f"[SYNC] Would upload: {item.file_type} - {Path(item.file_path).name}")
-
-    worker.sync_fn = print_sync
 
     # Claim and run the reserved job
     claimed_job = job_db.claim_reserved_job(full_job_id, worker_id)

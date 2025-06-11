@@ -1,0 +1,3 @@
+
+_target_: src.dr_exp.trainers.test_trainer.train
+epochs: 2

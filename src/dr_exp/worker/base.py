@@ -14,6 +14,7 @@ from omegaconf import OmegaConf
 
 from ..core.job_db import JobDB
 from ..sync.queue import SyncQueue, SyncItem
+from ..sync.sync_handler import SyncHandler
 
 
 class Worker:
@@ -28,6 +29,8 @@ class Worker:
         sync_interval: int = 30,
         heartbeat_interval: int = 60,
         sync_enabled: bool = True,
+        supabase_url: Optional[str] = None,
+        supabase_key: Optional[str] = None,
     ):
         """Initialize worker.
 
@@ -39,6 +42,8 @@ class Worker:
             sync_interval: Seconds between sync attempts
             heartbeat_interval: Seconds between heartbeats
             sync_enabled: Whether to enable background sync
+            supabase_url: Optional Supabase URL
+            supabase_key: Optional Supabase key
         """
         self.job_db = job_db
         self.worker_id = worker_id
@@ -84,8 +89,56 @@ class Worker:
         self.sync_thread: Optional[threading.Thread] = None
         self.heartbeat_thread: Optional[threading.Thread] = None
 
-        # Sync function (to be set by subclass or externally)
-        self.sync_fn: Optional[Callable[[SyncItem], None]] = None
+        # Sync metrics tracking
+        self.sync_metrics: Dict[str, Any] = {
+            "files_synced": 0,
+            "bytes_uploaded": 0,
+            "sync_errors": 0,
+            "sync_attempts": 0,
+            "last_sync_time": None,
+        }
+
+        # Initialize sync handler if enabled
+        if sync_enabled:
+            try:
+                self.sync_handler: Optional[SyncHandler] = SyncHandler(
+                    experiment_name=job_db.experiment_name,
+                    base_path=str(job_db.base_path),
+                    supabase_url=supabase_url,
+                    supabase_key=supabase_key,
+                )
+
+                # Set sync function
+                if self.sync_handler.enabled:
+
+                    def sync_with_metrics(item: SyncItem) -> None:
+                        """Sync file and track metrics."""
+                        self.sync_metrics["sync_attempts"] = (
+                            self.sync_metrics.get("sync_attempts", 0) + 1
+                        )
+                        try:
+                            if self.sync_handler:
+                                result = self.sync_handler.sync_file(item)
+                                self._update_sync_metrics(result)
+                        except Exception:
+                            self.sync_metrics["sync_errors"] = (
+                                self.sync_metrics.get("sync_errors", 0) + 1
+                            )
+                            raise
+
+                    self.sync_fn: Optional[Callable[[SyncItem], None]] = (
+                        sync_with_metrics
+                    )
+                else:
+                    self.sync_fn = None
+                    print(f"[{self.worker_id}] Sync disabled - Supabase not available")
+            except Exception as e:
+                print(f"[{self.worker_id}] Failed to initialize sync: {e}")
+                self.sync_handler = None
+                self.sync_fn = None
+        else:
+            self.sync_handler = None
+            self.sync_fn = None
 
     def _sync_worker(self) -> None:
         """Background thread that processes sync queue."""
@@ -160,6 +213,35 @@ class Worker:
         if self.heartbeat_thread and self.heartbeat_thread.is_alive():
             self.heartbeat_thread.join(timeout=5)
 
+    def _update_sync_metrics(self, result: Dict[str, Any]) -> None:
+        """Update sync metrics based on sync result.
+
+        Args:
+            result: Result from sync operation
+        """
+        if "bytes_uploaded" in result:
+            self.sync_metrics["files_synced"] = (
+                self.sync_metrics.get("files_synced", 0) + 1
+            )
+            self.sync_metrics["bytes_uploaded"] = (
+                self.sync_metrics.get("bytes_uploaded", 0) + result["bytes_uploaded"]
+            )
+            self.sync_metrics["last_sync_time"] = datetime.now(UTC).isoformat()
+
+    def _sync_job_on_completion(self, job_id: str) -> None:
+        """Sync job data to Supabase after completion.
+
+        Args:
+            job_id: Job ID to sync
+        """
+        if self.sync_handler and self.sync_handler.enabled:
+            try:
+                job_data = self.job_db.get_job(job_id)
+                if job_data:
+                    self.sync_handler.sync_job_data(job_data)
+            except Exception as e:
+                print(f"[{self.worker_id}] Failed to sync job data: {e}")
+
     def add_artifact_to_sync(
         self,
         job_id: str,
@@ -175,9 +257,7 @@ class Worker:
             file_type: Type of file (metrics, logs, model, etc.)
             metadata: Optional metadata
         """
-        if not self.sync_enabled:
-            return
-
+        # Always add to queue, even if sync is disabled
         # Create sync item
         sync_item = SyncItem(
             id=f"{job_id}_{file_type}_{int(time.time() * 1000)}",
@@ -185,7 +265,7 @@ class Worker:
             file_path=file_path,
             file_type=file_type,
             metadata=metadata or {},
-            created_at=datetime.utcnow().isoformat(),
+            created_at=datetime.now(UTC).isoformat(),
         )
 
         # Add to queue
@@ -326,6 +406,9 @@ class Worker:
             self.job_db.fail_job(job["id"], result["error"])
             print(f"[{self.worker_id}] Job {job['id']} failed")
             status = "failed"
+
+        # Sync job data to Supabase
+        self._sync_job_on_completion(job["id"])
 
         self.current_job_id = None
         return status
