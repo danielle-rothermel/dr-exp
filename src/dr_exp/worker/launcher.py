@@ -11,6 +11,15 @@ from datetime import datetime, UTC
 from typing import List, Dict, Optional, Any
 import logging
 
+# Configure logging for launcher
+logging.basicConfig(
+    level=logging.INFO,
+    format='%(asctime)s - %(name)s - %(levelname)s - %(message)s',
+    handlers=[
+        logging.StreamHandler(sys.stdout)  # Console output
+    ]
+)
+
 logger = logging.getLogger(__name__)
 
 
@@ -49,6 +58,15 @@ class WorkerLauncher:
         # Create log directory
         self.log_dir = base_log_dir / f"slurm_{self.slurm_job_id}"
         self.log_dir.mkdir(parents=True, exist_ok=True)
+        
+        # Set up file logging for this launcher instance
+        launcher_log_file = self.log_dir / f"launcher_{self.slurm_job_id}.log"
+        file_handler = logging.FileHandler(launcher_log_file)
+        file_handler.setLevel(logging.INFO)
+        file_handler.setFormatter(
+            logging.Formatter('%(asctime)s - %(name)s - %(levelname)s - %(message)s')
+        )
+        logger.addHandler(file_handler)
 
         # Control files
         self.control_dir = self.job_db.control_dir
