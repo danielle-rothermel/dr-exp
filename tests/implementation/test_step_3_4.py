@@ -52,22 +52,22 @@ def test_worker_with_supabase_sync() -> None:
 
         # Start background threads manually
         worker.start_background_threads()
-        
+
         # Run the job manually to keep threads alive
         status = worker.run_one_job()
         assert status == "completed"
-        
+
         # Check sync queue before waiting
         sync_stats_before = worker.sync_queue.get_stats()
         print(f"Sync queue before wait: {sync_stats_before}")
-        
+
         # Wait for sync to complete while threads are still running
         time.sleep(5)
-        
+
         # Check sync queue after waiting
         sync_stats_after = worker.sync_queue.get_stats()
         print(f"Sync queue after wait: {sync_stats_after}")
-        
+
         # Stop threads
         worker.stop_background_threads()
 

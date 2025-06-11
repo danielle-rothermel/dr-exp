@@ -105,17 +105,17 @@ Use this checklist to track progress through the implementation steps.
   - [x] Tests pass: `pt tests/implementation/test_step_3_4.py -v`
   - [x] Code quality passes: `ckdr`
   
-- [ ] Step 3.5: Remote Read Operations
-  - [ ] Remote read functionality complete
-  - [ ] Tests pass: `pt tests/implementation/test_step_3_5.py -v`
-  - [ ] Code quality passes: `ckdr`
-  - [ ] **Phase 3 Complete**: Can run `pt tests/implementation/test_step_3_*.py -v`
+- [x] Step 3.5: Remote Read Operations
+  - [x] Remote read functionality complete
+  - [x] Tests pass: `pt tests/implementation/test_step_3_5.py -v`
+  - [x] Code quality passes: `ckdr`
+  - [x] **Phase 3 Complete**: Can run `pt tests/implementation/test_step_3_*.py -v`
 
 ## Final Validation
-- [ ] All implementation tests pass: `pt tests/implementation/ -v`
-- [ ] All code quality checks pass: `ckdr`
-- [ ] Can create and run a simple job end-to-end
-- [ ] Documentation updated if needed
+- [x] All implementation tests pass: `pt tests/implementation/ -v`
+- [x] All code quality checks pass: `ckdr`
+- [x] Can create and run a simple job end-to-end
+- [x] Documentation updated if needed
 
 ## Notes Section
 Use this space to track any issues, deviations from the plan, or important decisions made during implementation:
@@ -151,5 +151,12 @@ Use this space to track any issues, deviations from the plan, or important decis
 
 ### Phase 3 Notes:
 
+**Step 3.5 Completed:** Remote read operations implemented successfully.
+- Added remote read methods to JobDB: enable_remote_read(), list_jobs_remote(), get_job_remote(), get_experiment_info_remote(), download_job_artifacts(), sync_mode()
+- Created FastAPI application (src/dr_exp/api/simple_api.py) for remote monitoring with endpoints for job listing, experiment info, artifact management, and health checks
+- Implemented graceful fallback to local operations when remote is unavailable
+- All remote operations handle network errors gracefully and don't break local functionality
+- Added comprehensive test suite covering remote operations, API endpoints, artifact downloads, and workflow integration
+- Phase 3 (Supabase Integration) is now complete with full remote read capabilities
 
 ### General Issues/Decisions:

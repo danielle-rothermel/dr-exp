@@ -68,6 +68,11 @@ class JobDB:
             ]:
                 dir_path.mkdir(parents=True, exist_ok=True)
 
+        # Remote read support (disabled by default)
+        self.remote_enabled = False
+        self.remote_client: Optional[Any] = None
+        self.remote_experiment_id: Optional[str] = None
+
         logger.info(
             f"JobDB initialized for experiment '{experiment_name}' at {self.experiment_path}"
         )
@@ -599,3 +604,174 @@ class JobDB:
         if success:
             return self.get_job(job_id)
         return None
+
+    def enable_remote_read(
+        self, supabase_url: Optional[str] = None, supabase_key: Optional[str] = None
+    ) -> bool:
+        """Enable remote read operations from Supabase.
+
+        Args:
+            supabase_url: Supabase URL (uses env var if not provided)
+            supabase_key: Supabase key (uses env var if not provided)
+
+        Returns:
+            True if remote read enabled successfully
+        """
+        try:
+            from ..sync.supabase_client import SupabaseClient
+
+            self.remote_client = SupabaseClient(url=supabase_url, key=supabase_key)
+            self.remote_experiment_id = self.remote_client.get_or_create_experiment(
+                experiment_name=self.experiment_name, base_path=str(self.base_path)
+            )
+            self.remote_enabled = True
+            return True
+
+        except Exception as e:
+            print(f"Failed to enable remote read: {e}")
+            self.remote_client = None
+            self.remote_experiment_id = None
+            self.remote_enabled = False
+            return False
+
+    def list_jobs_remote(self, status: Optional[str] = None) -> List[Dict[str, Any]]:
+        """List jobs from remote Supabase database.
+
+        Args:
+            status: Optional status filter
+
+        Returns:
+            List of job data dicts from Supabase
+        """
+        if not self.remote_enabled or not self.remote_client:
+            return []
+
+        try:
+            return self.remote_client.get_experiment_jobs(  # type: ignore
+                self.remote_experiment_id, status=status, limit=1000
+            )
+        except Exception as e:
+            print(f"Failed to list remote jobs: {e}")
+            return []
+
+    def get_job_remote(self, job_id: str) -> Optional[Dict[str, Any]]:
+        """Get a job from remote Supabase database.
+
+        Args:
+            job_id: Job ID to retrieve
+
+        Returns:
+            Job data dict or None if not found
+        """
+        if not self.remote_enabled or not self.remote_client:
+            return None
+
+        try:
+            jobs = self.remote_client.get_experiment_jobs(  # type: ignore
+                self.remote_experiment_id,
+                limit=1000,  # Get more jobs to find the one we want
+            )
+
+            # Filter by ID (since we don't have direct ID query)
+            for job in jobs:
+                if job["id"] == job_id:
+                    return job  # type: ignore
+
+            return None
+
+        except Exception as e:
+            print(f"Failed to get remote job: {e}")
+            return None
+
+    def get_experiment_info_remote(self) -> Dict[str, Any]:
+        """Get experiment info from remote Supabase.
+
+        Returns:
+            Dict with experiment metadata and stats
+        """
+        if not self.remote_enabled or not self.remote_client:
+            return self.get_experiment_info()  # Fallback to local
+
+        try:
+            stats = self.remote_client.get_experiment_stats(self.remote_experiment_id)
+
+            return {
+                "experiment_name": self.experiment_name,
+                "base_path": str(self.base_path),
+                "experiment_path": str(self.experiment_path),
+                "experiment_id": self.remote_experiment_id,
+                "total_jobs": stats.get("total_jobs", 0),
+                "status_counts": {
+                    "queued": stats.get("queued_jobs", 0),
+                    "running": stats.get("running_jobs", 0),
+                    "completed": stats.get("completed_jobs", 0),
+                    "failed": stats.get("failed_jobs", 0),
+                    "killed": stats.get("killed_jobs", 0),
+                },
+                "remote": True,
+            }
+
+        except Exception as e:
+            print(f"Failed to get remote experiment info: {e}")
+            return self.get_experiment_info()
+
+    def download_job_artifacts(
+        self, job_id: str, target_dir: Optional[Path] = None
+    ) -> List[Path]:
+        """Download job artifacts from remote storage.
+
+        Args:
+            job_id: Job ID to download artifacts for
+            target_dir: Directory to download to (defaults to storage path)
+
+        Returns:
+            List of downloaded file paths
+        """
+        if not self.remote_enabled or not self.remote_client:
+            return []
+
+        if target_dir is None:
+            target_dir = self.get_storage_path(job_id)
+
+        target_dir = Path(target_dir)
+        target_dir.mkdir(parents=True, exist_ok=True)
+
+        downloaded = []
+
+        try:
+            # Get sync status for job
+            sync_records = self.remote_client.get_job_sync_status(job_id)
+
+            for record in sync_records:
+                if record["status"] != "completed":
+                    continue
+
+                # Extract storage path from URL or metadata
+                file_name = Path(record["file_path"]).name
+                storage_path = f"{self.experiment_name}/jobs/{job_id}/{file_name}"
+
+                local_path = target_dir / file_name
+
+                try:
+                    self.remote_client.download_file(storage_path, local_path)
+                    downloaded.append(local_path)
+                    print(f"Downloaded: {file_name}")
+                except Exception as e:
+                    print(f"Failed to download {file_name}: {e}")
+
+            return downloaded
+
+        except Exception as e:
+            print(f"Failed to download artifacts: {e}")
+            return []
+
+    def sync_mode(self) -> str:
+        """Get current sync mode.
+
+        Returns:
+            'local', 'remote', or 'hybrid'
+        """
+        if self.remote_enabled:
+            return "remote"
+        else:
+            return "local"
