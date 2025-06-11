@@ -1,0 +1,28 @@
+{
+  "submissions": [
+    {
+      "timestamp": "2025-06-11T18:18:13.856055",
+      "config": "step00_baseline.yaml",
+      "seed": 0,
+      "job_id": "unknown",
+      "success": true,
+      "error": null
+    },
+    {
+      "timestamp": "2025-06-11T18:18:16.198704",
+      "config": "step00_baseline.yaml",
+      "seed": 1,
+      "job_id": "unknown",
+      "success": true,
+      "error": null
+    },
+    {
+      "timestamp": "2025-06-11T18:18:18.543523",
+      "config": "step00_baseline.yaml",
+      "seed": 2,
+      "job_id": "unknown",
+      "success": true,
+      "error": null
+    }
+  ]
+}

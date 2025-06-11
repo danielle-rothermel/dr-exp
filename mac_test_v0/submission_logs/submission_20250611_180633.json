@@ -1,0 +1,28 @@
+{
+  "submissions": [
+    {
+      "timestamp": "2025-06-11T18:06:34.183266",
+      "config": "step00_baseline.yaml",
+      "seed": 0,
+      "job_id": "",
+      "success": false,
+      "error": "Usage: dr_exp [OPTIONS] COMMAND [ARGS]...\nTry 'dr_exp --help' for help.\n\nError: No such command 'submit'."
+    },
+    {
+      "timestamp": "2025-06-11T18:06:34.550873",
+      "config": "step00_baseline.yaml",
+      "seed": 1,
+      "job_id": "",
+      "success": false,
+      "error": "Usage: dr_exp [OPTIONS] COMMAND [ARGS]...\nTry 'dr_exp --help' for help.\n\nError: No such command 'submit'."
+    },
+    {
+      "timestamp": "2025-06-11T18:06:34.919716",
+      "config": "step00_baseline.yaml",
+      "seed": 2,
+      "job_id": "",
+      "success": false,
+      "error": "Usage: dr_exp [OPTIONS] COMMAND [ARGS]...\nTry 'dr_exp --help' for help.\n\nError: No such command 'submit'."
+    }
+  ]
+}

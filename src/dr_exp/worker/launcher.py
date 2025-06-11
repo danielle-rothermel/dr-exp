@@ -125,16 +125,15 @@ class WorkerLauncher:
         cmd = [
             sys.executable,
             "-m",
-            "dr_exp.cli",
+            "dr_exp.cli.main",
             "--base-path",
             str(self.job_db.base_path),
             "--experiment",
             self.experiment_name,
             "worker",
-            "run",
             "--worker-id",
             worker_id,
-            "--work-dir",
+            "--working-dir",
             str(self.log_dir / worker_id),
         ]
 
