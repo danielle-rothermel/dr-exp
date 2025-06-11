@@ -59,11 +59,14 @@ class SyncHandler:
             self.enabled = False
             self.experiment_id = None
     
-    def sync_file(self, item: SyncItem) -> None:
+    def sync_file(self, item: SyncItem) -> Dict[str, Any]:
         """Sync a single file to Supabase.
         
         Args:
             item: Sync item to process
+            
+        Returns:
+            Dict with sync result including bytes_uploaded
             
         Raises:
             Exception: If sync fails (for retry logic)
@@ -76,6 +79,8 @@ class SyncHandler:
         # Check file exists
         if not file_path.exists():
             raise FileNotFoundError(f"File not found: {file_path}")
+        
+        file_size = file_path.stat().st_size
         
         # Upload file
         storage_url, checksum = self.client.upload_file(
@@ -92,12 +97,18 @@ class SyncHandler:
             file_path=item.file_path,
             file_type=item.file_type,
             checksum=checksum,
-            size_bytes=item.size_bytes or file_path.stat().st_size,
+            size_bytes=item.size_bytes or file_size,
             storage_url=storage_url,
             metadata=item.metadata
         )
         
         print(f"[SyncHandler] Uploaded {file_path.name} ({item.file_type})")
+        
+        # Return metrics
+        return {
+            "bytes_uploaded": file_size,
+            "file_type": item.file_type
+        }
     
     def sync_job_data(self, job_data: Dict[str, Any]) -> bool:
         """Sync job metadata to Supabase.
@@ -138,8 +149,9 @@ Add this import at the top:
 from typing import Optional, Dict, Any
 import threading
 from pathlib import Path
+from datetime import datetime, UTC
 from ..sync.sync_handler import SyncHandler
-from ..sync.queue import SyncQueue
+from ..sync.queue import SyncQueue, SyncItem
 ```
 
 Replace the `__init__` method with:
@@ -186,6 +198,15 @@ Replace the `__init__` method with:
         # Thread references
         self.sync_thread: Optional[threading.Thread] = None
         self.heartbeat_thread: Optional[threading.Thread] = None
+        
+        # Sync metrics tracking
+        self.sync_metrics = {
+            "files_synced": 0,
+            "bytes_uploaded": 0,
+            "sync_errors": 0,
+            "sync_attempts": 0,
+            "last_sync_time": None
+        }
         
         # Initialize sync handler if enabled
         if sync_enabled:
@@ -253,6 +274,40 @@ Update the `run_one_job` method to call sync after job completion:
         return status
 ```
 
+Add this method to track sync metrics:
+```python
+    def _update_sync_metrics(self, result: Dict[str, Any]) -> None:
+        """Update sync metrics based on sync result.
+        
+        Args:
+            result: Result from sync operation
+        """
+        if "bytes_uploaded" in result:
+            self.sync_metrics["files_synced"] += 1
+            self.sync_metrics["bytes_uploaded"] += result["bytes_uploaded"]
+            self.sync_metrics["last_sync_time"] = datetime.now(UTC).isoformat()
+```
+
+Update the sync queue initialization to use a wrapper that tracks metrics:
+```python
+        # Initialize sync queue with metrics tracking
+        self.sync_queue = SyncQueue(job_db.get_sync_queue_path())
+        
+        # Create sync function wrapper for metrics
+        if self.sync_handler and self.sync_handler.enabled:
+            def sync_with_metrics(item: SyncItem) -> None:
+                """Sync file and track metrics."""
+                self.sync_metrics["sync_attempts"] += 1
+                try:
+                    result = self.sync_handler.sync_file(item)
+                    self._update_sync_metrics(result)
+                except Exception as e:
+                    self.sync_metrics["sync_errors"] += 1
+                    raise
+            
+            self.sync_fn = sync_with_metrics
+```
+
 ### 3. Update src/dr_exp/cli/main.py
 Update the worker command to support Supabase credentials:
 ```python
@@ -307,6 +362,13 @@ def worker(ctx: click.Context, worker_id: str, working_dir: Optional[str],
         if sync_stats['total'] > 0:
             print(f"Sync queue: {sync_stats['completed']} completed, "
                   f"{sync_stats['pending']} pending, {sync_stats['failed']} failed")
+        
+        # Show sync metrics
+        metrics = worker_instance.sync_metrics
+        if metrics['files_synced'] > 0:
+            mb_uploaded = metrics['bytes_uploaded'] / (1024 * 1024)
+            print(f"Sync metrics: {metrics['files_synced']} files, "
+                  f"{mb_uploaded:.1f} MB uploaded, {metrics['sync_errors']} errors")
     
     # Exit with error if any jobs failed
     if stats['failed'] > 0:

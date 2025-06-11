@@ -15,6 +15,7 @@ Create a Supabase client class that handles file uploads to storage with checksu
 """Supabase client for remote storage and database operations."""
 import os
 import hashlib
+import time
 from pathlib import Path
 from typing import Dict, Any, Optional, Tuple
 from datetime import datetime, UTC
@@ -27,7 +28,7 @@ class SupabaseClient:
     """Client for interacting with Supabase storage and database."""
     
     def __init__(self, url: Optional[str] = None, key: Optional[str] = None) -> None:
-        """Initialize Supabase client.
+        """Initialize Supabase client with retry logic.
         
         Args:
             url: Supabase project URL (defaults to SUPABASE_URL env var)
@@ -39,8 +40,19 @@ class SupabaseClient:
         if not self.url or not self.key:
             raise ValueError("Supabase URL and key must be provided or set in environment")
         
-        # Create client
-        self.client: Client = create_client(self.url, self.key)
+        # Create client with retry logic
+        for attempt in range(3):
+            try:
+                self.client: Client = create_client(self.url, self.key)
+                # Test the connection
+                self.client.storage.list_buckets()
+                break
+            except Exception as e:
+                if attempt == 2:
+                    raise Exception(f"Failed to connect to Supabase after 3 attempts: {e}")
+                print(f"Connection attempt {attempt + 1} failed, retrying...")
+                time.sleep(1)
+        
         self.bucket_name = "experiments"
     
     def _calculate_checksum(self, file_path: Path) -> str:
@@ -82,6 +94,11 @@ class SupabaseClient:
     ) -> Tuple[str, str]:
         """Upload a file to Supabase storage.
         
+        Storage Limits:
+            - Maximum file size: 5GB for direct upload
+            - For files > 100MB, consider using multipart uploads
+            - For files > 5GB, use resumable uploads or external storage
+        
         Args:
             file_path: Local file path
             experiment_name: Experiment name
@@ -97,6 +114,14 @@ class SupabaseClient:
         """
         if not file_path.exists():
             raise FileNotFoundError(f"File not found: {file_path}")
+        
+        # Check file size
+        file_size = file_path.stat().st_size
+        if file_size > 5 * 1024 * 1024 * 1024:  # 5GB
+            raise ValueError(f"File too large ({file_size / 1024 / 1024 / 1024:.1f}GB). Maximum size is 5GB for direct upload.")
+        
+        if file_size > 100 * 1024 * 1024:  # 100MB
+            print(f"Warning: Large file ({file_size / 1024 / 1024:.1f}MB). Consider using multipart upload for better reliability.")
         
         # Calculate checksum
         checksum = self._calculate_checksum(file_path)
