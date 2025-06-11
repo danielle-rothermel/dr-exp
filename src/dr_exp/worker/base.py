@@ -434,13 +434,15 @@ class Worker:
                 status = self.run_one_job()
 
                 if status == "no_job":
-                    break
+                    # Wait before checking again
+                    time.sleep(10)  # Poll every 10 seconds
+                    continue
                 elif status == "completed":
                     stats["completed"] += 1
+                    stats["total"] += 1
                 elif status == "failed":
                     stats["failed"] += 1
-
-                stats["total"] += 1
+                    stats["total"] += 1
         finally:
             # Stop background threads
             self.stop_background_threads()
