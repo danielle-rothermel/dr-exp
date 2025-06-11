@@ -252,17 +252,27 @@ def list(ctx: click.Context, status: Optional[str]) -> None:
         return
 
     # Display header
-    click.echo(f"{'ID':>36} {'Status':>10} {'Priority':>8} {'Worker':>15} {'Created'}")
-    click.echo("-" * 90)
+    click.echo(f"{'ID':>12} {'Description':>30} {'Status':>10} {'Priority':>8} {'Worker':>15} {'Created'}")
+    click.echo("-" * 105)
 
     # Display jobs
     for job in jobs:
-        job_id = job["id"]
+        job_id = job["id"][:12]  # Show first 12 chars of ID
         job_status = job["status"]
         priority = job.get("priority", 0)
         worker = job.get("worker_id") or "-"
         created_at = job.get("created_at", "-")
         created = created_at[:19] if created_at != "-" else "-"  # Trim to date/time
+        
+        # Extract semantic description
+        config = job.get("config", {})
+        run_name = config.get("run_name", "unknown")
+        seed = config.get("seed", "?")
+        description = f"{run_name}/seed_{seed}"
+        
+        # Truncate description if too long
+        if len(description) > 30:
+            description = description[:27] + "..."
 
         # Color status
         if job_status == "completed":
@@ -274,10 +284,10 @@ def list(ctx: click.Context, status: Optional[str]) -> None:
         else:
             status_str = f"{job_status:>10}"
 
-        click.echo(f"{job_id:>36} {status_str} {priority:>8} {worker:>15} {created}")
+        click.echo(f"{job_id:>12} {description:>30} {status_str} {priority:>8} {worker:>15} {created}")
 
     # Summary
-    click.echo("-" * 90)
+    click.echo("-" * 105)
     click.echo(f"Total: {len(jobs)} jobs")
 
 
