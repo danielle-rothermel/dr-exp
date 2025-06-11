@@ -7,4 +7,7 @@ defaults:
   - override /optim: sgd  # Changed from adamw to sgd
   - _self_
 
-run_name: step01_sgd
+# High regularization experiment overrides
+optim:
+  lr: 0.1
+  weight_decay: 5e-4

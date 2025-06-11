@@ -1,6 +1,6 @@
 _target_: "dr_exp.trainers.decon_trainer.train_classification"
 defaults:
-  - step07_no_residual
+  - ../step07_no_residual
   - _self_
 
 # Full training for sweep

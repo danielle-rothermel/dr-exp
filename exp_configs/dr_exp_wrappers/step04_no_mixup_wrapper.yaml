@@ -1,6 +1,6 @@
 _target_: "dr_exp.trainers.decon_trainer.train_classification"
 defaults:
-  - step04_no_mixup
+  - ../step04_no_mixup
   - _self_
 
 # Full training for sweep

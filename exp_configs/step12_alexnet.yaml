@@ -1,3 +1,4 @@
+_target_: "dr_exp.trainers.decon_trainer.train_classification"
 # Step 12: Reduce to 8 layers deep (5 CNN, 3 fully connected - AlexNet-like)
 # Building on step11, switching to AlexNet-style architecture
 
@@ -6,6 +7,7 @@ defaults:
   - override /model: alexnet_cifar  # Switch to 8-layer AlexNet-style
   - _self_
 
+run_name: step12_alexnet
 model:
   source: deconcnn  # Override source back to deconcnn
   architecture: alexnet  # Explicitly set architecture  

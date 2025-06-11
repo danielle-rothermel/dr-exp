@@ -6,7 +6,7 @@ from pathlib import Path
 # Template for wrapper configs
 WRAPPER_TEMPLATE = """_target_: "dr_exp.trainers.decon_trainer.train_classification"
 defaults:
-  - {base_config}
+  - ../{base_config}
   - _self_
 
 # Full training for sweep

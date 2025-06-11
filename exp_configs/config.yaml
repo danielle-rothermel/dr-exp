@@ -26,6 +26,7 @@ data:
     train_val_split_factor: 0.1
 
 proj_dir_name: deconcnn
+run_name: base
 
 load_checkpoint:
 enable_checkpointing: False
@@ -36,7 +37,7 @@ seed: 0
 train: true
 eval: false
 
-epochs: 1
-batch_size: 10
+epochs: 50
+batch_size: 128
 loss: cross_entropy
 clip_grad_norm:

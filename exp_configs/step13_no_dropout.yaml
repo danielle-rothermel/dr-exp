@@ -1,3 +1,4 @@
+_target_: "dr_exp.trainers.decon_trainer.train_classification"
 # Step 13: Remove dropout (the one introduced in step 8)
 # Building on step12, removing dropout regularization
 
@@ -5,5 +6,6 @@ defaults:
   - step12_alexnet
   - _self_
 
+run_name: step13_no_dropout
 model:
   dropout_prob: 0.0  # Remove dropout

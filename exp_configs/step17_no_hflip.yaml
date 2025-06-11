@@ -1,3 +1,4 @@
+_target_: "dr_exp.trainers.decon_trainer.train_classification"
 # Step 17: Remove Horizontal Flip augmentation
 # Final step - removing the last augmentation
 
@@ -5,5 +6,6 @@ defaults:
   - step16_no_rrc
   - _self_
 
+run_name: step17_no_hflip
 train_transforms:
   hflip: false  # Remove Horizontal Flip

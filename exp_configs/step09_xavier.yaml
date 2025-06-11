@@ -1,3 +1,4 @@
+_target_: "dr_exp.trainers.decon_trainer.train_classification"
 # Step 09: Move from He initialization to Xavier Initialization
 # Building on step08, switching to older initialization method
 
@@ -5,5 +6,6 @@ defaults:
   - step08_lrn_dropout
   - _self_
 
+run_name: step09_xavier
 model:
   init_method: xavier  # Switch from he to xavier initialization

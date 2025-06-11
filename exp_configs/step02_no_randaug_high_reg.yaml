@@ -6,6 +6,10 @@ defaults:
   - step01_sgd
   - _self_
 
-run_name: step02_no_randaug
+# High regularization experiment overrides
+optim:
+  lr: 0.1
+  weight_decay: 5e-4
+
 train_transforms:
   randaug: false  # Removed RandAugment

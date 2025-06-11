@@ -1,6 +1,6 @@
 _target_: "dr_exp.trainers.decon_trainer.train_classification"
 defaults:
-  - step11_resnet12
+  - ../step11_resnet12
   - _self_
 
 # Full training for sweep

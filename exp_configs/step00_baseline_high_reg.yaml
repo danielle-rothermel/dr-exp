@@ -9,7 +9,10 @@ defaults:
   - override /lrsched: timm_cosine
   - _self_
 
-run_name: step00_baseline
+# High regularization experiment overrides
+optim:
+  lr: 0.001
+  weight_decay: 5e-4
 
 # Model configuration
 model:

@@ -1,3 +1,4 @@
+_target_: "dr_exp.trainers.decon_trainer.train_classification"
 # Step 07: Remove residual connections
 # Building on step06, creating "PlainNet18" by removing skip connections
 
@@ -5,5 +6,6 @@ defaults:
   - step06_steplr
   - _self_
 
+run_name: step07_no_residual
 model:
   use_residual: false  # Removed residual connections

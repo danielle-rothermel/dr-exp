@@ -1,3 +1,4 @@
+_target_: "dr_exp.trainers.decon_trainer.train_classification"
 # Step 11: Reduce to 12 layers deep
 # Building on step10, switching from ResNet18 to ResNet12
 
@@ -6,6 +7,7 @@ defaults:
   - override /model: resnet12_cifar  # Switch to 12-layer ResNet
   - _self_
 
+run_name: step11_resnet12
 model:
   source: deconcnn  # Override source back to deconcnn
   architecture: resnet12  # Explicitly set architecture

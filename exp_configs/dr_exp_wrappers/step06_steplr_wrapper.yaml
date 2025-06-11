@@ -1,6 +1,6 @@
 _target_: "dr_exp.trainers.decon_trainer.train_classification"
 defaults:
-  - step06_steplr
+  - ../step06_steplr
   - _self_
 
 # Full training for sweep

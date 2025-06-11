@@ -1,3 +1,4 @@
+_target_: "dr_exp.trainers.decon_trainer.train_classification"
 # Step 10: Remove LRN
 # Building on step09, removing Local Response Normalization
 
@@ -5,5 +6,6 @@ defaults:
   - step09_xavier
   - _self_
 
+run_name: step10_no_lrn
 model:
   norm_type: none  # Remove LRN, leaving only dropout

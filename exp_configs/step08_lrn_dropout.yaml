@@ -1,3 +1,4 @@
+_target_: "dr_exp.trainers.decon_trainer.train_classification"
 # Step 08: Switch from Batch Norm to Dropout + LRN
 # Building on step07, replacing BatchNorm with Dropout (0.4) and LRN
 
@@ -5,6 +6,7 @@ defaults:
   - step07_no_residual
   - _self_
 
+run_name: step08_lrn_dropout
 model:
   norm_type: lrn  # Switch from batchnorm to LRN
   dropout_prob: 0.4  # Add dropout before final linear layer

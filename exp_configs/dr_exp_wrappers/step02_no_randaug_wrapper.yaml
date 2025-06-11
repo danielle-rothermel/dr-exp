@@ -1,6 +1,6 @@
 _target_: "dr_exp.trainers.decon_trainer.train_classification"
 defaults:
-  - step02_no_randaug
+  - ../step02_no_randaug
   - _self_
 
 # Full training for sweep
