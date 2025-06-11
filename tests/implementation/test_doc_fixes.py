@@ -26,3 +26,21 @@ def test_error_file_format():
     quick_start = Path("docs/quick_start_guide.md").read_text()
     assert "error.json" not in quick_start
     assert "error.txt" in quick_start
+
+
+def test_submit_command_syntax():
+    # Ensure submit commands use --config-path and --config-name
+    debug_seq = Path("docs/agent_debug_sequence.md").read_text()
+    # Check that we don't have old submit syntax
+    assert "submit configs/test_job.yaml" not in debug_seq
+    assert "submit configs/decon_config.yaml" not in debug_seq
+    # Check that we have new syntax
+    assert "submit --config-path configs --config-name test_job" in debug_seq
+    assert "submit --config-path configs --config-name decon_config" in debug_seq
+
+
+def test_error_format_in_debug_sequence():
+    # Ensure error.txt in debug sequence
+    debug_seq = Path("docs/agent_debug_sequence.md").read_text()
+    assert "error.json" not in debug_seq
+    assert "error.txt" in debug_seq

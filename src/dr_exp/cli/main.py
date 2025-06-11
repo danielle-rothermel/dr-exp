@@ -54,6 +54,7 @@ def worker(
         job_db=job_db,
         worker_id=worker_id,
         working_dir=working_dir,
+        experiment_path=str(job_db.experiment_path),
         sync_enabled=not no_sync,
     )
 
@@ -529,6 +530,7 @@ def run_one(
         job_db=job_db,
         worker_id=worker_id,
         working_dir=working_dir,
+        experiment_path=str(job_db.experiment_path),
         sync_enabled=not no_sync,
     )
 

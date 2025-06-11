@@ -45,8 +45,7 @@ This creates:
 ├── storage/      # Training outputs
 ├── sync_queue/   # Background sync queue
 ├── logs/         # Worker logs
-├── control/      # Control commands
-└── .jobdb        # Metadata
+└── control/      # Control commands
 ```
 
 ### Step 2: Submit a Quick Debug Job
@@ -81,7 +80,8 @@ uv run python -m dr_exp.cli.main \
   --base-path $(pwd)/debug_experiment \
   --experiment test_run \
   submit \
-  debug_experiment/test_run/debug_decon.yaml \
+  --config-path debug_experiment/test_run \
+  --config-name debug_decon \
   --priority 500
 ```
 

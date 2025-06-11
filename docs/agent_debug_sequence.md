@@ -61,7 +61,7 @@ Verify: Check that these directories exist:
 ### Quick Start Guide Commands
 
 #### Step 4: Submit Test Job
-Command: `uv run python -m dr_exp.cli.main --base-path $(pwd)/test_experiment --experiment test_run submit configs/test_job.yaml --priority 500`
+Command: `uv run python -m dr_exp.cli.main --base-path $(pwd)/test_experiment --experiment test_run submit --config-path configs --config-name test_job --priority 500`
 Expected: Creates job and shows job ID, priority, and target
 Capture: Job ID for later use
 
@@ -106,7 +106,7 @@ Status Criteria:
 Note: run-one requires job ID, not config file
 
 #### Step 11: Test run-one (Correct Version)
-Command: `uv run python -m dr_exp.cli.main --base-path $(pwd)/test_experiment --experiment test_run submit configs/test_job.yaml`
+Command: `uv run python -m dr_exp.cli.main --base-path $(pwd)/test_experiment --experiment test_run submit --config-path configs --config-name test_job`
 Capture: Job ID from output
 Command: `uv run python -m dr_exp.cli.main --base-path $(pwd)/test_experiment --experiment test_run run-one [JOB_ID] --working-dir $(pwd)/work`
 Expected: Executes job immediately, shows "COMPLETED"
@@ -115,7 +115,7 @@ Expected: Executes job immediately, shows "COMPLETED"
 
 #### Step 12: Submit Failing Job
 Command: `echo '_target_: "src.dr_exp.trainers.test_trainer.train"\nepochs: 1\nfail_rate: 1.0' > test_experiment/test_run/fail_job.yaml`
-Command: `uv run python -m dr_exp.cli.main --base-path $(pwd)/test_experiment --experiment test_run submit test_experiment/test_run/fail_job.yaml`
+Command: `uv run python -m dr_exp.cli.main --base-path $(pwd)/test_experiment --experiment test_run submit --config-path test_experiment/test_run --config-name fail_job`
 Expected: Creates job successfully
 
 #### Step 13: Process Failing Job
@@ -128,14 +128,14 @@ Command: `uv run python -m dr_exp.cli.main --base-path $(pwd)/test_experiment --
 Expected: Shows 1 failed job
 
 #### Step 15: View Error Details
-Command: `cat $(pwd)/test_experiment/test_run/storage/run_*/error.json | jq .`
-Expected: JSON formatted error details
-Alternative: Try `error.txt` if `error.json` not found
+Command: `cat $(pwd)/test_experiment/test_run/storage/run_*/error.txt`
+Expected: Text formatted error details
+Note: Error files are stored as .txt not .json
 
 ### Multiple Worker Testing
 
 #### Step 16: Submit Multiple Jobs
-Command: `for i in {1..5}; do uv run python -m dr_exp.cli.main --base-path $(pwd)/test_experiment --experiment test_run submit configs/test_job.yaml --priority $((100 * i)); done`
+Command: `for i in {1..5}; do uv run python -m dr_exp.cli.main --base-path $(pwd)/test_experiment --experiment test_run submit --config-path configs --config-name test_job --priority $((100 * i)); done`
 Expected: Creates 5 jobs with priorities 100, 200, 300, 400, 500
 Capture: All job IDs
 
@@ -160,7 +160,7 @@ Command: `uv run python -m dr_exp.cli.main --base-path $(pwd)/test_experiment --
 Expected: Shows "✗ Validation FAILED" with missing directories
 
 #### Step 20: Test Boost Command
-Command: `uv run python -m dr_exp.cli.main --base-path $(pwd)/test_experiment --experiment test_run submit configs/test_job.yaml --priority 100`
+Command: `uv run python -m dr_exp.cli.main --base-path $(pwd)/test_experiment --experiment test_run submit --config-path configs --config-name test_job --priority 100`
 Capture: Job ID
 Command: `uv run python -m dr_exp.cli.main --base-path $(pwd)/test_experiment --experiment test_run boost [JOB_ID] --priority 800`
 Expected: Shows "Boosted job: [ID] (100 → 800)"
@@ -194,15 +194,11 @@ Expected: Shows job counts and sync queue status
 ### Config Composition Testing
 
 #### Step 24: Test Hydra Config
-Command: `uv run python -m dr_exp.cli.main --base-path $(pwd)/test_experiment --experiment test_run submit configs/decon_config.yaml`
-Expected: Creates job with DeconCNN trainer
-Alternative approaches when this fails:
-1. Check error message for missing fields
-2. Create minimal config with `_target_` field: `echo '_target_: "deconcnn.trainers.decon_trainer.train"\nepochs: 1' > test_config.yaml`
-3. Try submitting the minimal config
+Command: `uv run python -m dr_exp.cli.main --base-path $(pwd)/test_experiment --experiment test_run submit --config-path configs --config-name decon_config`
+Expected: Creates job with DeconCNN trainer using Hydra composition
 Status Criteria:
-- ✅ PASS if creates job (tests Hydra composition)
-- ❌ FAIL if missing _target_ error (known issue - config composition broken)
+- ✅ PASS if creates job (tests Hydra composition with defaults)
+- ❌ FAIL if missing fields or composition errors
 
 #### Step 25: Verify Storage Locations
 Command: `find . -name "lightning_logs" -type d 2>/dev/null`
