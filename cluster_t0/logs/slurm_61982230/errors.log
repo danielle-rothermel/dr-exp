@@ -1,0 +1,148 @@
+Error aggregation at 2025-06-12T09:57:35.733785+00:00
+================================================================================
+
+
+### Errors from slurm61982230_gr041_gpu0_0.log
+[slurm61982230_gr041_gpu0_0] Job 38181b03-4cef-4e5a-9723-cdae47b98f6c failed: InstantiationException: Error in call to target 'dr_exp.trainers.decon_trainer.train_classification':
+ValueError("dict contains fields not in fieldnames: 'train_loss', 'train_acc'")
+Traceback:
+Traceback (most recent call last):
+    raise ValueError("dict contains fields not in fieldnames: "
+ValueError: dict contains fields not in fieldnames: 'train_loss', 'train_acc'
+The above exception was the direct cause of the following exception:
+Traceback (most recent call last):
+    raise InstantiationException(msg) from e
+hydra.errors.InstantiationException: Error in call to target 'dr_exp.trainers.decon_trainer.train_classification':
+ValueError("dict contains fields not in fieldnames: 'train_loss', 'train_acc'")
+Exception ignored in: <function _MultiProcessingDataLoaderIter.__del__ at 0x14da57ddb4c0>
+Traceback (most recent call last):
+Exception ignored in: <function _MultiProcessingDataLoaderIter.__del__ at 0x14da57ddb4c0>
+Traceback (most recent call last):
+Exception ignored in: <function _MultiProcessingDataLoaderIter.__del__ at 0x14da57ddb4c0>
+Traceback (most recent call last):
+AssertionError: can only test a child process
+AssertionError: can only test a child process
+AssertionError: can only test a child process
+Exception ignored in: <function _MultiProcessingDataLoaderIter.__del__ at 0x14da57ddb4c0>
+Traceback (most recent call last):
+AssertionError: can only test a child process
+Exception ignored in: <function _MultiProcessingDataLoaderIter.__del__ at 0x14da57ddb4c0>
+Traceback (most recent call last):
+AssertionError: can only test a child process
+Exception ignored in: <function _MultiProcessingDataLoaderIter.__del__ at 0x14da57ddb4c0>
+Traceback (most recent call last):
+AssertionError: can only test a child process
+Exception ignored in: <function _MultiProcessingDataLoaderIter.__del__ at 0x14da57ddb4c0>
+Traceback (most recent call last):
+AssertionError: can only test a child process
+Exception ignored in: <function _MultiProcessingDataLoaderIter.__del__ at 0x14da57ddb4c0>
+Traceback (most recent call last):
+AssertionError: can only test a child process
+Exception ignored in: <function _MultiProcessingDataLoaderIter.__del__ at 0x14da57ddb4c0>
+Traceback (most recent call last):
+AssertionError: can only test a child process
+Exception ignored in: <function _MultiProcessingDataLoaderIter.__del__ at 0x14da57ddb4c0>
+Traceback (most recent call last):
+AssertionError: can only test a child process
+Exception ignored in: <function _MultiProcessingDataLoaderIter.__del__ at 0x14da57ddb4c0>
+Traceback (most recent call last):
+AssertionError: can only test a child process
+Exception ignored in: <function _MultiProcessingDataLoaderIter.__del__ at 0x14da57ddb4c0>
+Traceback (most recent call last):
+AssertionError: can only test a child process
+Exception ignored in: <function _MultiProcessingDataLoaderIter.__del__ at 0x14da57ddb4c0>
+Traceback (most recent call last):
+AssertionError: can only test a child process
+Exception ignored in: <function _MultiProcessingDataLoaderIter.__del__ at 0x14da57ddb4c0>
+Traceback (most recent call last):
+AssertionError: can only test a child process
+Exception ignored in: <function _MultiProcessingDataLoaderIter.__del__ at 0x14da57ddb4c0>
+Traceback (most recent call last):
+AssertionError: can only test a child process
+Exception ignored in: <function _MultiProcessingDataLoaderIter.__del__ at 0x14da57ddb4c0>
+Traceback (most recent call last):
+AssertionError: can only test a child process
+Exception ignored in: <function _MultiProcessingDataLoaderIter.__del__ at 0x14da57ddb4c0>
+Traceback (most recent call last):
+Exception ignored in: <function _MultiProcessingDataLoaderIter.__del__ at 0x14da57ddb4c0>
+Traceback (most recent call last):
+AssertionError: can only test a child process
+Exception ignored in: <function _MultiProcessingDataLoaderIter.__del__ at 0x14da57ddb4c0>
+Traceback (most recent call last):
+AssertionError: can only test a child process
+AssertionError: can only test a child process
+Exception ignored in: <function _MultiProcessingDataLoaderIter.__del__ at 0x14da57ddb4c0>
+Traceback (most recent call last):
+AssertionError: can only test a child process
+Exception ignored in: <function _MultiProcessingDataLoaderIter.__del__ at 0x14da57ddb4c0>
+Traceback (most recent call last):
+AssertionError: can only test a child process
+Exception ignored in: <function _MultiProcessingDataLoaderIter.__del__ at 0x14da57ddb4c0>
+Traceback (most recent call last):
+AssertionError: can only test a child process
+Exception ignored in: <function _MultiProcessingDataLoaderIter.__del__ at 0x14da57ddb4c0>
+Traceback (most recent call last):
+AssertionError: can only test a child process
+Exception ignored in: <function _MultiProcessingDataLoaderIter.__del__ at 0x14da57ddb4c0>
+Traceback (most recent call last):
+AssertionError: can only test a child process
+Exception ignored in: <function _MultiProcessingDataLoaderIter.__del__ at 0x14da57ddb4c0>
+Traceback (most recent call last):
+AssertionError: can only test a child process
+Exception ignored in: <function _MultiProcessingDataLoaderIter.__del__ at 0x14da57ddb4c0>
+Traceback (most recent call last):
+AssertionError: can only test a child process
+Exception ignored in: <function _MultiProcessingDataLoaderIter.__del__ at 0x14da57ddb4c0>
+Traceback (most recent call last):
+AssertionError: can only test a child process
+Exception ignored in: <function _MultiProcessingDataLoaderIter.__del__ at 0x14da57ddb4c0>
+Traceback (most recent call last):
+AssertionError: can only test a child process
+Exception ignored in: <function _MultiProcessingDataLoaderIter.__del__ at 0x14da57ddb4c0>
+Traceback (most recent call last):
+AssertionError: can only test a child process
+Exception ignored in: <function _MultiProcessingDataLoaderIter.__del__ at 0x14da57ddb4c0>
+Traceback (most recent call last):
+AssertionError: can only test a child process
+Exception ignored in: <function _MultiProcessingDataLoaderIter.__del__ at 0x14da57ddb4c0>
+Traceback (most recent call last):
+AssertionError: can only test a child process
+Exception ignored in: <function _MultiProcessingDataLoaderIter.__del__ at 0x14da57ddb4c0>
+Traceback (most recent call last):
+AssertionError: can only test a child process
+Exception ignored in: <function _MultiProcessingDataLoaderIter.__del__ at 0x14da57ddb4c0>
+Traceback (most recent call last):
+AssertionError: can only test a child process
+Exception ignored in: <function _MultiProcessingDataLoaderIter.__del__ at 0x14da57ddb4c0>
+Traceback (most recent call last):
+AssertionError: can only test a child process
+Exception ignored in: <function _MultiProcessingDataLoaderIter.__del__ at 0x14da57ddb4c0>
+Traceback (most recent call last):
+AssertionError: can only test a child process
+Exception ignored in: <function _MultiProcessingDataLoaderIter.__del__ at 0x14da57ddb4c0>
+Traceback (most recent call last):
+AssertionError: can only test a child process
+Exception ignored in: <function _MultiProcessingDataLoaderIter.__del__ at 0x14da57ddb4c0>
+Traceback (most recent call last):
+Exception ignored in: <function _MultiProcessingDataLoaderIter.__del__ at 0x14da57ddb4c0>
+Traceback (most recent call last):
+AssertionError: can only test a child process
+AssertionError: can only test a child process
+Exception ignored in: <function _MultiProcessingDataLoaderIter.__del__ at 0x14da57ddb4c0>
+Traceback (most recent call last):
+AssertionError: can only test a child process
+Exception ignored in: <function _MultiProcessingDataLoaderIter.__del__ at 0x14da57ddb4c0>
+Traceback (most recent call last):
+AssertionError: can only test a child process
+Exception ignored in: <function _MultiProcessingDataLoaderIter.__del__ at 0x14da57ddb4c0>
+Traceback (most recent call last):
+Exception ignored in: <function _MultiProcessingDataLoaderIter.__del__ at 0x14da57ddb4c0>
+Traceback (most recent call last):
+Exception ignored in: <function _MultiProcessingDataLoaderIter.__del__ at 0x14da57ddb4c0>
+Traceback (most recent call last):
+Exception ignored in: <function _MultiProcessingDataLoaderIter.__del__ at 0x14da57ddb4c0>
+Traceback (most recent call last):
+AssertionError: can only test a child process
+AssertionError: can only test a child process
+AssertionError: can only test a child process
+AssertionError: can only test a child process

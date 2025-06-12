@@ -1,0 +1,52 @@
+{
+  "submissions": [
+    {
+      "timestamp": "2025-06-12T01:29:44.076746",
+      "config": "step00_baseline.yaml",
+      "seed": 0,
+      "job_id": "unknown",
+      "success": true,
+      "error": null
+    },
+    {
+      "timestamp": "2025-06-12T01:29:51.958618",
+      "config": "step00_baseline.yaml",
+      "seed": 1,
+      "job_id": "unknown",
+      "success": true,
+      "error": null
+    },
+    {
+      "timestamp": "2025-06-12T01:30:00.452367",
+      "config": "step00_baseline.yaml",
+      "seed": 2,
+      "job_id": "unknown",
+      "success": true,
+      "error": null
+    },
+    {
+      "timestamp": "2025-06-12T01:30:09.045740",
+      "config": "step00_baseline.yaml",
+      "seed": 3,
+      "job_id": "unknown",
+      "success": true,
+      "error": null
+    },
+    {
+      "timestamp": "2025-06-12T01:30:16.876814",
+      "config": "step00_baseline.yaml",
+      "seed": 4,
+      "job_id": "unknown",
+      "success": true,
+      "error": null
+    },
+    {
+      "timestamp": "2025-06-12T01:30:24.593559",
+      "config": "step00_baseline.yaml",
+      "seed": 5,
+      "job_id": "unknown",
+      "success": true,
+      "error": null
+    }
+  ]
+}

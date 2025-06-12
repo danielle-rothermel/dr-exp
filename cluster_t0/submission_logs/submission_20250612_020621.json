@@ -1,0 +1,52 @@
+{
+  "submissions": [
+    {
+      "timestamp": "2025-06-12T02:06:31.087461",
+      "config": "controlled_steplr.yaml",
+      "seed": 0,
+      "job_id": "unknown",
+      "success": true,
+      "error": null
+    },
+    {
+      "timestamp": "2025-06-12T02:06:40.041292",
+      "config": "controlled_steplr.yaml",
+      "seed": 1,
+      "job_id": "unknown",
+      "success": true,
+      "error": null
+    },
+    {
+      "timestamp": "2025-06-12T02:06:48.650242",
+      "config": "controlled_steplr.yaml",
+      "seed": 2,
+      "job_id": "unknown",
+      "success": true,
+      "error": null
+    },
+    {
+      "timestamp": "2025-06-12T02:06:56.572398",
+      "config": "controlled_steplr.yaml",
+      "seed": 3,
+      "job_id": "unknown",
+      "success": true,
+      "error": null
+    },
+    {
+      "timestamp": "2025-06-12T02:07:04.938542",
+      "config": "controlled_steplr.yaml",
+      "seed": 4,
+      "job_id": "unknown",
+      "success": true,
+      "error": null
+    },
+    {
+      "timestamp": "2025-06-12T02:07:12.967114",
+      "config": "controlled_steplr.yaml",
+      "seed": 5,
+      "job_id": "unknown",
+      "success": true,
+      "error": null
+    }
+  ]
+}

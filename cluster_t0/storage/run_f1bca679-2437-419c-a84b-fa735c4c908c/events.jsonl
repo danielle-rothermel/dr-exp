@@ -1,0 +1,2 @@
+{"timestamp": "2025-06-12T07:40:47.373503+00:00", "event_type": "training_start", "data": {"max_epochs": 50, "devices": 1}}
+{"timestamp": "2025-06-12T07:47:16.173369+00:00", "event_type": "training_complete", "data": {"epochs_completed": 51}}

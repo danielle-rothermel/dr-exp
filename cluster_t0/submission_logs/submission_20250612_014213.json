@@ -1,0 +1,52 @@
+{
+  "submissions": [
+    {
+      "timestamp": "2025-06-12T01:43:17.900415",
+      "config": "step01_sgd.yaml",
+      "seed": 0,
+      "job_id": "unknown",
+      "success": true,
+      "error": null
+    },
+    {
+      "timestamp": "2025-06-12T01:43:26.769522",
+      "config": "step01_sgd.yaml",
+      "seed": 1,
+      "job_id": "unknown",
+      "success": true,
+      "error": null
+    },
+    {
+      "timestamp": "2025-06-12T01:43:35.687156",
+      "config": "step01_sgd.yaml",
+      "seed": 2,
+      "job_id": "unknown",
+      "success": true,
+      "error": null
+    },
+    {
+      "timestamp": "2025-06-12T01:43:43.862964",
+      "config": "step01_sgd.yaml",
+      "seed": 3,
+      "job_id": "unknown",
+      "success": true,
+      "error": null
+    },
+    {
+      "timestamp": "2025-06-12T01:43:51.749565",
+      "config": "step01_sgd.yaml",
+      "seed": 4,
+      "job_id": "unknown",
+      "success": true,
+      "error": null
+    },
+    {
+      "timestamp": "2025-06-12T01:43:59.875096",
+      "config": "step01_sgd.yaml",
+      "seed": 5,
+      "job_id": "unknown",
+      "success": true,
+      "error": null
+    }
+  ]
+}

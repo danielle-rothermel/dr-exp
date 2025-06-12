@@ -1,0 +1,21 @@
+{
+  "launcher": {
+    "slurm_job_id": "61982040",
+    "node": "gr016",
+    "start_time": "2025-06-12T05:44:09.319311+00:00",
+    "runtime_seconds": 15383,
+    "running": true
+  },
+  "workers": {
+    "slurm61982040_gr016_gpu0_0": "running"
+  },
+  "restarts": {
+    "slurm61982040_gr016_gpu0_0": 1
+  },
+  "jobs": {
+    "queued": 0,
+    "running": 0,
+    "completed": 222,
+    "failed": 0
+  }
+}

@@ -1,0 +1,52 @@
+{
+  "submissions": [
+    {
+      "timestamp": "2025-06-12T01:49:24.734806",
+      "config": "step14_tanh.yaml",
+      "seed": 0,
+      "job_id": "unknown",
+      "success": true,
+      "error": null
+    },
+    {
+      "timestamp": "2025-06-12T01:49:32.853331",
+      "config": "step14_tanh.yaml",
+      "seed": 1,
+      "job_id": "unknown",
+      "success": true,
+      "error": null
+    },
+    {
+      "timestamp": "2025-06-12T01:49:40.787510",
+      "config": "step14_tanh.yaml",
+      "seed": 2,
+      "job_id": "unknown",
+      "success": true,
+      "error": null
+    },
+    {
+      "timestamp": "2025-06-12T01:49:48.758687",
+      "config": "step14_tanh.yaml",
+      "seed": 3,
+      "job_id": "unknown",
+      "success": true,
+      "error": null
+    },
+    {
+      "timestamp": "2025-06-12T01:49:56.656381",
+      "config": "step14_tanh.yaml",
+      "seed": 4,
+      "job_id": "unknown",
+      "success": true,
+      "error": null
+    },
+    {
+      "timestamp": "2025-06-12T01:50:04.558821",
+      "config": "step14_tanh.yaml",
+      "seed": 5,
+      "job_id": "unknown",
+      "success": true,
+      "error": null
+    }
+  ]
+}

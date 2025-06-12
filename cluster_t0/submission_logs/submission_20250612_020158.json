@@ -1,0 +1,52 @@
+{
+  "submissions": [
+    {
+      "timestamp": "2025-06-12T02:02:07.153054",
+      "config": "controlled_adamw.yaml",
+      "seed": 0,
+      "job_id": "unknown",
+      "success": true,
+      "error": null
+    },
+    {
+      "timestamp": "2025-06-12T02:02:15.071847",
+      "config": "controlled_adamw.yaml",
+      "seed": 1,
+      "job_id": "unknown",
+      "success": true,
+      "error": null
+    },
+    {
+      "timestamp": "2025-06-12T02:02:22.942127",
+      "config": "controlled_adamw.yaml",
+      "seed": 2,
+      "job_id": "unknown",
+      "success": true,
+      "error": null
+    },
+    {
+      "timestamp": "2025-06-12T02:02:31.450431",
+      "config": "controlled_adamw.yaml",
+      "seed": 3,
+      "job_id": "unknown",
+      "success": true,
+      "error": null
+    },
+    {
+      "timestamp": "2025-06-12T02:02:39.560078",
+      "config": "controlled_adamw.yaml",
+      "seed": 4,
+      "job_id": "unknown",
+      "success": true,
+      "error": null
+    },
+    {
+      "timestamp": "2025-06-12T02:02:47.466987",
+      "config": "controlled_adamw.yaml",
+      "seed": 5,
+      "job_id": "unknown",
+      "success": true,
+      "error": null
+    }
+  ]
+}

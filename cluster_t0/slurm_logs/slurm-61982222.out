@@ -1,0 +1,118 @@
+========================================
+DR_EXP SLURM Job Starting
+========================================
+Job ID: 61982222
+Node: gr014
+Time: Thu Jun 12 02:07:11 AM EDT 2025
+Base path: /scratch/ddr8143/logs/dcnn_workers/
+Experiment: cluster_t0
+Workers per GPU: 1
+Allocated GPUs: 
+Allocated Memory: 61440 MB
+Log directory: /scratch/ddr8143/logs/dcnn_workers//cluster_t0/logs/slurm_61982222
+========================================
+CUDA MPS started for GPU sharing
+Launching singularity container...
+Starting workers with Supabase sync enabled...
+SUPABASE_URL: ...
+2025-06-12 02:07:17,590 - dr_exp.core.job_db - INFO - JobDB initialized for experiment 'cluster_t0' at /scratch/ddr8143/logs/dcnn_workers/cluster_t0
+2025-06-12 02:07:17,591 - dr_exp.worker.launcher - INFO - Starting launcher on node gr014
+2025-06-12 02:07:17,591 - dr_exp.worker.launcher - INFO - Found 1 GPUs: [0]
+2025-06-12 02:07:17,591 - dr_exp.worker.launcher - INFO - Spawning worker slurm61982222_gr014_gpu0_0 on GPU 0
+2025-06-12 02:07:17,744 - dr_exp.worker.launcher - INFO - Running maintenance
+2025-06-12 02:07:17,760 - dr_exp.worker.launcher - INFO - Workers alive: 1
+2025-06-12 02:07:17,777 - dr_exp.worker.launcher - INFO - Jobs queued: 116
+2025-06-12 02:07:17,777 - dr_exp.worker.launcher - INFO - Runtime: 0.0 hours
+2025-06-12 02:17:18,566 - dr_exp.worker.launcher - INFO - Running maintenance
+2025-06-12 02:17:18,583 - dr_exp.worker.launcher - INFO - Workers alive: 1
+2025-06-12 02:17:18,600 - dr_exp.worker.launcher - INFO - Jobs queued: 109
+2025-06-12 02:17:18,600 - dr_exp.worker.launcher - INFO - Runtime: 0.2 hours
+2025-06-12 02:27:19,410 - dr_exp.worker.launcher - INFO - Running maintenance
+2025-06-12 02:27:19,427 - dr_exp.worker.launcher - INFO - Workers alive: 1
+2025-06-12 02:27:19,444 - dr_exp.worker.launcher - INFO - Jobs queued: 95
+2025-06-12 02:27:19,444 - dr_exp.worker.launcher - INFO - Runtime: 0.3 hours
+2025-06-12 02:37:20,258 - dr_exp.worker.launcher - INFO - Running maintenance
+2025-06-12 02:37:20,274 - dr_exp.worker.launcher - INFO - Workers alive: 1
+2025-06-12 02:37:20,291 - dr_exp.worker.launcher - INFO - Jobs queued: 84
+2025-06-12 02:37:20,292 - dr_exp.worker.launcher - INFO - Runtime: 0.5 hours
+2025-06-12 02:47:21,135 - dr_exp.worker.launcher - INFO - Running maintenance
+2025-06-12 02:47:21,152 - dr_exp.worker.launcher - INFO - Workers alive: 1
+2025-06-12 02:47:21,169 - dr_exp.worker.launcher - INFO - Jobs queued: 73
+2025-06-12 02:47:21,169 - dr_exp.worker.launcher - INFO - Runtime: 0.7 hours
+2025-06-12 02:57:21,986 - dr_exp.worker.launcher - INFO - Running maintenance
+2025-06-12 02:57:22,004 - dr_exp.worker.launcher - INFO - Workers alive: 1
+2025-06-12 02:57:22,021 - dr_exp.worker.launcher - INFO - Jobs queued: 63
+2025-06-12 02:57:22,021 - dr_exp.worker.launcher - INFO - Runtime: 0.8 hours
+2025-06-12 03:07:22,837 - dr_exp.worker.launcher - INFO - Running maintenance
+2025-06-12 03:07:22,855 - dr_exp.worker.launcher - INFO - Workers alive: 1
+2025-06-12 03:07:22,871 - dr_exp.worker.launcher - INFO - Jobs queued: 48
+2025-06-12 03:07:22,872 - dr_exp.worker.launcher - INFO - Runtime: 1.0 hours
+2025-06-12 03:17:23,660 - dr_exp.worker.launcher - INFO - Running maintenance
+2025-06-12 03:17:23,677 - dr_exp.worker.launcher - INFO - Workers alive: 1
+2025-06-12 03:17:23,693 - dr_exp.worker.launcher - INFO - Jobs queued: 36
+2025-06-12 03:17:23,693 - dr_exp.worker.launcher - INFO - Runtime: 1.2 hours
+2025-06-12 03:27:24,496 - dr_exp.worker.launcher - INFO - Running maintenance
+2025-06-12 03:27:24,513 - dr_exp.worker.launcher - INFO - Workers alive: 1
+2025-06-12 03:27:24,529 - dr_exp.worker.launcher - INFO - Jobs queued: 24
+2025-06-12 03:27:24,529 - dr_exp.worker.launcher - INFO - Runtime: 1.3 hours
+2025-06-12 03:37:25,313 - dr_exp.worker.launcher - INFO - Running maintenance
+2025-06-12 03:37:25,330 - dr_exp.worker.launcher - INFO - Workers alive: 1
+2025-06-12 03:37:25,345 - dr_exp.worker.launcher - INFO - Jobs queued: 10
+2025-06-12 03:37:25,346 - dr_exp.worker.launcher - INFO - Runtime: 1.5 hours
+2025-06-12 03:47:26,099 - dr_exp.worker.launcher - INFO - Running maintenance
+2025-06-12 03:47:26,116 - dr_exp.worker.launcher - INFO - Workers alive: 1
+2025-06-12 03:47:26,131 - dr_exp.worker.launcher - INFO - Jobs queued: 0
+2025-06-12 03:47:26,131 - dr_exp.worker.launcher - INFO - Runtime: 1.7 hours
+2025-06-12 03:57:26,803 - dr_exp.worker.launcher - INFO - Running maintenance
+2025-06-12 03:57:26,820 - dr_exp.worker.launcher - INFO - Workers alive: 1
+2025-06-12 03:57:26,835 - dr_exp.worker.launcher - INFO - Jobs queued: 0
+2025-06-12 03:57:26,835 - dr_exp.worker.launcher - INFO - Runtime: 1.8 hours
+2025-06-12 04:07:27,512 - dr_exp.worker.launcher - INFO - Running maintenance
+2025-06-12 04:07:27,528 - dr_exp.worker.launcher - INFO - Workers alive: 1
+2025-06-12 04:07:27,544 - dr_exp.worker.launcher - INFO - Jobs queued: 0
+2025-06-12 04:07:27,544 - dr_exp.worker.launcher - INFO - Runtime: 2.0 hours
+2025-06-12 04:17:28,215 - dr_exp.worker.launcher - INFO - Running maintenance
+2025-06-12 04:17:28,232 - dr_exp.worker.launcher - INFO - Workers alive: 1
+2025-06-12 04:17:28,248 - dr_exp.worker.launcher - INFO - Jobs queued: 0
+2025-06-12 04:17:28,248 - dr_exp.worker.launcher - INFO - Runtime: 2.2 hours
+2025-06-12 04:27:28,937 - dr_exp.worker.launcher - INFO - Running maintenance
+2025-06-12 04:27:28,953 - dr_exp.worker.launcher - INFO - Workers alive: 1
+2025-06-12 04:27:28,969 - dr_exp.worker.launcher - INFO - Jobs queued: 0
+2025-06-12 04:27:28,969 - dr_exp.worker.launcher - INFO - Runtime: 2.3 hours
+2025-06-12 04:37:29,640 - dr_exp.worker.launcher - INFO - Running maintenance
+2025-06-12 04:37:29,656 - dr_exp.worker.launcher - INFO - Workers alive: 1
+2025-06-12 04:37:29,672 - dr_exp.worker.launcher - INFO - Jobs queued: 0
+2025-06-12 04:37:29,672 - dr_exp.worker.launcher - INFO - Runtime: 2.5 hours
+2025-06-12 04:47:30,343 - dr_exp.worker.launcher - INFO - Running maintenance
+2025-06-12 04:47:30,360 - dr_exp.worker.launcher - INFO - Workers alive: 1
+2025-06-12 04:47:30,375 - dr_exp.worker.launcher - INFO - Jobs queued: 0
+2025-06-12 04:47:30,375 - dr_exp.worker.launcher - INFO - Runtime: 2.7 hours
+2025-06-12 04:57:31,066 - dr_exp.worker.launcher - INFO - Running maintenance
+2025-06-12 04:57:31,082 - dr_exp.worker.launcher - INFO - Workers alive: 1
+2025-06-12 04:57:31,098 - dr_exp.worker.launcher - INFO - Jobs queued: 0
+2025-06-12 04:57:31,098 - dr_exp.worker.launcher - INFO - Runtime: 2.8 hours
+2025-06-12 05:07:31,767 - dr_exp.worker.launcher - INFO - Running maintenance
+2025-06-12 05:07:31,783 - dr_exp.worker.launcher - INFO - Workers alive: 1
+2025-06-12 05:07:31,799 - dr_exp.worker.launcher - INFO - Jobs queued: 0
+2025-06-12 05:07:31,799 - dr_exp.worker.launcher - INFO - Runtime: 3.0 hours
+2025-06-12 05:17:32,469 - dr_exp.worker.launcher - INFO - Running maintenance
+2025-06-12 05:17:32,485 - dr_exp.worker.launcher - INFO - Workers alive: 1
+2025-06-12 05:17:32,501 - dr_exp.worker.launcher - INFO - Jobs queued: 0
+2025-06-12 05:17:32,501 - dr_exp.worker.launcher - INFO - Runtime: 3.2 hours
+2025-06-12 05:27:33,176 - dr_exp.worker.launcher - INFO - Running maintenance
+2025-06-12 05:27:33,193 - dr_exp.worker.launcher - INFO - Workers alive: 1
+2025-06-12 05:27:33,208 - dr_exp.worker.launcher - INFO - Jobs queued: 0
+2025-06-12 05:27:33,208 - dr_exp.worker.launcher - INFO - Runtime: 3.3 hours
+2025-06-12 05:37:33,896 - dr_exp.worker.launcher - INFO - Running maintenance
+2025-06-12 05:37:33,913 - dr_exp.worker.launcher - INFO - Workers alive: 1
+2025-06-12 05:37:33,928 - dr_exp.worker.launcher - INFO - Jobs queued: 0
+2025-06-12 05:37:33,928 - dr_exp.worker.launcher - INFO - Runtime: 3.5 hours
+2025-06-12 05:47:34,601 - dr_exp.worker.launcher - INFO - Running maintenance
+2025-06-12 05:47:34,618 - dr_exp.worker.launcher - INFO - Workers alive: 1
+2025-06-12 05:47:34,633 - dr_exp.worker.launcher - INFO - Jobs queued: 0
+2025-06-12 05:47:34,633 - dr_exp.worker.launcher - INFO - Runtime: 3.7 hours
+2025-06-12 05:57:35,305 - dr_exp.worker.launcher - INFO - Running maintenance
+2025-06-12 05:57:35,322 - dr_exp.worker.launcher - INFO - Workers alive: 1
+2025-06-12 05:57:35,337 - dr_exp.worker.launcher - INFO - Jobs queued: 0
+2025-06-12 05:57:35,337 - dr_exp.worker.launcher - INFO - Runtime: 3.8 hours
+Cleaning up...

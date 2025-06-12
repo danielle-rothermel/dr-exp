@@ -1,0 +1,17 @@
+{
+  "id": "94540448-39a0-4673-8fc9-d32802152961_logs_1749709272819",
+  "job_id": "94540448-39a0-4673-8fc9-d32802152961",
+  "file_path": "/scratch/ddr8143/logs/dcnn_workers/cluster_t0/storage/run_94540448-39a0-4673-8fc9-d32802152961/metadata.json",
+  "file_type": "logs",
+  "metadata": {
+    "filename": "metadata.json"
+  },
+  "created_at": "2025-06-12T06:21:12.819413+00:00",
+  "status": "pending",
+  "attempts": 0,
+  "last_attempt": null,
+  "error": null,
+  "completed_at": null,
+  "checksum": "a6bb6b82e6bbc43d830302129deb14e3877e1d339f01df1673e521dd11e54da2",
+  "size_bytes": 175
+}
