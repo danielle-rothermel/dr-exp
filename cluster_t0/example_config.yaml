@@ -1,0 +1,16 @@
+# Example job configuration
+_target_: src.dr_exp.trainers.test_trainer.train
+
+# Training parameters
+epochs: 10
+batch_size: 32
+
+# Model parameters
+model:
+  name: resnet18
+  num_classes: 10
+
+# Optimizer parameters
+optimizer:
+  lr: 0.001
+  weight_decay: 0.0001

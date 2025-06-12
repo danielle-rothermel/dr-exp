@@ -1,0 +1,14 @@
+[?2004h[1;34m7:15:26 ddr8143@gr072[1;35m [S] [0;32m:/scratch/ddr8143/repos/dr_exp >[0m [Kexport CUDA_MPS_PIPE_DIRECTORY="/tmp/nviidia-mps-${SLURM_JOB_ID}"
+[?2004l[?2004h[1;34m7:15:33 ddr8143@gr072[1;35m [S] [0;32m:/scratch/ddr8143/repos/dr_exp >[0m [K    export CUDA_MPS_LOG_DIRECTORY="/tmp//nvidia-log-${SLURM_JOB_ID}"
+[?2004l[?2004h[1;34m7:15:33 ddr8143@gr072[1;35m [S] [0;32m:/scratch/ddr8143/repos/dr_exp >[0m [K    mkdir -p "$CUDA_MPS_PIPE_DIRECTORY"  "$CUDA_MPS_LOG_DIRECTORY"
+[?2004l[?2004h[1;34m7:15:33 ddr8143@gr072[1;35m [S] [0;32m:/scratch/ddr8143/repos/dr_exp >[0m [K    cleanup() { echo "Cleaning up..."; eecho quit | nvidia-cuda-mps-control 2>/dev/null || true; rm -rf "$CUDA_MPS_PIPE_DIRECTORY" "$CUDA_MPS_LOG__DIRECTORY" }
+[?2004l[?2004h>     trap cleanup EXIT
+[?2004l[?2004h> 
+[?2004l[?2004h>     nvidia-cuda-mps-control -d
+[?2004l[?2004h> 
+[?2004l[?2004h> [?2004h[1;34m7:16:38 ddr8143@gr072[1;35m [S] [0;32m:/scratch/ddr8143/repos/dr_exp >[0m [Kexport CUDA_MPS_PIPE_DIRECTORY="/tmp/nviidia-mps-${SLURM_JOB_ID}"
+[?2004l[?2004h[1;34m7:16:43 ddr8143@gr072[1;35m [S] [0;32m:/scratch/ddr8143/repos/dr_exp >[0m [K    export CUDA_MPS_LOG_DIRECTORY="/tmp//nvidia-log-${SLURM_JOB_ID}"
+[?2004l[?2004h[1;34m7:16:44 ddr8143@gr072[1;35m [S] [0;32m:/scratch/ddr8143/repos/dr_exp >[0m [Kmkdir -p "$CUDA_MPS_PIPE_DIRECTORY" "$CUUDA_MPS_LOG_DIRECTORY"
+[?2004l[?2004h[1;34m7:16:50 ddr8143@gr072[1;35m [S] [0;32m:/scratch/ddr8143/repos/dr_exp >[0m [Knvidia-cuda-mps-control -d
+[?2004l[?2004h[1;34m7:16:55 ddr8143@gr072[1;35m [S] [0;32m:/scratch/ddr8143/repos/dr_exp >[0m [Kuv run dr_exp --base-path $BASE_PATH --eexperiment $EXPERIMENT system launcher --workers-per-gpu 2 --max-hours 46
+[?2004l

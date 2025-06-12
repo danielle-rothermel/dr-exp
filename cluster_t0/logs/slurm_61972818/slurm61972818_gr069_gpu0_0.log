@@ -1,0 +1,368 @@
+GPU available: True (cuda), used: True
+TPU available: False, using: 0 TPU cores
+HPU available: False, using: 0 HPUs
+/scratch/ddr8143/repos/dr_exp/.venv/lib/python3.12/site-packages/lightning/pytorch/trainer/connectors/logger_connector/logger_connector.py:76: Starting from v1.9.0, `tensorboardX` has been removed as a dependency of the `lightning.pytorch` package, due to potential conflicts with other packages in the ML ecosystem. For this reason, `logger=True` will use `CSVLogger` as the default logger, unless the `tensorboard` or `tensorboardX` packages are found. Please `pip install lightning[extra]` or one of them to enable TensorBoard support by default
+LOCAL_RANK: 0 - CUDA_VISIBLE_DEVICES: [0]
+
+  | Name      | Type             | Params | Mode 
+-------------------------------------------------------
+0 | model     | CifarResNet18    | 11.2 M | train
+1 | criterion | CrossEntropyLoss | 0      | train
+-------------------------------------------------------
+11.2 M    Trainable params
+0         Non-trainable params
+11.2 M    Total params
+44.696    Total estimated model params size (MB)
+70        Modules in train mode
+0         Modules in eval mode
+SLURM auto-requeueing enabled. Setting signal handlers.
+[SyncHandler] Failed to initialize Supabase: Supabase URL and key must be provided or set in environment
+[SyncHandler] Sync disabled - files will remain in queue
+[slurm61972818_gr069_gpu0_0] Sync disabled - Supabase not available
+Sync: enabled (Supabase not available - queue only)
+Starting worker slurm61972818_gr069_gpu0_0
+Experiment: cluster_t0 at /scratch/ddr8143/logs/dcnn_workers
+------------------------------------------------------------
+[slurm61972818_gr069_gpu0_0] Worker started
+[slurm61972818_gr069_gpu0_0] Sync thread started
+[slurm61972818_gr069_gpu0_0] Heartbeat thread started
+[slurm61972818_gr069_gpu0_0] No jobs available
+[slurm61972818_gr069_gpu0_0] No jobs available
+[slurm61972818_gr069_gpu0_0] Claimed job 15967da9-efb6-4dca-8e23-13de1be99960 (priority=10)
+[slurm61972818_gr069_gpu0_0] Executing job 15967da9-efb6-4dca-8e23-13de1be99960 with _target_=dr_exp.trainers.decon_trainer.train_classification
+Epoch 0 | val_loss: 2.31981, val_acc: 0.12109
+/scratch/ddr8143/repos/dr_exp/.venv/lib/python3.12/site-packages/torch/optim/lr_scheduler.py:198: UserWarning: The epoch parameter in `scheduler.step()` was not necessary and is being deprecated where possible. Please use `scheduler.step()` to step the scheduler. During the deprecation, if epoch is different from None, the closed form is used instead of the new chainable form, where available. Please open an issue if you are unable to replicate your use case: https://github.com/pytorch/pytorch/issues/new/choose.
+  warnings.warn(EPOCH_DEPRECATION_WARNING, UserWarning)
+`Trainer.fit` stopped: `max_epochs=50` reached.
+GPU available: True (cuda), used: True
+TPU available: False, using: 0 TPU cores
+HPU available: False, using: 0 HPUs
+LOCAL_RANK: 0 - CUDA_VISIBLE_DEVICES: [0]
+
+  | Name      | Type             | Params | Mode 
+-------------------------------------------------------
+0 | model     | CifarResNet18    | 11.2 M | train
+1 | criterion | CrossEntropyLoss | 0      | train
+-------------------------------------------------------
+11.2 M    Trainable params
+0         Non-trainable params
+11.2 M    Total params
+44.696    Total estimated model params size (MB)
+70        Modules in train mode
+0         Modules in eval mode
+SLURM auto-requeueing enabled. Setting signal handlers.
+Epoch 0 | val_loss: 2.31963, val_acc: 0.09540
+Epoch 1 | val_loss: 1.36727, val_acc: 0.50460, train_loss: 2.31905, train_acc: 0.09973
+Epoch 2 | val_loss: 1.00302, val_acc: 0.65740, train_loss: 1.84385, train_acc: 0.37818
+Epoch 3 | val_loss: 0.91133, val_acc: 0.69440, train_loss: 1.48245, train_acc: 0.55796
+Epoch 4 | val_loss: 0.92216, val_acc: 0.69680, train_loss: 1.26042, train_acc: 0.66598
+Epoch 5 | val_loss: 0.92613, val_acc: 0.70000, train_loss: 1.15531, train_acc: 0.71496
+Epoch 6 | val_loss: 0.68128, val_acc: 0.78240, train_loss: 1.09128, train_acc: 0.74527
+Epoch 7 | val_loss: 0.71794, val_acc: 0.76120, train_loss: 1.01924, train_acc: 0.77649
+Epoch 8 | val_loss: 0.66246, val_acc: 0.79760, train_loss: 0.98107, train_acc: 0.79293
+Epoch 9 | val_loss: 0.75474, val_acc: 0.76120, train_loss: 0.94604, train_acc: 0.80842
+Epoch 10 | val_loss: 0.59037, val_acc: 0.81560, train_loss: 0.92156, train_acc: 0.81673
+Epoch 11 | val_loss: 0.76792, val_acc: 0.76000, train_loss: 0.90117, train_acc: 0.82722
+Epoch 12 | val_loss: 0.58951, val_acc: 0.81900, train_loss: 0.89033, train_acc: 0.83180
+Epoch 13 | val_loss: 0.59277, val_acc: 0.81920, train_loss: 0.87902, train_acc: 0.83760
+[slurm61972818_gr069_gpu0_0] Sync pending: 12 items
+Epoch 14 | val_loss: 0.56878, val_acc: 0.82720, train_loss: 0.86950, train_acc: 0.83949
+[slurm61972818_gr069_gpu0_0] Sync pending: 24 items
+Epoch 15 | val_loss: 0.68153, val_acc: 0.79320, train_loss: 0.85910, train_acc: 0.84571
+[slurm61972818_gr069_gpu0_0] Sync pending: 30 items
+Epoch 16 | val_loss: 0.59333, val_acc: 0.81700, train_loss: 0.84423, train_acc: 0.85082
+[slurm61972818_gr069_gpu0_0] Sync pending: 25 items
+Epoch 17 | val_loss: 0.52172, val_acc: 0.84140, train_loss: 0.83657, train_acc: 0.85602
+[slurm61972818_gr069_gpu0_0] Sync pending: 24 items
+Epoch 18 | val_loss: 0.52709, val_acc: 0.84040, train_loss: 0.82648, train_acc: 0.85902
+[slurm61972818_gr069_gpu0_0] Sync pending: 19 items
+Epoch 19 | val_loss: 0.53706, val_acc: 0.84020, train_loss: 0.81794, train_acc: 0.86236
+[slurm61972818_gr069_gpu0_0] Sync pending: 16 items
+Epoch 20 | val_loss: 0.64251, val_acc: 0.79740, train_loss: 0.80356, train_acc: 0.86964
+[slurm61972818_gr069_gpu0_0] Sync pending: 16 items
+Epoch 21 | val_loss: 0.64955, val_acc: 0.79560, train_loss: 0.80167, train_acc: 0.86927
+[slurm61972818_gr069_gpu0_0] Sync pending: 11 items
+Epoch 22 | val_loss: 0.48295, val_acc: 0.86180, train_loss: 0.78546, train_acc: 0.87644
+[slurm61972818_gr069_gpu0_0] Sync pending: 9 items
+Epoch 23 | val_loss: 0.51815, val_acc: 0.84580, train_loss: 0.78228, train_acc: 0.87958
+[slurm61972818_gr069_gpu0_0] Sync pending: 6 items
+Epoch 24 | val_loss: 0.53850, val_acc: 0.84240, train_loss: 0.76426, train_acc: 0.88653
+[slurm61972818_gr069_gpu0_0] Sync pending: 2 items
+Epoch 25 | val_loss: 0.54992, val_acc: 0.83160, train_loss: 0.75893, train_acc: 0.88891
+Epoch 26 | val_loss: 0.51476, val_acc: 0.84840, train_loss: 0.74473, train_acc: 0.89578
+[slurm61972818_gr069_gpu0_0] Sync pending: 2 items
+Epoch 27 | val_loss: 0.45791, val_acc: 0.86640, train_loss: 0.73592, train_acc: 0.89916
+Epoch 28 | val_loss: 0.46393, val_acc: 0.86800, train_loss: 0.72602, train_acc: 0.90456
+Epoch 29 | val_loss: 0.41039, val_acc: 0.88280, train_loss: 0.71229, train_acc: 0.90953
+[slurm61972818_gr069_gpu0_0] Sync pending: 4 items
+Epoch 30 | val_loss: 0.40899, val_acc: 0.88500, train_loss: 0.70150, train_acc: 0.91376
+[slurm61972818_gr069_gpu0_0] Sync pending: 3 items
+Epoch 31 | val_loss: 0.42492, val_acc: 0.88180, train_loss: 0.68770, train_acc: 0.92027
+[slurm61972818_gr069_gpu0_0] Sync pending: 3 items
+Epoch 32 | val_loss: 0.40596, val_acc: 0.88580, train_loss: 0.68035, train_acc: 0.92353
+[slurm61972818_gr069_gpu0_0] Sync pending: 7 items
+Epoch 33 | val_loss: 0.35415, val_acc: 0.90320, train_loss: 0.66522, train_acc: 0.93056
+[slurm61972818_gr069_gpu0_0] Sync pending: 10 items
+Epoch 34 | val_loss: 0.38231, val_acc: 0.89400, train_loss: 0.65634, train_acc: 0.93449
+[slurm61972818_gr069_gpu0_0] Sync pending: 14 items
+Epoch 35 | val_loss: 0.36999, val_acc: 0.90100, train_loss: 0.64280, train_acc: 0.94033
+[slurm61972818_gr069_gpu0_0] Sync pending: 13 items
+Epoch 36 | val_loss: 0.34206, val_acc: 0.90820, train_loss: 0.62586, train_acc: 0.94862
+[slurm61972818_gr069_gpu0_0] Sync pending: 13 items
+Epoch 37 | val_loss: 0.37041, val_acc: 0.90240, train_loss: 0.61224, train_acc: 0.95347
+[slurm61972818_gr069_gpu0_0] Sync pending: 9 items
+Epoch 38 | val_loss: 0.34003, val_acc: 0.90960, train_loss: 0.60233, train_acc: 0.95878
+[slurm61972818_gr069_gpu0_0] Sync pending: 5 items
+Epoch 39 | val_loss: 0.32933, val_acc: 0.91780, train_loss: 0.58967, train_acc: 0.96471
+[slurm61972818_gr069_gpu0_0] Sync pending: 1 items
+Epoch 40 | val_loss: 0.30636, val_acc: 0.92260, train_loss: 0.57538, train_acc: 0.97040
+[slurm61972818_gr069_gpu0_0] Sync pending: 5 items
+Epoch 41 | val_loss: 0.29977, val_acc: 0.92580, train_loss: 0.56160, train_acc: 0.97602
+[slurm61972818_gr069_gpu0_0] Sync pending: 5 items
+Epoch 42 | val_loss: 0.29637, val_acc: 0.92680, train_loss: 0.55424, train_acc: 0.97973
+[slurm61972818_gr069_gpu0_0] Sync pending: 8 items
+Epoch 43 | val_loss: 0.28272, val_acc: 0.93360, train_loss: 0.54227, train_acc: 0.98516
+[slurm61972818_gr069_gpu0_0] Sync pending: 8 items
+Epoch 44 | val_loss: 0.28101, val_acc: 0.93420, train_loss: 0.53633, train_acc: 0.98753
+[slurm61972818_gr069_gpu0_0] Sync pending: 12 items
+Epoch 45 | val_loss: 0.28171, val_acc: 0.93440, train_loss: 0.53141, train_acc: 0.98947
+[slurm61972818_gr069_gpu0_0] Sync pending: 16 items
+Epoch 46 | val_loss: 0.27659, val_acc: 0.93720, train_loss: 0.52713, train_acc: 0.99173
+[slurm61972818_gr069_gpu0_0] Sync pending: 14 items
+Epoch 47 | val_loss: 0.27448, val_acc: 0.93700, train_loss: 0.52532, train_acc: 0.99191
+[slurm61972818_gr069_gpu0_0] Sync pending: 14 items
+Epoch 48 | val_loss: 0.27070, val_acc: 0.93920, train_loss: 0.52275, train_acc: 0.99349
+[slurm61972818_gr069_gpu0_0] Sync pending: 21 items
+Epoch 49 | val_loss: 0.27281, val_acc: 0.93760, train_loss: 0.52164, train_acc: 0.99349
+[slurm61972818_gr069_gpu0_0] Job 15967da9-efb6-4dca-8e23-13de1be99960 completed successfully
+[slurm61972818_gr069_gpu0_0] Claimed job b0ad3056-0120-488c-9bf1-a0b65af88b3d (priority=10)
+[slurm61972818_gr069_gpu0_0] Executing job b0ad3056-0120-488c-9bf1-a0b65af88b3d with _target_=dr_exp.trainers.decon_trainer.train_classification
+Epoch 0 | val_loss: 2.30905, val_acc: 0.08984
+`Trainer.fit` stopped: `max_epochs=50` reached.
+GPU available: True (cuda), used: True
+TPU available: False, using: 0 TPU cores
+HPU available: False, using: 0 HPUs
+LOCAL_RANK: 0 - CUDA_VISIBLE_DEVICES: [0]
+
+  | Name      | Type             | Params | Mode 
+-------------------------------------------------------
+0 | model     | CifarResNet18    | 11.2 M | train
+1 | criterion | CrossEntropyLoss | 0      | train
+-------------------------------------------------------
+11.2 M    Trainable params
+0         Non-trainable params
+11.2 M    Total params
+44.696    Total estimated model params size (MB)
+70        Modules in train mode
+0         Modules in eval mode
+SLURM auto-requeueing enabled. Setting signal handlers.
+[slurm61972818_gr069_gpu0_0] Sync pending: 27 items
+Epoch 0 | val_loss: 1.59374, val_acc: 0.42540
+[slurm61972818_gr069_gpu0_0] Sync pending: 27 items
+Epoch 1 | val_loss: 1.30241, val_acc: 0.53560, train_loss: 2.03548, train_acc: 0.28938
+[slurm61972818_gr069_gpu0_0] Sync pending: 26 items
+Epoch 2 | val_loss: 0.99870, val_acc: 0.65840, train_loss: 1.62103, train_acc: 0.48262
+[slurm61972818_gr069_gpu0_0] Sync pending: 23 items
+Epoch 3 | val_loss: 0.83053, val_acc: 0.73140, train_loss: 1.32126, train_acc: 0.63402
+[slurm61972818_gr069_gpu0_0] Sync pending: 23 items
+Epoch 4 | val_loss: 0.89596, val_acc: 0.71000, train_loss: 1.15831, train_acc: 0.71107
+[slurm61972818_gr069_gpu0_0] Sync pending: 29 items
+Epoch 5 | val_loss: 1.04173, val_acc: 0.65340, train_loss: 1.07210, train_acc: 0.75344
+[slurm61972818_gr069_gpu0_0] Sync pending: 27 items
+Epoch 6 | val_loss: 0.75700, val_acc: 0.76580, train_loss: 1.01985, train_acc: 0.77396
+[slurm61972818_gr069_gpu0_0] Sync pending: 28 items
+Epoch 7 | val_loss: 0.75369, val_acc: 0.75760, train_loss: 0.97869, train_acc: 0.79360
+[slurm61972818_gr069_gpu0_0] Sync pending: 26 items
+Epoch 8 | val_loss: 0.72836, val_acc: 0.76220, train_loss: 0.94952, train_acc: 0.80642
+[slurm61972818_gr069_gpu0_0] Sync pending: 24 items
+Epoch 9 | val_loss: 0.60841, val_acc: 0.81000, train_loss: 0.93576, train_acc: 0.80978
+[slurm61972818_gr069_gpu0_0] Sync pending: 24 items
+Epoch 10 | val_loss: 0.66760, val_acc: 0.79020, train_loss: 0.91595, train_acc: 0.81982
+[slurm61972818_gr069_gpu0_0] Sync pending: 23 items
+Epoch 11 | val_loss: 0.60848, val_acc: 0.81420, train_loss: 0.89865, train_acc: 0.82587
+Epoch 12 | val_loss: 0.69332, val_acc: 0.78640, train_loss: 0.89586, train_acc: 0.82978
+[slurm61972818_gr069_gpu0_0] Sync pending: 21 items
+Epoch 13 | val_loss: 0.59682, val_acc: 0.81800, train_loss: 0.87949, train_acc: 0.83587
+[slurm61972818_gr069_gpu0_0] Sync pending: 19 items
+Epoch 14 | val_loss: 0.65509, val_acc: 0.79780, train_loss: 0.87422, train_acc: 0.83936
+[slurm61972818_gr069_gpu0_0] Sync pending: 22 items
+Epoch 15 | val_loss: 0.72292, val_acc: 0.77320, train_loss: 0.86819, train_acc: 0.84149
+[slurm61972818_gr069_gpu0_0] Sync pending: 21 items
+Epoch 16 | val_loss: 0.67311, val_acc: 0.78600, train_loss: 0.85847, train_acc: 0.84553
+[slurm61972818_gr069_gpu0_0] Sync pending: 20 items
+Epoch 17 | val_loss: 0.56402, val_acc: 0.82840, train_loss: 0.85849, train_acc: 0.84613
+[slurm61972818_gr069_gpu0_0] Sync pending: 20 items
+Epoch 18 | val_loss: 0.73806, val_acc: 0.76880, train_loss: 0.85434, train_acc: 0.84924
+[slurm61972818_gr069_gpu0_0] Sync pending: 20 items
+Epoch 19 | val_loss: 0.58730, val_acc: 0.81940, train_loss: 0.84557, train_acc: 0.85160
+[slurm61972818_gr069_gpu0_0] Sync pending: 24 items
+Epoch 20 | val_loss: 0.76543, val_acc: 0.74840, train_loss: 0.84234, train_acc: 0.85336
+[slurm61972818_gr069_gpu0_0] Sync pending: 24 items
+Epoch 21 | val_loss: 0.60516, val_acc: 0.80980, train_loss: 0.83752, train_acc: 0.85511
+[slurm61972818_gr069_gpu0_0] Sync pending: 28 items
+Epoch 22 | val_loss: 0.57126, val_acc: 0.82780, train_loss: 0.83683, train_acc: 0.85424
+[slurm61972818_gr069_gpu0_0] Sync pending: 31 items
+Epoch 23 | val_loss: 0.59173, val_acc: 0.81780, train_loss: 0.82417, train_acc: 0.86031
+[slurm61972818_gr069_gpu0_0] Sync pending: 38 items
+Epoch 24 | val_loss: 0.53268, val_acc: 0.84280, train_loss: 0.83201, train_acc: 0.85822
+[slurm61972818_gr069_gpu0_0] Sync pending: 38 items
+Epoch 25 | val_loss: 0.50674, val_acc: 0.84860, train_loss: 0.82299, train_acc: 0.86202
+[slurm61972818_gr069_gpu0_0] Sync pending: 37 items
+Epoch 26 | val_loss: 0.79592, val_acc: 0.75400, train_loss: 0.82322, train_acc: 0.86018
+[slurm61972818_gr069_gpu0_0] Sync pending: 40 items
+Epoch 27 | val_loss: 0.52015, val_acc: 0.84380, train_loss: 0.82169, train_acc: 0.86318
+[slurm61972818_gr069_gpu0_0] Sync pending: 43 items
+Epoch 28 | val_loss: 0.58413, val_acc: 0.82060, train_loss: 0.81848, train_acc: 0.86393
+[slurm61972818_gr069_gpu0_0] Sync pending: 42 items
+Epoch 29 | val_loss: 0.52630, val_acc: 0.84460, train_loss: 0.81836, train_acc: 0.86229
+[slurm61972818_gr069_gpu0_0] Sync pending: 42 items
+Epoch 30 | val_loss: 0.33098, val_acc: 0.91600, train_loss: 0.82214, train_acc: 0.86147
+[slurm61972818_gr069_gpu0_0] Sync pending: 46 items
+Epoch 31 | val_loss: 0.31852, val_acc: 0.91840, train_loss: 0.69426, train_acc: 0.91907
+[slurm61972818_gr069_gpu0_0] Sync pending: 46 items
+Epoch 32 | val_loss: 0.31022, val_acc: 0.92020, train_loss: 0.65457, train_acc: 0.93691
+[slurm61972818_gr069_gpu0_0] Sync pending: 46 items
+Epoch 33 | val_loss: 0.30707, val_acc: 0.92300, train_loss: 0.63541, train_acc: 0.94544
+[slurm61972818_gr069_gpu0_0] Sync pending: 53 items
+Epoch 34 | val_loss: 0.30145, val_acc: 0.92560, train_loss: 0.62200, train_acc: 0.95096
+[slurm61972818_gr069_gpu0_0] Sync pending: 56 items
+Epoch 35 | val_loss: 0.29362, val_acc: 0.92660, train_loss: 0.61492, train_acc: 0.95520
+[slurm61972818_gr069_gpu0_0] Sync pending: 59 items
+Epoch 36 | val_loss: 0.30443, val_acc: 0.92380, train_loss: 0.60764, train_acc: 0.95669
+[slurm61972818_gr069_gpu0_0] Sync pending: 58 items
+Epoch 37 | val_loss: 0.30415, val_acc: 0.92240, train_loss: 0.59925, train_acc: 0.96124
+[slurm61972818_gr069_gpu0_0] Sync pending: 57 items
+Epoch 38 | val_loss: 0.29742, val_acc: 0.92700, train_loss: 0.59177, train_acc: 0.96442
+[slurm61972818_gr069_gpu0_0] Sync pending: 56 items
+Epoch 39 | val_loss: 0.30182, val_acc: 0.92660, train_loss: 0.58780, train_acc: 0.96527
+[slurm61972818_gr069_gpu0_0] Sync pending: 56 items
+Epoch 40 | val_loss: 0.30307, val_acc: 0.92360, train_loss: 0.58396, train_acc: 0.96771
+[slurm61972818_gr069_gpu0_0] Sync pending: 56 items
+Epoch 41 | val_loss: 0.30158, val_acc: 0.92620, train_loss: 0.57883, train_acc: 0.96973
+[slurm61972818_gr069_gpu0_0] Sync pending: 60 items
+Epoch 42 | val_loss: 0.30412, val_acc: 0.92380, train_loss: 0.57612, train_acc: 0.97122
+[slurm61972818_gr069_gpu0_0] Sync pending: 59 items
+Epoch 43 | val_loss: 0.30772, val_acc: 0.92140, train_loss: 0.57253, train_acc: 0.97318
+Epoch 44 | val_loss: 0.30929, val_acc: 0.92320, train_loss: 0.56749, train_acc: 0.97493
+[slurm61972818_gr069_gpu0_0] Sync pending: 59 items
+Epoch 45 | val_loss: 0.30134, val_acc: 0.92540, train_loss: 0.56466, train_acc: 0.97567
+[slurm61972818_gr069_gpu0_0] Sync pending: 58 items
+Epoch 46 | val_loss: 0.30554, val_acc: 0.92620, train_loss: 0.56270, train_acc: 0.97604
+[slurm61972818_gr069_gpu0_0] Sync pending: 58 items
+Epoch 47 | val_loss: 0.31133, val_acc: 0.92360, train_loss: 0.56107, train_acc: 0.97722
+[slurm61972818_gr069_gpu0_0] Sync pending: 58 items
+Epoch 48 | val_loss: 0.31057, val_acc: 0.92320, train_loss: 0.56384, train_acc: 0.97476
+[slurm61972818_gr069_gpu0_0] Sync pending: 62 items
+Epoch 49 | val_loss: 0.30927, val_acc: 0.92180, train_loss: 0.55991, train_acc: 0.97740
+[slurm61972818_gr069_gpu0_0] Job b0ad3056-0120-488c-9bf1-a0b65af88b3d completed successfully
+[slurm61972818_gr069_gpu0_0] Claimed job 4f3fb339-1f47-47f9-b428-c2b0ea711f1a (priority=10)
+[slurm61972818_gr069_gpu0_0] Executing job 4f3fb339-1f47-47f9-b428-c2b0ea711f1a with _target_=dr_exp.trainers.decon_trainer.train_classification
+Epoch 0 | val_loss: 2.32284, val_acc: 0.11719
+`Trainer.fit` stopped: `max_epochs=50` reached.
+GPU available: True (cuda), used: True
+TPU available: False, using: 0 TPU cores
+HPU available: False, using: 0 HPUs
+LOCAL_RANK: 0 - CUDA_VISIBLE_DEVICES: [0]
+
+  | Name      | Type             | Params | Mode 
+-------------------------------------------------------
+0 | model     | CifarResNet18    | 11.2 M | train
+1 | criterion | CrossEntropyLoss | 0      | train
+-------------------------------------------------------
+11.2 M    Trainable params
+0         Non-trainable params
+11.2 M    Total params
+44.657    Total estimated model params size (MB)
+70        Modules in train mode
+0         Modules in eval mode
+SLURM auto-requeueing enabled. Setting signal handlers.
+[slurm61972818_gr069_gpu0_0] Sync pending: 70 items
+Epoch 0 | val_loss: 2.32954, val_acc: 0.10000
+[slurm61972818_gr069_gpu0_0] Sync pending: 74 items
+Epoch 1 | val_loss: 1.67515, val_acc: 0.42220, train_loss: 2.31625, train_acc: 0.09969
+Epoch 2 | val_loss: 1.36857, val_acc: 0.55720, train_loss: 2.13429, train_acc: 0.22273
+[slurm61972818_gr069_gpu0_0] Sync pending: 74 items
+Epoch 3 | val_loss: 1.18176, val_acc: 0.67280, train_loss: 2.00467, train_acc: 0.29587
+Epoch 4 | val_loss: 1.16360, val_acc: 0.64360, train_loss: 1.88456, train_acc: 0.34011
+[slurm61972818_gr069_gpu0_0] Sync pending: 78 items
+Epoch 5 | val_loss: 1.13352, val_acc: 0.67160, train_loss: 1.80944, train_acc: 0.35509
+[slurm61972818_gr069_gpu0_0] Sync pending: 78 items
+Epoch 6 | val_loss: 0.95762, val_acc: 0.74540, train_loss: 1.79695, train_acc: 0.38038
+Epoch 7 | val_loss: 1.14717, val_acc: 0.66940, train_loss: 1.75250, train_acc: 0.41527
+[slurm61972818_gr069_gpu0_0] Sync pending: 82 items
+Epoch 8 | val_loss: 0.95683, val_acc: 0.76400, train_loss: 1.72083, train_acc: 0.38071
+[slurm61972818_gr069_gpu0_0] Sync pending: 86 items
+Epoch 9 | val_loss: 1.11311, val_acc: 0.70480, train_loss: 1.70593, train_acc: 0.40471
+Epoch 10 | val_loss: 0.98093, val_acc: 0.75980, train_loss: 1.69416, train_acc: 0.41478
+[slurm61972818_gr069_gpu0_0] Sync pending: 86 items
+Epoch 11 | val_loss: 1.02095, val_acc: 0.73180, train_loss: 1.66956, train_acc: 0.44813
+Epoch 12 | val_loss: 1.01480, val_acc: 0.72500, train_loss: 1.67107, train_acc: 0.42922
+[slurm61972818_gr069_gpu0_0] Sync pending: 86 items
+Epoch 13 | val_loss: 0.83869, val_acc: 0.78680, train_loss: 1.65797, train_acc: 0.45513
+[slurm61972818_gr069_gpu0_0] Sync pending: 86 items
+Epoch 14 | val_loss: 0.91553, val_acc: 0.79240, train_loss: 1.66793, train_acc: 0.43947
+Epoch 15 | val_loss: 0.85991, val_acc: 0.79080, train_loss: 1.65134, train_acc: 0.42713
+[slurm61972818_gr069_gpu0_0] Sync pending: 86 items
+Epoch 16 | val_loss: 0.87835, val_acc: 0.79720, train_loss: 1.64158, train_acc: 0.45236
+Epoch 17 | val_loss: 1.00695, val_acc: 0.77540, train_loss: 1.65781, train_acc: 0.44002
+[slurm61972818_gr069_gpu0_0] Sync pending: 90 items
+Epoch 18 | val_loss: 0.88331, val_acc: 0.78320, train_loss: 1.61877, train_acc: 0.45718
+[slurm61972818_gr069_gpu0_0] Sync pending: 94 items
+Epoch 19 | val_loss: 0.86704, val_acc: 0.81320, train_loss: 1.61569, train_acc: 0.43280
+Epoch 20 | val_loss: 0.78191, val_acc: 0.83200, train_loss: 1.62956, train_acc: 0.44898
+[slurm61972818_gr069_gpu0_0] Sync pending: 94 items
+Epoch 21 | val_loss: 0.84967, val_acc: 0.81460, train_loss: 1.62666, train_acc: 0.46087
+[slurm61972818_gr069_gpu0_0] Sync pending: 94 items
+Epoch 22 | val_loss: 0.75889, val_acc: 0.83720, train_loss: 1.60110, train_acc: 0.43024
+Epoch 23 | val_loss: 0.75226, val_acc: 0.83300, train_loss: 1.59679, train_acc: 0.47956
+[slurm61972818_gr069_gpu0_0] Sync pending: 94 items
+Epoch 24 | val_loss: 0.89292, val_acc: 0.79420, train_loss: 1.57554, train_acc: 0.45873
+Epoch 25 | val_loss: 0.78719, val_acc: 0.83600, train_loss: 1.60490, train_acc: 0.48004
+[slurm61972818_gr069_gpu0_0] Sync pending: 98 items
+Epoch 26 | val_loss: 0.78488, val_acc: 0.81980, train_loss: 1.57713, train_acc: 0.47762
+[slurm61972818_gr069_gpu0_0] Sync pending: 98 items
+Epoch 27 | val_loss: 0.73226, val_acc: 0.84560, train_loss: 1.56947, train_acc: 0.46347
+Epoch 28 | val_loss: 0.71533, val_acc: 0.86520, train_loss: 1.57048, train_acc: 0.46947
+[slurm61972818_gr069_gpu0_0] Sync pending: 106 items
+Epoch 29 | val_loss: 0.71812, val_acc: 0.87100, train_loss: 1.57218, train_acc: 0.48576
+Epoch 30 | val_loss: 0.70511, val_acc: 0.86400, train_loss: 1.57935, train_acc: 0.47780
+[slurm61972818_gr069_gpu0_0] Sync pending: 106 items
+Epoch 31 | val_loss: 0.73880, val_acc: 0.86700, train_loss: 1.53083, train_acc: 0.45971
+[slurm61972818_gr069_gpu0_0] Sync pending: 106 items
+Epoch 32 | val_loss: 0.73025, val_acc: 0.85540, train_loss: 1.54422, train_acc: 0.46198
+Epoch 33 | val_loss: 0.64876, val_acc: 0.89200, train_loss: 1.56099, train_acc: 0.46742
+[slurm61972818_gr069_gpu0_0] Sync pending: 106 items
+Epoch 34 | val_loss: 0.69772, val_acc: 0.88180, train_loss: 1.53069, train_acc: 0.48209
+[slurm61972818_gr069_gpu0_0] Sync pending: 106 items
+Epoch 35 | val_loss: 0.69484, val_acc: 0.89340, train_loss: 1.51808, train_acc: 0.52031
+Epoch 36 | val_loss: 0.56332, val_acc: 0.89500, train_loss: 1.51631, train_acc: 0.48302
+[slurm61972818_gr069_gpu0_0] Sync pending: 110 items
+Epoch 37 | val_loss: 0.65628, val_acc: 0.89400, train_loss: 1.50581, train_acc: 0.49176
+Epoch 38 | val_loss: 0.62003, val_acc: 0.89940, train_loss: 1.48374, train_acc: 0.49416
+[slurm61972818_gr069_gpu0_0] Sync pending: 110 items
+Epoch 39 | val_loss: 0.61509, val_acc: 0.90360, train_loss: 1.47013, train_acc: 0.50144
+[slurm61972818_gr069_gpu0_0] Sync pending: 114 items
+Epoch 40 | val_loss: 0.61769, val_acc: 0.91600, train_loss: 1.48627, train_acc: 0.46482
+[slurm61972818_gr069_gpu0_0] Sync pending: 118 items
+Epoch 41 | val_loss: 0.60180, val_acc: 0.90680, train_loss: 1.47919, train_acc: 0.49296
+[slurm61972818_gr069_gpu0_0] Sync pending: 118 items
+Epoch 42 | val_loss: 0.53729, val_acc: 0.92120, train_loss: 1.44328, train_acc: 0.50824
+[slurm61972818_gr069_gpu0_0] Sync pending: 118 items
+Epoch 43 | val_loss: 0.57279, val_acc: 0.92140, train_loss: 1.44808, train_acc: 0.51307
+[slurm61972818_gr069_gpu0_0] Sync pending: 118 items
+Epoch 44 | val_loss: 0.60258, val_acc: 0.92480, train_loss: 1.44240, train_acc: 0.51869
+[slurm61972818_gr069_gpu0_0] Sync pending: 118 items
+Epoch 45 | val_loss: 0.55172, val_acc: 0.92460, train_loss: 1.42017, train_acc: 0.54342
+[slurm61972818_gr069_gpu0_0] Sync pending: 118 items
+Epoch 46 | val_loss: 0.56798, val_acc: 0.92840, train_loss: 1.43096, train_acc: 0.49309
+[slurm61972818_gr069_gpu0_0] Sync pending: 118 items
+Epoch 47 | val_loss: 0.56954, val_acc: 0.92800, train_loss: 1.44465, train_acc: 0.53198
+[slurm61972818_gr069_gpu0_0] Sync pending: 122 items
+Epoch 48 | val_loss: 0.57696, val_acc: 0.93060, train_loss: 1.42335, train_acc: 0.57080
+Epoch 49 | val_loss: 0.60536, val_acc: 0.92940, train_loss: 1.41415, train_acc: 0.52553
+[slurm61972818_gr069_gpu0_0] Job 4f3fb339-1f47-47f9-b428-c2b0ea711f1a completed successfully
+[slurm61972818_gr069_gpu0_0] Claimed job cd258a66-1833-44c0-a96d-b0992f232cc5 (priority=10)
+[slurm61972818_gr069_gpu0_0] Executing job cd258a66-1833-44c0-a96d-b0992f232cc5 with _target_=dr_exp.trainers.decon_trainer.train_classification
+[slurm61972818_gr069_gpu0_0] Sync pending: 126 items
+Epoch 0 | val_loss: 2.30258, val_acc: 0.08984
+`Trainer.fit` stopped: `max_epochs=50` reached.

@@ -1,0 +1,17 @@
+{
+  "id": "9cc1b680-0ba6-45d7-bbb9-a0e602d8b835_logs_1749687598453",
+  "job_id": "9cc1b680-0ba6-45d7-bbb9-a0e602d8b835",
+  "file_path": "/scratch/ddr8143/logs/dcnn_workers/cluster_t0/storage/run_9cc1b680-0ba6-45d7-bbb9-a0e602d8b835/config.json",
+  "file_type": "logs",
+  "metadata": {
+    "filename": "config.json"
+  },
+  "created_at": "2025-06-12T00:19:58.453773+00:00",
+  "status": "failed",
+  "attempts": 3,
+  "last_attempt": "2025-06-12T00:23:33.746870",
+  "error": "Failed to create sync status: {'code': '23503', 'details': 'Key (job_id)=(9cc1b680-0ba6-45d7-bbb9-a0e602d8b835) is not present in table \"jobs\".', 'hint': None, 'message': 'insert or update on table \"sync_status\" violates foreign key constraint \"sync_status_job_id_fkey\"'}",
+  "completed_at": null,
+  "checksum": "348bedc596073bba149e67c3c9621df2ff03426a640437554a047504e66ee148",
+  "size_bytes": 2646
+}

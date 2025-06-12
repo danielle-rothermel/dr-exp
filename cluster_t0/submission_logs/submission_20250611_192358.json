@@ -1,0 +1,28 @@
+{
+  "submissions": [
+    {
+      "timestamp": "2025-06-11T19:24:06.714009",
+      "config": "step06_steplr.yaml",
+      "seed": 0,
+      "job_id": "unknown",
+      "success": true,
+      "error": null
+    },
+    {
+      "timestamp": "2025-06-11T19:24:15.403085",
+      "config": "step06_steplr.yaml",
+      "seed": 1,
+      "job_id": "unknown",
+      "success": true,
+      "error": null
+    },
+    {
+      "timestamp": "2025-06-11T19:24:23.480028",
+      "config": "step06_steplr.yaml",
+      "seed": 2,
+      "job_id": "unknown",
+      "success": true,
+      "error": null
+    }
+  ]
+}

@@ -1,0 +1,140 @@
+{
+  "id": "48df34c4-9c6d-48b3-8fbf-c34b9e6c0326",
+  "experiment_name": "cluster_t0",
+  "config": {
+    "machine": {
+      "root_dir": "/scratch/ddr8143/",
+      "device": "cuda"
+    },
+    "paths": {
+      "data": "/scratch/ddr8143//data",
+      "logs": "/scratch/ddr8143//logs",
+      "my_data": "/scratch/ddr8143//data/deconcnn",
+      "my_logs": "/scratch/ddr8143//logs/deconcnn",
+      "run_dir": "/scratch/ddr8143//logs/deconcnn/2025-06-11-19-56-1749686171",
+      "dataset_cache_root": "/scratch/ddr8143//data/cifar10/",
+      "agg_results": "/scratch/ddr8143//data/run_results/"
+    },
+    "model": {
+      "source": "deconcnn",
+      "name": "alexnet",
+      "architecture": "alexnet",
+      "layers": 8,
+      "nonlinearity": "tanh",
+      "norm_type": "none",
+      "dropout_prob": 0.0,
+      "use_residual": false,
+      "init_method": "xavier",
+      "use_imagenet_head": false
+    },
+    "optim": {
+      "name": "sgdm",
+      "weight_decay": 0.0005,
+      "lr": 0.1,
+      "momentum": 0.9,
+      "nesterov": false
+    },
+    "lrsched": {
+      "source": "torchvision",
+      "sched_type": "steplr",
+      "lr_min": 0.0,
+      "warmup_epochs": 0,
+      "warmup_start_lr": 0.0,
+      "cycle_limit": 1,
+      "step_size": 30,
+      "gamma": 0.1
+    },
+    "train_transforms": {
+      "rcc": false,
+      "hflip": true,
+      "randaug": false,
+      "colorjitter": false,
+      "mixup": false,
+      "cutmix": false,
+      "normalize_mean": [
+        0.4914,
+        0.4822,
+        0.4465
+      ],
+      "normalize_std": [
+        0.2023,
+        0.1994,
+        0.201
+      ],
+      "rcc_scale_min": 0.7,
+      "rcc_init_size": 32,
+      "colorjitter_brightness": 0.2,
+      "colorjitter_contrast": 0.2,
+      "colorjitter_saturation": 0.2,
+      "colorjitter_hue": 0.1,
+      "label_smoothing": 0.1,
+      "mixup_alpha": 1.0,
+      "cutmix_alpha": 1.0
+    },
+    "eval_transforms": {
+      "rcc": false,
+      "hflip": false,
+      "randaug": false,
+      "colorjitter": false,
+      "mixup": false,
+      "cutmix": false,
+      "normalize_mean": [
+        0.4914,
+        0.4822,
+        0.4465
+      ],
+      "normalize_std": [
+        0.2023,
+        0.1994,
+        0.201
+      ],
+      "rcc_scale_min": 1.0,
+      "rcc_init_size": 32,
+      "colorjitter_brightness": 0.2,
+      "colorjitter_contrast": 0.2,
+      "colorjitter_saturation": 0.2,
+      "colorjitter_hue": 0.1,
+      "label_smoothing": 0.1,
+      "mixup_alpha": 1.0,
+      "cutmix_alpha": 1.0
+    },
+    "data": {
+      "name": "cifar10",
+      "num_workers": 4,
+      "download": true,
+      "data_split_seed": 1,
+      "train_val_split_factor": 0.1
+    },
+    "proj_dir_name": "deconcnn",
+    "run_name": "step16_no_rrc",
+    "load_checkpoint": null,
+    "enable_checkpointing": false,
+    "log_every": 1,
+    "limit_train_batches": null,
+    "seed": 3,
+    "train": true,
+    "eval": false,
+    "epochs": 50,
+    "batch_size": 128,
+    "loss": "cross_entropy",
+    "clip_grad_norm": null,
+    "_target_": "dr_exp.trainers.decon_trainer.train_classification"
+  },
+  "priority": 10,
+  "status": "completed",
+  "created_at": "2025-06-11T23:56:16.547833+00:00",
+  "updated_at": "2025-06-12T00:10:26.751513+00:00",
+  "attempts": 1,
+  "worker_id": "slurm61964909_gr070_gpu0_0",
+  "error": null,
+  "completed_at": "2025-06-12T00:10:26.751366+00:00",
+  "started_at": "2025-06-12T00:03:22.704912+00:00",
+  "last_heartbeat": "2025-06-12T00:10:13.497324+00:00",
+  "final_metrics": {
+    "val_loss": 0.6372531652450562,
+    "val_acc": 0.8137999773025513,
+    "train_loss": 0.5416548848152161,
+    "train_acc": 0.9954000115394592,
+    "epoch": 49
+  }
+}

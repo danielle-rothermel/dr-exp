@@ -1,0 +1,17 @@
+{
+  "id": "ac5a9d03-1965-460b-a0db-f5f1fb14d61b_metrics_1749690840341",
+  "job_id": "ac5a9d03-1965-460b-a0db-f5f1fb14d61b",
+  "file_path": "/scratch/ddr8143/logs/dcnn_workers/cluster_t0/storage/run_ac5a9d03-1965-460b-a0db-f5f1fb14d61b/events.jsonl",
+  "file_type": "metrics",
+  "metadata": {
+    "filename": "events.jsonl"
+  },
+  "created_at": "2025-06-12T01:14:00.341319+00:00",
+  "status": "pending",
+  "attempts": 0,
+  "last_attempt": null,
+  "error": null,
+  "completed_at": null,
+  "checksum": "2e0e48abe2e6057ff3f21d50be116cf456f9947ce4be98bdafd3741194326073",
+  "size_bytes": 243
+}

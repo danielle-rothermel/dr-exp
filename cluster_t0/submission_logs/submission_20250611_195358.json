@@ -1,0 +1,124 @@
+{
+  "submissions": [
+    {
+      "timestamp": "2025-06-11T19:55:11.840782",
+      "config": "step13_no_dropout.yaml",
+      "seed": 3,
+      "job_id": "unknown",
+      "success": true,
+      "error": null
+    },
+    {
+      "timestamp": "2025-06-11T19:55:19.165860",
+      "config": "step13_no_dropout.yaml",
+      "seed": 4,
+      "job_id": "unknown",
+      "success": true,
+      "error": null
+    },
+    {
+      "timestamp": "2025-06-11T19:55:26.480725",
+      "config": "step13_no_dropout.yaml",
+      "seed": 5,
+      "job_id": "unknown",
+      "success": true,
+      "error": null
+    },
+    {
+      "timestamp": "2025-06-11T19:55:33.779057",
+      "config": "step14_tanh.yaml",
+      "seed": 3,
+      "job_id": "unknown",
+      "success": true,
+      "error": null
+    },
+    {
+      "timestamp": "2025-06-11T19:55:41.049296",
+      "config": "step14_tanh.yaml",
+      "seed": 4,
+      "job_id": "unknown",
+      "success": true,
+      "error": null
+    },
+    {
+      "timestamp": "2025-06-11T19:55:48.359390",
+      "config": "step14_tanh.yaml",
+      "seed": 5,
+      "job_id": "unknown",
+      "success": true,
+      "error": null
+    },
+    {
+      "timestamp": "2025-06-11T19:55:55.655615",
+      "config": "step15_no_colorjitter.yaml",
+      "seed": 3,
+      "job_id": "unknown",
+      "success": true,
+      "error": null
+    },
+    {
+      "timestamp": "2025-06-11T19:56:02.935686",
+      "config": "step15_no_colorjitter.yaml",
+      "seed": 4,
+      "job_id": "unknown",
+      "success": true,
+      "error": null
+    },
+    {
+      "timestamp": "2025-06-11T19:56:10.246786",
+      "config": "step15_no_colorjitter.yaml",
+      "seed": 5,
+      "job_id": "unknown",
+      "success": true,
+      "error": null
+    },
+    {
+      "timestamp": "2025-06-11T19:56:17.749063",
+      "config": "step16_no_rrc.yaml",
+      "seed": 3,
+      "job_id": "unknown",
+      "success": true,
+      "error": null
+    },
+    {
+      "timestamp": "2025-06-11T19:56:25.059255",
+      "config": "step16_no_rrc.yaml",
+      "seed": 4,
+      "job_id": "unknown",
+      "success": true,
+      "error": null
+    },
+    {
+      "timestamp": "2025-06-11T19:56:32.362068",
+      "config": "step16_no_rrc.yaml",
+      "seed": 5,
+      "job_id": "unknown",
+      "success": true,
+      "error": null
+    },
+    {
+      "timestamp": "2025-06-11T19:56:39.684912",
+      "config": "step17_no_hflip.yaml",
+      "seed": 3,
+      "job_id": "unknown",
+      "success": true,
+      "error": null
+    },
+    {
+      "timestamp": "2025-06-11T19:56:46.965155",
+      "config": "step17_no_hflip.yaml",
+      "seed": 4,
+      "job_id": "unknown",
+      "success": true,
+      "error": null
+    },
+    {
+      "timestamp": "2025-06-11T19:56:54.276093",
+      "config": "step17_no_hflip.yaml",
+      "seed": 5,
+      "job_id": "unknown",
+      "success": true,
+      "error": null
+    }
+  ]
+}

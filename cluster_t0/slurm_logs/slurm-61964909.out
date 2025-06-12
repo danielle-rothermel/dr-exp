@@ -1,0 +1,118 @@
+[?2004h[1;34m6:33:12 ddr8143@gr070[1;35m [S] [0;32m:/scratch/ddr8143/repos/dr_exp >[0m [Kecho "What?"
+[?2004lWhat?
+[?2004h[1;34m6:33:20 ddr8143@gr070[1;35m [S] [0;32m:/scratch/ddr8143/repos/dr_exp >[0m ls /scratch/ddr8143/logs/dcnn_workers/clluster_t0/slurm_logs
+[?2004l[0m[00mslurm-61964909.out[0m
+[?2004h[1;34m6:33:39 ddr8143@gr070[1;35m [S] [0;32m:/scratch/ddr8143/repos/dr_exp >[0m [Kvim /scratch/ddr8143/logs/dcnn_workers/ccluster_t0/slurm_logs/slurm-61964909.out 
+[?2004lVim: Warning: Output is not to a terminal
+[?1049h[?1h=[1;70r[27m[24m[23m[0m[H[J[?25l[70;1H"/scratch/ddr8143/logs/dcnn_workers/cluster_t0/slurm_logs/slurm-61964909.out"</ddr8143/logs/dcnn_workers/cluster_t0/slurm_logs/slurm-61964909.out" [noeol] 7L, 684B[1;1H[93m1   [0m[38;5;81m^[[0m[?2004h[38;5;81m^[[0m[1;34m6:33:12 ddr8143@gr070[38;5;81m^[[0m[1;35m [S] [38;5;81m^[[0m[0;32m:/scratch/ddr8143/repos/dr_exp >[38;5;81m^[[0m[0m [38;5;81m^[[0m[KK[2;1H[93m    [0mecho "What?"
+[93m  1 [0m[38;5;81m^[[0m[?2004l[38;5;81m^M[0mWhat?
+[93m  2 [0m[38;5;81m^[[0m[?2004h[38;5;81m^[[0m[1;34m6:33:20 ddr8143@gr070[38;5;81m^[[0m[1;35m [S] [38;5;81m^[[0m[0;32m:/scratch/ddr8143/repos/dr_exp >[38;5;81m^[[0m[0m ls //[5;1H[93m    [0mscratch/ddr8143/logs/dcnn_workers/cl[38;5;81m^M[0mluster_t0/slurm_logs
+[93m  3 [0m[38;5;81m^[[0m[?2004l[38;5;81m^M^[[0m[0m[38;5;81m^[[0m[00mslurm-61964909.out[38;5;81m^[[0m[0m
+[93m  4 [0m[38;5;81m^[[0m[?2004h[38;5;81m^[[0m[1;34m6:33:39 ddr8143@gr070[38;5;81m^[[0m[1;35m [S] [38;5;81m^[[0m[0;32m:/scratch/ddr8143/repos/dr_exp >[38;5;81m^[[0m[0m [38;5;81m^[[0m[KK[8;1H[93m    [0mvim /scratch/ddr8143/logs/dcnn_workers/c[38;5;81m^M[0mcluster_t0/slurm_logs/slurm-61964909.out
+[93m  5 [0m[38;5;81m^[[0m[?2004l[38;5;81m^M[0mVim: Warning: Output is not to a terminal
+[93m  6 [0m[38;5;81m^[[0m[?1049h[38;5;81m^[[0m[?1h[38;5;81m^[[0m=[38;5;81m^[[0m[1;70r[38;5;81m^[[0m[27m[38;5;81m^[[0m[24m[38;5;81m^[[0m[23m[38;5;81m^[[0m[0m[38;5;81m^[[0m[H[38;5;81m^[[0m[J[38;5;81m^[[0m[?25l[38;5;81m^[[0m[70;1H"/scratch/ddr8143/logs/dcnn_ww[11;1H[93m    [0morkers/cluster_t0/slurm_logs/slurm-61964909.out"
+[94m~                                                                                                        [13;1H~                                                                                                        [14;1H~                                                                                                        [15;1H~                                                                                                        [16;1H~                                                                                                        [17;1H~                                                                                                        [18;1H~                                                                                                        [19;1H~                                                                                                        [20;1H~                                                                                                        [21;1H~                                                                                                        [22;1H~                                                                                                        [23;1H~                                                                                                        [24;1H~                                                                                                        [25;1H~                                                                                                        [26;1H~                                                                                                        [27;1H~                                                                                                        [28;1H~                                                                                                        [29;1H~                                                                                                        [30;1H~                                                                                                        [31;1H~                                                                                                        [32;1H~                                                                                                        [33;1H~                                                                                                        [34;1H~                                                                                                        [35;1H~                                                                                                        [36;1H~                                                                                                        [37;1H~                                                                                                        [38;1H~                                                                                                        [39;1H~                                                                                                        [40;1H~                                                                                                        [41;1H~                                                                                                        [42;1H~                                                                                                        [43;1H~                                                                                                        [44;1H~                                                                                                        [45;1H~                                                                                                        [46;1H~                                                                                                        [47;1H~                                                                                                        [48;1H~                                                                                                        [49;1H~                                                                                                        [50;1H~                                                                                                        [51;1H~                                                                                                        [52;1H~                                                                                                        [53;1H~                                                                                                        [54;1H~                                                                                                        [55;1H~                                                                                                        [56;1H~                                                                                                        [57;1H~                                                                                                        [58;1H~                                                                                                        [59;1H~                                                                                                        [60;1H~                                                                                                        [61;1H~                                                                                                        [62;1H~                                                                                                        [63;1H~                                                                                                        [64;1H~                                                                                                        [65;1H~                                                                                                        [66;1H~                                                                                                        [67;1H~                                                                                                        [68;1H~                                                                                                        [69;1H~                                                                                                        [0m[70;88H1,1[11CAll[1;5H[34h[?25h[?25l[70;1H[K[70;1H:[34h[?25hq[?25l[70;1H[K[70;1H[?1l>[34h[?25h[?1049l[?2004h[1;34m6:33:55 ddr8143@gr070[1;35m [S] [0;32m:/scratch/ddr8143/repos/dr_exp >[0m [Kvim /scratch/ddr8143/logs/dcnn_workers/ccluster_t0/slurm_logs/slurm-61964909.out M[1;34m6:33:55 ddr8143@gr070[1;35m [S] [0;32m:/scratch/ddr8143/repos/dr_exp >[0m ls /scratch/ddr8143/logs/dcnn_workers/cl[21Puster_t0/slurm_logsM[1;34m6:33:55 ddr8143@gr070[1;35m [S] [0;32m:/scratch/ddr8143/repos/dr_exp >[0m 
+
+[?2004l[0m[00mslurm-61964909.out[0m
+[?2004h[1;34m6:33:58 ddr8143@gr070[1;35m [S] [0;32m:/scratch/ddr8143/repos/dr_exp >[0m [Khead -n 3 /scratch/ddr8143/logs/dcnn_worrkers/cluster_t0/slurm_logs
+[?2004lhead: error reading '/scratch/ddr8143/logs/dcnn_workers/cluster_t0/slurm_logs': Is a directory
+[?2004h[1;34m6:34:04 ddr8143@gr070[1;35m [S] [0;32m:/scratch/ddr8143/repos/dr_exp >[0m [Khead -n 3 /scratch/ddr8143/logs/dcnn_worrkers/cluster_t0/slurm_logsM[1;34m6:34:04 ddr8143@gr070[1;35m [S] [0;32m:/scratch/ddr8143/repos/dr_exp >[0m [K
+[KM[1;34m6:34:04 ddr8143@gr070[1;35m [S] [0;32m:/scratch/ddr8143/repos/dr_exp >[0m head -n 3 /scratch/ddr8143/logs/dcnn_worrkers/cluster_t0/slurm_logsM[1;34m6:34:04 ddr8143@gr070[1;35m [S] [0;32m:/scratch/ddr8143/repos/dr_exp >[0m /[K
+[KM[1;34m6:34:04 ddr8143@gr070[1;35m [S] [0;32m:/scratch/ddr8143/repos/dr_exp >[0m /head -n 3 /scratch/ddr8143/logs/dcnn_woorkers/cluster_t0/slurm_logsM[1;34m6:34:04 ddr8143@gr070[1;35m [S] [0;32m:/scratch/ddr8143/repos/dr_exp >[0m head -n 3 /scratch/ddr8143/logs/dcnn_wor[1PM[1;34m6:34:04 ddr8143@gr070[1;35m [S] [0;32m:/scratch/ddr8143/repos/dr_exp >[0m 
+
+[?2004lhead: error reading '/scratch/ddr8143/logs/dcnn_workers/cluster_t0/slurm_logs': Is a directory
+[?2004h[1;34m6:34:15 ddr8143@gr070[1;35m [S] [0;32m:/scratch/ddr8143/repos/dr_exp >[0m [Khead -n 3 /scratch/ddr8143/logs/dcnn_worrkers/cluster_t0/slurm_logs/slurm-61964909.out 
+[?2004l[?2004h[1;34m6:33:12 ddr8143@gr070[1;35m [S] [0;32m:/scratch/ddr8143/repos/dr_exp >[0m [Kecho "What?"
+[?2004lWhat?
+[?2004h[1;34m6:33:20 ddr8143@gr070[1;35m [S] [0;32m:/scratch/ddr8143/repos/dr_exp >[0m ls /scratch/ddr8143/logs/dcnn_workers/clluster_t0/slurm_logs
+[?2004h[1;34m6:34:22 ddr8143@gr070[1;35m [S] [0;32m:/scratch/ddr8143/repos/dr_exp >[0m [Kclear     echo "Node: $SLURMD_NODENAME"
+[?2004lNode: gr070
+[?2004h[1;34m6:34:52 ddr8143@gr070[1;35m [S] [0;32m:/scratch/ddr8143/repos/dr_exp >[0m [Kecho "Time: $(date)"
+[?2004lTime: Wed Jun 11 18:34:58 EDT 2025
+[?2004h[1;34m6:34:58 ddr8143@gr070[1;35m [S] [0;32m:/scratch/ddr8143/repos/dr_exp >[0m [Kecho "Log directory: $LOG_DIR"
+[?2004lLog directory: /scratch/ddr8143/logs/dcnn_workers/cluster_t0/logs/slurm_61964909
+[?2004h[1;34m6:35:10 ddr8143@gr070[1;35m [S] [0;32m:/scratch/ddr8143/repos/dr_exp >[0m [Kexport CUDA_MPS_PIPE_DIRECTORY="/tmp/nviidia-mps-${SLURM_JOB_ID}"
+[?2004l[?2004h[1;34m6:35:17 ddr8143@gr070[1;35m [S] [0;32m:/scratch/ddr8143/repos/dr_exp >[0m [Kexport CUDA_MPS_LOG_DIRECTORY="/tmp/nviddia-log-${SLURM_JOB_ID}"
+[?2004l[?2004h[1;34m6:35:25 ddr8143@gr070[1;35m [S] [0;32m:/scratch/ddr8143/repos/dr_exp >[0m [Kmkdir -p "$CUDA_MPS_PIPE_DIRECTORY" "$CUUDA_MPS_LOG_DIRECTORY"
+[?2004l[?2004h[1;34m6:35:31 ddr8143@gr070[1;35m [S] [0;32m:/scratch/ddr8143/repos/dr_exp >[0m [Kcleanup() {
+[?2004l[?2004h> echo "Cleaning up..."
+[?2004l[?2004h> echo quit | nvidia-cuda-mps-control 2>/dev/null || true
+[?2004l[?2004h> rm -rf "$CUDA_MPS_PIPE_DIRECTORY" "$CUDA_MPS_LOG_DIRECTORY"
+[?2004l[?2004h> }
+[?2004l[?2004h[1;34m6:35:58 ddr8143@gr070[1;35m [S] [0;32m:/scratch/ddr8143/repos/dr_exp >[0m trap cleanup EXIT
+[?2004l[?2004h[1;34m6:36:04 ddr8143@gr070[1;35m [S] [0;32m:/scratch/ddr8143/repos/dr_exp >[0m nvidia-cuda-mps-control -d
+[?2004l[?2004h[1;34m6:36:11 ddr8143@gr070[1;35m [S] [0;32m:/scratch/ddr8143/repos/dr_exp >[0m [Ksource /scratch/ddr8143/repos/dr_exp/.veenv/bin/activate
+[?2004l[?2004h[1;34m6:36:28 ddr8143@gr070[1;35m [S] [0;32m:/scratch/ddr8143/repos/dr_exp >[0m [Kcd /scratch/ddr8143/repos/dr_exp
+[?2004l[?2004h[1;34m6:36:34 ddr8143@gr070[1;35m [S] [0;32m:/scratch/ddr8143/repos/dr_exp >[0m [Ksource .env
+[?2004l[?2004h[1;34m6:36:38 ddr8143@gr070[1;35m [S] [0;32m:/scratch/ddr8143/repos/dr_exp >[0m export SUPABASE_URL=$SUPABASE_URL
+[?2004l[?2004h[1;34m6:36:45 ddr8143@gr070[1;35m [S] [0;32m:/scratch/ddr8143/repos/dr_exp >[0m [K$ echo ${SUPABASE_URL}
+[?2004lhttps://yfawygsfsuwrqvohsayp.supabase.co
+[?2004h[1;34m6:36:52 ddr8143@gr070[1;35m [S] [0;32m:/scratch/ddr8143/repos/dr_exp >[0m [Kexport SUPABASE_KEY=$SUPABASE_KEY
+[?2004l[?2004h[1;34m6:36:59 ddr8143@gr070[1;35m [S] [0;32m:/scratch/ddr8143/repos/dr_exp >[0m [Kecho ${SUPABASE_KEY}
+[?2004leyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InlmYXd5Z3Nmc3V3cnF2b2hzYXlwIiwicm9sZSI6InNlcnZpY2Vfcm9sZSIsImlhdCI6MTc0ODczNzk2OSwiZXhwIjoyMDY0MzEzOTY5fQ.27MtkXO_977xH0IVny4azHOfRte-DTb8-_iF-GK1KNE
+[?2004h[1;34m6:37:03 ddr8143@gr070[1;35m [S] [0;32m:/scratch/ddr8143/repos/dr_exp >[0m [Kuv run dr_exp --base-path $BASE_PATH --eexperiment $EXPERIMENT launcher --workers-per-gpu 2 --max-hours 46
+[?2004lUsage: dr_exp [OPTIONS] COMMAND [ARGS]...
+Try 'dr_exp --help' for help.
+
+Error: No such command 'launcher'.
+[?2004h[1;34m6:38:28 ddr8143@gr070[1;35m [S] [0;32m:/scratch/ddr8143/repos/dr_exp >[0m [Kuv run dr_exp --base-path $BASE_PATH --eexperiment $EXPERIMENT system launcher --workers-per-gpu 2 --max-hours 46
+[?2004lTraceback (most recent call last):
+  File "/scratch/ddr8143/repos/dr_exp/.venv/bin/dr_exp", line 10, in <module>
+    sys.exit(main())
+             ^^^^^^
+  File "/scratch/ddr8143/repos/dr_exp/src/dr_exp/cli/main.py", line 723, in main
+    cli()
+  File "/scratch/ddr8143/repos/dr_exp/.venv/lib/python3.12/site-packages/click/core.py", line 1442, in __call__
+    return self.main(*args, **kwargs)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/scratch/ddr8143/repos/dr_exp/.venv/lib/python3.12/site-packages/click/core.py", line 1363, in main
+    rv = self.invoke(ctx)
+         ^^^^^^^^^^^^^^^^
+  File "/scratch/ddr8143/repos/dr_exp/.venv/lib/python3.12/site-packages/click/core.py", line 1830, in invoke
+    return _process_result(sub_ctx.command.invoke(sub_ctx))
+                           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/scratch/ddr8143/repos/dr_exp/.venv/lib/python3.12/site-packages/click/core.py", line 1830, in invoke
+    return _process_result(sub_ctx.command.invoke(sub_ctx))
+                           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/scratch/ddr8143/repos/dr_exp/.venv/lib/python3.12/site-packages/click/core.py", line 1226, in invoke
+    return ctx.invoke(self.callback, **ctx.params)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/scratch/ddr8143/repos/dr_exp/.venv/lib/python3.12/site-packages/click/core.py", line 794, in invoke
+    return callback(*args, **kwargs)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/scratch/ddr8143/repos/dr_exp/.venv/lib/python3.12/site-packages/click/decorators.py", line 34, in new_func
+    return f(get_current_context(), *args, **kwargs)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/scratch/ddr8143/repos/dr_exp/src/dr_exp/cli/main.py", line 128, in launcher
+    job_db = JobDB(
+             ^^^^^^
+  File "/scratch/ddr8143/repos/dr_exp/src/dr_exp/core/job_db.py", line 56, in __init__
+    raise RuntimeError(
+RuntimeError: Experiment not initialized. Missing directories: ['jobs', 'storage', 'sync_queue', 'control']
+Run: dr_exp --base-path /scratch/ddr8143/logs/dcnn_workers --experiment cluster_t0 init
+[?2004h[1;34m6:41:34 ddr8143@gr070[1;35m [S] [0;32m:/scratch/ddr8143/repos/dr_exp >[0m [Kuv run dr_exp --base-path $BASE_PATH --eexperiment $EXPERIMENT init
+[?2004lInitializing experiment: cluster_t0
+Base path: /scratch/ddr8143/logs/dcnn_workers
+Created: /scratch/ddr8143/logs/dcnn_workers/cluster_t0/jobs
+Created: /scratch/ddr8143/logs/dcnn_workers/cluster_t0/storage
+Created: /scratch/ddr8143/logs/dcnn_workers/cluster_t0/sync_queue
+Created: /scratch/ddr8143/logs/dcnn_workers/cluster_t0/logs
+Created: /scratch/ddr8143/logs/dcnn_workers/cluster_t0/control
+Created: /scratch/ddr8143/logs/dcnn_workers/cluster_t0/example_config.yaml
+
+Experiment initialized successfully!
+
+To submit a job: dr_exp --base-path /scratch/ddr8143/logs/dcnn_workers --experiment cluster_t0 submit --config-path configs --config-name your_config
+[?2004h[1;34m6:42:04 ddr8143@gr070[1;35m [S] [0;32m:/scratch/ddr8143/repos/dr_exp >[0m [Kuv run dr_exp --base-path $BASE_PATH --eexperiment $EXPERIMENT system launcher --workers-per-gpu 2 --max-hours 46
+[?2004l[?2004h[1;34m6:58:20 ddr8143@gr070[1;35m [S] [0;32m:/scratch/ddr8143/repos/dr_exp >[0m [K
+[?2004l[?2004h[1;34m6:58:20 ddr8143@gr070[1;35m [S] [0;32m:/scratch/ddr8143/repos/dr_exp >[0m 
+[?2004l[?2004h[1;34m6:58:25 ddr8143@gr070[1;35m [S] [0;32m:/scratch/ddr8143/repos/dr_exp >[0m 
+[?2004l[?2004h[1;34m6:58:25 ddr8143@gr070[1;35m [S] [0;32m:/scratch/ddr8143/repos/dr_exp >[0m uv run dr_exp --base-path $BASE_PATH --eexperiment $EXPERIMENT system launcher --workers-per-gpu 2 --max-hours 46
+[?2004l[?2004h[1;34m7:00:08 ddr8143@gr070[1;35m [S] [0;32m:/scratch/ddr8143/repos/dr_exp >[0m [K
+[?2004l[?2004h[1;34m7:00:08 ddr8143@gr070[1;35m [S] [0;32m:/scratch/ddr8143/repos/dr_exp >[0m 
+[?2004l[?2004h[1;34m7:00:08 ddr8143@gr070[1;35m [S] [0;32m:/scratch/ddr8143/repos/dr_exp >[0m 
+[?2004l[?2004h[1;34m7:00:31 ddr8143@gr070[1;35m [S] [0;32m:/scratch/ddr8143/repos/dr_exp >[0m i PYTHONUNBUFFERED=1 uv run dr_exp --base--path $BASE_PATH --experiment $EXPERIMENT system launcher --workers-per-gpu 2 --max-hours 46
+[?2004l[?2004h[1;34m7:08:42 ddr8143@gr070[1;35m [S] [0;32m:/scratch/ddr8143/repos/dr_exp >[0m [K
+[?2004l[?2004h[1;34m7:08:42 ddr8143@gr070[1;35m [S] [0;32m:/scratch/ddr8143/repos/dr_exp >[0m 
+[?2004l[?2004h[1;34m7:08:42 ddr8143@gr070[1;35m [S] [0;32m:/scratch/ddr8143/repos/dr_exp >[0m PYTHONUNBUFFERED=1 uv run dr_exp --base--path $BASE_PATH --experiment $EXPERIMENT system launcher --workers-per-gpu 2 --max-hours 46
+[?2004l

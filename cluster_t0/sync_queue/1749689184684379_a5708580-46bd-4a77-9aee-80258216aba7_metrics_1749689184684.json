@@ -1,0 +1,17 @@
+{
+  "id": "a5708580-46bd-4a77-9aee-80258216aba7_metrics_1749689184684",
+  "job_id": "a5708580-46bd-4a77-9aee-80258216aba7",
+  "file_path": "/scratch/ddr8143/logs/dcnn_workers/cluster_t0/storage/run_a5708580-46bd-4a77-9aee-80258216aba7/metrics.jsonl",
+  "file_type": "metrics",
+  "metadata": {
+    "filename": "metrics.jsonl"
+  },
+  "created_at": "2025-06-12T00:46:24.684234+00:00",
+  "status": "pending",
+  "attempts": 0,
+  "last_attempt": null,
+  "error": null,
+  "completed_at": null,
+  "checksum": "940a3a928772d85672d24902e0714b1432b385d2bf352441db0774bc2d60f1af",
+  "size_bytes": 10848
+}

@@ -1,0 +1,27 @@
+{
+  "launcher": {
+    "slurm_job_id": "61964575",
+    "node": "gr072",
+    "start_time": "2025-06-11T23:17:30.204187+00:00",
+    "runtime_seconds": 16989,
+    "running": true
+  },
+  "workers": {
+    "slurm61964575_gr072_gpu0_0": "running",
+    "slurm61964575_gr072_gpu0_1": "running",
+    "slurm61964575_gr072_gpu1_0": "running",
+    "slurm61964575_gr072_gpu1_1": "running"
+  },
+  "restarts": {
+    "slurm61964575_gr072_gpu0_0": 1,
+    "slurm61964575_gr072_gpu0_1": 1,
+    "slurm61964575_gr072_gpu1_0": 1,
+    "slurm61964575_gr072_gpu1_1": 1
+  },
+  "jobs": {
+    "queued": 0,
+    "running": 0,
+    "completed": 90,
+    "failed": 0
+  }
+}

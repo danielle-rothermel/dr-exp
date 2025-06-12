@@ -1,0 +1,28 @@
+{
+  "submissions": [
+    {
+      "timestamp": "2025-06-11T19:23:12.467215",
+      "config": "step04_no_mixup.yaml",
+      "seed": 0,
+      "job_id": "unknown",
+      "success": true,
+      "error": null
+    },
+    {
+      "timestamp": "2025-06-11T19:23:19.935265",
+      "config": "step04_no_mixup.yaml",
+      "seed": 1,
+      "job_id": "unknown",
+      "success": true,
+      "error": null
+    },
+    {
+      "timestamp": "2025-06-11T19:23:27.227627",
+      "config": "step04_no_mixup.yaml",
+      "seed": 2,
+      "job_id": "unknown",
+      "success": true,
+      "error": null
+    }
+  ]
+}
