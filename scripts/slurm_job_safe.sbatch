@@ -12,24 +12,15 @@
 #SBATCH --cpus-per-task=10
 #SBATCH --account=cds
 
-# Parameters from environment or defaults
+# IMPORTANT: Set parameters HERE, not relying on environment
+# These can be overridden at submission time with:
+# sbatch --export=ALL,BASE_PATH=/path,EXPERIMENT=name,WORKERS_PER_GPU=4 scripts/slurm_job_safe.sbatch
 BASE_PATH=${BASE_PATH:-/scratch/ddr8143/logs/dcnn_workers/}
 EXPERIMENT=${EXPERIMENT:-cluster_t0}
-WORKERS_PER_GPU=${WORKERS_PER_GPU:-1}
+WORKERS_PER_GPU=${WORKERS_PER_GPU:-2}
 
-
-# Create log directory for this SLURM job
-LOG_DIR="$BASE_PATH/$EXPERIMENT/logs/slurm_${SLURM_JOB_ID}"
-mkdir -p "$LOG_DIR/workers"
-mkdir -p "$BASE_PATH/$EXPERIMENT/control"
-
-# Redirect SLURM output
-SLURM_LOG_DIR="$BASE_PATH/$EXPERIMENT/slurm_logs"
-mkdir -p "$SLURM_LOG_DIR"
-exec &> >(tee -a "$SLURM_LOG_DIR/slurm-${SLURM_JOB_ID}.out")
-
-# Log startup info
-echo "========================================"
+# Log what we received
+echo "========================================" 
 echo "DR_EXP SLURM Job Starting"
 echo "========================================"
 echo "Job ID: $SLURM_JOB_ID"
@@ -40,8 +31,17 @@ echo "Experiment: $EXPERIMENT"
 echo "Workers per GPU: $WORKERS_PER_GPU"
 echo "Allocated GPUs: $SLURM_GPUS_PER_NODE"
 echo "Allocated Memory: $SLURM_MEM_PER_NODE MB"
-echo "Log directory: $LOG_DIR"
 echo "========================================"
+
+# Create log directory for this SLURM job
+LOG_DIR="$BASE_PATH/$EXPERIMENT/logs/slurm_${SLURM_JOB_ID}"
+mkdir -p "$LOG_DIR/workers"
+mkdir -p "$BASE_PATH/$EXPERIMENT/control"
+
+# Redirect SLURM output
+SLURM_LOG_DIR="$BASE_PATH/$EXPERIMENT/slurm_logs"
+mkdir -p "$SLURM_LOG_DIR"
+exec &> >(tee -a "$SLURM_LOG_DIR/slurm-${SLURM_JOB_ID}.out")
 
 # Setup CUDA MPS for better GPU sharing (REQUIRED for multiple workers per GPU)
 export CUDA_MPS_PIPE_DIRECTORY="/tmp/nvidia-mps-${SLURM_JOB_ID}"
@@ -61,14 +61,26 @@ echo "CUDA MPS started for GPU sharing"
 
 echo "Launching singularity container..."
 
-# Launch the run manager
+# IMPORTANT: Pass variables explicitly to singularity
 singularity exec --nv --overlay $SCRATCH/drexp.ext3:ro /scratch/work/public/singularity/cuda11.8.86-cudnn8.7-devel-ubuntu22.04.2.sif /bin/bash -c "
 source /scratch/ddr8143/repos/dr_exp/.venv/bin/activate
 cd /scratch/ddr8143/repos/dr_exp
 source .env
-export SUPABASE_URL=$SUPABASE_URL
-export SUPABASE_KEY=$SUPABASE_KEY
+
+# Re-export variables inside container (belt and suspenders approach)
+export BASE_PATH='$BASE_PATH'
+export EXPERIMENT='$EXPERIMENT'
+export WORKERS_PER_GPU='$WORKERS_PER_GPU'
+export SUPABASE_URL=\$SUPABASE_URL
+export SUPABASE_KEY=\$SUPABASE_KEY
+
+echo 'Environment check inside container:'
+echo \"  BASE_PATH: \$BASE_PATH\"
+echo \"  EXPERIMENT: \$EXPERIMENT\"
+echo \"  WORKERS_PER_GPU: \$WORKERS_PER_GPU\"
+echo \"  SUPABASE_URL: \${SUPABASE_URL:0:30}...\"
+
+echo ''
 echo 'Starting workers with Supabase sync enabled...'
-echo 'SUPABASE_URL: ${SUPABASE_URL:0:30}...'
-dr_exp --base-path $BASE_PATH --experiment $EXPERIMENT system launcher --workers-per-gpu $WORKERS_PER_GPU --max-hours 46
+uv run dr_exp --base-path \$BASE_PATH --experiment \$EXPERIMENT system launcher --workers-per-gpu \$WORKERS_PER_GPU --max-hours 46
 "
