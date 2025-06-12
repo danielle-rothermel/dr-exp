@@ -2,7 +2,6 @@
 *.swp
 temp.patch
 job_data/
-storage/
 test_experiment/
 .coverage
 chronological_ablation/
