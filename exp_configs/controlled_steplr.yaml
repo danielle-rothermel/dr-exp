@@ -1,0 +1,9 @@
+_target_: "dr_exp.trainers.decon_trainer.train_classification"
+# Controlled experiment: StepLR scheduler
+
+defaults:
+  - controlled_base
+  - override /lrsched: torchvision_step
+  - _self_
+
+run_name: controlled_steplr

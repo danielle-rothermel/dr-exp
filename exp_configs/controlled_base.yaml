@@ -1,0 +1,52 @@
+_target_: "dr_exp.trainers.decon_trainer.train_classification"
+# Controlled experiment base - moderate augmentation only
+# Fixed augmentation: HFlip + ColorJitter + RRC (no heavy augmentations)
+
+defaults:
+  - config
+  - override /model: resnet18_cifar
+  - override /optim: sgd  # Start with SGD as base
+  - override /lrsched: timm_cosine
+  - _self_
+
+run_name: controlled_base
+
+# Model configuration
+model:
+  source: deconcnn
+  architecture: resnet18
+  nonlinearity: relu
+  norm_type: batchnorm
+  dropout_prob: 0.0
+  use_residual: true
+  init_method: he
+  use_imagenet_head: false
+
+# Fixed moderate augmentations
+train_transforms:
+  rcc: true
+  hflip: true
+  randaug: false      # OFF - too much variation
+  colorjitter: true
+  mixup: false        # OFF - too much variation
+  cutmix: false       # OFF - too much variation
+  normalize_mean: [0.4914, 0.4822, 0.4465]
+  normalize_std: [0.2023, 0.1994, 0.2010]
+  rcc_scale_min: 0.8  # Less aggressive than 0.7
+  rcc_init_size: 32
+  colorjitter_brightness: 0.1  # Reduced from 0.2
+  colorjitter_contrast: 0.1    # Reduced from 0.2
+  colorjitter_saturation: 0.1  # Reduced from 0.2
+  colorjitter_hue: 0.05        # Reduced from 0.1
+  label_smoothing: 0.0         # OFF for cleaner comparison
+
+# Standard eval transforms
+eval_transforms:
+  rcc: false
+  hflip: false
+  randaug: false
+  colorjitter: false
+  mixup: false
+  cutmix: false
+  normalize_mean: [0.4914, 0.4822, 0.4465]
+  normalize_std: [0.2023, 0.1994, 0.2010]
