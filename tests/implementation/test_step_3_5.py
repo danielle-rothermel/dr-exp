@@ -9,7 +9,7 @@ from dotenv import load_dotenv
 
 from fastapi.testclient import TestClient
 
-from src.dr_exp.core.job_db import JobDB
+from dr_exp.core.job_db import JobDB
 from src.dr_exp.worker.base import Worker
 from src.dr_exp.api.simple_api import app
 

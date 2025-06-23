@@ -4,7 +4,7 @@ import tempfile
 import time
 from datetime import datetime, timedelta, UTC
 
-from src.dr_exp.core.job_db import JobDB
+from dr_exp.core.job_db import JobDB
 
 
 def test_mark_job_failed():

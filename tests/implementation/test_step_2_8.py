@@ -4,7 +4,7 @@ import tempfile
 from pathlib import Path
 from click.testing import CliRunner
 
-from src.dr_exp.core.job_db import JobDB
+from dr_exp.core.job_db import JobDB
 from src.dr_exp.cli.sweep_utils import (
     parse_sweep_params,
     generate_sweep_configs,

@@ -4,7 +4,7 @@ import tempfile
 import time
 import json
 
-from src.dr_exp.core.job_db import JobDB
+from dr_exp.core.job_db import JobDB
 
 
 def test_job_lifecycle():

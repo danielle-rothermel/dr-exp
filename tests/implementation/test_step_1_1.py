@@ -4,7 +4,7 @@ import tempfile
 import shutil
 from pathlib import Path
 
-from src.dr_exp.core.job_db import JobDB
+from dr_exp.core.job_db import JobDB
 
 
 def test_jobdb_basic() -> None:

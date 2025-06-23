@@ -6,7 +6,7 @@ import json
 from unittest.mock import patch
 from click.testing import CliRunner
 
-from src.dr_exp.core.job_db import JobDB
+from dr_exp.core.job_db import JobDB
 from src.dr_exp.cli.main import cli
 
 

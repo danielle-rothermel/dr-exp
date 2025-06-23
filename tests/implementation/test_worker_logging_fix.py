@@ -1,5 +1,5 @@
 from src.dr_exp.worker.base import Worker
-from src.dr_exp.core.job_db import JobDB
+from dr_exp.core.job_db import JobDB
 
 
 def test_worker_creates_log_file(tmp_path):

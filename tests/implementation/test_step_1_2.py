@@ -4,7 +4,7 @@ import tempfile
 import multiprocessing
 import time
 
-from src.dr_exp.core.job_db import JobDB
+from dr_exp.core.job_db import JobDB
 
 
 def worker_process(base_path: str, worker_id: str, results_queue):

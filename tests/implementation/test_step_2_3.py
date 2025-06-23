@@ -5,7 +5,7 @@ import time
 import threading
 from pathlib import Path
 
-from src.dr_exp.core.job_db import JobDB
+from dr_exp.core.job_db import JobDB
 from src.dr_exp.worker.base import Worker
 from src.dr_exp.sync.queue import SyncItem
 

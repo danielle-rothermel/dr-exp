@@ -7,7 +7,7 @@ import json
 from pathlib import Path
 from unittest.mock import Mock, patch
 
-from src.dr_exp.core.job_db import JobDB
+from dr_exp.core.job_db import JobDB
 from src.dr_exp.worker.launcher import WorkerLauncher
 
 
