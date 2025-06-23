@@ -1,0 +1,11 @@
+_target_: "dr_exp.trainers.decon_trainer.train_classification"
+# Controlled experiment: No residual connections
+
+defaults:
+  - controlled_base
+  - _self_
+
+run_name: controlled_no_residual
+
+model:
+  use_residual: false

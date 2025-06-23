@@ -1,0 +1,8 @@
+source: torchvision
+sched_type: steplr
+lr_min: 0.0
+warmup_epochs: 5
+warmup_start_lr: 0.0
+cycle_limit: 1
+step_size: 30
+gamma: 0.1

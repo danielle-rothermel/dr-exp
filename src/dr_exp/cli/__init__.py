@@ -1,1 +1,1 @@
-"""Command line interface package."""
+# Empty file to make this a package

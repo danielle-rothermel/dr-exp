@@ -8,7 +8,7 @@ import sys
 from dr_exp.utils.factory import create_system, SystemConfig
 from dr_exp.job_db import JobDBConfig
 from dr_exp.manage.worker import run_worker
-from dr_exp.training.decon_trainer import train as decon_train
+from dr_exp.trainers.decon_trainer import train_classification as decon_train
 from dr_exp.logging.structured_logger import StructuredLogger
 
 

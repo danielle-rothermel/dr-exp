@@ -1,117 +1,96 @@
-import os
+"""Dummy trainer for testing config sweeps."""
+
 import time
-from typing import Any, Optional
+import random
+from pathlib import Path
+from typing import Dict, Any
 
-from dr_exp.logging.base_logger import BaseLogger
-from dr_exp.logging.structured_logger import StructuredLogger
-from dr_exp.training.training_result import TrainingResult, create_success_result
+from ..logging.structured_logger import StructuredLogger
 
 
-def train(cfg: Any, logger: Optional[BaseLogger] = None) -> TrainingResult:
-    """Simulate a training run and log metrics.
+def train_dummy(
+    job_id: str,
+    worker_id: str,
+    storage_path: str,
+    epochs: int = 10,
+    batch_size: int = 32,
+    lr: float = 0.001,
+    model: str = "resnet18",
+    **kwargs: Any,
+) -> Dict[str, Any]:
+    """Dummy training function for testing.
 
-    Parameters
-    ----------
-    cfg : Any
-        Configuration object for the run.
-    logger : BaseLogger, optional
-        Logger instance used to record metrics. If ``None`` a new logger is
-        created.
+    Args:
+        job_id: Job ID (injected by worker)
+        worker_id: Worker ID (injected by worker)
+        storage_path: Path to store artifacts (injected by worker)
+        epochs: Number of epochs to simulate
+        batch_size: Batch size
+        lr: Learning rate
+        model: Model name
+        **kwargs: Additional config parameters
 
-    Returns
-    -------
-    TrainingResult
-        Summary information about the run.
+    Returns:
+        Dict with training results
     """
-    # Extract num_epochs from config - check multiple possible locations for compatibility
-    num_epochs = 10  # default for robustness, but warn if using fallback
-    if isinstance(cfg, dict):
-        # Try top-level fields first (for dr_exp wrapped configs)
-        if "max_epochs" in cfg:
-            num_epochs = cfg["max_epochs"]
-        elif "epochs" in cfg:
-            num_epochs = cfg["epochs"]
-        # Check nested train config (for direct test calls and backwards compatibility)
-        elif "train" in cfg and "num_epochs" in cfg["train"]:
-            num_epochs = cfg["train"]["num_epochs"]
-        else:
-            import warnings
+    # Initialize structured logger
+    logger = StructuredLogger(storage_path, job_id, worker_id)
 
-            warnings.warn(
-                "No epoch configuration found - using default 10 epochs", stacklevel=2
-            )
-    else:
-        # Handle object-style configs
-        if hasattr(cfg, "max_epochs"):
-            num_epochs = cfg.max_epochs
-        elif hasattr(cfg, "epochs"):
-            num_epochs = cfg.epochs
-        # Check nested train attribute
-        elif (
-            hasattr(cfg, "train")
-            and isinstance(cfg.train, dict)
-            and "num_epochs" in cfg.train
-        ):
-            num_epochs = cfg.train["num_epochs"]
-        else:
-            import warnings
-
-            warnings.warn(
-                "No epoch configuration found - using default 10 epochs", stacklevel=2
-            )
-
-    num_epochs = int(num_epochs)
-
-    if logger is None:
-        # Get log_dir from config - warn if using fallback
-        log_dir = None
-        if isinstance(cfg, dict):
-            log_dir = cfg.get("log_dir")
-        else:
-            log_dir = getattr(cfg, "log_dir", None)
-
-        if log_dir is None:
-            log_dir = "./logs"
-            import warnings
-
-            warnings.warn(
-                "No log_dir configuration found - using default './logs'", stacklevel=2
-            )
-
-        debug_mode = os.getenv("DEBUG", "False").lower() in ("true", "1", "yes")
-        logger = StructuredLogger(log_dir, debug=debug_mode)
-
-    final_train_loss = 0.0
-    final_val_acc = 0.0
-    for epoch in range(1, num_epochs + 1):
-        time.sleep(0.01)
-        train_loss = round(1.0 / (epoch + 1), 3)
-        val_acc = round(0.5 + epoch * 0.05, 3)
-        logger.log({"epoch": epoch, "train_loss": train_loss, "val_acc": val_acc})
-        final_train_loss = train_loss
-        final_val_acc = val_acc
-
-        if epoch in {num_epochs // 2, num_epochs}:
-            logger.save_checkpoint({"epoch": epoch}, tag=f"epoch_{epoch}")
-
-    # Create artifact in logger's artifact directory
-    artifact_path = os.path.join(logger.paths.artifact_dir, "loss_plot.txt")
-    with open(artifact_path, "w") as f:
-        f.write("dummy artifact")
-    logger.log_artifact(artifact_path)
-
-    logger_meta = logger.finalize()
-
-    final_metrics = {
-        "final_val_acc": final_val_acc,
-        "final_train_loss": final_train_loss,
-        "final_val_loss": final_train_loss,  # Use train loss as val loss for dummy
+    # Log configuration
+    config = {
+        "epochs": epochs,
+        "batch_size": batch_size,
+        "lr": lr,
+        "model": model,
+        **kwargs,
     }
+    logger.log_config(config)
 
-    return create_success_result(
-        final_metrics=final_metrics,
-        epochs=num_epochs,
-        logger_meta=logger_meta,
-        artifacts_path=logger.paths.artifact_dir,
-        training_time=0.1,  # Dummy training time
+    print(f"Dummy trainer started: job_id={job_id}, model={model}, epochs={epochs}")
+
+    # Create storage directory
+    storage = Path(storage_path)
+    storage.mkdir(parents=True, exist_ok=True)
+
+    # Start training
+    logger.log_event("training_start")
+
+    # Simulate training with metrics
+    for epoch in range(epochs):
+        loss = 1.0 / (epoch + 1) + random.random() * 0.1
+        accuracy = min(0.99, epoch / epochs + random.random() * 0.1)
+
+        # Log metrics using structured logger
+        metrics = {"epoch": epoch, "loss": loss, "accuracy": accuracy}
+        logger.log_metrics(metrics, step=epoch)
+
+        # Simulate computation time
+        time.sleep(0.01)
+
+    # Save final model (dummy file)
+    model_file = storage / "model_final.pt"
+    model_file.write_text(f"Dummy model {model} for job {job_id}")
+    logger.log_artifact(model_file, "model", {"job_id": job_id, "model": model})
+
+    logger.log_event("training_complete")
+
+    # Get summary from logger
+    summary = logger.get_summary()
+    final_metrics = summary["final_metrics"]
+
+    print(
+        f"Dummy trainer completed: model={model}, final_accuracy={final_metrics.get('accuracy', 0):.3f}"
     )
+
+    return {
+        "metrics": {
+            "final_loss": final_metrics.get("loss"),
+            "final_accuracy": final_metrics.get("accuracy"),
+            "total_epochs": epochs,
+            "model": model,
+        },
+        "artifacts": {
+            "metrics_file": str(logger.metrics_file),
+            "model_file": str(model_file),
+        },
+    }

@@ -1,0 +1,51 @@
+_target_: "dr_exp.trainers.decon_trainer.train_classification"
+# Step 00: Baseline - Full modern configuration with all features
+# This is the starting point with all modern techniques enabled
+
+defaults:
+  - config  # Include the base config.yaml
+  - override /model: resnet18_cifar
+  - override /optim: adamw
+  - override /lrsched: timm_cosine
+  - _self_
+
+# High regularization experiment overrides
+optim:
+  lr: 0.001
+  weight_decay: 5e-4
+
+# Model configuration
+model:
+  source: deconcnn
+  architecture: resnet18
+  nonlinearity: relu
+  norm_type: batchnorm
+  dropout_prob: 0.0
+  use_residual: true
+  init_method: he
+  use_imagenet_head: false  # CIFAR-optimized: 3x3 conv1, no maxpool
+
+# Learning rate scheduler with warmup
+lrsched:
+  warmup_epochs: 5
+  warmup_start_lr: 0.0
+
+# Training augmentations - all enabled
+train_transforms:
+  rcc: true
+  hflip: true
+  randaug: true
+  colorjitter: true
+  mixup: true
+  cutmix: true
+  normalize_mean: [0.4914, 0.4822, 0.4465]
+  normalize_std: [0.2023, 0.1994, 0.2010]
+  rcc_scale_min: 0.7  # CIFAR scale as specified
+  rcc_init_size: 32
+  colorjitter_brightness: 0.2
+  colorjitter_contrast: 0.2
+  colorjitter_saturation: 0.2
+  colorjitter_hue: 0.1
+  label_smoothing: 0.1
+  mixup_alpha: 1.0
+  cutmix_alpha: 1.0

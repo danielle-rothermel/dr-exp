@@ -1,281 +1,195 @@
 # dr_exp - Deep Learning Experiment Manager
 
-## 🏗️ ARCHITECTURE OVERVIEW
+## System Overview
+dr_exp is a **local-first deep learning experiment manager** for HPC clusters. It manages ML training jobs via filesystem operations with optional cloud sync. No distributed systems, no complex abstractions - just files and locks.
 
-### What This System Does
-- Manages large-scale ML experiments on SLURM GPU clusters
-- Priority-based job queue (0-1000) with smart scheduling
-- Centralized data storage (Supabase) + real-time web monitoring
-- Hydra-based config management with hyperparameter sweeps
+**Core Purpose**: Submit jobs → Workers claim by priority → Execute training → Sync results → Monitor remotely
 
-### Core Components
-```
-src/dr_exp/
-├── job_db/          # Database abstraction (BaseJobDB → LocalJobDB/SupabaseJobDB)
-├── manage/          # Manager/Worker system + ProcessManager
-├── api/             # FastAPI backend + WebSocket
-├── logging/         # StructuredLogger for metrics/artifacts
-├── cli/             # CLI Utility for using manage functionality
-├── training/        # Training functions used by workers
-└── utils/           # Factory, priority system helpers
-```
+## Current Implementation Status
 
-### Key Design Patterns
-- **Abstract Interface First**: All DB operations use `BaseJobDB` interface
-- **Factory Pattern**: `Factory` creates integrated components with shared config
-- **Priority-Based Scheduling**: Jobs have priorities 0-1000, highest runs first
-- **Worker-Manager Model**: Manager coordinates, Workers execute training
+### ✅ Complete (Phase 1-3)
+- **JobDB**: File-based job queue with atomic operations via fcntl
+- **Worker**: Executes jobs using Hydra dispatch, manages artifacts, logs to files
+- **CLI**: All commands operational (init, submit, worker, list, sweep, launcher, etc.)
+- **Sync Queue**: Tracks files for upload with retry logic
+- **Integration**: Test trainer and DeconCNN wrapper working
+- **Multi-Worker Launcher**: Spawns workers across GPUs with health monitoring
+- **Config Sweeps**: Parameter sweep generation and submission
+- **SLURM Integration**: Scripts and commands for HPC clusters
+- **Supabase Sync**: Full database and storage bucket integration
+- **Remote API**: FastAPI endpoints for experiment monitoring
 
-## 🔧 CONFIGURATION
+### ⚠️ Known Limitations
+- **Error format**: Saved as .txt not .json (minor issue)
+- **Submit syntax**: Uses Hydra-style flags not direct paths
+- **API artifact endpoints**: Some download functionality may need testing
 
-### CLI-Based Configuration
-All commands now require explicit configuration via CLI arguments. No environment variables needed for paths and modes.
+## 📦 DEPENDENCY MANAGEMENT
 
-### Required Arguments (All Commands)
-- `--base-path /path/to/data` - Base directory for experiment data (jobs stored in `{base-path}/job_data/`)
-- `--mode files_local|supabase_local|supabase_remote` - Database mode
+### ⚠️ CRITICAL: Always Use `uv add`, Never `uv pip install`
 
-### Optional Arguments
-- `--storage-path /path/to/storage` - Storage directory for artifacts (defaults to `{base-path}/storage/`)
+This project uses `uv` for dependency management with a `pyproject.toml` file. Dependencies MUST be added using `uv add` to ensure they are properly tracked in both `pyproject.toml` and `uv.lock`.
 
-### Supabase Credentials (Environment Variables)
-For security, Supabase credentials remain in environment variables:
-- `SUPABASE_URL` - Supabase project URL (required for supabase modes)
-- `SUPABASE_KEY` - Supabase service role key (required for supabase modes)
-
-### Database Modes
-
-#### Simple Testing (Files Local)
+**✅ CORRECT - Use these commands:**
 ```bash
-# No environment setup needed - all via CLI
-# Commands use: --base-path ./logs --mode files_local
-```
-- Stores job data in JSON files at `./logs/job_data/`
-- No database services required
-- Good for isolated testing
+# Add a production dependency
+uv add package-name
 
-#### Development (Supabase Local) 
+# Add a development dependency
+uv add --dev package-name
+
+# Add with version constraints
+uv add "package-name>=1.2.0"
+
+# Add from git
+uv add "package-name @ git+https://github.com/user/repo"
+
+# Remove a dependency
+uv remove package-name
+```
+
+**❌ INCORRECT - Never use these:**
 ```bash
-# Start local Supabase
-supabase start
+# NEVER use uv pip install
+uv pip install package-name  # ❌ Wrong!
 
-# Commands use: --base-path ./logs --mode supabase_local
-# Credentials automatically use local defaults
+# NEVER use pip directly
+pip install package-name     # ❌ Wrong!
 ```
-- Local PostgreSQL with web UI at `http://127.0.0.1:54323`
-- Real-time features and API
-- No credential setup needed for local mode
 
-#### Production (Supabase Remote)
+### Why This Matters
+- `uv add` updates both `pyproject.toml` and `uv.lock` files
+- `uv pip install` only installs to the environment without updating project files
+- Using `uv pip install` breaks reproducibility and dependency tracking
+- Team members won't get your dependencies if you use `uv pip install`
+
+## Architecture
+
+```
+experiment_dir/
+├── jobs/         # Job JSON files (UUID.json)
+├── storage/      # Job outputs (run_UUID/)
+├── sync_queue/   # Upload queue (pending/)
+├── logs/         # Worker and launcher logs
+├── control/      # Control files for launcher
+└── .jobdb_lock   # Global lock file
+```
+
+**Key Classes**:
+- `JobDB` (core/job_db.py): File-based job queue with locking
+- `Worker` (worker/base.py): Claims jobs, executes via Hydra, syncs results
+- `SyncQueue` (sync/queue.py): Persistent file upload queue
+- `SyncHandler` (sync/sync_handler.py): Supabase upload orchestrator
+- `WorkerLauncher` (worker/launcher.py): Multi-GPU worker spawner
+- `SupabaseClient` (sync/supabase_client.py): Cloud sync client
+- `CLI` (cli/main.py): All user commands
+
+**Job Flow**:
+1. User submits config with `_target_: module.function`
+2. Worker claims highest priority job atomically
+3. Hydra calls the target function with config
+4. Outputs saved to storage/run_{job_id}/
+5. Job marked complete/failed
+6. SyncHandler uploads artifacts to Supabase
+7. Remote API serves results
+
+## CLI Commands
+
+
+All commands follow pattern:
 ```bash
-# Set credentials in environment
-export SUPABASE_URL="your-project-url"
-export SUPABASE_KEY="your-service-role-key"
-
-# Commands use: --base-path ./logs --mode supabase_remote
+dr_exp --base-path <path> --experiment <name> <command> [options]
 ```
-- Cloud Supabase deployment
-- Requires valid Supabase credentials in environment
 
-**⚠️ Important:** Always use consistent `--base-path` and `--mode` across all commands in a workflow.
-
-## 📋 COMMON WORKFLOWS
-
-### Quick Dev Cycle (Supabase Local)
+**Essential Commands**:
 ```bash
-# 1. Start local Supabase (run once per session)
-supabase start
+# Setup
+init                          # Create experiment structure
 
-# 2. Upload test jobs
-uvrp scripts/upload_configs.py \
-  --base-path ./logs \
-  --mode supabase_local \
-  --base-config-path configs \
-  --config-name decon_config \
-  --sweep "limit_train_batches=10 model=alexnet_cifar epochs=5" \
-  --priority 150
+# Job Management  
+submit --config-path <dir> --config-name <file> [--priority N]
+sweep --config <file> --params "key=v1,v2" [--dry-run]
+list [--status queued|running|completed|failed]
+kill <job_id>
+boost <job_id> --priority N
+run-one <job_id> --working-dir <dir>
 
-# 3. Run worker
-uv run python scripts/manager_cli.py \
-  --base-path ./logs \
-  --mode supabase_local \
-  system run_worker dev_worker ./work
+# Worker Operations
+worker --worker-id <id> [--max-jobs N] [--working-dir <dir>]
+launcher --workers-per-gpu N [--max-hours 47]
+
+# SLURM Commands
+slurm status [--job-id ID]    # Show launcher status
+slurm errors [--job-id ID]    # View aggregated errors
+slurm control <stop|finish>   # Control launchers
+slurm logs [--job-id ID]      # Show worker logs
+
+# Monitoring
+status                        # Job counts
+sync-status                   # Queue status
+validate                      # Check structure
+recover                       # Fix stale jobs
 ```
 
-### Simple Testing Cycle (Files Local)
-```bash
-# 1. Upload test jobs (no setup needed)
-uvrp scripts/upload_configs.py \
-  --base-path ./logs \
-  --mode files_local \
-  --base-config-path configs \
-  --config-name decon_config \
-  --sweep "limit_train_batches=10 epochs=2" \
-  --priority 150
+## Key Technical Components
 
-# 2. Run worker
-uv run python scripts/manager_cli.py \
-  --base-path ./logs \
-  --mode files_local \
-  system run_worker dev_worker ./work
-```
+### File Locking (JobDB)
+- Uses fcntl for atomic operations
+- Microsecond timestamp prefixes prevent collisions
+- Global lock for claim operations
+- Job-specific locks for updates
 
-### Priority Management
-```bash
-# Upload urgent job
-uvrp scripts/manager_cli.py \
-  --base-path ./logs \
-  --mode files_local \
-  job upload_configs \
-  --priority 800 \
-  --sweep "..."
+### Worker System
+- Health monitoring with automatic restarts
+- GPU assignment via CUDA_VISIBLE_DEVICES
+- File logging to experiment logs directory
+- Graceful shutdown on SIGTERM
 
-# Boost existing job
-uvrp scripts/manager_cli.py \
-  --base-path ./logs \
-  --mode files_local \
-  job boost_priority <job_id> \
-  --amount 200
-
-# Run single job immediately (bypasses queue)
-uvrp scripts/manager_cli.py \
-  --base-path ./logs \
-  --mode files_local \
-  job run_one \
-  --overrides "model=resnet,lr=0.001"
-```
-
-### Debug and Diagnostics
-```bash
-# Show detailed system configuration
-uv run python scripts/manager_cli.py \
-  --base-path ./logs \
-  --mode files_local \
-  debug debug_config
-
-# Perform comprehensive health check
-uv run python scripts/manager_cli.py \
-  --base-path ./logs \
-  --mode files_local \
-  debug debug_health_check
-
-# Health check with verbose details
-uv run python scripts/manager_cli.py \
-  --base-path ./logs \
-  --mode files_local \
-  debug debug_health_check --verbose
-```
-
-## 🔍 KEY FILES & THEIR ROLES
-
-### Database Layer (`src/dr_exp/job_db/`)
-- `base_job_db.py` - **NEVER MODIFY**: Abstract interface contract
-- `local_job_db.py` - JSON file implementation for testing
-- `supabase_job_db.py` - PostgreSQL implementation for production
-
-### Manager System (`src/dr_exp/manage/`)
-- `manager.py` - Coordinates workers, claims jobs by priority
-- `worker.py` - Executes training, logs metrics, handles errors
-- `factory.py` - **START HERE**: Creates properly configured systems
-
-### API & Frontend
-- `src/dr_exp/api/main.py` - FastAPI app with WebSocket
-- `react-babysitter-ui/` - Real-time monitoring interface
-- Visit: `http://localhost:8000/docs` (API), `http://localhost:5173` (UI)
-
-## ⚠️ CRITICAL CONSTRAINTS
-
-### Database Abstraction Rules
-- **Manager ONLY uses BaseJobDB methods** - no database-specific code
-- **Never bypass the interface** - all DB access through job_db layer
-- **Factory creates integrated components** - don't instantiate directly
-
-### Priority System Rules
-- **0-1000 range**: 0=lowest, 1000=highest
-- **System jobs (900-1000)**: Critical maintenance only
-- **Urgent jobs (700-899)**: Deadlines, "run one" functionality
-- **Normal jobs (100-399)**: Default range
+### Sync System
+- SyncQueue with exponential backoff (60s × 2^attempts)
+- SupabaseClient handles PostgreSQL + storage bucket
+- Batch upload support
+- MIME type safety for .pt files
 
 ### SLURM Integration
-- Workers designed for multi-GPU SLURM environments
-- Use `scripts/slurm_job.sbatch` for cluster submission
-- Manager handles `--gpus-per-node` and `--workers-per-gpu` scaling
+- 47-hour runtime limit (buffer before 48h)
+- Control files for graceful shutdown
+- Status JSON files for monitoring
+- Error aggregation from worker logs
 
-## 🚨 TROUBLESHOOTING
+## Development Standards
 
-### Configuration Issues
+**Quality Gates** (MUST pass):
+```bash
+ckdr  # ruff + mypy checks
+pt    # pytest (all tests)
+```
 
-#### Worker Reports "no_job" But Jobs Exist
-**Symptoms:** `uv run python scripts/manager_cli.py --base-path ./logs --mode files_local job list_jobs` shows queued jobs, but worker completes with "no_job" status.
+**Dependencies**:
+```bash
+uv add <package>       # Production deps
+uv add --dev <package> # Dev deps
+# NEVER use: pip install or uv pip install
+```
 
-**Cause:** Configuration mismatch between job upload and worker execution.
+**Testing**:
+- Tests in `tests/implementation/test_step_X_Y.py`
+- Use pytest fixtures, not standalone scripts
+- Test both success and failure paths
+- Mock external services (Supabase, subprocess)
 
-**Debug Steps:**
-1. **Run system health check** (recommended first step):
-   ```bash
-   uv run python scripts/manager_cli.py \
-     --base-path ./logs \
-     --mode files_local \
-     debug debug_health_check --verbose
-   ```
+## Common Tasks
 
-2. **Check configuration details**:
-   ```bash
-   uv run python scripts/manager_cli.py \
-     --base-path ./logs \
-     --mode files_local \
-     debug debug_config
-   ```
+**Submit parameter sweep**:
+```bash
+# Preview sweep
+dr_exp --base-path ./exp --experiment test sweep \
+  --config configs/train.yaml \
+  --params "model=resnet18,resnet50 lr=0.01,0.001" \
+  --dry-run
 
-3. **Manual verification** (if needed):
-   ```bash
-   # For files_local mode, check if jobs exist in expected location
-   ls -la ./logs/job_data/
-   ```
-
-4. **Fix:** Use consistent CLI arguments:
-   ```bash
-   # Ensure same --base-path and --mode for all commands
-   uvrp scripts/upload_configs.py --base-path ./logs --mode files_local ...
-   uv run python scripts/manager_cli.py --base-path ./logs --mode files_local system run_worker ...
-   ```
-
-#### Jobs Not Being Uploaded
-**Symptoms:** Upload command succeeds but `job list_jobs` shows no jobs.
-
-**Cause:** Different `--base-path` or `--mode` between upload and list commands.
-
-**Fix:** Ensure same CLI arguments for all commands in workflow.
-
-### Database Issues
-- **"No such table"**: Run `supabase db reset` to apply migrations
-- **Connection failures**: Check `--mode` argument matches database state (files_local vs supabase_local)
-- **Stale data**: Use `scripts/reset_local_jobdb.py --base-path ./logs --mode files_local` for files_local mode
-
-### Job Execution
-- **Jobs stuck in queue**: Check priorities with `--base-path ./logs --mode files_local job list_jobs --status queued`
-- **Worker not claiming**: Verify consistent `--base-path` and `--mode` between upload and worker commands
-- **Training failures**: Check `StructuredLogger` setup in worker code
-
-### Configuration
-- **Hydra configs live in**: `configs/`
-- **Override syntax**: `model=resnet,vit lr=0.01,0.001` (comma-separated values)
-- **Custom configs**: Place in configs/ directory, reference by name
-
-## 🧪 TESTING PATTERNS
-
-### Unit Tests
-- Database layer: Test against both LocalJobDB and SupabaseJobDB
-- Manager: Mock BaseJobDB interface, test job claiming logic
-- API: Use FastAPI test client with auth tokens
-
-### Integration Tests
-- Use `--mode files_local` for fast test cycles (no environment variables needed)
-- Test complete workflows: upload → claim → execute → complete
-- Verify priority ordering in job queues
-- All tests use explicit `JobDBConfig(base_path=..., mode=...)` construction
-
-### Development Debugging
-- **API logs**: `uvicorn dr_exp.api.main:app --reload --log-level debug`
-- **WebSocket**: Browser dev tools Network tab to see live updates
-- **Database state**: Use Supabase Studio at `http://127.0.0.1:54323`
+# Submit sweep
+dr_exp --base-path ./exp --experiment test sweep \
+  --config configs/train.yaml \
+  --params "model=resnet18,resnet50 lr=0.01,0.001"
+```

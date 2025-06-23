@@ -1,3 +1,4 @@
+_target_: "dr_exp.trainers.decon_trainer.train_classification"
 defaults:
     - machine: cluster
     - paths: default

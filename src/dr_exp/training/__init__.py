@@ -1,9 +1,1 @@
-"""Training module for dr_exp."""
-
-from .training_result import (
-    TrainingResult,
-    create_success_result,
-    create_failure_result,
-)
-
-__all__ = ["TrainingResult", "create_success_result", "create_failure_result"]
+# Empty file to make this a package

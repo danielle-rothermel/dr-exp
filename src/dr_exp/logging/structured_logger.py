@@ -1,199 +1,170 @@
+"""Structured logging for ML experiments."""
+
 import json
-import os
-import gzip
-import uuid
+from pathlib import Path
+from typing import Dict, Any, Optional, Union
 from datetime import datetime, UTC
-from typing import Any, Dict, List, Optional, Union
+from contextlib import contextmanager
 
-import fcntl
-
-from .base_logger import BaseLogger
-from .logger_paths import LoggerPathConfig, LoggerPathManager
+from omegaconf import OmegaConf, DictConfig
 
 
-class StructuredLogger(BaseLogger):
-    """Local filesystem-based structured logger implementation.
+def _convert_config(config: Any) -> Any:
+    """Convert DictConfig and other special objects to JSON-serializable types."""
+    if isinstance(config, DictConfig):
+        return OmegaConf.to_container(config, resolve=True)
+    elif isinstance(config, dict):
+        return {k: _convert_config(v) for k, v in config.items()}
+    elif isinstance(config, (list, tuple)):
+        return [_convert_config(item) for item in config]
+    else:
+        return config
 
-    This class provides a concrete implementation of the BaseLogger interface
-    using local files for metrics storage, checkpoint saving, and artifact
-    tracking. Ideal for development, testing, and local training runs."""
 
-    def __init__(
-        self,
-        log_dir: Union[str, LoggerPathConfig],
-        run_id: Optional[str] = None,
-        compress_checkpoints: bool = False,
-        debug: bool = False,
-    ) -> None:
-        """Initialize the structured logger.
+class StructuredLogger:
+    """Logger that writes structured data (metrics, configs, etc.) to files."""
 
-        Creates necessary directories and opens the metrics file for writing.
+    def __init__(self, log_dir: Union[str, Path], job_id: str, worker_id: str) -> None:
+        """Initialize structured logger.
 
-        Parameters
-        ----------
-        log_dir : str or LoggerPathConfig
-            Base directory for all logging outputs, or a full path configuration.
-        run_id : str, optional
-            Unique identifier for this run. If not provided, a UUID will be generated.
-        compress_checkpoints : bool, optional
-            Whether to gzip checkpoint files for space efficiency, by default False.
-        debug : bool, optional
-            If True, errors are raised immediately instead of being logged
-            to an error file. Useful for development, by default False.
+        Args:
+            log_dir: Directory to write logs to
+            job_id: Job ID for this run
+            worker_id: Worker ID running this job
         """
-        self._paths = LoggerPathManager(log_dir)
-        self.compress_checkpoints = compress_checkpoints
-        self.debug = debug
-        self.run_id = run_id or uuid.uuid4().hex
+        self.log_dir = Path(log_dir)
+        self.job_id = job_id
+        self.worker_id = worker_id
 
-        self.metrics_file = open(self._paths.metrics_path, "a", encoding="utf-8")
-        self.metrics_count = 0
-        self.checkpoint_count = 0
-        self.artifact_paths: List[str] = []
-        self._finalized = False
+        # Ensure directory exists
+        self.log_dir.mkdir(parents=True, exist_ok=True)
 
-    @property
-    def paths(self) -> LoggerPathManager:
-        """Get the path manager for this logger."""
-        return self._paths
+        # File paths
+        self.metrics_file = self.log_dir / "metrics.jsonl"
+        self.config_file = self.log_dir / "config.json"
+        self.metadata_file = self.log_dir / "metadata.json"
+        self.events_file = self.log_dir / "events.jsonl"
 
-    def _write_error(self, msg: str) -> None:
-        """Append an error message to the logger error file."""
-        with open(self._paths.error_log_path, "a", encoding="utf-8") as ef:
-            ef.write(f"{datetime.now(UTC).isoformat()}Z {msg}\n")
+        # Write initial metadata
+        self._write_metadata()
 
-    def log(self, metrics: Dict[str, Any]) -> None:
-        """Log metrics data to the metrics file.
-
-        Writes metrics as a JSON line to the configured output file with
-        file locking for thread safety. Automatically adds run_id and
-        timestamp if not present.
-
-        Parameters
-        ----------
-        metrics : dict[str, Any]
-            Dictionary containing metrics to log. Common keys include
-            'epoch', 'train_loss', 'val_acc', etc.
-        """
-        record = dict(metrics)
-        record.setdefault("run_id", self.run_id)
-        record.setdefault("timestamp", datetime.now(UTC).isoformat() + "Z")
-        try:
-            fcntl.flock(self.metrics_file.fileno(), fcntl.LOCK_EX)
-            self.metrics_file.write(json.dumps(record) + "\n")
-            self.metrics_file.flush()
-            self.metrics_count += 1
-        except Exception as e:  # pragma: no cover - debug path
-            if self.debug:
-                raise
-            # Fail fast principle: make logging errors visible
-            import warnings
-
-            warnings.warn(
-                f"CRITICAL: Logging failure - metrics may be lost: {e}", stacklevel=2
-            )
-            self._write_error(f"log error: {e}")
-        finally:
-            try:
-                fcntl.flock(self.metrics_file.fileno(), fcntl.LOCK_UN)
-            except Exception:
-                pass
-
-    def save_checkpoint(self, state_dict: Dict[str, Any], tag: str) -> str:
-        """Save a model checkpoint to the checkpoint directory.
-
-        Saves checkpoint data as JSON, optionally compressed with gzip.
-        Filenames follow the pattern 'checkpoint_{tag}.pt[.gz]'.
-
-        Parameters
-        ----------
-        state_dict : dict[str, Any]
-            Serializable checkpoint data containing model state.
-        tag : str
-            Identifier for the checkpoint (e.g., 'epoch_10', 'best').
-
-        Returns
-        -------
-        str
-            Path to the saved checkpoint file.
-        """
-        path = self._paths.checkpoint_path(tag, compressed=self.compress_checkpoints)
-        try:
-            if self.compress_checkpoints:
-                with gzip.open(path, "wb") as f:
-                    f.write(json.dumps(state_dict).encode("utf-8"))
-            else:
-                with open(path, "w") as f:
-                    json.dump(state_dict, f)
-            self.checkpoint_count += 1
-        except Exception as e:  # pragma: no cover - debug path
-            if self.debug:
-                raise
-            # Fail fast principle: make checkpoint errors visible
-            import warnings
-
-            warnings.warn(f"CRITICAL: Checkpoint save failure: {e}", stacklevel=2)
-            self._write_error(f"checkpoint error: {e}")
-        return path
-
-    def log_artifact(self, path: str) -> None:
-        """Register an artifact file for tracking and potential upload.
-
-        Adds the absolute path to the internal artifact list if the file exists.
-        Artifact paths are included in the finalization summary.
-
-        Parameters
-        ----------
-        path : str
-            Path to the artifact file or directory to register.
-        """
-        assert os.path.exists(path), f"Artifact path does not exist: {path}"
-        self.artifact_paths.append(os.path.abspath(path))
-
-    def _summary(self, success: bool) -> Dict[str, Any]:
-        """Return a final summary dictionary."""
-        return {
-            "metrics_path": self._paths.metrics_path,
-            "num_metrics": self.metrics_count,
-            "artifact_paths": self.artifact_paths,
-            "num_checkpoints": self.checkpoint_count,
-            "finalize_success": success,
+    def _write_metadata(self) -> None:
+        """Write job metadata."""
+        metadata = {
+            "job_id": self.job_id,
+            "worker_id": self.worker_id,
+            "started_at": datetime.now(UTC).isoformat(),
+            "log_version": "1.0",
         }
 
-    def finalize(self) -> Dict[str, Any]:
-        """Finalize logging and return summary metadata.
+        with open(self.metadata_file, "w") as f:
+            json.dump(metadata, f, indent=2)
 
-        Closes the metrics file and returns comprehensive metadata about
-        the logging session. This method is idempotent and can be called
-        multiple times safely.
+    def log_config(self, config: Dict[str, Any]) -> None:
+        """Log the configuration used for this run.
 
-        Returns
-        -------
-        dict[str, Any]
-            Summary metadata containing:
-            - metrics_path: path to the metrics file
-            - num_metrics: number of metrics logged
-            - artifact_paths: list of registered artifact paths
-            - num_checkpoints: number of checkpoints saved
-            - finalize_success: whether finalization succeeded
+        Args:
+            config: Configuration dictionary
         """
-        if self._finalized:
-            return self._summary(True)
-        finalize_success = True
-        try:
-            self.metrics_file.flush()
-            self.metrics_file.close()
-        except Exception as e:  # pragma: no cover - debug path
-            finalize_success = False
-            if self.debug:
-                raise
-            # Fail fast principle: make finalization errors visible
-            import warnings
+        # Convert DictConfig to regular dict if needed
+        config = _convert_config(config)
 
-            warnings.warn(
-                f"CRITICAL: Logger finalization failure - data may be lost: {e}",
-                stacklevel=2,
-            )
-            self._write_error(f"finalize error: {e}")
-        self._finalized = True
-        return self._summary(finalize_success)
+        with open(self.config_file, "w") as f:
+            json.dump(config, f, indent=2)
+
+    def log_metrics(self, metrics: Dict[str, Any], step: Optional[int] = None) -> None:
+        """Log metrics for a training step.
+
+        Args:
+            metrics: Dictionary of metric values
+            step: Optional step number (epoch, iteration, etc.)
+        """
+        entry = {
+            "timestamp": datetime.now(UTC).isoformat(),
+            "step": step,
+            "metrics": metrics,
+        }
+
+        with open(self.metrics_file, "a") as f:
+            f.write(json.dumps(entry) + "\n")
+
+    def log_event(self, event_type: str, data: Optional[Dict[str, Any]] = None) -> None:
+        """Log a training event (start, end, checkpoint, etc.).
+
+        Args:
+            event_type: Type of event
+            data: Optional event data
+        """
+        entry = {
+            "timestamp": datetime.now(UTC).isoformat(),
+            "event_type": event_type,
+            "data": data or {},
+        }
+
+        with open(self.events_file, "a") as f:
+            f.write(json.dumps(entry) + "\n")
+
+    def log_artifact(
+        self,
+        artifact_path: Path,
+        artifact_type: str,
+        metadata: Optional[Dict[str, Any]] = None,
+    ) -> None:
+        """Log that an artifact was created.
+
+        Args:
+            artifact_path: Path to the artifact
+            artifact_type: Type of artifact (model, plot, etc.)
+            metadata: Optional metadata about the artifact
+        """
+        self.log_event(
+            "artifact_created",
+            {
+                "path": str(artifact_path),
+                "type": artifact_type,
+                "metadata": metadata or {},
+            },
+        )
+
+    @contextmanager
+    def phase(self, phase_name: str) -> Any:
+        """Context manager for logging training phases.
+
+        Args:
+            phase_name: Name of the phase (train, eval, etc.)
+        """
+        self.log_event(f"{phase_name}_start")
+        try:
+            yield
+        finally:
+            self.log_event(f"{phase_name}_end")
+
+    def get_summary(self) -> Dict[str, Any]:
+        """Get a summary of the logged data.
+
+        Returns:
+            Summary dictionary
+        """
+        summary = {
+            "job_id": self.job_id,
+            "worker_id": self.worker_id,
+            "metrics_entries": 0,
+            "events_entries": 0,
+            "final_metrics": None,
+        }
+
+        # Count metrics entries and get final
+        if self.metrics_file.exists():
+            with open(self.metrics_file, "r") as f:
+                lines = f.readlines()
+                summary["metrics_entries"] = len(lines)
+                if lines:
+                    last_entry = json.loads(lines[-1])
+                    summary["final_metrics"] = last_entry.get("metrics", {})
+
+        # Count events
+        if self.events_file.exists():
+            with open(self.events_file, "r") as f:
+                summary["events_entries"] = sum(1 for _ in f)
+
+        return summary

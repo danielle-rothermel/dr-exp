@@ -1,0 +1,11 @@
+_target_: "dr_exp.trainers.decon_trainer.train_classification"
+# Step 02: Remove RandAugment (2019)
+# Building on step01, removing modern augmentation technique
+
+defaults:
+  - step01_sgd
+  - _self_
+
+run_name: step02_no_randaug
+train_transforms:
+  randaug: false  # Removed RandAugment
