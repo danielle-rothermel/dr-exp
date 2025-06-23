@@ -1,4 +1,4 @@
-from src.dr_exp.worker.base import Worker
+from dr_exp.worker.base import Worker
 from dr_exp.core.job_db import JobDB
 
 
@@ -8,7 +8,7 @@ def test_worker_creates_log_file(tmp_path):
 
     # Create a job
     job_db.create_job(
-        config={"_target_": "src.dr_exp.trainers.test_trainer.train", "epochs": 1},
+        config={"_target_": "dr_exp.trainers.test_trainer.train", "epochs": 1},
         priority=100,
     )
 
@@ -72,7 +72,7 @@ def test_worker_log_on_error(tmp_path):
     # Create failing job
     job_db.create_job(
         config={
-            "_target_": "src.dr_exp.trainers.test_trainer.train",
+            "_target_": "dr_exp.trainers.test_trainer.train",
             "epochs": 1,
             "fail_rate": 1.0,
         },

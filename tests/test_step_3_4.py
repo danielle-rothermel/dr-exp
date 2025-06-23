@@ -7,8 +7,8 @@ from pathlib import Path
 from dotenv import load_dotenv
 
 from dr_exp.core.job_db import JobDB
-from src.dr_exp.worker.base import Worker
-from src.dr_exp.sync.supabase_client import SupabaseClient
+from dr_exp.worker.base import Worker
+from dr_exp.sync.supabase_client import SupabaseClient
 
 
 def setup_test_env() -> None:
@@ -34,7 +34,7 @@ def test_worker_with_supabase_sync() -> None:
         )
 
         # Create a test job
-        config = {"_target_": "src.dr_exp.trainers.test_trainer.train", "epochs": 3}
+        config = {"_target_": "dr_exp.trainers.test_trainer.train", "epochs": 3}
         job_id = job_db.create_job(config, priority=100)
 
         # Create worker with Supabase sync
@@ -104,7 +104,7 @@ def test_worker_sync_failure_handling() -> None:
         )
 
         # Create job
-        config = {"_target_": "src.dr_exp.trainers.test_trainer.train", "epochs": 2}
+        config = {"_target_": "dr_exp.trainers.test_trainer.train", "epochs": 2}
         job_id = job_db.create_job(config)
 
         # Create worker with invalid Supabase credentials
@@ -136,7 +136,7 @@ def test_worker_without_sync() -> None:
         job_db = JobDB(base_path=tmpdir, experiment_name="no_sync_test", validate=False)
 
         # Create job
-        config = {"_target_": "src.dr_exp.trainers.test_trainer.train", "epochs": 2}
+        config = {"_target_": "dr_exp.trainers.test_trainer.train", "epochs": 2}
         job_db.create_job(config)
 
         # Create worker with sync disabled
@@ -164,7 +164,7 @@ def test_sync_retry_logic() -> None:
         job_db = JobDB(base_path=tmpdir, experiment_name="retry_test", validate=False)
 
         # Create a job that produces files
-        config = {"_target_": "src.dr_exp.trainers.test_trainer.train", "epochs": 1}
+        config = {"_target_": "dr_exp.trainers.test_trainer.train", "epochs": 1}
         job_id = job_db.create_job(config)
 
         # Run job to generate files
@@ -215,7 +215,7 @@ def test_experiment_isolation() -> None:
         job_db2 = JobDB(base_path=tmpdir, experiment_name="exp2", validate=False)
 
         # Create jobs in each
-        config = {"_target_": "src.dr_exp.trainers.test_trainer.train", "epochs": 1}
+        config = {"_target_": "dr_exp.trainers.test_trainer.train", "epochs": 1}
         job1 = job_db1.create_job(config)
         job2 = job_db2.create_job(config)
 
@@ -248,7 +248,7 @@ def test_cli_integration() -> None:
     setup_test_env()
 
     from click.testing import CliRunner
-    from src.dr_exp.cli.main import cli
+    from dr_exp.cli.main import cli
 
     runner = CliRunner()
 
@@ -261,7 +261,7 @@ def test_cli_integration() -> None:
 
         # Create job config
         Path("test.yaml").write_text("""
-_target_: src.dr_exp.trainers.test_trainer.train
+_target_: dr_exp.trainers.test_trainer.train
 epochs: 2
 """)
 

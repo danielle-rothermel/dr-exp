@@ -10,8 +10,8 @@ from dotenv import load_dotenv
 from fastapi.testclient import TestClient
 
 from dr_exp.core.job_db import JobDB
-from src.dr_exp.worker.base import Worker
-from src.dr_exp.api.simple_api import app
+from dr_exp.worker.base import Worker
+from dr_exp.api.simple_api import app
 
 
 def setup_test_env() -> None:
@@ -44,7 +44,7 @@ def test_remote_read_operations() -> None:
         assert job_db.experiment_name == "remote_read_test"
 
         # Create and sync a job
-        config = {"_target_": "src.dr_exp.trainers.test_trainer.train", "epochs": 2}
+        config = {"_target_": "dr_exp.trainers.test_trainer.train", "epochs": 2}
         job_id = job_db.create_job(config, priority=500)
 
         # Run with worker to sync
@@ -86,7 +86,7 @@ def test_artifact_download() -> None:
         )
         job_db.enable_remote_read()
 
-        config = {"_target_": "src.dr_exp.trainers.test_trainer.train", "epochs": 2}
+        config = {"_target_": "dr_exp.trainers.test_trainer.train", "epochs": 2}
         job_id = job_db.create_job(config)
 
         # Run and sync
@@ -144,7 +144,7 @@ def test_api_endpoints() -> None:
         # Create jobs
         job_ids = []
         for i in range(3):
-            config = {"_target_": "src.dr_exp.trainers.test_trainer.train", "index": i}
+            config = {"_target_": "dr_exp.trainers.test_trainer.train", "index": i}
             job_id = job_db.create_job(config, priority=i * 100)
             job_ids.append(job_id)
 
@@ -155,7 +155,7 @@ def test_api_endpoints() -> None:
         time.sleep(3)
 
         # Initialize API
-        from src.dr_exp import api
+        from dr_exp import api
 
         api.simple_api.job_db = job_db
 
@@ -233,7 +233,7 @@ def test_fallback_to_local() -> None:
         assert not job_db.remote_enabled
 
         # Create local job
-        config = {"_target_": "src.dr_exp.trainers.test_trainer.train"}
+        config = {"_target_": "dr_exp.trainers.test_trainer.train"}
         job_db.create_job(config)
 
         # Should fall back to local operations
@@ -268,7 +268,7 @@ def test_remote_status_filter() -> None:
         ]
 
         for cfg in configs:
-            job_db.create_job({"_target_": "src.dr_exp.trainers.test_trainer.train"})
+            job_db.create_job({"_target_": "dr_exp.trainers.test_trainer.train"})
 
             if cfg["status"] == "running":
                 job_db.claim_next_job("worker")
@@ -319,7 +319,7 @@ def test_full_remote_workflow() -> None:
         # Create some jobs
         job_ids = []
         for i in range(3):
-            config = {"_target_": "src.dr_exp.trainers.test_trainer.train", "epochs": 2}
+            config = {"_target_": "dr_exp.trainers.test_trainer.train", "epochs": 2}
             job_id = job_db.create_job(config, priority=100 + i * 100)
             job_ids.append(job_id)
 

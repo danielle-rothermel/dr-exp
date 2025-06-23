@@ -8,7 +8,7 @@ from pathlib import Path
 from unittest.mock import Mock, patch
 
 from dr_exp.core.job_db import JobDB
-from src.dr_exp.worker.launcher import WorkerLauncher
+from dr_exp.worker.launcher import WorkerLauncher
 
 
 def test_launcher_init() -> None:

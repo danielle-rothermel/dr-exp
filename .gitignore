@@ -1,4 +1,5 @@
 .dmypy.json
+.mypy_errors.jsonl
 .env
 *.swp
 temp.patch

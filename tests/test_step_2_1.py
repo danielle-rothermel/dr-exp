@@ -4,7 +4,7 @@ import tempfile
 from pathlib import Path
 
 from dr_exp.core.job_db import JobDB
-from src.dr_exp.worker.base import Worker
+from dr_exp.worker.base import Worker
 
 
 def test_basic_worker():
@@ -14,7 +14,7 @@ def test_basic_worker():
         job_db = JobDB(base_path=tmpdir, experiment_name="test_exp", validate=False)
 
         # Create a test job
-        config = {"_target_": "src.dr_exp.trainers.test_trainer.train", "epochs": 5}
+        config = {"_target_": "dr_exp.trainers.test_trainer.train", "epochs": 5}
         job_id = job_db.create_job(config, priority=100)
 
         # Create worker with specific working directory
@@ -51,7 +51,7 @@ def test_worker_failure_handling():
 
         # Create a job that will fail
         config = {
-            "_target_": "src.dr_exp.trainers.test_trainer.train",
+            "_target_": "dr_exp.trainers.test_trainer.train",
             "epochs": 5,
             "fail_rate": 1.0,  # Always fail
         }
@@ -90,7 +90,7 @@ def test_worker_run_multiple():
         job_ids = []
         for i in range(5):
             config = {
-                "_target_": "src.dr_exp.trainers.test_trainer.train",
+                "_target_": "dr_exp.trainers.test_trainer.train",
                 "epochs": 2,
                 "index": i,
                 "fail_rate": 0.2 if i == 2 else 0.0,  # One job will fail
@@ -120,7 +120,7 @@ def test_worker_max_jobs():
 
         # Create 10 jobs
         for i in range(10):
-            config = {"_target_": "src.dr_exp.trainers.test_trainer.train", "epochs": 1}
+            config = {"_target_": "dr_exp.trainers.test_trainer.train", "epochs": 1}
             job_db.create_job(config)
 
         # Run worker with limit
@@ -141,7 +141,7 @@ def test_worker_priority_order():
         job_db = JobDB(base_path=tmpdir, experiment_name="test_exp", validate=False)
 
         # Create jobs with different priorities
-        config = {"_target_": "src.dr_exp.trainers.test_trainer.train", "epochs": 1}
+        config = {"_target_": "dr_exp.trainers.test_trainer.train", "epochs": 1}
 
         low_id = job_db.create_job(config, priority=100)
         high_id = job_db.create_job(config, priority=900)

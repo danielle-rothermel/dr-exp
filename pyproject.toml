@@ -35,6 +35,8 @@ dependencies = [
     "torch>=2.7.1",
     "torchvision>=0.22.1",
     "types-cachetools>=6.0.0.20250525",
+    "types-pyyaml>=6.0.12.20250516",
+    "types-requests>=2.32.4.20250611",
     "uvicorn>=0.34.2",
     "websockets>=15.0.1",
 ]

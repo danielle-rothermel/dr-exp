@@ -6,8 +6,8 @@ import threading
 from pathlib import Path
 
 from dr_exp.core.job_db import JobDB
-from src.dr_exp.worker.base import Worker
-from src.dr_exp.sync.queue import SyncItem
+from dr_exp.worker.base import Worker
+from dr_exp.sync.queue import SyncItem
 
 
 def test_worker_with_threads():
@@ -17,7 +17,7 @@ def test_worker_with_threads():
         job_db = JobDB(base_path=tmpdir, experiment_name="test_exp", validate=False)
 
         # Create a test job
-        config = {"_target_": "src.dr_exp.trainers.test_trainer.train", "epochs": 3}
+        config = {"_target_": "dr_exp.trainers.test_trainer.train", "epochs": 3}
         job_id = job_db.create_job(config, priority=100)
 
         # Track sync calls
@@ -68,7 +68,7 @@ def test_worker_no_sync():
         job_db = JobDB(base_path=tmpdir, experiment_name="test_exp", validate=False)
 
         # Create a job
-        config = {"_target_": "src.dr_exp.trainers.test_trainer.train", "epochs": 2}
+        config = {"_target_": "dr_exp.trainers.test_trainer.train", "epochs": 2}
         job_db.create_job(config)
 
         # Create worker with sync disabled
@@ -93,7 +93,7 @@ def test_worker_thread_cleanup():
 
         # Create multiple jobs
         for i in range(3):
-            config = {"_target_": "src.dr_exp.trainers.test_trainer.train", "epochs": 1}
+            config = {"_target_": "dr_exp.trainers.test_trainer.train", "epochs": 1}
             job_db.create_job(config)
 
         # Create worker
@@ -131,7 +131,7 @@ def test_worker_heartbeat_during_execution():
 
         # Create a slow job
         config = {
-            "_target_": "src.dr_exp.trainers.test_trainer.train",
+            "_target_": "dr_exp.trainers.test_trainer.train",
             "epochs": 50,  # More epochs = longer execution
         }
         job_db.create_job(config)
@@ -178,7 +178,7 @@ def test_worker_sync_queue_integration():
         job_db = JobDB(base_path=tmpdir, experiment_name="test_exp", validate=False)
 
         # Create a job
-        config = {"_target_": "src.dr_exp.trainers.test_trainer.train", "epochs": 5}
+        config = {"_target_": "dr_exp.trainers.test_trainer.train", "epochs": 5}
         job_db.create_job(config)
 
         # Track sync processing
@@ -222,7 +222,7 @@ def test_worker_error_artifacts():
 
         # Create a job that will fail
         config = {
-            "_target_": "src.dr_exp.trainers.test_trainer.train",
+            "_target_": "dr_exp.trainers.test_trainer.train",
             "epochs": 5,
             "fail_rate": 1.0,  # Always fail
         }

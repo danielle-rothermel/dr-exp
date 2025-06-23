@@ -6,8 +6,8 @@ from pathlib import Path
 from typing import Dict, Any, Optional
 
 from dr_exp.core.job_db import JobDB
-from src.dr_exp.worker.base import Worker
-from src.dr_exp.logging.structured_logger import StructuredLogger
+from dr_exp.worker.base import Worker
+from dr_exp.logging.structured_logger import StructuredLogger
 
 
 def test_structured_logger() -> None:
@@ -72,7 +72,7 @@ def test_decon_classification_trainer() -> None:
         job_db = JobDB(base_path=tmpdir, experiment_name="test_exp", validate=False)
 
         config = {
-            "_target_": "src.dr_exp.trainers.decon_trainer.train_classification",
+            "_target_": "dr_exp.trainers.decon_trainer.train_classification",
             "model": {"architecture": "resnet18", "num_classes": 10},
             "optim": {"name": "adamw", "lr": 0.001},
             "epochs": 5,
@@ -122,7 +122,7 @@ def test_decon_autoencoder_trainer() -> None:
         job_db = JobDB(base_path=tmpdir, experiment_name="test_exp", validate=False)
 
         config = {
-            "_target_": "src.dr_exp.trainers.decon_trainer.train_autoencoder",
+            "_target_": "dr_exp.trainers.decon_trainer.train_autoencoder",
             "model": {"encoder_dims": [784, 256, 64], "decoder_dims": [64, 256, 784]},
             "optim": {"name": "adam", "lr": 0.0001},
             "epochs": 10,
@@ -155,7 +155,7 @@ def test_trainer_error_handling() -> None:
 
         # Create a config that will cause an error
         config = {
-            "_target_": "src.dr_exp.trainers.test_trainer.train",
+            "_target_": "dr_exp.trainers.test_trainer.train",
             "epochs": 5,
             "fail_rate": 1.0,  # Will cause failure
         }
@@ -188,7 +188,7 @@ def test_worker_artifact_discovery() -> None:
         job_db = JobDB(base_path=tmpdir, experiment_name="test_exp", validate=False)
 
         config = {
-            "_target_": "src.dr_exp.trainers.decon_trainer.train_classification",
+            "_target_": "dr_exp.trainers.decon_trainer.train_classification",
             "model": {"architecture": "resnet50"},
             "optim": {"lr": 0.01},
             "epochs": 3,
@@ -231,7 +231,7 @@ def test_full_integration() -> None:
     """Test complete integration from job submission to completion."""
     with tempfile.TemporaryDirectory() as tmpdir:
         from click.testing import CliRunner
-        from src.dr_exp.cli.main import cli
+        from dr_exp.cli.main import cli
 
         runner = CliRunner()
 
@@ -244,7 +244,7 @@ def test_full_integration() -> None:
         # Create config file
         config_file = Path(tmpdir) / "train_config.yaml"
         config_file.write_text("""
-_target_: src.dr_exp.trainers.decon_trainer.train_classification
+_target_: dr_exp.trainers.decon_trainer.train_classification
 model:
   architecture: efficientnet_b0
   num_classes: 100

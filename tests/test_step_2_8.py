@@ -5,12 +5,12 @@ from pathlib import Path
 from click.testing import CliRunner
 
 from dr_exp.core.job_db import JobDB
-from src.dr_exp.cli.sweep_utils import (
+from dr_exp.cli.sweep_utils import (
     parse_sweep_params,
     generate_sweep_configs,
     validate_sweep_config,
 )
-from src.dr_exp.cli.main import cli
+from dr_exp.cli.main import cli
 
 
 def test_parse_sweep_params() -> None:

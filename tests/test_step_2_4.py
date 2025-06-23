@@ -4,7 +4,7 @@ import tempfile
 from pathlib import Path
 from click.testing import CliRunner
 
-from src.dr_exp.cli.main import cli
+from dr_exp.cli.main import cli
 from dr_exp.core.job_db import JobDB
 
 
@@ -39,7 +39,7 @@ def test_cli_submit():
         # Create config file
         config_file = Path(tmpdir) / "test_config.yaml"
         config_file.write_text("""
-_target_: src.dr_exp.trainers.test_trainer.train
+_target_: dr_exp.trainers.test_trainer.train
 epochs: 10
 """)
 
@@ -162,7 +162,7 @@ def test_cli_worker():
     with tempfile.TemporaryDirectory() as tmpdir:
         # Create a job
         job_db = JobDB(base_path=tmpdir, experiment_name="test_exp", validate=False)
-        config = {"_target_": "src.dr_exp.trainers.test_trainer.train", "epochs": 2}
+        config = {"_target_": "dr_exp.trainers.test_trainer.train", "epochs": 2}
         job_db.create_job(config)
 
         # Run worker
@@ -195,7 +195,7 @@ def test_cli_worker_with_sync():
     with tempfile.TemporaryDirectory() as tmpdir:
         # Create a job
         job_db = JobDB(base_path=tmpdir, experiment_name="test_exp", validate=False)
-        config = {"_target_": "src.dr_exp.trainers.test_trainer.train", "epochs": 2}
+        config = {"_target_": "dr_exp.trainers.test_trainer.train", "epochs": 2}
         job_db.create_job(config)
 
         # Run worker with sync

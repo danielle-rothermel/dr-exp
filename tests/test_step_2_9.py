@@ -7,7 +7,7 @@ from unittest.mock import patch
 from click.testing import CliRunner
 
 from dr_exp.core.job_db import JobDB
-from src.dr_exp.cli.main import cli
+from dr_exp.cli.main import cli
 
 
 def test_slurm_status_command() -> None:
@@ -238,7 +238,7 @@ def test_slurm_environment_handling() -> None:
         },
     ):
         # Verify launcher can read environment
-        from src.dr_exp.worker.launcher import WorkerLauncher
+        from dr_exp.worker.launcher import WorkerLauncher
 
         with tempfile.TemporaryDirectory() as tmpdir:
             job_db = JobDB(base_path=tmpdir, experiment_name="test_exp", validate=False)

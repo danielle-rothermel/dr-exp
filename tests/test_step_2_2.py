@@ -6,7 +6,7 @@ import json
 from pathlib import Path
 from datetime import datetime, timedelta
 
-from src.dr_exp.sync.queue import SyncQueue, SyncItem
+from dr_exp.sync.queue import SyncQueue, SyncItem
 
 
 def test_sync_queue_basic():

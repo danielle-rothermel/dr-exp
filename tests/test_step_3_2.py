@@ -5,7 +5,7 @@ import tempfile
 from pathlib import Path
 from dotenv import load_dotenv
 
-from src.dr_exp.sync.supabase_client import SupabaseClient
+from dr_exp.sync.supabase_client import SupabaseClient
 
 
 def setup_test_env() -> None:
