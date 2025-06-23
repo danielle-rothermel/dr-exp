@@ -1,20 +1,11 @@
+.dmypy.json
 .env
 *.swp
 temp.patch
-job_data/
-test_experiment/
 .coverage
-chronological_ablation/
-high_regularization_ablation/
 
-mock_db/*.json
-mock_db/*.jsonl
-mock_db/jobs/*.json
-mock_db/metrics/*.jsonl
-mock_storage/*.jsonl
-mock_storage/*.pt
-mock_storage/*.log
-mock_storage/*.yaml
+mock_db/*
+mock_storage/*
 
 # Python
 __pycache__/
