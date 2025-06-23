@@ -164,7 +164,9 @@ cli.add_command(slurm)
     "--config-name", required=True, help="Name of config file (without .yaml)"
 )
 @click.option("--priority", default=100, help="Job priority (0-1000)")
-@click.option("--tags", help="Comma-separated job tags (e.g., 'baseline,gpu-test,ablation')")
+@click.option(
+    "--tags", help="Comma-separated job tags (e.g., 'baseline,gpu-test,ablation')"
+)
 @click.option("--overrides", help="Hydra overrides (key=value,key2=value2)")
 @click.pass_context
 def submit(
@@ -225,7 +227,7 @@ def submit(
     tag_list = []
     if tags:
         tag_list = [t.strip() for t in tags.split(",") if t.strip()]
-    
+
     # Create job
     job_db = JobDB(
         base_path=ctx.obj["base_path"], experiment_name=ctx.obj["experiment"]
@@ -255,7 +257,7 @@ def list(ctx: click.Context, status: Optional[str], tag: Optional[str]) -> None:
 
     # Get jobs
     jobs = job_db.list_jobs(status=status)
-    
+
     # Filter by tag if specified
     if tag:
         jobs = [job for job in jobs if tag in job.get("tags", [])]
@@ -265,7 +267,9 @@ def list(ctx: click.Context, status: Optional[str], tag: Optional[str]) -> None:
         return
 
     # Display header
-    click.echo(f"{'ID':>12} {'Description':>30} {'Status':>10} {'Priority':>8} {'Worker':>15} {'Created'}")
+    click.echo(
+        f"{'ID':>12} {'Description':>30} {'Status':>10} {'Priority':>8} {'Worker':>15} {'Created'}"
+    )
     click.echo("-" * 105)
 
     # Display jobs
@@ -276,18 +280,18 @@ def list(ctx: click.Context, status: Optional[str], tag: Optional[str]) -> None:
         worker = job.get("worker_id") or "-"
         created_at = job.get("created_at", "-")
         created = created_at[:19] if created_at != "-" else "-"  # Trim to date/time
-        
+
         # Extract semantic description
         config = job.get("config", {})
         run_name = config.get("run_name", "unknown")
         seed = config.get("seed", "?")
         job_tags = job.get("tags", [])
-        
+
         # Build description with tags
         description = f"{run_name}/seed_{seed}"
         if job_tags:
             description += f" [{','.join(job_tags)}]"
-        
+
         # Truncate description if too long
         if len(description) > 30:
             description = description[:27] + "..."
@@ -302,7 +306,9 @@ def list(ctx: click.Context, status: Optional[str], tag: Optional[str]) -> None:
         else:
             status_str = f"{job_status:>10}"
 
-        click.echo(f"{job_id:>12} {description:>30} {status_str} {priority:>8} {worker:>15} {created}")
+        click.echo(
+            f"{job_id:>12} {description:>30} {status_str} {priority:>8} {worker:>15} {created}"
+        )
 
     # Summary
     click.echo("-" * 105)

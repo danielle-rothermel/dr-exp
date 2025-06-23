@@ -77,7 +77,12 @@ class JobDB:
             f"JobDB initialized for experiment '{experiment_name}' at {self.experiment_path}"
         )
 
-    def create_job(self, config: Dict[str, Any], priority: int = 100, tags: Optional[List[str]] = None) -> str:
+    def create_job(
+        self,
+        config: Dict[str, Any],
+        priority: int = 100,
+        tags: Optional[List[str]] = None,
+    ) -> str:
         """Create a new job with given config and priority.
 
         Args:
