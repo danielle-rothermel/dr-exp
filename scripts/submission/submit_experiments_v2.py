@@ -123,15 +123,14 @@ def main():
 
     if args.dry_run:
         print("\n🚀 DRY RUN MODE - No jobs will actually be submitted")
-    else:
-        # Confirmation prompt for large submissions
-        if total_new_jobs > 20:
-            response = input(
-                f"\n⚠️  About to submit {total_new_jobs} jobs. Continue? [y/N]: "
-            )
-            if response.lower() != "y":
-                print("Aborted.")
-                return 0
+    # Confirmation prompt for large submissions
+    elif total_new_jobs > 20:
+        response = input(
+            f"\n⚠️  About to submit {total_new_jobs} jobs. Continue? [y/N]: "
+        )
+        if response.lower() != "y":
+            print("Aborted.")
+            return 0
 
     # Submit jobs
     print(f"\n🚀 Submitting {total_new_jobs} jobs...")
@@ -169,7 +168,8 @@ def main():
                 "--experiment",
                 args.experiment,
                 "status",
-            ]
+            ],
+            check=False,
         )
 
     # Print failure summary if any

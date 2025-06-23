@@ -3,9 +3,9 @@
 import time
 import random
 from pathlib import Path
-from typing import Dict, Any
+from typing import Any
 
-from ..logging.structured_logger import StructuredLogger
+from dr_exp.logging.structured_logger import StructuredLogger
 
 
 def train_dummy(
@@ -16,8 +16,8 @@ def train_dummy(
     batch_size: int = 32,
     lr: float = 0.001,
     model: str = "resnet18",
-    **kwargs: Any,
-) -> Dict[str, Any]:
+    **kwargs: Any,  # noqa: ANN401
+) -> dict[str, Any]:
     """Dummy training function for testing.
 
     Args:
@@ -57,8 +57,8 @@ def train_dummy(
 
     # Simulate training with metrics
     for epoch in range(epochs):
-        loss = 1.0 / (epoch + 1) + random.random() * 0.1
-        accuracy = min(0.99, epoch / epochs + random.random() * 0.1)
+        loss = 1.0 / (epoch + 1) + random.random() * 0.1  # noqa: S311
+        accuracy = min(0.99, epoch / epochs + random.random() * 0.1)  # noqa: S311
 
         # Log metrics using structured logger
         metrics = {"epoch": epoch, "loss": loss, "accuracy": accuracy}
@@ -79,7 +79,8 @@ def train_dummy(
     final_metrics = summary["final_metrics"]
 
     print(
-        f"Dummy trainer completed: model={model}, final_accuracy={final_metrics.get('accuracy', 0):.3f}"
+        f"Dummy trainer completed: model={model}, "
+        f"final_accuracy={final_metrics.get('accuracy', 0):.3f}"
     )
 
     return {

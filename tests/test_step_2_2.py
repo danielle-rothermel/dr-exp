@@ -33,7 +33,7 @@ def test_sync_queue_basic():
         assert Path(queue_file).exists()
 
         # Item should have checksum and size
-        with open(queue_file, "r") as f:
+        with open(queue_file) as f:
             data = json.load(f)
             assert data["checksum"] is not None
             assert data["size_bytes"] == len("Test content")
@@ -96,7 +96,7 @@ def test_sync_queue_processing():
 
         # Verify history file
         assert queue.history_file.exists()
-        with open(queue.history_file, "r") as f:
+        with open(queue.history_file) as f:
             lines = f.readlines()
             assert len(lines) == 3
 
@@ -131,7 +131,7 @@ def test_sync_queue_retry():
 
         # Check the raw data
         for queue_file in queue_dir.glob("*_retry_test.json"):
-            with open(queue_file, "r") as f:
+            with open(queue_file) as f:
                 data = json.load(f)
                 assert data["attempts"] == 1
                 assert data["error"] == "Network error"
@@ -165,7 +165,7 @@ def test_sync_queue_retry():
 
         # Check final status
         for queue_file in queue_dir.glob("*_retry_test.json"):
-            with open(queue_file, "r") as f:
+            with open(queue_file) as f:
                 data = json.load(f)
                 assert data["attempts"] == 3
                 assert data["status"] == "failed"
@@ -201,7 +201,7 @@ def test_sync_queue_complete():
 
         # Should be in history
         assert queue.history_file.exists()
-        with open(queue.history_file, "r") as f:
+        with open(queue.history_file) as f:
             line = f.readline()
             data = json.loads(line)
             assert data["id"] == "complete_test"
@@ -282,7 +282,7 @@ def test_sync_queue_error_handling():
 
         # Check failed item
         for queue_file in queue_dir.glob("*_error_1.json"):
-            with open(queue_file, "r") as f:
+            with open(queue_file) as f:
                 data = json.load(f)
                 assert data["attempts"] == 1
                 assert "Simulated sync error" in data["error"]

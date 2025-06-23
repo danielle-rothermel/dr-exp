@@ -5,7 +5,7 @@ import json
 import subprocess
 from datetime import datetime
 from pathlib import Path
-from typing import Any, Dict, List, Optional, Set, Tuple
+from typing import Any
 
 
 class SubmissionLogger:
@@ -13,7 +13,7 @@ class SubmissionLogger:
 
     def __init__(self, log_file: Path):
         self.log_file = log_file
-        self.submissions: List[Dict[str, Any]] = []
+        self.submissions: list[dict[str, Any]] = []
 
         # Load existing log if present
         if log_file.exists():
@@ -27,7 +27,7 @@ class SubmissionLogger:
         seed: int,
         job_id: str,
         success: bool,
-        error: Optional[str] = None,
+        error: str | None = None,
     ):
         """Log a submission attempt."""
         entry = {
@@ -46,7 +46,7 @@ class SubmissionLogger:
         with open(self.log_file, "w") as f:
             json.dump({"submissions": self.submissions}, f, indent=2)
 
-    def get_successful_submissions(self) -> Set[Tuple[str, int]]:
+    def get_successful_submissions(self) -> set[tuple[str, int]]:
         """Return set of (config, seed) tuples for successful submissions."""
         return {
             (s["config"], s["seed"])
@@ -62,7 +62,7 @@ class JobSubmitter:
         self.base_path = base_path
         self.experiment = experiment
         self.dry_run = dry_run
-        self.failed_jobs: List[Dict[str, Any]] = []
+        self.failed_jobs: list[dict[str, Any]] = []
 
         # Set up logging
         timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
@@ -70,7 +70,7 @@ class JobSubmitter:
         log_dir.mkdir(parents=True, exist_ok=True)
         self.logger = SubmissionLogger(log_dir / f"submission_{timestamp}.json")
 
-    def check_existing_jobs(self) -> Set[Tuple[str, int]]:
+    def check_existing_jobs(self) -> set[tuple[str, int]]:
         """Check for existing jobs to avoid duplicates."""
         try:
             result = subprocess.run(
@@ -87,6 +87,7 @@ class JobSubmitter:
                 ],
                 capture_output=True,
                 text=True,
+                check=False,
             )
 
             existing = set()
@@ -142,11 +143,10 @@ class JobSubmitter:
         config: str,
         seed: int,
         priority: int = 0,
-        extra_overrides: Optional[str] = None,
-        tags: Optional[List[str]] = None,
-    ) -> Tuple[bool, Optional[str]]:
+        extra_overrides: str | None = None,
+        tags: list[str] | None = None,
+    ) -> tuple[bool, str | None]:
         """Submit a single job. Returns (success, job_id)."""
-
         if self.dry_run:
             print(
                 f"[DRY RUN] Would submit: config={config}, seed={seed}, priority={priority}"
@@ -181,7 +181,7 @@ class JobSubmitter:
             cmd.extend(["--tags", ",".join(tags)])
 
         try:
-            result = subprocess.run(cmd, capture_output=True, text=True)
+            result = subprocess.run(cmd, capture_output=True, text=True, check=False)
 
             if result.returncode == 0:
                 # Extract job ID from output

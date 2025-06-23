@@ -1,10 +1,9 @@
 """GPU discovery utilities for the experiment management system."""
 
 import os
-from typing import List
 
 
-def discover_gpus(gpus_per_node: int) -> List[str]:
+def discover_gpus(gpus_per_node: int) -> list[str]:
     """Discover available GPUs from environment.
 
     Parameters
@@ -12,7 +11,7 @@ def discover_gpus(gpus_per_node: int) -> List[str]:
     gpus_per_node : int
         Number of GPUs to assume if CUDA_VISIBLE_DEVICES is not set
 
-    Returns
+    Returns:
     -------
     List[str]
         List of GPU IDs as strings
@@ -28,7 +27,7 @@ def discover_gpus(gpus_per_node: int) -> List[str]:
     return [str(i) for i in range(gpus_per_node)]
 
 
-def validate_gpu_ids(gpu_ids: List[str]) -> None:
+def validate_gpu_ids(gpu_ids: list[str]) -> None:
     """Validate that GPU IDs are properly formatted.
 
     Parameters
@@ -44,5 +43,5 @@ def validate_gpu_ids(gpu_ids: List[str]) -> None:
         # Check if it's a valid integer string
         try:
             int(gpu_id)
-        except ValueError:
-            assert False, f"GPU ID '{gpu_id}' is not a valid integer"
+        except ValueError as e:
+            raise AssertionError(f"GPU ID '{gpu_id}' is not a valid integer") from e

@@ -4,7 +4,8 @@ import json
 import time
 import hashlib
 from pathlib import Path
-from typing import Dict, Any, List, Optional, Callable
+from typing import Any
+from collections.abc import Callable
 from datetime import datetime, timedelta
 from dataclasses import dataclass, asdict
 
@@ -17,21 +18,21 @@ class SyncItem:
     job_id: str
     file_path: str
     file_type: str
-    metadata: Dict[str, Any]
+    metadata: dict[str, Any]
     created_at: str
     status: str = "pending"
     attempts: int = 0
-    last_attempt: Optional[str] = None
-    error: Optional[str] = None
-    completed_at: Optional[str] = None
-    checksum: Optional[str] = None
-    size_bytes: Optional[int] = None
+    last_attempt: str | None = None
+    error: str | None = None
+    completed_at: str | None = None
+    checksum: str | None = None
+    size_bytes: int | None = None
 
 
 class SyncQueue:
     """Manages queue of files to sync."""
 
-    def __init__(self, queue_dir: Path, max_retries: int = 3):
+    def __init__(self, queue_dir: Path, max_retries: int = 3) -> None:
         """Initialize sync queue.
 
         Args:
@@ -55,7 +56,7 @@ class SyncQueue:
             Hex string of checksum
         """
         sha256_hash = hashlib.sha256()
-        with open(file_path, "rb") as f:
+        with file_path.open("rb") as f:
             for byte_block in iter(lambda: f.read(4096), b""):
                 sha256_hash.update(byte_block)
         return sha256_hash.hexdigest()
@@ -81,12 +82,12 @@ class SyncQueue:
         timestamp = int(time.time() * 1000000)  # Microseconds
         queue_file = self.queue_dir / f"{timestamp}_{sync_item.id}.json"
 
-        with open(queue_file, "w") as f:
+        with queue_file.open("w") as f:
             json.dump(asdict(sync_item), f, indent=2)
 
         return str(queue_file)
 
-    def get_pending_items(self, limit: Optional[int] = None) -> List[SyncItem]:
+    def get_pending_items(self, limit: int | None = None) -> list[SyncItem]:
         """Get pending items from the queue.
 
         Args:
@@ -106,7 +107,7 @@ class SyncQueue:
                 continue
 
             try:
-                with open(queue_file, "r") as f:
+                with queue_file.open() as f:
                     data = json.load(f)
 
                 # Skip if not pending or too many attempts
@@ -133,7 +134,7 @@ class SyncQueue:
 
         return items
 
-    def update_item(self, item_id: str, updates: Dict[str, Any]) -> bool:
+    def update_item(self, item_id: str, updates: dict[str, Any]) -> bool:
         """Update a sync item in the queue.
 
         Args:
@@ -146,24 +147,24 @@ class SyncQueue:
         # Find the queue file
         for queue_file in self.queue_dir.glob(f"*_{item_id}.json"):
             try:
-                with open(queue_file, "r") as f:
+                with queue_file.open() as f:
                     data = json.load(f)
 
                 # Apply updates
                 data.update(updates)
 
                 # Write back
-                with open(queue_file, "w") as f:
+                with queue_file.open("w") as f:
                     json.dump(data, f, indent=2)
 
                 return True
 
-            except (json.JSONDecodeError, IOError):
+            except (OSError, json.JSONDecodeError):
                 continue
 
         return False
 
-    def mark_attempt(self, item_id: str, error: Optional[str] = None) -> bool:
+    def mark_attempt(self, item_id: str, error: str | None = None) -> bool:
         """Mark a sync attempt (success or failure).
 
         Args:
@@ -182,11 +183,11 @@ class SyncQueue:
             # Get current attempts to increment
             for queue_file in self.queue_dir.glob(f"*_{item_id}.json"):
                 try:
-                    with open(queue_file, "r") as f:
+                    with queue_file.open() as f:
                         data = json.load(f)
                         current_attempts = data.get("attempts", 0) + 1
                     break
-                except (json.JSONDecodeError, IOError):
+                except (OSError, json.JSONDecodeError):
                     continue
 
             updates = {
@@ -216,7 +217,7 @@ class SyncQueue:
         # Find and read the queue file
         for queue_file in self.queue_dir.glob(f"*_{item_id}.json"):
             try:
-                with open(queue_file, "r") as f:
+                with queue_file.open() as f:
                     data = json.load(f)
 
                 # Update status
@@ -225,7 +226,7 @@ class SyncQueue:
                 data["error"] = None
 
                 # Append to history
-                with open(self.history_file, "a") as f:
+                with self.history_file.open("a") as f:
                     f.write(json.dumps(data) + "\n")
 
                 # Remove from queue
@@ -233,12 +234,12 @@ class SyncQueue:
 
                 return True
 
-            except (json.JSONDecodeError, IOError):
+            except (OSError, json.JSONDecodeError):
                 continue
 
         return False
 
-    def get_stats(self) -> Dict[str, int]:
+    def get_stats(self) -> dict[str, int]:
         """Get queue statistics.
 
         Returns:
@@ -252,32 +253,32 @@ class SyncQueue:
                 continue
 
             try:
-                with open(queue_file, "r") as f:
+                with queue_file.open() as f:
                     data = json.load(f)
                     status = data.get("status", "pending")
                     if status in stats:
                         stats[status] += 1
                     stats["total"] += 1
-            except (json.JSONDecodeError, IOError):
+            except (OSError, json.JSONDecodeError):
                 continue
 
         # Count history entries
         if self.history_file.exists():
-            with open(self.history_file, "r") as f:
+            with self.history_file.open() as f:
                 for line in f:
                     try:
                         data = json.loads(line)
                         if data.get("status") == "completed":
                             stats["completed"] += 1
                             stats["total"] += 1
-                    except (json.JSONDecodeError, IOError):
+                    except (OSError, json.JSONDecodeError):
                         continue
 
         return stats
 
     def process_queue(
         self, sync_fn: Callable[[SyncItem], None], batch_size: int = 10
-    ) -> Dict[str, int]:
+    ) -> dict[str, int]:
         """Process pending items in the queue.
 
         Args:

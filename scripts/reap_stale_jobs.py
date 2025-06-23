@@ -1,5 +1,4 @@
 import argparse
-from typing import Optional
 
 from dr_exp.utils.jobdb_factory import get_job_db_client
 from dr_exp.utils.job_reaper import reap_stale_jobs
@@ -17,7 +16,7 @@ def build_arg_parser() -> argparse.ArgumentParser:
     return parser
 
 
-def main(argv: Optional[list[str]] = None) -> None:
+def main(argv: list[str] | None = None) -> None:
     args = build_arg_parser().parse_args(argv)
     client = get_job_db_client()
     count = reap_stale_jobs(client, args.max_age_mins)
@@ -27,4 +26,4 @@ def main(argv: Optional[list[str]] = None) -> None:
 if __name__ == "__main__":
     main()
 
-__all__ = ["reap_stale_jobs", "build_arg_parser", "main"]
+__all__ = ["build_arg_parser", "main", "reap_stale_jobs"]

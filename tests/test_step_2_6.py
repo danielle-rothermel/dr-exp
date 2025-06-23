@@ -3,7 +3,7 @@
 import tempfile
 import json
 from pathlib import Path
-from typing import Dict, Any, Optional
+from typing import Any
 
 from dr_exp.core.job_db import JobDB
 from dr_exp.worker.base import Worker
@@ -206,7 +206,7 @@ def test_worker_artifact_discovery() -> None:
                 job_id: str,
                 file_path: str,
                 file_type: str,
-                metadata: Optional[Dict[str, Any]] = None,
+                metadata: dict[str, Any] | None = None,
             ) -> None:
                 queued_files.append((Path(file_path).name, file_type))
                 super().add_artifact_to_sync(job_id, file_path, file_type, metadata)

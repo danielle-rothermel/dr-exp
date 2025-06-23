@@ -152,7 +152,8 @@ def main():
                 "--experiment",
                 args.experiment,
                 "status",
-            ]
+            ],
+            check=False,
         )
 
     # Print failure summary if any

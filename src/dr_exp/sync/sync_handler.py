@@ -1,7 +1,7 @@
 """Sync handler that connects sync queue to Supabase."""
 
 from pathlib import Path
-from typing import Optional, Dict, Any
+from typing import Any
 
 from .queue import SyncItem
 from .supabase_client import SupabaseClient
@@ -14,9 +14,9 @@ class SyncHandler:
         self,
         experiment_name: str,
         base_path: str,
-        supabase_url: Optional[str] = None,
-        supabase_key: Optional[str] = None,
-    ):
+        supabase_url: str | None = None,
+        supabase_key: str | None = None,
+    ) -> None:
         """Initialize sync handler.
 
         Args:
@@ -30,13 +30,13 @@ class SyncHandler:
 
         # Initialize Supabase client
         try:
-            self.client: Optional[SupabaseClient] = SupabaseClient(
+            self.client: SupabaseClient | None = SupabaseClient(
                 url=supabase_url, key=supabase_key
             )
             self.enabled = True
 
             # Get or create experiment
-            self.experiment_id: Optional[str] = self.client.get_or_create_experiment(
+            self.experiment_id: str | None = self.client.get_or_create_experiment(
                 experiment_name=experiment_name, base_path=base_path
             )
         except Exception as e:
@@ -46,7 +46,7 @@ class SyncHandler:
             self.enabled = False
             self.experiment_id = None
 
-    def sync_file(self, item: SyncItem) -> Dict[str, Any]:
+    def sync_file(self, item: SyncItem) -> dict[str, Any]:
         """Sync a single file to Supabase.
 
         Args:
@@ -94,7 +94,7 @@ class SyncHandler:
         # Return metrics
         return {"bytes_uploaded": file_size, "file_type": item.file_type}
 
-    def sync_job_data(self, job_data: Dict[str, Any]) -> bool:
+    def sync_job_data(self, job_data: dict[str, Any]) -> bool:
         """Sync job metadata to Supabase.
 
         Args:

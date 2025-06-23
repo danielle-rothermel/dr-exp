@@ -7,7 +7,6 @@ import subprocess
 import sys
 import time
 from pathlib import Path
-from typing import List, Tuple
 
 from submission_utils import JobSubmitter
 
@@ -43,7 +42,7 @@ HIGH_REG_EXPERIMENTS = [
 ]
 
 
-def load_failed_jobs(log_dir: Path) -> List[Tuple[str, int]]:
+def load_failed_jobs(log_dir: Path) -> list[tuple[str, int]]:
     """Load failed jobs from the most recent log file."""
     if not log_dir.exists():
         return []
@@ -359,7 +358,8 @@ Examples:
                 "--experiment",
                 args.experiment,
                 "status",
-            ]
+            ],
+            check=False,
         )
 
     # Print failure summary if any

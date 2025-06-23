@@ -8,13 +8,17 @@ from pathlib import Path
 def test_local_supabase() -> tuple[str, str]:
     """Test local Supabase setup."""
     # Check if Supabase is installed
-    result = subprocess.run(["supabase", "--version"], capture_output=True, text=True)
+    result = subprocess.run(
+        ["supabase", "--version"], capture_output=True, text=True, check=False
+    )
     assert result.returncode == 0, "Supabase CLI not installed"
     print(f"Supabase version: {result.stdout.strip()}")
 
     # Start Supabase (if not already running)
     print("Starting local Supabase...")
-    result = subprocess.run(["supabase", "start"], capture_output=True, text=True)
+    result = subprocess.run(
+        ["supabase", "start"], capture_output=True, text=True, check=False
+    )
     if result.returncode != 0 and "is already running" not in result.stderr:
         print(f"Error starting Supabase: {result.stderr}")
         assert False, "Failed to start Supabase"
@@ -23,7 +27,9 @@ def test_local_supabase() -> tuple[str, str]:
     time.sleep(2)
 
     # Get status
-    result = subprocess.run(["supabase", "status"], capture_output=True, text=True)
+    result = subprocess.run(
+        ["supabase", "status"], capture_output=True, text=True, check=False
+    )
     assert result.returncode == 0
     print("Supabase status:")
     print(result.stdout)

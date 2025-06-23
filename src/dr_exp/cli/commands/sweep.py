@@ -20,7 +20,7 @@ from dr_exp.cli.sweep_utils import (
 @click.option("--dry-run", is_flag=True, help="Show configs without creating jobs")
 @click.option("--verbose", is_flag=True, help="Show detailed config information")
 @click.pass_context
-def sweep(
+def sweep(  # noqa: C901
     ctx: click.Context,
     config: str,
     params: str,
@@ -29,20 +29,20 @@ def sweep(
     dry_run: bool,
     verbose: bool,
 ) -> None:
-    """Submit a parameter sweep based on a config file.
-    
+    r"""Submit a parameter sweep based on a config file.
+
     Examples:
         # Basic sweep
         dr_exp --base-path /scratch --experiment exp1 job sweep \\
             --config configs/train.yaml \\
             --params "model=resnet18,resnet50 lr=0.001,0.01"
-            
+
         # With target override
         dr_exp --base-path /scratch --experiment exp1 job sweep \\
             --config configs/base.yaml \\
             --params "epochs=10,20,50" \\
             --target dr_exp.training.train_model
-            
+
         # Dry run to preview
         dr_exp --base-path /scratch --experiment exp1 job sweep \\
             --config configs/train.yaml \\
@@ -120,7 +120,8 @@ def sweep(
             created += 1
 
             # Show progress for large sweeps
-            if len(configs) > 20 and (i + 1) % 10 == 0:
+            PROGRESS_THRESHOLD = 20
+            if len(configs) > PROGRESS_THRESHOLD and (i + 1) % 10 == 0:
                 click.echo(f"Progress: {i + 1}/{len(configs)} jobs...")
 
         except Exception as e:

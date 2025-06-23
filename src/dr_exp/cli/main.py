@@ -6,15 +6,20 @@ import sys
 import time
 from datetime import UTC, datetime
 from pathlib import Path
-from typing import Optional, Tuple, Dict, Any, cast
+from typing import Any, cast
 
 import click
 
-from ..core.job_db import JobDB
-from ..sync.queue import SyncQueue
-from ..worker.base import Worker
+from dr_exp.core.job_db import JobDB
+from dr_exp.sync.queue import SyncQueue
+from dr_exp.worker.base import Worker
 from .commands.sweep import sweep
 from .commands.slurm import slurm
+
+# Constants
+DESCRIPTION_MAX_LENGTH = 30
+DESCRIPTION_TRUNCATE_LENGTH = 27
+STALE_JOB_THRESHOLD_SECONDS = 300
 
 
 @click.group()
@@ -44,11 +49,11 @@ def cli(ctx: click.Context, base_path: str, experiment: str) -> None:
 def worker(
     ctx: click.Context,
     worker_id: str,
-    working_dir: Optional[str],
-    max_jobs: Optional[int],
+    working_dir: str | None,
+    max_jobs: int | None,
     no_sync: bool,
-    supabase_url: Optional[str],
-    supabase_key: Optional[str],
+    supabase_url: str | None,
+    supabase_key: str | None,
 ) -> None:
     """Run a worker to process jobs."""
     job_db = JobDB(
@@ -113,7 +118,6 @@ def worker(
 @click.pass_context
 def system(ctx: click.Context) -> None:
     """System and launcher commands."""
-    pass
 
 
 @system.command()
@@ -122,7 +126,7 @@ def system(ctx: click.Context) -> None:
 @click.pass_context
 def launcher(ctx: click.Context, workers_per_gpu: int, max_hours: float) -> None:
     """Run multi-worker launcher for SLURM jobs."""
-    from ..worker.launcher import WorkerLauncher
+    from dr_exp.worker.launcher import WorkerLauncher
 
     # Create JobDB instance for this command
     job_db = JobDB(
@@ -148,7 +152,6 @@ def launcher(ctx: click.Context, workers_per_gpu: int, max_hours: float) -> None
 @click.pass_context
 def job(ctx: click.Context) -> None:
     """Job management commands."""
-    pass
 
 
 # Add sweep command to job group
@@ -174,21 +177,21 @@ def submit(
     config_path: str,
     config_name: str,
     priority: int,
-    tags: Optional[str],
-    overrides: Optional[str],
+    tags: str | None,
+    overrides: str | None,
 ) -> None:
     """Submit a job using Hydra config composition."""
     from hydra import compose, initialize_config_dir
     from hydra.core.global_hydra import GlobalHydra
     from omegaconf import OmegaConf
-    import os
 
     # Clear any existing Hydra instance
     GlobalHydra.instance().clear()
 
     # Convert config path to absolute
-    if not os.path.isabs(config_path):
-        config_path = os.path.abspath(config_path)
+    config_path_obj = Path(config_path)
+    if not config_path_obj.is_absolute():
+        config_path = str(config_path_obj.resolve())
 
     # Prepare overrides list
     override_list = []
@@ -204,7 +207,7 @@ def submit(
             # Convert to plain dict for storage
             config_dict = OmegaConf.to_container(cfg, resolve=True)
             assert isinstance(config_dict, dict), "Config must be a dictionary"
-            config_dict = cast(Dict[str, Any], config_dict)
+            config_dict = cast(dict[str, Any], config_dict)
     except Exception as e:
         click.echo(f"Error composing config: {e}", err=True)
         ctx.exit(1)
@@ -245,11 +248,11 @@ def submit(
         click.echo(f"Tags: {', '.join(tag_list)}")
 
 
-@job.command()
+@job.command(name="list")
 @click.option("--status", help="Filter by status (queued, running, completed, failed)")
 @click.option("--tag", help="Filter by tag")
 @click.pass_context
-def list(ctx: click.Context, status: Optional[str], tag: Optional[str]) -> None:
+def list_jobs(ctx: click.Context, status: str | None, tag: str | None) -> None:
     """List jobs in the experiment."""
     job_db = JobDB(
         base_path=ctx.obj["base_path"], experiment_name=ctx.obj["experiment"]
@@ -267,9 +270,11 @@ def list(ctx: click.Context, status: Optional[str], tag: Optional[str]) -> None:
         return
 
     # Display header
-    click.echo(
-        f"{'ID':>12} {'Description':>30} {'Status':>10} {'Priority':>8} {'Worker':>15} {'Created'}"
+    header = (
+        f"{'ID':>12} {'Description':>30} {'Status':>10} {'Priority':>8} "
+        f"{'Worker':>15} {'Created'}"
     )
+    click.echo(header)
     click.echo("-" * 105)
 
     # Display jobs
@@ -293,8 +298,8 @@ def list(ctx: click.Context, status: Optional[str], tag: Optional[str]) -> None:
             description += f" [{','.join(job_tags)}]"
 
         # Truncate description if too long
-        if len(description) > 30:
-            description = description[:27] + "..."
+        if len(description) > DESCRIPTION_MAX_LENGTH:
+            description = description[:DESCRIPTION_TRUNCATE_LENGTH] + "..."
 
         # Color status
         if job_status == "completed":
@@ -306,9 +311,11 @@ def list(ctx: click.Context, status: Optional[str], tag: Optional[str]) -> None:
         else:
             status_str = f"{job_status:>10}"
 
-        click.echo(
-            f"{job_id:>12} {description:>30} {status_str} {priority:>8} {worker:>15} {created}"
+        job_line = (
+            f"{job_id:>12} {description:>30} {status_str} {priority:>8} "
+            f"{worker:>15} {created}"
         )
+        click.echo(job_line)
 
     # Summary
     click.echo("-" * 105)
@@ -319,7 +326,6 @@ def list(ctx: click.Context, status: Optional[str], tag: Optional[str]) -> None:
 @click.pass_context
 def init(ctx: click.Context) -> None:
     """Initialize a new experiment."""
-
     click.echo(f"Initializing experiment: {ctx.obj['experiment']}")
     click.echo(f"Base path: {ctx.obj['base_path']}")
 
@@ -358,9 +364,12 @@ optimizer:
     click.echo(f"Created: {example_config}")
 
     click.echo("\nExperiment initialized successfully!")
-    click.echo(
-        f"\nTo submit a job: dr_exp --base-path {ctx.obj['base_path']} --experiment {ctx.obj['experiment']} submit --config-path configs --config-name your_config"
+    submit_example = (
+        f"\nTo submit a job: dr_exp --base-path {ctx.obj['base_path']} "
+        f"--experiment {ctx.obj['experiment']} submit --config-path configs "
+        f"--config-name your_config"
     )
+    click.echo(submit_example)
 
 
 @cli.command()
@@ -399,7 +408,7 @@ def status(ctx: click.Context) -> None:
     # Check sync queue
     sync_queue_path = Path(info["experiment_path"]) / "sync_queue"
     if sync_queue_path.exists():
-        from ..sync.queue import SyncQueue
+        from dr_exp.sync.queue import SyncQueue
 
         sync_queue = SyncQueue(sync_queue_path)
         sync_stats = sync_queue.get_stats()
@@ -415,7 +424,7 @@ def status(ctx: click.Context) -> None:
 @job.command()
 @click.argument("job_ids", nargs=-1, required=True)
 @click.pass_context
-def kill(ctx: click.Context, job_ids: Tuple[str, ...]) -> None:
+def kill(ctx: click.Context, job_ids: tuple[str, ...]) -> None:
     """Kill one or more jobs."""
     # Create JobDB instance for this command
     job_db = JobDB(
@@ -466,7 +475,7 @@ def kill(ctx: click.Context, job_ids: Tuple[str, ...]) -> None:
 @click.argument("job_ids", nargs=-1, required=True)
 @click.option("--priority", type=int, required=True, help="New priority (0-1000)")
 @click.pass_context
-def boost(ctx: click.Context, job_ids: Tuple[str, ...], priority: int) -> None:
+def boost(ctx: click.Context, job_ids: tuple[str, ...], priority: int) -> None:
     """Boost priority of one or more jobs."""
     # Create JobDB instance for this command
     job_db = JobDB(
@@ -556,7 +565,6 @@ def recover(ctx: click.Context, threshold: int, dry_run: bool) -> None:
 @click.pass_context
 def sync_status(ctx: click.Context, verbose: bool) -> None:
     """Show sync queue status."""
-
     sync_queue_path = Path(ctx.obj["base_path"]) / ctx.obj["experiment"] / "sync_queue"
     if not sync_queue_path.exists():
         click.echo("No sync queue found")
@@ -592,7 +600,7 @@ def sync_status(ctx: click.Context, verbose: bool) -> None:
 @click.option("--working-dir", help="Working directory for execution")
 @click.pass_context
 def run_one(
-    ctx: click.Context, job_id: str, no_sync: bool, working_dir: Optional[str]
+    ctx: click.Context, job_id: str, no_sync: bool, working_dir: str | None
 ) -> None:
     """Run a specific job immediately by job ID.
 
@@ -676,7 +684,7 @@ def run_one(
 
 @cli.command()
 @click.pass_context
-def validate(ctx: click.Context) -> None:
+def validate(ctx: click.Context) -> None:  # noqa: C901
     """Validate experiment setup and configuration."""
     exp_path = Path(ctx.obj["base_path"]) / ctx.obj["experiment"]
 
@@ -722,10 +730,12 @@ def validate(ctx: click.Context) -> None:
                     if last_heartbeat:
                         last_time = datetime.fromisoformat(last_heartbeat)
                         stale_seconds = (now - last_time).total_seconds()
-                        if stale_seconds > 300:
-                            warnings.append(
-                                f"Job {job['id']} may be stale (no heartbeat for {int(stale_seconds)}s)"
+                        if stale_seconds > STALE_JOB_THRESHOLD_SECONDS:
+                            stale_warning = (
+                                f"Job {job['id']} may be stale "
+                                f"(no heartbeat for {int(stale_seconds)}s)"
                             )
+                            warnings.append(stale_warning)
     except Exception as e:
         issues.append(f"Error reading jobs: {e}")
 

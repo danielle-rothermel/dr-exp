@@ -8,8 +8,12 @@ import time
 import json
 from pathlib import Path
 from datetime import datetime, UTC
-from typing import List, Dict, Optional, Any
+from typing import TYPE_CHECKING
 import logging
+import contextlib
+
+if TYPE_CHECKING:
+    from dr_exp.core.job_db import JobDB
 
 # Configure logging for launcher
 logging.basicConfig(
@@ -22,13 +26,19 @@ logging.basicConfig(
 
 logger = logging.getLogger(__name__)
 
+# Constants
+STATUS_WRITE_INTERVAL = 60  # Write status every minute
+MAINTENANCE_INTERVAL = 600  # Run maintenance every 10 minutes
+WORKER_CHECK_INTERVAL = 5  # Check worker health every 5 seconds
+GRACEFUL_SHUTDOWN_TIMEOUT = 5  # Wait 5 seconds before force kill
+
 
 class WorkerLauncher:
     """Launches and monitors multiple workers across GPUs."""
 
     def __init__(
         self,
-        job_db: Any,
+        job_db: "JobDB",
         experiment_name: str,
         base_log_dir: Path,
         workers_per_gpu: int = 2,
@@ -76,8 +86,8 @@ class WorkerLauncher:
         )
 
         # Process tracking
-        self.processes: Dict[str, subprocess.Popen] = {}
-        self.worker_restarts: Dict[str, int] = {}
+        self.processes: dict[str, subprocess.Popen[bytes]] = {}
+        self.worker_restarts: dict[str, int] = {}
         self.start_time = time.time()
         self.running = False
 
@@ -85,7 +95,7 @@ class WorkerLauncher:
         signal.signal(signal.SIGTERM, self._handle_signal)
         signal.signal(signal.SIGINT, self._handle_signal)
 
-    def discover_gpus(self) -> List[int]:
+    def discover_gpus(self) -> list[int]:
         """Discover available GPUs.
 
         Returns:
@@ -100,9 +110,10 @@ class WorkerLauncher:
                 logger.warning(f"Invalid CUDA_VISIBLE_DEVICES: {cuda_visible}")
 
         # Fall back to nvidia-smi
+        # Note: subprocess call is safe - using hardcoded trusted nvidia-smi command
         try:
-            result = subprocess.run(
-                ["nvidia-smi", "--list-gpus"],
+            result = subprocess.run(  # noqa: S603 - trusted nvidia-smi command
+                ["/usr/bin/nvidia-smi", "--list-gpus"],  # Use full path for security
                 capture_output=True,
                 text=True,
                 check=True,
@@ -113,7 +124,7 @@ class WorkerLauncher:
             logger.warning("No GPUs detected, running in CPU mode")
             return []
 
-    def spawn_worker(self, gpu_index: Optional[int], worker_index: int) -> str:
+    def spawn_worker(self, gpu_index: int | None, worker_index: int) -> str:
         """Spawn a single worker process.
 
         Args:
@@ -125,7 +136,9 @@ class WorkerLauncher:
         """
         # Create unique worker ID
         if gpu_index is not None:
-            worker_id = f"slurm{self.slurm_job_id}_{self.slurm_node_name}_gpu{gpu_index}_{worker_index}"
+            worker_id = (
+                f"slurm{self.slurm_job_id}_{self.slurm_node_name}_gpu{gpu_index}_{worker_index}"
+            )
         else:
             worker_id = (
                 f"slurm{self.slurm_job_id}_{self.slurm_node_name}_cpu_{worker_index}"
@@ -157,13 +170,15 @@ class WorkerLauncher:
 
         logger.info(f"Spawning worker {worker_id} on GPU {gpu_index}")
 
-        with open(worker_log, "w") as log_file:
-            process = subprocess.Popen(
+        with worker_log.open("w") as log_file:
+            # Note: subprocess call is safe - using trusted dr_exp CLI command
+            # preexec_fn usage: Required for proper process group management in HPC
+            process = subprocess.Popen(  # noqa: S603 - trusted dr_exp CLI command
                 cmd,
                 env=env,
                 stdout=log_file,
                 stderr=subprocess.STDOUT,
-                preexec_fn=os.setsid,  # Create new process group
+                preexec_fn=os.setsid,  # noqa: PLW1509 - required for process groups
             )
 
         self.processes[worker_id] = process
@@ -171,7 +186,7 @@ class WorkerLauncher:
 
         return worker_id
 
-    def check_worker_health(self) -> Dict[str, str]:
+    def check_worker_health(self) -> dict[str, str]:
         """Check health of all workers.
 
         Returns:
@@ -189,18 +204,17 @@ class WorkerLauncher:
                 del self.processes[worker_id]
 
                 # Check if we should restart
-                if self.restart_on_failure and self.running:
-                    if self.has_pending_jobs():
-                        # Extract GPU info from worker ID
-                        if "_gpu" in worker_id:
-                            parts = worker_id.split("_gpu")
-                            gpu_part = parts[1].split("_")[0]
-                            gpu_index = int(gpu_part)
-                            worker_index = int(parts[1].split("_")[1])
-                            self.spawn_worker(gpu_index, worker_index)
-                        elif "_cpu" in worker_id:
-                            worker_index = int(worker_id.split("_cpu_")[1])
-                            self.spawn_worker(None, worker_index)
+                if self.restart_on_failure and self.running and self.has_pending_jobs():
+                    # Extract GPU info from worker ID
+                    if "_gpu" in worker_id:
+                        parts = worker_id.split("_gpu")
+                        gpu_part = parts[1].split("_")[0]
+                        gpu_index = int(gpu_part)
+                        worker_index = int(parts[1].split("_")[1])
+                        self.spawn_worker(gpu_index, worker_index)
+                    elif "_cpu" in worker_id:
+                        worker_index = int(worker_id.split("_cpu_")[1])
+                        self.spawn_worker(None, worker_index)
 
         return status
 
@@ -209,7 +223,7 @@ class WorkerLauncher:
         queued = self.job_db.list_jobs(status="queued")
         return len(queued) > 0
 
-    def check_control_files(self) -> Optional[str]:
+    def check_control_files(self) -> str | None:
         """Check for control file commands.
 
         Returns:
@@ -250,14 +264,14 @@ class WorkerLauncher:
         }
 
         status_file = self.control_dir / f"status_{self.slurm_job_id}.json"
-        with open(status_file, "w") as f:
+        with status_file.open("w") as f:
             json.dump(status_data, f, indent=2)
 
     def aggregate_errors(self) -> None:
         """Aggregate errors from worker logs."""
         error_file = self.log_dir / "errors.log"
 
-        with open(error_file, "w") as err_out:
+        with error_file.open("w") as err_out:
             err_out.write(f"Error aggregation at {datetime.now(UTC).isoformat()}\n")
             err_out.write("=" * 80 + "\n\n")
 
@@ -267,7 +281,7 @@ class WorkerLauncher:
 
                 # Look for errors in log
                 errors_found = False
-                with open(log_file) as f:
+                with log_file.open() as f:
                     for line in f:
                         if any(
                             marker in line.lower()
@@ -319,12 +333,12 @@ class WorkerLauncher:
                     break
 
                 # Write status every minute
-                if time.time() - last_status_write > 60:
+                if time.time() - last_status_write > STATUS_WRITE_INTERVAL:
                     self.write_status()
                     last_status_write = time.time()
 
                 # Run maintenance every 10 minutes
-                if time.time() - last_maintenance > 600:
+                if time.time() - last_maintenance > MAINTENANCE_INTERVAL:
                     self.maintenance()
                     last_maintenance = time.time()
 
@@ -332,7 +346,7 @@ class WorkerLauncher:
                 self.check_worker_health()
 
                 # Sleep briefly
-                time.sleep(5)
+                time.sleep(WORKER_CHECK_INTERVAL)
 
             except KeyboardInterrupt:
                 logger.info("Received interrupt, shutting down")
@@ -367,22 +381,18 @@ class WorkerLauncher:
         # Send SIGTERM to all workers
         for worker_id, process in self.processes.items():
             logger.info(f"Terminating {worker_id}")
-            try:
+            with contextlib.suppress(ProcessLookupError):
                 os.killpg(os.getpgid(process.pid), signal.SIGTERM)
-            except ProcessLookupError:
-                pass
 
         # Wait briefly for graceful shutdown
-        time.sleep(5)
+        time.sleep(GRACEFUL_SHUTDOWN_TIMEOUT)
 
         # Force kill any remaining
         for worker_id, process in list(self.processes.items()):
             if process.poll() is None:
                 logger.warning(f"Force killing {worker_id}")
-                try:
+                with contextlib.suppress(ProcessLookupError):
                     os.killpg(os.getpgid(process.pid), signal.SIGKILL)
-                except ProcessLookupError:
-                    pass
 
     def finish_current(self) -> None:
         """Let workers finish current jobs then stop."""
@@ -427,7 +437,7 @@ class WorkerLauncher:
 
         logger.info("Launcher shutdown complete")
 
-    def _handle_signal(self, signum: int, frame: Any) -> None:
+    def _handle_signal(self, signum: int, _frame: object) -> None:
         """Handle shutdown signals."""
         logger.info(f"Received signal {signum}")
         self.stop()

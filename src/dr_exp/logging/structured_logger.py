@@ -2,20 +2,20 @@
 
 import json
 from pathlib import Path
-from typing import Dict, Any, Optional, Union
+from typing import Any
 from datetime import datetime, UTC
 from contextlib import contextmanager
 
 from omegaconf import OmegaConf, DictConfig
 
 
-def _convert_config(config: Any) -> Any:
+def _convert_config(config: Any) -> Any:  # noqa: ANN401
     """Convert DictConfig and other special objects to JSON-serializable types."""
     if isinstance(config, DictConfig):
         return OmegaConf.to_container(config, resolve=True)
     elif isinstance(config, dict):
         return {k: _convert_config(v) for k, v in config.items()}
-    elif isinstance(config, (list, tuple)):
+    elif isinstance(config, list | tuple):
         return [_convert_config(item) for item in config]
     else:
         return config
@@ -24,7 +24,7 @@ def _convert_config(config: Any) -> Any:
 class StructuredLogger:
     """Logger that writes structured data (metrics, configs, etc.) to files."""
 
-    def __init__(self, log_dir: Union[str, Path], job_id: str, worker_id: str) -> None:
+    def __init__(self, log_dir: str | Path, job_id: str, worker_id: str) -> None:
         """Initialize structured logger.
 
         Args:
@@ -57,10 +57,10 @@ class StructuredLogger:
             "log_version": "1.0",
         }
 
-        with open(self.metadata_file, "w") as f:
+        with self.metadata_file.open("w") as f:
             json.dump(metadata, f, indent=2)
 
-    def log_config(self, config: Dict[str, Any]) -> None:
+    def log_config(self, config: dict[str, Any]) -> None:
         """Log the configuration used for this run.
 
         Args:
@@ -69,10 +69,10 @@ class StructuredLogger:
         # Convert DictConfig to regular dict if needed
         config = _convert_config(config)
 
-        with open(self.config_file, "w") as f:
+        with self.config_file.open("w") as f:
             json.dump(config, f, indent=2)
 
-    def log_metrics(self, metrics: Dict[str, Any], step: Optional[int] = None) -> None:
+    def log_metrics(self, metrics: dict[str, Any], step: int | None = None) -> None:
         """Log metrics for a training step.
 
         Args:
@@ -85,10 +85,10 @@ class StructuredLogger:
             "metrics": metrics,
         }
 
-        with open(self.metrics_file, "a") as f:
+        with self.metrics_file.open("a") as f:
             f.write(json.dumps(entry) + "\n")
 
-    def log_event(self, event_type: str, data: Optional[Dict[str, Any]] = None) -> None:
+    def log_event(self, event_type: str, data: dict[str, Any] | None = None) -> None:
         """Log a training event (start, end, checkpoint, etc.).
 
         Args:
@@ -101,14 +101,14 @@ class StructuredLogger:
             "data": data or {},
         }
 
-        with open(self.events_file, "a") as f:
+        with self.events_file.open("a") as f:
             f.write(json.dumps(entry) + "\n")
 
     def log_artifact(
         self,
         artifact_path: Path,
         artifact_type: str,
-        metadata: Optional[Dict[str, Any]] = None,
+        metadata: dict[str, Any] | None = None,
     ) -> None:
         """Log that an artifact was created.
 
@@ -127,7 +127,7 @@ class StructuredLogger:
         )
 
     @contextmanager
-    def phase(self, phase_name: str) -> Any:
+    def phase(self, phase_name: str) -> Any:  # noqa: ANN401
         """Context manager for logging training phases.
 
         Args:
@@ -139,7 +139,7 @@ class StructuredLogger:
         finally:
             self.log_event(f"{phase_name}_end")
 
-    def get_summary(self) -> Dict[str, Any]:
+    def get_summary(self) -> dict[str, Any]:
         """Get a summary of the logged data.
 
         Returns:
@@ -155,7 +155,7 @@ class StructuredLogger:
 
         # Count metrics entries and get final
         if self.metrics_file.exists():
-            with open(self.metrics_file, "r") as f:
+            with self.metrics_file.open() as f:
                 lines = f.readlines()
                 summary["metrics_entries"] = len(lines)
                 if lines:
@@ -164,7 +164,7 @@ class StructuredLogger:
 
         # Count events
         if self.events_file.exists():
-            with open(self.events_file, "r") as f:
+            with self.events_file.open() as f:
                 summary["events_entries"] = sum(1 for _ in f)
 
         return summary

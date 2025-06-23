@@ -7,7 +7,6 @@ import click
 @click.group()
 def slurm() -> None:
     """SLURM job management commands."""
-    pass
 
 
 @slurm.command()
@@ -37,7 +36,7 @@ def status(ctx: click.Context) -> None:
         status_file = job_db.control_dir / f"status_{job_id}.json"
 
         if status_file.exists():
-            with open(status_file) as f:
+            with status_file.open() as f:
                 status = json.load(f)
 
             # Extract key info
@@ -111,7 +110,7 @@ def errors(ctx: click.Context, job_id: str, tail: int) -> None:
         return
 
     # Show last N lines
-    with open(error_log) as f:
+    with error_log.open() as f:
         lines = f.readlines()
         for line in lines[-tail:]:
             click.echo(line.rstrip())
@@ -143,7 +142,7 @@ def logs(ctx: click.Context, job_id: str, worker: str | None, tail: int) -> None
         return
 
     # Show last N lines
-    with open(log_file) as f:
+    with log_file.open() as f:
         lines = f.readlines()
         for line in lines[-tail:]:
             click.echo(line.rstrip())

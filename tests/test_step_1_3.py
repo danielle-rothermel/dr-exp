@@ -167,7 +167,7 @@ def test_sync_queue():
         # Verify files are ordered by timestamp
         sync_files.sort()
         for sync_file in sync_files:
-            with open(sync_file, "r") as f:
+            with open(sync_file) as f:
                 sync_data = json.load(f)
                 assert sync_data["id"] in sync_ids
                 assert sync_data["job_id"] == job_id

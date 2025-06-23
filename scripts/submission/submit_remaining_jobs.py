@@ -43,7 +43,7 @@ cmd_check = [
     "job",
     "list",
 ]
-result = subprocess.run(cmd_check, capture_output=True, text=True)
+result = subprocess.run(cmd_check, capture_output=True, text=True, check=False)
 existing_jobs = (
     result.stdout.count("queued")
     + result.stdout.count("running")
@@ -75,7 +75,7 @@ def submit_job(config_name, seed, priority):
         str(priority),
     ]
 
-    result = subprocess.run(cmd, capture_output=True, text=True)
+    result = subprocess.run(cmd, capture_output=True, text=True, check=False)
     if result.returncode == 0:
         # Extract job ID from output
         for line in result.stdout.split("\n"):

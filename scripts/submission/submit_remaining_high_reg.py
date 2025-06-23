@@ -96,7 +96,8 @@ def main():
             "--experiment",
             "main",
             "status",
-        ]
+        ],
+        check=False,
     )
 
 

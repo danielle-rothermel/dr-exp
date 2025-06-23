@@ -26,7 +26,7 @@ if not sql_file.exists():
     print(f"❌ SQL file not found: {sql_file}")
     sys.exit(1)
 
-with open(sql_file, "r") as f:
+with open(sql_file) as f:
     sql_content = f.read()
 
 # Since Supabase Python client doesn't support running raw SQL directly,
