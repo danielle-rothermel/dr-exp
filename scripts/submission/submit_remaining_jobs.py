@@ -2,7 +2,6 @@
 """Submit remaining ablation experiment jobs."""
 
 import subprocess
-from pathlib import Path
 
 # Configuration
 EXP_DIR = "/scratch/ddr8143/repos/dr_exp/chronological_ablation"
@@ -13,7 +12,7 @@ CONFIG_PATH = "exp_configs"
 # All step configs in order
 STEPS = [
     "step00_baseline",
-    "step01_sgd", 
+    "step01_sgd",
     "step02_no_randaug",
     "step03_no_cutmix",
     "step04_no_mixup",
@@ -34,38 +33,59 @@ STEPS = [
 
 # Check how many jobs already exist
 cmd_check = [
-    "uv", "run", "dr_exp",
-    "--base-path", EXP_DIR,
-    "--experiment", EXPERIMENT,
-    "job", "list"
+    "uv",
+    "run",
+    "dr_exp",
+    "--base-path",
+    EXP_DIR,
+    "--experiment",
+    EXPERIMENT,
+    "job",
+    "list",
 ]
 result = subprocess.run(cmd_check, capture_output=True, text=True)
-existing_jobs = result.stdout.count("queued") + result.stdout.count("running") + result.stdout.count("completed") + result.stdout.count("failed")
+existing_jobs = (
+    result.stdout.count("queued")
+    + result.stdout.count("running")
+    + result.stdout.count("completed")
+    + result.stdout.count("failed")
+)
 print(f"Found {existing_jobs} existing jobs")
+
 
 def submit_job(config_name, seed, priority):
     """Submit a single job."""
     cmd = [
-        "uv", "run", "dr_exp",
-        "--base-path", EXP_DIR,
-        "--experiment", EXPERIMENT,
-        "job", "submit",
-        "--config-path", CONFIG_PATH,
-        "--config-name", f"{config_name}",
-        "--overrides", f"seed={seed}",
-        "--priority", str(priority)
+        "uv",
+        "run",
+        "dr_exp",
+        "--base-path",
+        EXP_DIR,
+        "--experiment",
+        EXPERIMENT,
+        "job",
+        "submit",
+        "--config-path",
+        CONFIG_PATH,
+        "--config-name",
+        f"{config_name}",
+        "--overrides",
+        f"seed={seed}",
+        "--priority",
+        str(priority),
     ]
-    
+
     result = subprocess.run(cmd, capture_output=True, text=True)
     if result.returncode == 0:
         # Extract job ID from output
-        for line in result.stdout.split('\n'):
+        for line in result.stdout.split("\n"):
             if line.startswith("Created job:"):
                 job_id = line.split(": ")[1]
                 return job_id
     else:
         print(f"Error submitting {config_name} seed={seed}: {result.stderr}")
         return None
+
 
 # Submit remaining jobs
 total_jobs = len(STEPS) * len(SEEDS)
@@ -78,24 +98,28 @@ print("=" * 60)
 for step_idx, step_name in enumerate(STEPS):
     for seed_idx, seed in enumerate(SEEDS):
         job_count += 1
-        
+
         # Skip if we've already submitted enough jobs
         if job_count <= existing_jobs:
             continue
-            
+
         # Priority: later steps get higher priority to see degradation sooner
         # Also prioritize seed 0 slightly to get one complete run per config faster
         # Scale to fit within 0-1000 range
         priority = (len(STEPS) - step_idx) * 50 + (2 - seed_idx) * 5
         priority = min(priority, 1000)  # Ensure within limits
-        
+
         job_id = submit_job(step_name, seed, priority)
         submitted_count += 1
-        
+
         if job_id:
-            print(f"[{submitted_count:3d}/{total_jobs - existing_jobs}] {step_name} seed={seed} priority={priority} -> {job_id}")
+            print(
+                f"[{submitted_count:3d}/{total_jobs - existing_jobs}] {step_name} seed={seed} priority={priority} -> {job_id}"
+            )
         else:
-            print(f"[{submitted_count:3d}/{total_jobs - existing_jobs}] {step_name} seed={seed} -> FAILED")
+            print(
+                f"[{submitted_count:3d}/{total_jobs - existing_jobs}] {step_name} seed={seed} -> FAILED"
+            )
 
 print("=" * 60)
 print(f"Submitted {submitted_count} additional jobs")
@@ -104,4 +128,6 @@ print(f"Base path: {EXP_DIR}")
 print("\nTo monitor status:")
 print(f"  uv run dr_exp --base-path {EXP_DIR} --experiment {EXPERIMENT} status")
 print("\nTo launch workers (6 workers on 1 GPU):")
-print(f"  uv run dr_exp --base-path {EXP_DIR} --experiment {EXPERIMENT} system launcher --workers-per-gpu 6")
+print(
+    f"  uv run dr_exp --base-path {EXP_DIR} --experiment {EXPERIMENT} system launcher --workers-per-gpu 6"
+)

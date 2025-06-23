@@ -17,13 +17,11 @@ remaining_jobs = [
     ("step02_no_randaug_high_reg.yaml", 2, 78),
     ("step02_no_randaug_high_reg.yaml", 3, 77),
     ("step02_no_randaug_high_reg.yaml", 4, 76),
-    
     ("step03_no_cutmix_high_reg.yaml", 0, 70),
     ("step03_no_cutmix_high_reg.yaml", 1, 69),
     ("step03_no_cutmix_high_reg.yaml", 2, 68),
     ("step03_no_cutmix_high_reg.yaml", 3, 67),
     ("step03_no_cutmix_high_reg.yaml", 4, 66),
-    
     ("step04_no_mixup_high_reg.yaml", 0, 60),
     ("step04_no_mixup_high_reg.yaml", 1, 59),
     ("step04_no_mixup_high_reg.yaml", 2, 58),
@@ -31,19 +29,29 @@ remaining_jobs = [
     ("step04_no_mixup_high_reg.yaml", 4, 56),
 ]
 
+
 def submit_job(config_name: str, seed: int, priority: int):
     """Submit a single job."""
     cmd = [
-        "uv", "run", "dr_exp",
-        "--base-path", str(EXP_DIR),
-        "--experiment", "main",
-        "job", "submit",
-        "--config-path", str(CONFIG_DIR),
-        "--config-name", config_name,
-        "--priority", str(priority),
-        "--overrides", f"seed={seed}"
+        "uv",
+        "run",
+        "dr_exp",
+        "--base-path",
+        str(EXP_DIR),
+        "--experiment",
+        "main",
+        "job",
+        "submit",
+        "--config-path",
+        str(CONFIG_DIR),
+        "--config-name",
+        config_name,
+        "--priority",
+        str(priority),
+        "--overrides",
+        f"seed={seed}",
     ]
-    
+
     print(f"Submitting: {config_name} with seed={seed}, priority={priority}")
     try:
         result = subprocess.run(cmd, capture_output=True, text=True, check=True)
@@ -53,36 +61,44 @@ def submit_job(config_name: str, seed: int, priority: int):
         print(f"  ✗ Failed: {e.stderr}")
         return False
 
+
 def main():
     """Submit remaining jobs."""
     print("=== Submitting Remaining High Regularization Jobs ===")
     print(f"Jobs to submit: {len(remaining_jobs)}")
     print()
-    
+
     submitted = 0
     failed = 0
-    
+
     for config, seed, priority in remaining_jobs:
         if submit_job(config, seed, priority):
             submitted += 1
         else:
             failed += 1
-        
+
         # Small delay to avoid overwhelming the system
         time.sleep(2)
-    
-    print(f"\n=== Submission Complete ===")
+
+    print("\n=== Submission Complete ===")
     print(f"Successfully submitted: {submitted}")
     print(f"Failed: {failed}")
-    
+
     # Show status
     print("\nChecking experiment status...")
-    subprocess.run([
-        "uv", "run", "dr_exp",
-        "--base-path", str(EXP_DIR),
-        "--experiment", "main",
-        "status"
-    ])
+    subprocess.run(
+        [
+            "uv",
+            "run",
+            "dr_exp",
+            "--base-path",
+            str(EXP_DIR),
+            "--experiment",
+            "main",
+            "status",
+        ]
+    )
+
 
 if __name__ == "__main__":
     main()

@@ -13,9 +13,9 @@ step_configs = sorted(exp_configs_dir.glob("step*.yaml"))
 for config_path in step_configs:
     # Read current content
     content = config_path.read_text()
-    
+
     # Check if target already exists
-    if '_target_' not in content:
+    if "_target_" not in content:
         # Add target as first line
         new_content = TARGET_LINE + content
         config_path.write_text(new_content)
