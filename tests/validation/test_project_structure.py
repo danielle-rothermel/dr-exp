@@ -1,10 +1,10 @@
-"""Test that Step 0 cleanup was successful."""
+"""Validation tests for project structure integrity."""
 
 from pathlib import Path
 
 
-def test_old_directories_removed() -> None:
-    """Verify old directories have been deleted."""
+def test_deprecated_directories_removed() -> None:
+    """Verify deprecated directories have been cleaned up."""
     old_dirs = [
         "src/dr_exp/job_db",
         "src/dr_exp/manage",
@@ -14,8 +14,8 @@ def test_old_directories_removed() -> None:
         assert not Path(dir_path).exists(), f"Directory should be deleted: {dir_path}"
 
 
-def test_old_files_removed() -> None:
-    """Verify old files have been deleted."""
+def test_deprecated_files_removed() -> None:
+    """Verify deprecated files have been cleaned up."""
     old_files = [
         "src/dr_exp/utils/factory.py",
         "src/dr_exp/utils/jobdb_factory.py",
@@ -30,8 +30,8 @@ def test_old_files_removed() -> None:
         assert not Path(file_path).exists(), f"File should be deleted: {file_path}"
 
 
-def test_new_directories_created() -> None:
-    """Verify new directories exist with __init__.py files."""
+def test_core_directories_exist() -> None:
+    """Verify core project directories exist with proper structure."""
     new_dirs = [
         "src/dr_exp/core",
         "src/dr_exp/sync",
@@ -45,8 +45,8 @@ def test_new_directories_created() -> None:
         assert init_file.exists(), f"Missing __init__.py in: {dir_path}"
 
 
-def test_remaining_structure() -> None:
-    """Verify important directories were kept."""
+def test_essential_structure_preserved() -> None:
+    """Verify essential project structure is maintained."""
     kept_dirs = [
         "src/dr_exp/utils",  # Only utils remains from original dirs
         "src/dr_exp/core",  # New core module

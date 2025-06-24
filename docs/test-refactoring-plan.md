@@ -245,7 +245,7 @@ git mv tests/test_doc_fixes.py tests/validation/test_documentation.py
 # Update module docstring to: """Validation tests for documentation accuracy."""
 ```
 
-**Commit 25:** `test: rename cleanup tests to project structure validation` - TODO
+**Commit 25:** `test: rename cleanup tests to project structure validation` - DONE
 ```bash
 git mv tests/test_step_0_cleanup.py tests/validation/test_project_structure.py
 # Update module docstring and test names to reflect project structure validation
