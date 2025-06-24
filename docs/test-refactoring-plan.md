@@ -17,7 +17,7 @@ touch tests/__init__.py tests/unit/__init__.py tests/integration/__init__.py
 touch tests/validation/__init__.py tests/fixtures/__init__.py tests/utils/__init__.py
 ```
 
-**Commit 2:** `test: add pytest configuration` - TODO
+**Commit 2:** `test: add pytest configuration` - DONE
 Create `tests/pytest.ini`:
 ```ini
 [pytest]
