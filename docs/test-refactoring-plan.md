@@ -166,7 +166,7 @@ git mv tests/test_step_2_2.py tests/unit/test_sync_queue.py
 # Update module docstring to: """Unit tests for SyncQueue functionality."""
 ```
 
-**Commit 12:** `test: extract structured logger tests` - TODO
+**Commit 12:** `test: extract structured logger tests` - DONE
 - Extract StructuredLogger tests from test_step_2_6.py
 - Create tests/unit/test_structured_logger.py
 - Move only the test_structured_logger function
