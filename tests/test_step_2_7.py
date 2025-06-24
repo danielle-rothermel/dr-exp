@@ -47,7 +47,7 @@ def test_gpu_discovery() -> None:
         # Test empty CUDA_VISIBLE_DEVICES
         with (
             patch.dict(os.environ, {"CUDA_VISIBLE_DEVICES": ""}),
-            patch("subprocess.run") as mock_run
+            patch("subprocess.run") as mock_run,
         ):
             # Simulate no GPUs
             mock_run.side_effect = FileNotFoundError()
@@ -196,7 +196,7 @@ def test_graceful_shutdown() -> None:
 
         with (
             patch("os.killpg") as mock_killpg,
-            patch("os.getpgid", side_effect=lambda pid: pid)
+            patch("os.getpgid", side_effect=lambda pid: pid),
         ):
             launcher.stop()
 

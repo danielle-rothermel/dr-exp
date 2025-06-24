@@ -9,7 +9,10 @@ def test_local_supabase() -> tuple[str, str]:
     """Test local Supabase setup."""
     # Check if Supabase is installed
     result = subprocess.run(  # noqa: S603
-        ["supabase", "--version"], capture_output=True, text=True, check=False  # noqa: S607
+        ["supabase", "--version"],
+        capture_output=True,
+        text=True,
+        check=False,
     )
     assert result.returncode == 0, "Supabase CLI not installed"
     print(f"Supabase version: {result.stdout.strip()}")
@@ -17,7 +20,10 @@ def test_local_supabase() -> tuple[str, str]:
     # Start Supabase (if not already running)
     print("Starting local Supabase...")
     result = subprocess.run(  # noqa: S603
-        ["supabase", "start"], capture_output=True, text=True, check=False  # noqa: S607
+        ["supabase", "start"],
+        capture_output=True,
+        text=True,
+        check=False,
     )
     if result.returncode != 0 and "is already running" not in result.stderr:
         print(f"Error starting Supabase: {result.stderr}")
@@ -28,7 +34,10 @@ def test_local_supabase() -> tuple[str, str]:
 
     # Get status
     result = subprocess.run(  # noqa: S603
-        ["supabase", "status"], capture_output=True, text=True, check=False  # noqa: S607
+        ["supabase", "status"],
+        capture_output=True,
+        text=True,
+        check=False,
     )
     assert result.returncode == 0
     print("Supabase status:")
