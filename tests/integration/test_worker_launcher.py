@@ -1,4 +1,4 @@
-"""Test multi-worker launcher functionality."""
+"""Integration tests for WorkerLauncher."""
 
 import tempfile
 import time
