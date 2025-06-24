@@ -1,4 +1,4 @@
-"""Test worker with threading integration."""
+"""Integration tests for worker with sync functionality."""
 
 import tempfile
 import time

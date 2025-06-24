@@ -185,7 +185,7 @@ git mv tests/test_step_1_4.py tests/integration/test_job_operations.py
 # Update module docstring to: """Integration tests for job operations."""
 ```
 
-**Commit 15:** `test: move worker sync integration tests` - TODO
+**Commit 15:** `test: move worker sync integration tests` - DONE
 ```bash
 git mv tests/test_step_2_3.py tests/integration/test_worker_sync.py
 # Update module docstring to: """Integration tests for worker with sync functionality."""
