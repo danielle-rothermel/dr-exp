@@ -4,6 +4,8 @@ import tempfile
 import shutil
 from pathlib import Path
 
+import pytest
+
 from dr_exp.core.job_db import JobDB
 
 
@@ -49,34 +51,21 @@ def test_jobdb_basic() -> None:
         assert storage_path == exp_path / "storage" / f"run_{job_id}"
 
         # Test validation mode
-        try:
-            # Delete a directory and try with validation=True
-            shutil.rmtree(exp_path / "logs")
+        # Delete a directory and try with validation=True
+        shutil.rmtree(exp_path / "logs")
+        with pytest.raises(RuntimeError, match="Missing directories.*logs"):
             JobDB(base_path=tmpdir, experiment_name="test_exp", validate=True)
-            assert False, "Should have failed"
-        except RuntimeError as e:
-            assert "Missing directories" in str(e)
-            assert "logs" in str(e)
 
         # Test input validation
-        try:
-            # Missing _target_
+        # Missing _target_
+        with pytest.raises(AssertionError, match="_target_"):
             job_db.create_job({"model": "resnet"}, priority=100)
-            assert False, "Should have failed"
-        except AssertionError as e:
-            assert "_target_" in str(e)
 
-        try:
-            # Invalid priority
+        # Invalid priority
+        with pytest.raises(AssertionError, match="Priority"):
             job_db.create_job(config, priority=1500)
-            assert False, "Should have failed"
-        except AssertionError as e:
-            assert "Priority" in str(e)
 
-        try:
-            # Invalid target module
-            bad_config = {"_target_": "nonexistent.module.train"}
+        # Invalid target module
+        bad_config = {"_target_": "nonexistent.module.train"}
+        with pytest.raises(AssertionError, match="Cannot import"):
             job_db.create_job(bad_config, priority=100)
-            assert False, "Should have failed"
-        except AssertionError as e:
-            assert "Cannot import" in str(e)

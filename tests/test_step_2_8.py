@@ -4,6 +4,8 @@ import tempfile
 from pathlib import Path
 from click.testing import CliRunner
 
+import pytest
+
 from dr_exp.core.job_db import JobDB
 from dr_exp.cli.sweep_utils import (
     parse_sweep_params,
@@ -80,18 +82,12 @@ def test_validate_config() -> None:
     validate_sweep_config(config)  # Should not raise
 
     # Missing target
-    try:
+    with pytest.raises(AssertionError, match="_target_"):
         validate_sweep_config({"epochs": 10})
-        assert False, "Should have failed"
-    except AssertionError as e:
-        assert "_target_" in str(e)
 
     # Invalid target
-    try:
+    with pytest.raises(AssertionError, match="Cannot import"):
         validate_sweep_config({"_target_": "nonexistent.module.func"})
-        assert False, "Should have failed"
-    except AssertionError as e:
-        assert "Cannot import" in str(e)
 
 
 def test_sweep_cli_dry_run() -> None:
