@@ -154,7 +154,7 @@ git mv tests/test_step_1_3.py tests/unit/test_job_lifecycle.py
 # Update module docstring to: """Unit tests for job lifecycle management."""
 ```
 
-**Commit 10:** `test: move worker tests to unit/test_worker.py` - TODO
+**Commit 10:** `test: move worker tests to unit/test_worker.py` - DONE
 ```bash
 git mv tests/test_step_2_1.py tests/unit/test_worker.py
 # Update module docstring to: """Unit tests for Worker base functionality."""

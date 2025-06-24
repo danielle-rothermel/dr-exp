@@ -1,4 +1,4 @@
-"""Test basic worker functionality."""
+"""Unit tests for Worker base functionality."""
 
 import tempfile
 from pathlib import Path
