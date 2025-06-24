@@ -1,4 +1,4 @@
-"""Test worker integration with Supabase sync."""
+"""Integration tests for worker Supabase sync functionality."""
 
 import tempfile
 import time

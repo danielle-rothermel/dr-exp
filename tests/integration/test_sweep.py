@@ -1,4 +1,4 @@
-"""Test config sweep functionality."""
+"""Integration tests for config sweep functionality."""
 
 import tempfile
 from pathlib import Path

@@ -1,4 +1,4 @@
-"""Test database operations in Supabase client."""
+"""Integration tests for database operations."""
 
 import os
 import tempfile

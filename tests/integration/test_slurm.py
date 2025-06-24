@@ -1,4 +1,4 @@
-"""Test SLURM integration functionality."""
+"""Integration tests for SLURM functionality."""
 
 import tempfile
 import os

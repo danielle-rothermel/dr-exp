@@ -266,7 +266,7 @@ Create `tests/README.md` with:
 - Test markers and their usage
 - Examples of running subsets of tests
 
-**Commit 28:** `test: remove old test files and check for missing tests` - TODO
+**Commit 28:** `test: remove old test files and check for missing tests` - DONE
 - Check for any remaining test_step_*.py files in other phases (2_8, 2_9, 3_3, 3_4, 3_5)
 - Move them to appropriate locations or remove if empty
 - Clean up any test artifacts

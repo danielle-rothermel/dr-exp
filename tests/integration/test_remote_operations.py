@@ -1,4 +1,4 @@
-"""Test remote read operations."""
+"""Integration tests for remote operations."""
 
 import os
 import tempfile
