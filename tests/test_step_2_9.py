@@ -35,7 +35,7 @@ def test_slurm_status_command() -> None:
         }
 
         status_file = job_db.control_dir / "status_123456.json"
-        with open(status_file, "w") as f:
+        with status_file.open("w") as f:
             json.dump(status_data, f)
 
         # Run command
@@ -269,6 +269,6 @@ def test_batch_script_generation() -> None:
     }
 
     # Verify parameters would be used correctly
-    for key, value in test_params.items():
+    for key in test_params:
         # In actual script, these would be: ${PARAM:-default}
         assert key in ["BASE_PATH", "EXPERIMENT", "WORKERS_PER_GPU"]

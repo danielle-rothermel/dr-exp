@@ -1,6 +1,6 @@
 """Test that Step 0 cleanup was successful."""
 
-import os
+from pathlib import Path
 
 
 def test_old_directories_removed() -> None:
@@ -11,7 +11,7 @@ def test_old_directories_removed() -> None:
     ]  # CLI still exists but simplified
 
     for dir_path in old_dirs:
-        assert not os.path.exists(dir_path), f"Directory should be deleted: {dir_path}"
+        assert not Path(dir_path).exists(), f"Directory should be deleted: {dir_path}"
 
 
 def test_old_files_removed() -> None:
@@ -27,7 +27,7 @@ def test_old_files_removed() -> None:
     ]
 
     for file_path in old_files:
-        assert not os.path.exists(file_path), f"File should be deleted: {file_path}"
+        assert not Path(file_path).exists(), f"File should be deleted: {file_path}"
 
 
 def test_new_directories_created() -> None:
@@ -40,9 +40,9 @@ def test_new_directories_created() -> None:
     ]
 
     for dir_path in new_dirs:
-        assert os.path.exists(dir_path), f"Directory should exist: {dir_path}"
-        init_file = os.path.join(dir_path, "__init__.py")
-        assert os.path.exists(init_file), f"Missing __init__.py in: {dir_path}"
+        assert Path(dir_path).exists(), f"Directory should exist: {dir_path}"
+        init_file = Path(dir_path) / "__init__.py"
+        assert init_file.exists(), f"Missing __init__.py in: {dir_path}"
 
 
 def test_remaining_structure() -> None:
@@ -54,4 +54,4 @@ def test_remaining_structure() -> None:
     ]
 
     for dir_path in kept_dirs:
-        assert os.path.exists(dir_path), f"Directory should still exist: {dir_path}"
+        assert Path(dir_path).exists(), f"Directory should still exist: {dir_path}"

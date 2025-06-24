@@ -1,8 +1,12 @@
+"""Tests for worker logging fixes."""
+
+from pathlib import Path
+
 from dr_exp.worker.base import Worker
 from dr_exp.core.job_db import JobDB
 
 
-def test_worker_creates_log_file(tmp_path):
+def test_worker_creates_log_file(tmp_path: Path) -> None:
     # Create experiment
     job_db = JobDB(base_path=str(tmp_path), experiment_name="test_exp", validate=False)
 
@@ -36,7 +40,7 @@ def test_worker_creates_log_file(tmp_path):
     assert stats["completed"] == 1
 
 
-def test_worker_log_append_mode(tmp_path):
+def test_worker_log_append_mode(tmp_path: Path) -> None:
     # Create experiment
     job_db = JobDB(base_path=str(tmp_path), experiment_name="test_exp", validate=False)
 
@@ -65,7 +69,7 @@ def test_worker_log_append_mode(tmp_path):
     assert "Worker test_worker started at" in log_content
 
 
-def test_worker_log_on_error(tmp_path):
+def test_worker_log_on_error(tmp_path: Path) -> None:
     # Create experiment
     job_db = JobDB(base_path=str(tmp_path), experiment_name="test_exp", validate=False)
 

@@ -61,9 +61,7 @@ epochs: 10
         assert len(configs) == 4
 
         # Check all combinations exist
-        combinations = []
-        for cfg in configs:
-            combinations.append((cfg["model"], cfg["lr"]))
+        combinations = [(cfg["model"], cfg["lr"]) for cfg in configs]
 
         assert ("resnet18", 0.001) in combinations
         assert ("resnet18", 0.01) in combinations

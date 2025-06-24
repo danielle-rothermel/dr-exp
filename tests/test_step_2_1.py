@@ -2,12 +2,13 @@
 
 import tempfile
 from pathlib import Path
+from typing import Any
 
 from dr_exp.core.job_db import JobDB
 from dr_exp.worker.base import Worker
 
 
-def test_basic_worker():
+def test_basic_worker() -> None:
     """Test worker can execute a single job."""
     with tempfile.TemporaryDirectory() as tmpdir:
         # Initialize JobDB
@@ -44,7 +45,7 @@ def test_basic_worker():
         assert (work_dir / f"job_{job_id}").exists()
 
 
-def test_worker_failure_handling():
+def test_worker_failure_handling() -> None:
     """Test worker handles job failures correctly."""
     with tempfile.TemporaryDirectory() as tmpdir:
         job_db = JobDB(base_path=tmpdir, experiment_name="test_exp", validate=False)
@@ -69,7 +70,7 @@ def test_worker_failure_handling():
         assert "Simulated training failure" in job["error"]
 
 
-def test_worker_no_jobs():
+def test_worker_no_jobs() -> None:
     """Test worker behavior when no jobs available."""
     with tempfile.TemporaryDirectory() as tmpdir:
         job_db = JobDB(base_path=tmpdir, experiment_name="test_exp", validate=False)
@@ -81,7 +82,7 @@ def test_worker_no_jobs():
         assert status == "no_job"
 
 
-def test_worker_run_multiple():
+def test_worker_run_multiple() -> None:
     """Test worker running multiple jobs."""
     with tempfile.TemporaryDirectory() as tmpdir:
         job_db = JobDB(base_path=tmpdir, experiment_name="test_exp", validate=False)
@@ -113,13 +114,13 @@ def test_worker_run_multiple():
             assert job["status"] in ["completed", "failed"]
 
 
-def test_worker_max_jobs():
+def test_worker_max_jobs() -> None:
     """Test worker respects max_jobs limit."""
     with tempfile.TemporaryDirectory() as tmpdir:
         job_db = JobDB(base_path=tmpdir, experiment_name="test_exp", validate=False)
 
         # Create 10 jobs
-        for i in range(10):
+        for _i in range(10):
             config = {"_target_": "dr_exp.trainers.test_trainer.train", "epochs": 1}
             job_db.create_job(config)
 
@@ -135,7 +136,7 @@ def test_worker_max_jobs():
         assert queued_count == 7
 
 
-def test_worker_priority_order():
+def test_worker_priority_order() -> None:
     """Test worker processes jobs in priority order."""
     with tempfile.TemporaryDirectory() as tmpdir:
         job_db = JobDB(base_path=tmpdir, experiment_name="test_exp", validate=False)
@@ -152,7 +153,7 @@ def test_worker_priority_order():
 
         # Custom worker that tracks order
         class TrackingWorker(Worker):
-            def execute_job(self, job):
+            def execute_job(self, job: dict[str, Any]) -> dict[str, Any]:
                 execution_order.append(job["id"])
                 return super().execute_job(job)
 

@@ -224,8 +224,9 @@ def test_error_handling(tmp_path: Path) -> None:
         bad_client = SupabaseClient(url="http://localhost:54321", key="invalid_key")
         bad_client.test_connection()
         # May or may not fail depending on Supabase config
-    except Exception:
-        pass  # Expected to fail with invalid credentials
+    except Exception:  # noqa: S110
+        # Expected to fail with invalid credentials - this is the desired behavior
+        pass
 
 
 def test_checksum_calculation() -> None:
@@ -285,4 +286,4 @@ def test_mime_type_detection() -> None:
                 )
                 assert storage_url is not None
             except Exception as e:
-                raise AssertionError(f"Failed to upload {filename}: {e}")
+                raise AssertionError(f"Failed to upload {filename}: {e}") from e

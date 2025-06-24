@@ -9,7 +9,7 @@ from datetime import datetime, timedelta
 from dr_exp.sync.queue import SyncQueue, SyncItem
 
 
-def test_sync_queue_basic():
+def test_sync_queue_basic() -> None:
     """Test basic sync queue operations."""
     with tempfile.TemporaryDirectory() as tmpdir:
         queue_dir = Path(tmpdir) / "sync_queue"
@@ -33,7 +33,7 @@ def test_sync_queue_basic():
         assert Path(queue_file).exists()
 
         # Item should have checksum and size
-        with open(queue_file) as f:
+        with Path(queue_file).open() as f:
             data = json.load(f)
             assert data["checksum"] is not None
             assert data["size_bytes"] == len("Test content")
@@ -51,7 +51,7 @@ def test_sync_queue_basic():
         assert stats["total"] == 1
 
 
-def test_sync_queue_processing():
+def test_sync_queue_processing() -> None:
     """Test processing items in the queue."""
     with tempfile.TemporaryDirectory() as tmpdir:
         queue_dir = Path(tmpdir) / "sync_queue"
@@ -76,7 +76,7 @@ def test_sync_queue_processing():
         # Define sync function
         processed = []
 
-        def mock_sync(item: SyncItem):
+        def mock_sync(item: SyncItem) -> None:
             processed.append(item.id)
             # Simulate upload
             time.sleep(0.01)
@@ -96,12 +96,12 @@ def test_sync_queue_processing():
 
         # Verify history file
         assert queue.history_file.exists()
-        with open(queue.history_file) as f:
+        with queue.history_file.open() as f:
             lines = f.readlines()
             assert len(lines) == 3
 
 
-def test_sync_queue_retry():
+def test_sync_queue_retry() -> None:
     """Test retry logic with exponential backoff."""
     with tempfile.TemporaryDirectory() as tmpdir:
         queue_dir = Path(tmpdir) / "sync_queue"
@@ -131,7 +131,7 @@ def test_sync_queue_retry():
 
         # Check the raw data
         for queue_file in queue_dir.glob("*_retry_test.json"):
-            with open(queue_file) as f:
+            with Path(queue_file).open() as f:
                 data = json.load(f)
                 assert data["attempts"] == 1
                 assert data["error"] == "Network error"
@@ -165,13 +165,13 @@ def test_sync_queue_retry():
 
         # Check final status
         for queue_file in queue_dir.glob("*_retry_test.json"):
-            with open(queue_file) as f:
+            with Path(queue_file).open() as f:
                 data = json.load(f)
                 assert data["attempts"] == 3
                 assert data["status"] == "failed"
 
 
-def test_sync_queue_complete():
+def test_sync_queue_complete() -> None:
     """Test completing items."""
     with tempfile.TemporaryDirectory() as tmpdir:
         queue_dir = Path(tmpdir) / "sync_queue"
@@ -201,7 +201,7 @@ def test_sync_queue_complete():
 
         # Should be in history
         assert queue.history_file.exists()
-        with open(queue.history_file) as f:
+        with queue.history_file.open() as f:
             line = f.readline()
             data = json.loads(line)
             assert data["id"] == "complete_test"
@@ -213,7 +213,7 @@ def test_sync_queue_complete():
         assert len(queue_files) == 0
 
 
-def test_sync_queue_ordering():
+def test_sync_queue_ordering() -> None:
     """Test that items are processed in order."""
     with tempfile.TemporaryDirectory() as tmpdir:
         queue_dir = Path(tmpdir) / "sync_queue"
@@ -247,7 +247,7 @@ def test_sync_queue_ordering():
             assert item.metadata["order"] == i
 
 
-def test_sync_queue_error_handling():
+def test_sync_queue_error_handling() -> None:
     """Test handling sync errors."""
     with tempfile.TemporaryDirectory() as tmpdir:
         queue_dir = Path(tmpdir) / "sync_queue"
@@ -269,7 +269,7 @@ def test_sync_queue_error_handling():
             queue.add_item(item)
 
         # Sync function that fails for specific items
-        def failing_sync(item: SyncItem):
+        def failing_sync(item: SyncItem) -> None:
             if "error_1" in item.id:
                 raise ValueError("Simulated sync error")
             # Others succeed
@@ -282,7 +282,7 @@ def test_sync_queue_error_handling():
 
         # Check failed item
         for queue_file in queue_dir.glob("*_error_1.json"):
-            with open(queue_file) as f:
+            with Path(queue_file).open() as f:
                 data = json.load(f)
                 assert data["attempts"] == 1
                 assert "Simulated sync error" in data["error"]

@@ -37,12 +37,12 @@ def test_structured_logger() -> None:
         assert logger.metadata_file.exists()
 
         # Verify content
-        with open(logger.config_file) as f:
+        with logger.config_file.open() as f:
             saved_config = json.load(f)
             assert saved_config == config
 
         # Check metrics entries
-        with open(logger.metrics_file) as f:
+        with logger.metrics_file.open() as f:
             lines = f.readlines()
             assert len(lines) == 6  # 5 + 1 validation
 
@@ -51,7 +51,7 @@ def test_structured_logger() -> None:
             assert first_entry["metrics"]["loss"] == 1.0
 
         # Check events
-        with open(logger.events_file) as f:
+        with logger.events_file.open() as f:
             events = [json.loads(line) for line in f]
             event_types = [e["event_type"] for e in events]
             assert "checkpoint_saved" in event_types
@@ -106,7 +106,7 @@ def test_decon_classification_trainer() -> None:
         assert (storage_path / "events.jsonl").exists()
 
         # Check metrics file content
-        with open(storage_path / "metrics.jsonl") as f:
+        with (storage_path / "metrics.jsonl").open() as f:
             lines = f.readlines()
             assert len(lines) == 5  # One per epoch
 
