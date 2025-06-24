@@ -94,7 +94,7 @@ def create_multiple_jobs(job_db, count, priority_start=100, priority_step=50):
     return job_ids
 ```
 
-**Commit 5:** `test: add mock implementations for external services` - TODO
+**Commit 5:** `test: add mock implementations for external services` - DONE
 Create `tests/utils/mocks.py`:
 ```python
 from dr_exp.sync.supabase_client import SupabaseClient
