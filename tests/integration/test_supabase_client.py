@@ -24,6 +24,7 @@ def setup_test_env() -> None:
         )
 
 
+@pytest.mark.supabase
 def test_supabase_connection() -> None:
     """Test basic connection to Supabase."""
     setup_test_env()
@@ -38,6 +39,7 @@ def test_supabase_connection() -> None:
     assert client.bucket_name == "experiments"
 
 
+@pytest.mark.supabase
 def test_file_upload() -> list[tuple[str, str, str]]:
     """Test uploading files to Supabase storage."""
     setup_test_env()
@@ -102,6 +104,7 @@ def test_file_upload() -> list[tuple[str, str, str]]:
         return uploaded
 
 
+@pytest.mark.supabase
 def test_file_download() -> None:
     """Test downloading files from Supabase storage."""
     setup_test_env()
@@ -139,6 +142,7 @@ def test_file_download() -> None:
         assert downloaded_checksum == checksum
 
 
+@pytest.mark.supabase
 def test_file_listing() -> None:
     """Test listing files in storage."""
     setup_test_env()
@@ -171,6 +175,7 @@ def test_file_listing() -> None:
         assert isinstance(files, list)
 
 
+@pytest.mark.supabase
 def test_signed_urls() -> None:
     """Test generating signed URLs for temporary access."""
     setup_test_env()
@@ -198,6 +203,7 @@ def test_signed_urls() -> None:
         assert storage_path in signed_url
 
 
+@pytest.mark.supabase
 def test_error_handling(tmp_path: Path) -> None:
     """Test error handling in Supabase client."""
     setup_test_env()
@@ -229,6 +235,7 @@ def test_error_handling(tmp_path: Path) -> None:
         pass
 
 
+@pytest.mark.supabase
 def test_checksum_calculation() -> None:
     """Test checksum calculation."""
     setup_test_env()
@@ -256,6 +263,7 @@ def test_checksum_calculation() -> None:
         assert checksum1 == checksum3  # Same content
 
 
+@pytest.mark.supabase
 def test_mime_type_detection() -> None:
     """Test MIME type detection for different file types."""
     setup_test_env()

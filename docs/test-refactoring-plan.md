@@ -219,7 +219,7 @@ git mv tests/test_step_3_1.py tests/integration/test_database_schema.py
 # Update module docstring to: """Integration tests for database schema and operations."""
 ```
 
-**Commit 21:** `test: move Supabase client tests` - TODO
+**Commit 21:** `test: move Supabase client tests` - DONE
 ```bash
 git mv tests/test_step_3_2.py tests/integration/test_supabase_client.py
 # Add @pytest.mark.supabase decorator to all test functions
