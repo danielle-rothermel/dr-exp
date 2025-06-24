@@ -225,7 +225,7 @@ git mv tests/test_step_3_2.py tests/integration/test_supabase_client.py
 # Add @pytest.mark.supabase decorator to all test functions
 ```
 
-**Commit 22:** `test: move Hydra config tests` - TODO
+**Commit 22:** `test: move Hydra config tests` - DONE
 ```bash
 git mv tests/test_hydra_fix.py tests/integration/test_hydra_config.py
 # Update module docstring to: """Integration tests for Hydra configuration."""

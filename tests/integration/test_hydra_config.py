@@ -1,4 +1,4 @@
-"""Tests for Hydra configuration fixes."""
+"""Integration tests for Hydra configuration."""
 
 import yaml
 from pathlib import Path
