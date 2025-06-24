@@ -116,6 +116,13 @@ with pytest.raises(Exception, match="expected"):
 - Use `_` for intentionally unused variables
 - Add `-> None` to all test functions
 - Use `pytest.raises()` for exception testing
+- Type pytest fixtures properly: `tmp_path: Path`, `monkeypatch: pytest.MonkeyPatch`
+
+### Important Notes
+- **D103, S106, SLF001** already suppressed in pyproject.toml for tests
+- **Run tests frequently** to ensure fixes don't break functionality
+- **Commit after each phase** to avoid losing work
+- **Use parallel Task agents** for similar pattern fixes (S108, B007, etc.)
 
 ## Time Estimation
 - Phase 1 (Analysis & Auto): 5 minutes
