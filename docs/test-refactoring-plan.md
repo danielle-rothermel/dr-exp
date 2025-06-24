@@ -62,7 +62,7 @@ def mock_config():
     }
 ```
 
-**Commit 4:** `test: add job creation test utilities` - TODO
+**Commit 4:** `test: add job creation test utilities` - DONE
 Create `tests/utils/job_helpers.py`:
 ```python
 def create_test_job(job_db, priority=100, **kwargs):
