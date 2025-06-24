@@ -271,7 +271,7 @@ Create `tests/README.md` with:
 - Move them to appropriate locations or remove if empty
 - Clean up any test artifacts
 
-**Commit 29:** `test: add test coverage configuration` - TODO
+**Commit 29:** `test: add test coverage configuration` - DONE
 Create `.coveragerc`:
 ```ini
 [run]
