@@ -146,6 +146,10 @@ ignore = [
 "tests/**/*.py" = [
     "ARG",                  # unused arguments in fixtures
     "PLR2004",              # Magic values are OK in tests
+    "D103",
+    "S106",
+    "SLF001",
+    "S101",
 ]
 "**/scripts/**/*.py" = [
     "T201",                 # print() is fine in scripts

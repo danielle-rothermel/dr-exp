@@ -22,9 +22,9 @@ Building on lessons from scripts/ fixes:
 - **Focus on real improvements** not pedantic fixes
 
 ## Semantic Commands Available
-Use the `ruff_tools.sh` script for easy analysis:
+Use the global ruff tools for easy analysis:
 ```bash
-source ./ruff_tools.sh  # Load commands
+source ~/.claude/ruff_tools.sh  # Load commands (always available)
 
 # Analysis commands
 ruff_analyze tests              # Generate .ruff_errors.jsonl
@@ -45,7 +45,7 @@ ruff_preview tests              # Preview what would be fixed
 ### Phase 1: Analysis & Automated Fixes (Target: 5 minutes)
 ```bash
 # Setup
-source ./ruff_tools.sh
+source ~/.claude/ruff_tools.sh
 
 # Analyze current state
 ruff_analyze tests

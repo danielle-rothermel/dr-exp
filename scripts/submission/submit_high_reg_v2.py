@@ -92,8 +92,7 @@ def print_submission_summary(
     """Print the submission summary."""
     print("\n📊 High Regularization Experiment Summary:")
     print(
-        f"  Configurations: "
-        f"{', '.join(c.replace('.yaml', '') for c, _ in experiments)}"
+        f"  Configurations: {', '.join(c.replace('.yaml', '') for c, _ in experiments)}"
     )
     print(f"  Seeds per config: {len(args.seeds)} ({args.seeds})")
     print(f"  Total possible jobs: {len(experiments) * len(args.seeds)}")
