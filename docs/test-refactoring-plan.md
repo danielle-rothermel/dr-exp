@@ -173,7 +173,7 @@ git mv tests/test_step_2_2.py tests/unit/test_sync_queue.py
 
 ### Phase 3: Refactor Integration Tests
 
-**Commit 13:** `test: consolidate concurrency tests` - TODO
+**Commit 13:** `test: consolidate concurrency tests` - DONE
 - Create tests/integration/test_concurrency.py
 - Move all tests from test_step_1_2.py
 - Add tests from test_priority_concurrency_fix.py
