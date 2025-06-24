@@ -148,7 +148,7 @@ git mv tests/test_step_1_1.py tests/unit/test_job_db.py
 - Remove step references from docstrings
 - Rename test functions if needed for clarity
 
-**Commit 9:** `test: move job lifecycle tests to unit/test_job_lifecycle.py` - TODO
+**Commit 9:** `test: move job lifecycle tests to unit/test_job_lifecycle.py` - DONE
 ```bash
 git mv tests/test_step_1_3.py tests/unit/test_job_lifecycle.py
 # Update module docstring to: """Unit tests for job lifecycle management."""

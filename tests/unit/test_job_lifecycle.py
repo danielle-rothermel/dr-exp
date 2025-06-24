@@ -1,4 +1,4 @@
-"""Test job lifecycle management."""
+"""Unit tests for job lifecycle management."""
 
 import tempfile
 import time
