@@ -32,7 +32,7 @@ markers =
     gpu: marks tests requiring GPU (deselect with '-m "not gpu"')
 ```
 
-**Commit 3:** `test: create base test fixtures` - TODO
+**Commit 3:** `test: create base test fixtures` - DONE
 Create `tests/fixtures/conftest.py`:
 ```python
 import pytest
