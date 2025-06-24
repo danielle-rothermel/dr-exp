@@ -1,3 +1,5 @@
+"""Mark stale running jobs as failed."""
+
 import argparse
 
 from dr_exp.utils.jobdb_factory import get_job_db_client

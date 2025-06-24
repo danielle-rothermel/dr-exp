@@ -140,9 +140,7 @@ class SupabaseClient:
         else:
             # Only guess for types we don't have mapped
             guessed_type, _ = mimetypes.guess_type(file_path)
-            if (
-                guessed_type is None or guessed_type.startswith(("chemical/", "model/"))
-            ):
+            if guessed_type is None or guessed_type.startswith(("chemical/", "model/")):
                 mime_type = "application/octet-stream"
             else:
                 mime_type = guessed_type

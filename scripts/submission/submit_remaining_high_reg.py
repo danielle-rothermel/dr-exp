@@ -30,7 +30,7 @@ remaining_jobs = [
 ]
 
 
-def submit_job(config_name: str, seed: int, priority: int):
+def submit_job(config_name: str, seed: int, priority: int) -> bool | None:
     """Submit a single job."""
     cmd = [
         "uv",
@@ -54,7 +54,7 @@ def submit_job(config_name: str, seed: int, priority: int):
 
     print(f"Submitting: {config_name} with seed={seed}, priority={priority}")
     try:
-        result = subprocess.run(cmd, capture_output=True, text=True, check=True)
+        result = subprocess.run(cmd, capture_output=True, text=True, check=True)  # noqa: S603
         print(f"  ✓ Success: {result.stdout.strip()}")
         return True
     except subprocess.CalledProcessError as e:
@@ -62,7 +62,7 @@ def submit_job(config_name: str, seed: int, priority: int):
         return False
 
 
-def main():
+def main() -> None:
     """Submit remaining jobs."""
     print("=== Submitting Remaining High Regularization Jobs ===")
     print(f"Jobs to submit: {len(remaining_jobs)}")
@@ -86,8 +86,8 @@ def main():
 
     # Show status
     print("\nChecking experiment status...")
-    subprocess.run(
-        [
+    subprocess.run(  # noqa: S603
+        [  # noqa: S607
             "uv",
             "run",
             "dr_exp",

@@ -43,7 +43,7 @@ cmd_check = [
     "job",
     "list",
 ]
-result = subprocess.run(cmd_check, capture_output=True, text=True, check=False)
+result = subprocess.run(cmd_check, capture_output=True, text=True, check=False)  # noqa: S603
 existing_jobs = (
     result.stdout.count("queued")
     + result.stdout.count("running")
@@ -53,7 +53,7 @@ existing_jobs = (
 print(f"Found {existing_jobs} existing jobs")
 
 
-def submit_job(config_name, seed, priority):
+def submit_job(config_name: str, seed: int, priority: int) -> str | None:
     """Submit a single job."""
     cmd = [
         "uv",
@@ -75,7 +75,7 @@ def submit_job(config_name, seed, priority):
         str(priority),
     ]
 
-    result = subprocess.run(cmd, capture_output=True, text=True, check=False)
+    result = subprocess.run(cmd, capture_output=True, text=True, check=False)  # noqa: S603
     if result.returncode == 0:
         # Extract job ID from output
         for line in result.stdout.split("\n"):
@@ -114,11 +114,13 @@ for step_idx, step_name in enumerate(STEPS):
 
         if job_id:
             print(
-                f"[{submitted_count:3d}/{total_jobs - existing_jobs}] {step_name} seed={seed} priority={priority} -> {job_id}"
+                f"[{submitted_count:3d}/{total_jobs - existing_jobs}] {step_name} "
+                f"seed={seed} priority={priority} -> {job_id}"
             )
         else:
             print(
-                f"[{submitted_count:3d}/{total_jobs - existing_jobs}] {step_name} seed={seed} -> FAILED"
+                f"[{submitted_count:3d}/{total_jobs - existing_jobs}] {step_name} "
+                f"seed={seed} -> FAILED"
             )
 
 print("=" * 60)
@@ -129,5 +131,6 @@ print("\nTo monitor status:")
 print(f"  uv run dr_exp --base-path {EXP_DIR} --experiment {EXPERIMENT} status")
 print("\nTo launch workers (6 workers on 1 GPU):")
 print(
-    f"  uv run dr_exp --base-path {EXP_DIR} --experiment {EXPERIMENT} system launcher --workers-per-gpu 6"
+    f"  uv run dr_exp --base-path {EXP_DIR} --experiment {EXPERIMENT} "
+    f"system launcher --workers-per-gpu 6"
 )
