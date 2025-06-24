@@ -1,4 +1,4 @@
-"""Test operational features."""
+"""Integration tests for job operations."""
 
 import tempfile
 import time

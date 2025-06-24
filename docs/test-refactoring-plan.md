@@ -179,7 +179,7 @@ git mv tests/test_step_2_2.py tests/unit/test_sync_queue.py
 - Add tests from test_priority_concurrency_fix.py
 - Remove original files after consolidation
 
-**Commit 14:** `test: move job operations tests` - TODO
+**Commit 14:** `test: move job operations tests` - DONE
 ```bash
 git mv tests/test_step_1_4.py tests/integration/test_job_operations.py
 # Update module docstring to: """Integration tests for job operations."""
