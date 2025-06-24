@@ -1,4 +1,4 @@
-"""Test sync queue functionality."""
+"""Unit tests for SyncQueue functionality."""
 
 import tempfile
 import time

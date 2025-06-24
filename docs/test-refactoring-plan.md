@@ -160,7 +160,7 @@ git mv tests/test_step_2_1.py tests/unit/test_worker.py
 # Update module docstring to: """Unit tests for Worker base functionality."""
 ```
 
-**Commit 11:** `test: move sync queue tests to unit/test_sync_queue.py` - TODO
+**Commit 11:** `test: move sync queue tests to unit/test_sync_queue.py` - DONE
 ```bash
 git mv tests/test_step_2_2.py tests/unit/test_sync_queue.py
 # Update module docstring to: """Unit tests for SyncQueue functionality."""
