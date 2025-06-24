@@ -239,7 +239,7 @@ git mv tests/test_worker_logging_fix.py tests/validation/test_worker_logging.py
 # Update module docstring to: """Validation tests for worker logging functionality."""
 ```
 
-**Commit 24:** `test: move documentation validation tests` - TODO
+**Commit 24:** `test: move documentation validation tests` - DONE
 ```bash
 git mv tests/test_doc_fixes.py tests/validation/test_documentation.py
 # Update module docstring to: """Validation tests for documentation accuracy."""

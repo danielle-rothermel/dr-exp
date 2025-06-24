@@ -1,4 +1,4 @@
-"""Tests for documentation generation fixes."""
+"""Validation tests for documentation accuracy."""
 
 from pathlib import Path
 
