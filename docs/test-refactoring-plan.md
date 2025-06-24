@@ -142,7 +142,7 @@ git mv tests/test_step_1_1.py tests/unit/test_job_db.py
 # Update module docstring to: """Unit tests for JobDB core functionality."""
 ```
 
-**Commit 8:** `test: update imports in test_job_db.py` - TODO
+**Commit 8:** `test: update imports in test_job_db.py` - DONE
 - Update imports to use fixtures from conftest
 - Update imports to use utilities from tests/utils/
 - Remove step references from docstrings
