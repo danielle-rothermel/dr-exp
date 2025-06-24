@@ -126,7 +126,7 @@ def mock_sync_function(item):
     return True
 ```
 
-**Commit 6:** `test: add test environment configuration` - TODO
+**Commit 6:** `test: add test environment configuration` - DONE
 Create `tests/.env.test`:
 ```
 SUPABASE_URL=http://localhost:54321
