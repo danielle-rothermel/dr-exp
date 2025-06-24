@@ -1,4 +1,4 @@
-"""Test basic JobDB functionality."""
+"""Unit tests for JobDB core functionality."""
 
 import tempfile
 import shutil

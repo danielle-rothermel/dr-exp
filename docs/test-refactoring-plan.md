@@ -136,7 +136,7 @@ TEST_MODE=true
 
 ### Phase 2: Refactor Unit Tests
 
-**Commit 7:** `test: move JobDB tests to unit/test_job_db.py` - TODO
+**Commit 7:** `test: move JobDB tests to unit/test_job_db.py` - DONE
 ```bash
 git mv tests/test_step_1_1.py tests/unit/test_job_db.py
 # Update module docstring to: """Unit tests for JobDB core functionality."""
