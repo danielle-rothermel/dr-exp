@@ -1,4 +1,4 @@
-"""Test job management commands."""
+"""Integration tests for CLI job management commands."""
 
 import tempfile
 from datetime import datetime, timedelta, UTC

@@ -197,7 +197,7 @@ git mv tests/test_step_2_4.py tests/integration/test_cli.py
 # Update module docstring to: """Integration tests for CLI commands."""
 ```
 
-**Commit 17:** `test: move CLI job management tests` - TODO
+**Commit 17:** `test: move CLI job management tests` - DONE
 ```bash
 git mv tests/test_step_2_5.py tests/integration/test_cli_job_management.py
 # Update module docstring to: """Integration tests for CLI job management commands."""
