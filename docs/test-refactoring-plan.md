@@ -191,7 +191,7 @@ git mv tests/test_step_2_3.py tests/integration/test_worker_sync.py
 # Update module docstring to: """Integration tests for worker with sync functionality."""
 ```
 
-**Commit 16:** `test: move CLI tests to integration/test_cli.py` - TODO
+**Commit 16:** `test: move CLI tests to integration/test_cli.py` - DONE
 ```bash
 git mv tests/test_step_2_4.py tests/integration/test_cli.py
 # Update module docstring to: """Integration tests for CLI commands."""
