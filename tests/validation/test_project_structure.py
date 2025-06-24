@@ -36,7 +36,9 @@ def test_core_directories_exist() -> None:
         "src/dr_exp/core",
         "src/dr_exp/sync",
         "src/dr_exp/worker",
-        "tests/implementation",
+        "tests/unit",
+        "tests/integration",
+        "tests/validation",
     ]
 
     for dir_path in new_dirs:

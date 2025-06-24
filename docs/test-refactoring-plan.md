@@ -289,7 +289,7 @@ exclude_lines =
     raise NotImplementedError
 ```
 
-**Commit 30:** `test: verify all tests pass` - TODO
+**Commit 30:** `test: verify all tests pass` - DONE
 - Run `pytest` to ensure all tests pass
 - Run `pytest -m "not supabase"` to verify non-Supabase tests
 - Fix any import issues or test failures
