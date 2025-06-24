@@ -213,7 +213,7 @@ git mv tests/test_step_2_7.py tests/integration/test_worker_launcher.py
 # Update module docstring to: """Integration tests for WorkerLauncher."""
 ```
 
-**Commit 20:** `test: move database schema tests` - TODO
+**Commit 20:** `test: move database schema tests` - DONE
 ```bash
 git mv tests/test_step_3_1.py tests/integration/test_database_schema.py
 # Update module docstring to: """Integration tests for database schema and operations."""

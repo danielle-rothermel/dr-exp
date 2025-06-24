@@ -1,4 +1,4 @@
-"""Test database schema setup."""
+"""Integration tests for database schema and operations."""
 
 import subprocess
 import time
