@@ -1,4 +1,4 @@
-"""Test training integration."""
+"""Integration tests for training functionality."""
 
 import tempfile
 import json

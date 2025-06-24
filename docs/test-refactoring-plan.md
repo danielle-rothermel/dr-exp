@@ -203,7 +203,7 @@ git mv tests/test_step_2_5.py tests/integration/test_cli_job_management.py
 # Update module docstring to: """Integration tests for CLI job management commands."""
 ```
 
-**Commit 18:** `test: extract training integration tests` - TODO
+**Commit 18:** `test: extract training integration tests` - DONE
 - Move remaining tests from test_step_2_6.py to appropriate files
 - Delete test_step_2_6.py after extraction
 
