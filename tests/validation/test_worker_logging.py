@@ -1,4 +1,4 @@
-"""Tests for worker logging fixes."""
+"""Validation tests for worker logging functionality."""
 
 from pathlib import Path
 

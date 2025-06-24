@@ -233,7 +233,7 @@ git mv tests/test_hydra_fix.py tests/integration/test_hydra_config.py
 
 ### Phase 4: Refactor Validation Tests
 
-**Commit 23:** `test: move worker logging validation tests` - TODO
+**Commit 23:** `test: move worker logging validation tests` - DONE
 ```bash
 git mv tests/test_worker_logging_fix.py tests/validation/test_worker_logging.py
 # Update module docstring to: """Validation tests for worker logging functionality."""
