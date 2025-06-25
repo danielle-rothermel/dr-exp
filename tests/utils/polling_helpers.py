@@ -2,8 +2,8 @@
 
 import time
 import threading
-from typing import Any
 from collections.abc import Callable
+from dr_exp.core.job_db import JobDB
 from dr_exp.worker.base import Worker
 
 
@@ -11,6 +11,7 @@ class PollingTestResult:
     """Result container for polling tests."""
 
     def __init__(self) -> None:
+        """Initialize polling test result container."""
         self.worker_started = False
         self.worker_finished = False
         self.stats: dict[str, int] | None = None
@@ -105,7 +106,7 @@ def run_max_jobs_termination_test(
 
 
 def create_background_job_adder(
-    job_db: Any, delay_seconds: float = 1.0, job_count: int = 2
+    job_db: JobDB, delay_seconds: float = 1.0, job_count: int = 2
 ) -> Callable[[], None]:
     """Create a function that adds jobs to the database after a delay.
 
