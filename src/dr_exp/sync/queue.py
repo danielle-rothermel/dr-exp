@@ -6,7 +6,7 @@ import hashlib
 from pathlib import Path
 from typing import Any
 from collections.abc import Callable
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, UTC
 from dataclasses import dataclass, asdict
 
 
@@ -120,7 +120,7 @@ class SyncQueue:
                 if data["attempts"] > 0 and data.get("last_attempt"):
                     last_attempt = datetime.fromisoformat(data["last_attempt"])
                     retry_delay = timedelta(seconds=60 * (2 ** (data["attempts"] - 1)))
-                    if datetime.utcnow() < last_attempt + retry_delay:
+                    if datetime.now(UTC) < last_attempt + retry_delay:
                         continue
 
                 items.append(SyncItem(**data))
@@ -174,7 +174,7 @@ class SyncQueue:
         Returns:
             True if updated
         """
-        now = datetime.utcnow().isoformat()
+        now = datetime.now(UTC).isoformat()
 
         if error:
             # Failed attempt
@@ -222,7 +222,7 @@ class SyncQueue:
 
                 # Update status
                 data["status"] = "completed"
-                data["completed_at"] = datetime.utcnow().isoformat()
+                data["completed_at"] = datetime.now(UTC).isoformat()
                 data["error"] = None
 
                 # Append to history
