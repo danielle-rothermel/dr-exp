@@ -83,7 +83,6 @@ def test_worker_no_jobs() -> None:
         assert status == "no_job"
 
 
-@pytest.mark.skip(reason="Test hangs - needs investigation")
 def test_worker_run_multiple() -> None:
     """Test worker running multiple jobs."""
     with tempfile.TemporaryDirectory() as tmpdir:
@@ -101,9 +100,9 @@ def test_worker_run_multiple() -> None:
             job_id = job_db.create_job(config, priority=i * 100)
             job_ids.append(job_id)
 
-        # Run worker
+        # Run worker with max_jobs=5 to process exactly these jobs
         worker = Worker(job_db=job_db, worker_id="batch_worker")
-        stats = worker.run()
+        stats = worker.run(max_jobs=5)
 
         # Verify stats
         assert stats["total"] == 5
@@ -138,7 +137,6 @@ def test_worker_max_jobs() -> None:
         assert queued_count == 7
 
 
-@pytest.mark.skip(reason="Test hangs - needs investigation")
 def test_worker_priority_order() -> None:
     """Test worker processes jobs in priority order."""
     with tempfile.TemporaryDirectory() as tmpdir:
@@ -161,7 +159,7 @@ def test_worker_priority_order() -> None:
                 return super().execute_job(job)
 
         worker = TrackingWorker(job_db=job_db, worker_id="tracking_worker")
-        worker.run()
+        worker.run(max_jobs=3)  # Process exactly the 3 jobs we created
 
         # Verify priority order (high, med, low)
         assert execution_order == [high_id, med_id, low_id]

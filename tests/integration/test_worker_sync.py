@@ -63,7 +63,6 @@ def test_worker_with_threads() -> None:
         assert "metrics" in file_types or "model" in file_types
 
 
-@pytest.mark.skip(reason="Test hangs - needs investigation")
 def test_worker_no_sync() -> None:
     """Test worker with sync disabled."""
     with tempfile.TemporaryDirectory() as tmpdir:
@@ -76,8 +75,8 @@ def test_worker_no_sync() -> None:
         # Create worker with sync disabled
         worker = Worker(job_db=job_db, worker_id="no_sync_worker", sync_enabled=False)
 
-        # Run the job
-        stats = worker.run()
+        # Run the job with max_jobs to prevent infinite polling
+        stats = worker.run(max_jobs=1)
 
         assert stats["completed"] == 1
 
@@ -88,7 +87,6 @@ def test_worker_no_sync() -> None:
         assert worker.heartbeat_thread is not None
 
 
-@pytest.mark.skip(reason="Test hangs - needs investigation")
 def test_worker_thread_cleanup() -> None:
     """Test that threads are properly cleaned up."""
     with tempfile.TemporaryDirectory() as tmpdir:
@@ -110,8 +108,8 @@ def test_worker_thread_cleanup() -> None:
         # Get initial thread count
         initial_threads = threading.active_count()
 
-        # Run worker
-        stats = worker.run()
+        # Run worker with max_jobs to process exactly 3 jobs
+        stats = worker.run(max_jobs=3)
 
         assert stats["completed"] == 3
 
@@ -127,7 +125,6 @@ def test_worker_thread_cleanup() -> None:
         assert final_threads <= initial_threads + 1  # Allow small variance
 
 
-@pytest.mark.skip(reason="Test hangs - needs investigation")
 def test_worker_heartbeat_during_execution() -> None:
     """Test that heartbeats are sent during job execution."""
     with tempfile.TemporaryDirectory() as tmpdir:
@@ -157,8 +154,8 @@ def test_worker_heartbeat_during_execution() -> None:
             heartbeat_interval=0.1,  # 100ms
         )
 
-        # Run the job
-        stats = worker.run()
+        # Run the job with max_jobs=1 to process only this job
+        stats = worker.run(max_jobs=1)
 
         assert stats["completed"] == 1
 
@@ -176,7 +173,6 @@ def test_worker_heartbeat_during_execution() -> None:
             assert 0.05 < avg_interval < 0.2  # Close to 0.1s
 
 
-@pytest.mark.skip(reason="Test hangs - needs investigation")
 def test_worker_sync_queue_integration() -> None:
     """Test that sync queue is properly integrated."""
     with tempfile.TemporaryDirectory() as tmpdir:
@@ -198,8 +194,8 @@ def test_worker_sync_queue_integration() -> None:
         worker = Worker(job_db=job_db, worker_id="sync_test_worker", sync_interval=0.5)
         worker.sync_fn = tracking_sync
 
-        # Run the job
-        stats = worker.run()
+        # Run the job with max_jobs=1 to process only this job
+        stats = worker.run(max_jobs=1)
 
         assert stats["completed"] == 1
 
@@ -220,7 +216,6 @@ def test_worker_sync_queue_integration() -> None:
         assert sync_stats["completed"] > 0
 
 
-@pytest.mark.skip(reason="Test hangs - needs investigation")
 def test_worker_error_artifacts() -> None:
     """Test that errors are saved and queued for sync."""
     with tempfile.TemporaryDirectory() as tmpdir:
@@ -237,8 +232,8 @@ def test_worker_error_artifacts() -> None:
         # Create worker
         worker = Worker(job_db=job_db, worker_id="error_worker")
 
-        # Run the job
-        stats = worker.run()
+        # Run the job with max_jobs=1 to process only this job
+        stats = worker.run(max_jobs=1)
 
         assert stats["failed"] == 1
 
