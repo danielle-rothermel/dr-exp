@@ -189,6 +189,9 @@ def test_sync_retry_logic() -> None:
             sync_enabled=True,
         )
 
+        # Start background threads to enable sync processing
+        sync_worker.start_background_threads()
+
         # Let sync run a few times
         time.sleep(3)
 

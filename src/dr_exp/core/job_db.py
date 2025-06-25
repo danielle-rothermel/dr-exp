@@ -36,7 +36,7 @@ class JobDB:
         assert experiment_name, "experiment_name cannot be empty"
         assert "/" not in experiment_name, "experiment_name cannot contain '/'"
 
-        self.base_path = Path(base_path)
+        self.base_path = Path(base_path).resolve()
         self.experiment_name = experiment_name
         self.experiment_path = self.base_path / experiment_name
 
