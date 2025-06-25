@@ -253,7 +253,7 @@ git mv tests/test_step_0_cleanup.py tests/validation/test_project_structure.py
 
 ### Phase 5: Final Updates
 
-**Commit 26:** `test: update all test imports for new structure` - TODO
+**Commit 26:** `test: update all test imports for new structure` - DONE
 - Update imports in all test files to use shared fixtures
 - Update imports to use test utilities
 - Remove any relative imports
