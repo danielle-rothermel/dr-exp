@@ -20,9 +20,9 @@ dr_exp is a **local-first deep learning experiment manager** for HPC clusters. I
 - **Remote API**: FastAPI endpoints for experiment monitoring
 
 ### ⚠️ Known Limitations
-- **Error format**: Saved as .txt not .json (minor issue)
-- **Submit syntax**: Uses Hydra-style flags not direct paths
-- **API artifact endpoints**: Some download functionality may need testing
+- **Submit syntax**: Uses Hydra config composition with --config-path and --config-name
+- **Job IDs**: Support partial matching for convenience in CLI commands
+- **SLURM integration**: Requires specific directory structure and control files
 
 ## 📦 DEPENDENCY MANAGEMENT
 
@@ -76,13 +76,15 @@ experiment_dir/
 ```
 
 **Key Classes**:
-- `JobDB` (core/job_db.py): File-based job queue with locking
+- `JobDB` (core/job_db.py): File-based job queue with atomic locking
 - `Worker` (worker/base.py): Claims jobs, executes via Hydra, syncs results
-- `SyncQueue` (sync/queue.py): Persistent file upload queue
+- `SyncQueue` (sync/queue.py): Persistent file upload queue with retry logic
 - `SyncHandler` (sync/sync_handler.py): Supabase upload orchestrator
-- `WorkerLauncher` (worker/launcher.py): Multi-GPU worker spawner
-- `SupabaseClient` (sync/supabase_client.py): Cloud sync client
-- `CLI` (cli/main.py): All user commands
+- `WorkerLauncher` (worker/launcher.py): Multi-GPU worker spawner with health monitoring
+- `SupabaseClient` (sync/supabase_client.py): Cloud sync client for PostgreSQL + storage
+- `CLI` (cli/main.py): Main CLI entry point with command groups
+- `SweepUtils` (cli/sweep_utils.py): Parameter sweep generation utilities
+- `StructuredLogger` (logging/structured_logger.py): JSON-based logging for workers
 
 **Job Flow**:
 1. User submits config with `_target_: module.function`
@@ -95,7 +97,6 @@ experiment_dir/
 
 ## CLI Commands
 
-
 All commands follow pattern:
 ```bash
 dr_exp --base-path <path> --experiment <name> <command> [options]
@@ -105,30 +106,28 @@ dr_exp --base-path <path> --experiment <name> <command> [options]
 ```bash
 # Setup
 init                          # Create experiment structure
+validate                      # Check experiment structure
+status                        # Show experiment status
 
-# Job Management  
-submit --config-path <dir> --config-name <file> [--priority N]
-sweep --config <file> --params "key=v1,v2" [--dry-run]
-list [--status queued|running|completed|failed]
-kill <job_id>
-boost <job_id> --priority N
-run-one <job_id> --working-dir <dir>
+# Job Management (job subgroup)
+job submit --config-path <dir> --config-name <file> [--priority N] [--tags <tags>] [--overrides <overrides>]
+job sweep --config <file> --params "key=v1,v2" [--dry-run] [--verbose]
+job list [--status queued|running|completed|failed] [--tag <tag>]
+job kill <job_id...>          # Kill one or more jobs
+job boost <job_id...> --priority N  # Boost job priority
+job run-one <job_id> [--working-dir <dir>] [--no-sync]  # Run specific job immediately
+job recover [--threshold 300] [--dry-run]  # Recover stale jobs
+job sync-status [--verbose]   # Show sync queue status
 
 # Worker Operations
-worker --worker-id <id> [--max-jobs N] [--working-dir <dir>]
-launcher --workers-per-gpu N [--max-hours 47]
+worker --worker-id <id> [--max-jobs N] [--working-dir <dir>] [--no-sync]
+system launcher --workers-per-gpu N [--max-hours 47]  # Multi-worker launcher
 
-# SLURM Commands
-slurm status [--job-id ID]    # Show launcher status
-slurm errors [--job-id ID]    # View aggregated errors
-slurm control <stop|finish>   # Control launchers
-slurm logs [--job-id ID]      # Show worker logs
-
-# Monitoring
-status                        # Job counts
-sync-status                   # Queue status
-validate                      # Check structure
-recover                       # Fix stale jobs
+# SLURM Commands (slurm subgroup)
+slurm status                  # Show all SLURM job status
+slurm control <job_id> [--finish-current|--stop-now]  # Control SLURM jobs
+slurm errors <job_id> [--tail N]   # View aggregated errors
+slurm logs <job_id> [--worker <id>] [--tail N]  # Show worker logs
 ```
 
 ## Key Technical Components
