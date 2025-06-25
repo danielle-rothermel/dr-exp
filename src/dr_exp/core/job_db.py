@@ -36,7 +36,7 @@ class JobDB:
         assert experiment_name, "experiment_name cannot be empty"
         assert "/" not in experiment_name, "experiment_name cannot contain '/'"
 
-        self.base_path = Path(base_path)
+        self.base_path = Path(base_path).resolve()
         self.experiment_name = experiment_name
         self.experiment_path = self.base_path / experiment_name
 
@@ -226,9 +226,10 @@ class JobDB:
                         return None
 
             try:
-                # Find highest priority unclaimed job
+                # Find highest priority unclaimed job, with creation time as tiebreaker
                 best_job = None
                 best_priority = -1
+                best_created_at = None
 
                 for job_file in self.jobs_dir.glob("*.json"):
                     if job_file.name == ".claim_lock":
@@ -238,12 +239,22 @@ class JobDB:
                         with job_file.open() as f:
                             job_data = json.load(f)
 
-                        if (
-                            job_data["status"] == "queued"
-                            and job_data["priority"] > best_priority
-                        ):
-                            best_job = job_data
-                            best_priority = job_data["priority"]
+                        if job_data["status"] == "queued":
+                            priority = job_data["priority"]
+                            created_at = job_data.get("created_at", "")
+
+                            # Select if higher priority, or same priority but earlier
+                            # creation
+                            if priority > best_priority or (
+                                priority == best_priority
+                                and (
+                                    best_created_at is None
+                                    or created_at < best_created_at
+                                )
+                            ):
+                                best_job = job_data
+                                best_priority = priority
+                                best_created_at = created_at
 
                     except (json.JSONDecodeError, KeyError):
                         continue
