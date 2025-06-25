@@ -9,6 +9,7 @@ from unittest.mock import Mock, patch
 
 from dr_exp.core.job_db import JobDB
 from dr_exp.worker.launcher import WorkerLauncher
+import contextlib
 
 
 def test_launcher_init() -> None:
@@ -44,12 +45,14 @@ def test_gpu_discovery() -> None:
             assert gpus == [0, 1, 3]
 
         # Test empty CUDA_VISIBLE_DEVICES
-        with patch.dict(os.environ, {"CUDA_VISIBLE_DEVICES": ""}):
-            with patch("subprocess.run") as mock_run:
-                # Simulate no GPUs
-                mock_run.side_effect = FileNotFoundError()
-                gpus = launcher.discover_gpus()
-                assert gpus == []
+        with (
+            patch.dict(os.environ, {"CUDA_VISIBLE_DEVICES": ""}),
+            patch("subprocess.run") as mock_run
+        ):
+            # Simulate no GPUs
+            mock_run.side_effect = FileNotFoundError()
+            gpus = launcher.discover_gpus()
+            assert gpus == []
 
 
 def test_worker_spawning() -> None:
@@ -191,9 +194,11 @@ def test_graceful_shutdown() -> None:
 
         launcher.processes = {"worker1": mock_process1, "worker2": mock_process2}
 
-        with patch("os.killpg") as mock_killpg:
-            with patch("os.getpgid", side_effect=lambda pid: pid):
-                launcher.stop()
+        with (
+            patch("os.killpg") as mock_killpg,
+            patch("os.getpgid", side_effect=lambda pid: pid)
+        ):
+            launcher.stop()
 
         # Should have sent SIGTERM to both
         assert mock_killpg.call_count >= 2
@@ -223,11 +228,8 @@ def test_runtime_limits() -> None:
         launcher.running = True
 
         # Should detect timeout and call stop
-        with patch("time.sleep"):
+        with patch("time.sleep"), contextlib.suppress(Exception):
             # Run one iteration of the main loop
-            try:
-                launcher.run()
-            except Exception:
-                pass
+            launcher.run()
 
         launcher.stop.assert_called()

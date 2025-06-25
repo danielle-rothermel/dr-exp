@@ -10,7 +10,7 @@ from dr_exp.worker.base import Worker
 from dr_exp.sync.queue import SyncItem
 
 
-def test_worker_with_threads():
+def test_worker_with_threads() -> None:
     """Test worker with background threads."""
     with tempfile.TemporaryDirectory() as tmpdir:
         # Initialize JobDB
@@ -23,7 +23,7 @@ def test_worker_with_threads():
         # Track sync calls
         synced_items = []
 
-        def mock_sync(item: SyncItem):
+        def mock_sync(item: SyncItem) -> None:
             synced_items.append(item)
             print(f"Mock sync: {item.file_type} - {Path(item.file_path).name}")
 
@@ -62,7 +62,7 @@ def test_worker_with_threads():
         assert "metrics" in file_types or "model" in file_types
 
 
-def test_worker_no_sync():
+def test_worker_no_sync() -> None:
     """Test worker with sync disabled."""
     with tempfile.TemporaryDirectory() as tmpdir:
         job_db = JobDB(base_path=tmpdir, experiment_name="test_exp", validate=False)
@@ -86,13 +86,13 @@ def test_worker_no_sync():
         assert worker.heartbeat_thread is not None
 
 
-def test_worker_thread_cleanup():
+def test_worker_thread_cleanup() -> None:
     """Test that threads are properly cleaned up."""
     with tempfile.TemporaryDirectory() as tmpdir:
         job_db = JobDB(base_path=tmpdir, experiment_name="test_exp", validate=False)
 
         # Create multiple jobs
-        for i in range(3):
+        for _i in range(3):
             config = {"_target_": "dr_exp.trainers.test_trainer.train", "epochs": 1}
             job_db.create_job(config)
 
@@ -124,7 +124,7 @@ def test_worker_thread_cleanup():
         assert final_threads <= initial_threads + 1  # Allow small variance
 
 
-def test_worker_heartbeat_during_execution():
+def test_worker_heartbeat_during_execution() -> None:
     """Test that heartbeats are sent during job execution."""
     with tempfile.TemporaryDirectory() as tmpdir:
         job_db = JobDB(base_path=tmpdir, experiment_name="test_exp", validate=False)
@@ -140,7 +140,7 @@ def test_worker_heartbeat_during_execution():
         heartbeat_times = []
         original_heartbeat = job_db.heartbeat
 
-        def tracking_heartbeat(job_id_arg):
+        def tracking_heartbeat(job_id_arg: str) -> bool:
             heartbeat_times.append(time.time())
             return original_heartbeat(job_id_arg)
 
@@ -172,7 +172,7 @@ def test_worker_heartbeat_during_execution():
             assert 0.05 < avg_interval < 0.2  # Close to 0.1s
 
 
-def test_worker_sync_queue_integration():
+def test_worker_sync_queue_integration() -> None:
     """Test that sync queue is properly integrated."""
     with tempfile.TemporaryDirectory() as tmpdir:
         job_db = JobDB(base_path=tmpdir, experiment_name="test_exp", validate=False)
@@ -184,7 +184,7 @@ def test_worker_sync_queue_integration():
         # Track sync processing
         processed_files = []
 
-        def tracking_sync(item: SyncItem):
+        def tracking_sync(item: SyncItem) -> None:
             processed_files.append(Path(item.file_path).name)
             # Simulate successful upload
             time.sleep(0.01)
@@ -215,7 +215,7 @@ def test_worker_sync_queue_integration():
         assert sync_stats["completed"] > 0
 
 
-def test_worker_error_artifacts():
+def test_worker_error_artifacts() -> None:
     """Test that errors are saved and queued for sync."""
     with tempfile.TemporaryDirectory() as tmpdir:
         job_db = JobDB(base_path=tmpdir, experiment_name="test_exp", validate=False)

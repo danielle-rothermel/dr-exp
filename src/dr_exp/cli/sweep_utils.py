@@ -2,13 +2,13 @@
 
 import itertools
 from pathlib import Path
-from typing import List, Dict, Any, cast
+from typing import Any, cast
 import hydra
 from hydra.core.global_hydra import GlobalHydra
 from omegaconf import OmegaConf
 
 
-def parse_sweep_params(params_str: str) -> Dict[str, List[str]]:
+def parse_sweep_params(params_str: str) -> dict[str, list[str]]:
     """Parse sweep parameters from string format.
 
     Example: "model=resnet18,resnet50 optim.lr=0.001,0.01"
@@ -35,8 +35,8 @@ def parse_sweep_params(params_str: str) -> Dict[str, List[str]]:
 
 
 def generate_sweep_configs(
-    base_config: str, sweep_params: Dict[str, List[str]]
-) -> List[Dict[str, Any]]:
+    base_config: str, sweep_params: dict[str, list[str]]
+) -> list[dict[str, Any]]:
     """Generate all config combinations for a parameter sweep.
 
     Args:
@@ -56,14 +56,14 @@ def generate_sweep_configs(
 
     configs = []
     for combo in itertools.product(*values):
-        overrides = [f"{k}={v}" for k, v in zip(keys, combo)]
+        overrides = [f"{k}={v}" for k, v in zip(keys, combo, strict=False)]
         config = load_hydra_config(base_config, overrides)
         configs.append(config)
 
     return configs
 
 
-def load_hydra_config(config_path: str, overrides: List[str]) -> Dict[str, Any]:
+def load_hydra_config(config_path: str, overrides: list[str]) -> dict[str, Any]:
     """Load and compose a Hydra config with overrides.
 
     Args:
@@ -86,10 +86,10 @@ def load_hydra_config(config_path: str, overrides: List[str]) -> Dict[str, Any]:
         # Convert to regular dict and resolve
         result = OmegaConf.to_container(cfg, resolve=True, throw_on_missing=True)
         assert isinstance(result, dict), "Config must be a dictionary"
-        return cast(Dict[str, Any], result)
+        return cast(dict[str, Any], result)
 
 
-def validate_sweep_config(config: Dict[str, Any]) -> None:
+def validate_sweep_config(config: dict[str, Any]) -> None:
     """Validate that a config is ready for job submission.
 
     Args:
@@ -112,4 +112,4 @@ def validate_sweep_config(config: Dict[str, Any]) -> None:
             f"Function {func_name} not found in {module_path}"
         )
     except Exception as e:
-        assert False, f"Cannot import target {target}: {e}"
+        raise AssertionError(f"Cannot import target {target}: {e}") from e

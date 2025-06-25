@@ -3,11 +3,12 @@
 import tempfile
 import multiprocessing
 import time
+from multiprocessing import Queue
 
 from dr_exp.core.job_db import JobDB
 
 
-def worker_process(base_path: str, worker_id: str, results_queue):
+def worker_process(base_path: str, worker_id: str, results_queue: Queue) -> None:
     """Worker process that tries to claim jobs."""
     job_db = JobDB(base_path=base_path, experiment_name="test_exp", validate=False)
 
@@ -26,7 +27,7 @@ def worker_process(base_path: str, worker_id: str, results_queue):
     results_queue.put((worker_id, claimed_jobs))
 
 
-def test_concurrent_claiming():
+def test_concurrent_claiming() -> None:
     """Test that multiple workers can claim jobs without conflicts."""
     with tempfile.TemporaryDirectory() as tmpdir:
         # Initialize JobDB
@@ -78,7 +79,7 @@ def test_concurrent_claiming():
         # Verify high priority jobs were claimed first
         # Get the first 5 jobs claimed across all workers
         claim_times = {}
-        for worker_id, claims in worker_claims.items():
+        for claims in worker_claims.values():
             for idx, job_id in enumerate(claims):
                 if job_id not in claim_times:
                     claim_times[job_id] = idx
@@ -95,7 +96,7 @@ def test_concurrent_claiming():
         assert avg_claim_order < 10, "High priority jobs not claimed first"
 
 
-def test_job_updates():
+def test_job_updates() -> None:
     """Test atomic job updates."""
     with tempfile.TemporaryDirectory() as tmpdir:
         job_db = JobDB(base_path=tmpdir, experiment_name="test_exp", validate=False)

@@ -5,6 +5,8 @@ import tempfile
 from pathlib import Path
 from dotenv import load_dotenv
 
+import pytest
+
 from dr_exp.sync.supabase_client import SupabaseClient
 
 
@@ -196,40 +198,35 @@ def test_signed_urls() -> None:
         assert storage_path in signed_url
 
 
-def test_error_handling() -> None:
+def test_error_handling(tmp_path: Path) -> None:
     """Test error handling in Supabase client."""
     setup_test_env()
 
     client = SupabaseClient()
 
     # Test invalid file
-    try:
+    with pytest.raises(FileNotFoundError, match="File not found"):
         client.upload_file(
             file_path=Path("/nonexistent/file.txt"),
             experiment_name="test",
             job_id="test",
             file_type="logs",
         )
-        assert False, "Should have raised FileNotFoundError"
-    except FileNotFoundError as e:
-        assert "File not found" in str(e)
 
     # Test invalid download
-    try:
+    with pytest.raises(Exception, match="Failed to download"):
         client.download_file(
-            storage_path="nonexistent/path.txt", local_path=Path("/tmp/download.txt")
+            storage_path="nonexistent/path.txt", local_path=tmp_path / "download.txt"
         )
-        assert False, "Should have raised exception"
-    except Exception as e:
-        assert "Failed to download" in str(e)
 
     # Test invalid credentials
     try:
         bad_client = SupabaseClient(url="http://localhost:54321", key="invalid_key")
         bad_client.test_connection()
         # May or may not fail depending on Supabase config
-    except Exception:
-        pass  # Expected to fail with invalid credentials
+    except Exception:  # noqa: S110
+        # Expected to fail with invalid credentials - this is the desired behavior
+        pass
 
 
 def test_checksum_calculation() -> None:
@@ -275,7 +272,7 @@ def test_mime_type_detection() -> None:
             "unknown.xyz": ("other", "application/octet-stream"),
         }
 
-        for filename, (file_type, expected_mime) in test_files.items():
+        for filename, (file_type, _expected_mime) in test_files.items():
             file_path = Path(tmpdir) / filename
             file_path.write_text("test")
 
@@ -289,4 +286,4 @@ def test_mime_type_detection() -> None:
                 )
                 assert storage_url is not None
             except Exception as e:
-                assert False, f"Failed to upload {filename}: {e}"
+                raise AssertionError(f"Failed to upload {filename}: {e}") from e

@@ -3,11 +3,12 @@
 import tempfile
 import time
 import json
+from pathlib import Path
 
 from dr_exp.core.job_db import JobDB
 
 
-def test_job_lifecycle():
+def test_job_lifecycle() -> None:
     """Test complete job lifecycle from creation to completion."""
     with tempfile.TemporaryDirectory() as tmpdir:
         job_db = JobDB(base_path=tmpdir, experiment_name="test_exp", validate=False)
@@ -31,7 +32,7 @@ def test_job_lifecycle():
         assert "started_at" in claimed_job
 
         # Send heartbeats
-        for i in range(3):
+        for _i in range(3):
             time.sleep(0.1)
             success = job_db.heartbeat(job_id)
             assert success
@@ -53,7 +54,7 @@ def test_job_lifecycle():
         assert job["final_metrics"] == metrics
 
 
-def test_job_failure():
+def test_job_failure() -> None:
     """Test job failure handling."""
     with tempfile.TemporaryDirectory() as tmpdir:
         job_db = JobDB(base_path=tmpdir, experiment_name="test_exp", validate=False)
@@ -75,7 +76,7 @@ def test_job_failure():
         assert "completed_at" in job
 
 
-def test_job_listing():
+def test_job_listing() -> None:
     """Test listing jobs with filters."""
     with tempfile.TemporaryDirectory() as tmpdir:
         job_db = JobDB(base_path=tmpdir, experiment_name="test_exp", validate=False)
@@ -85,7 +86,7 @@ def test_job_listing():
 
         # Create all jobs first, then manipulate their states
         all_job_ids = []
-        for i in range(5):
+        for _i in range(5):
             job_id = job_db.create_job(config, priority=100)
             all_job_ids.append(job_id)
 
@@ -127,7 +128,7 @@ def test_job_listing():
         assert failed_jobs[0]["id"] == failed_id
 
 
-def test_sync_queue():
+def test_sync_queue(tmp_path: Path) -> None:
     """Test sync queue functionality."""
     with tempfile.TemporaryDirectory() as tmpdir:
         job_db = JobDB(base_path=tmpdir, experiment_name="test_exp", validate=False)
@@ -142,7 +143,7 @@ def test_sync_queue():
         # Add metrics file
         sync_id1 = job_db.add_to_sync_queue(
             job_id=job_id,
-            file_path="/tmp/metrics.json",
+            file_path=str(tmp_path / "metrics.json"),
             file_type="metrics",
             metadata={"lines": 100},
         )
@@ -154,7 +155,7 @@ def test_sync_queue():
         # Add model file
         sync_id2 = job_db.add_to_sync_queue(
             job_id=job_id,
-            file_path="/tmp/model.pt",
+            file_path=str(tmp_path / "model.pt"),
             file_type="model",
             metadata={"epoch": 10, "size_mb": 250},
         )
@@ -167,7 +168,7 @@ def test_sync_queue():
         # Verify files are ordered by timestamp
         sync_files.sort()
         for sync_file in sync_files:
-            with open(sync_file, "r") as f:
+            with Path(sync_file).open() as f:
                 sync_data = json.load(f)
                 assert sync_data["id"] in sync_ids
                 assert sync_data["job_id"] == job_id
@@ -175,7 +176,7 @@ def test_sync_queue():
                 assert sync_data["attempts"] == 0
 
 
-def test_experiment_info():
+def test_experiment_info() -> None:
     """Test experiment info gathering."""
     with tempfile.TemporaryDirectory() as tmpdir:
         job_db = JobDB(base_path=tmpdir, experiment_name="test_exp", validate=False)
@@ -195,7 +196,7 @@ def test_experiment_info():
         job_db.claim_next_job("worker_2")
 
         # 3 completed
-        for i in range(3):
+        for _i in range(3):
             claimed_job = job_db.claim_next_job("worker_temp")
             job_db.complete_job(claimed_job["id"])
 

@@ -22,7 +22,7 @@ def setup_test_env() -> None:
         )
 
 
-def test_experiment_operations() -> str:
+def test_experiment_operations(tmp_path: Path) -> str:
     """Test experiment creation and retrieval."""
     setup_test_env()
 
@@ -30,7 +30,7 @@ def test_experiment_operations() -> str:
 
     # Create new experiment
     exp_name = f"test_exp_{int(datetime.now(UTC).timestamp())}"
-    base_path = "/tmp/test"
+    base_path = str(tmp_path / "test")
     metadata = {"created_by": "test", "purpose": "testing"}
 
     exp_id = client.get_or_create_experiment(exp_name, base_path, metadata)
@@ -48,7 +48,7 @@ def test_experiment_operations() -> str:
     return exp_id
 
 
-def test_job_sync() -> tuple[str, str]:
+def test_job_sync(tmp_path: Path) -> tuple[str, str]:
     """Test syncing jobs to database."""
     setup_test_env()
 
@@ -56,7 +56,7 @@ def test_job_sync() -> tuple[str, str]:
 
     # Create experiment
     exp_name = f"job_sync_test_{int(datetime.now(UTC).timestamp())}"
-    exp_id = client.get_or_create_experiment(exp_name, "/tmp/test")
+    exp_id = client.get_or_create_experiment(exp_name, str(tmp_path / "test"))
 
     # Create job data (mimicking local JobDB format)
     job_id = str(uuid.uuid4())
@@ -94,7 +94,7 @@ def test_job_sync() -> tuple[str, str]:
     return exp_id, job_id
 
 
-def test_sync_status() -> None:
+def test_sync_status(tmp_path: Path) -> None:
     """Test sync status tracking."""
     setup_test_env()
 
@@ -102,7 +102,7 @@ def test_sync_status() -> None:
 
     # Create experiment and job
     exp_name = f"sync_status_test_{int(datetime.now(UTC).timestamp())}"
-    exp_id = client.get_or_create_experiment(exp_name, "/tmp/test")
+    exp_id = client.get_or_create_experiment(exp_name, str(tmp_path / "test"))
 
     job_id = str(uuid.uuid4())
     job_data = {
@@ -118,7 +118,7 @@ def test_sync_status() -> None:
     # Create sync status for uploaded file
     sync_id = client.create_sync_status(
         job_id=job_id,
-        file_path="/tmp/test/metrics.jsonl",
+        file_path=str(tmp_path / "test" / "metrics.jsonl"),
         file_type="metrics",
         checksum="abc123def456",
         size_bytes=1024,
@@ -135,7 +135,7 @@ def test_sync_status() -> None:
     assert sync_records[0]["status"] == "completed"
 
 
-def test_experiment_stats() -> None:
+def test_experiment_stats(tmp_path: Path) -> None:
     """Test getting experiment statistics."""
     setup_test_env()
 
@@ -143,7 +143,7 @@ def test_experiment_stats() -> None:
 
     # Create experiment with multiple jobs
     exp_name = f"stats_test_{int(datetime.now(UTC).timestamp())}"
-    exp_id = client.get_or_create_experiment(exp_name, "/tmp/test")
+    exp_id = client.get_or_create_experiment(exp_name, str(tmp_path / "test"))
 
     # Create jobs in different states
     job_configs = [
@@ -154,7 +154,7 @@ def test_experiment_stats() -> None:
         {"status": "failed", "error": "OOM"},
     ]
 
-    for i, config in enumerate(job_configs):
+    for _i, config in enumerate(job_configs):
         job_data = {
             "id": str(uuid.uuid4()),
             "config": {"_target_": "test.train"},
@@ -187,7 +187,7 @@ def test_experiment_stats() -> None:
     assert stats["failed_jobs"] == 1
 
 
-def test_batch_operations() -> None:
+def test_batch_operations(tmp_path: Path) -> None:
     """Test batch syncing of jobs."""
     setup_test_env()
 
@@ -195,7 +195,7 @@ def test_batch_operations() -> None:
 
     # Create experiment
     exp_name = f"batch_test_{int(datetime.now(UTC).timestamp())}"
-    exp_id = client.get_or_create_experiment(exp_name, "/tmp/test")
+    exp_id = client.get_or_create_experiment(exp_name, str(tmp_path / "test"))
 
     # Create multiple jobs
     jobs = []
@@ -224,7 +224,7 @@ def test_batch_operations() -> None:
     assert db_jobs[0]["config"]["index"] == 0  # Most recent
 
 
-def test_job_queries() -> None:
+def test_job_queries(tmp_path: Path) -> None:
     """Test querying jobs with filters."""
     setup_test_env()
 
@@ -232,13 +232,13 @@ def test_job_queries() -> None:
 
     # Create experiment
     exp_name = f"query_test_{int(datetime.now(UTC).timestamp())}"
-    exp_id = client.get_or_create_experiment(exp_name, "/tmp/test")
+    exp_id = client.get_or_create_experiment(exp_name, str(tmp_path / "test"))
 
     # Create jobs with different statuses
     statuses = ["queued", "queued", "running", "completed", "failed"]
     job_ids = []
 
-    for i, status in enumerate(statuses):
+    for _i, status in enumerate(statuses):
         job_data = {
             "id": str(uuid.uuid4()),
             "config": {"_target_": "test.train"},

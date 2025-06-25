@@ -1,23 +1,27 @@
 #!/usr/bin/env python3
-"""Utilities for safe job submission with proper error handling and duplicate detection."""
+"""Utilities for safe job submission with error handling and duplicate detection."""
 
 import json
 import subprocess
 from datetime import datetime
 from pathlib import Path
-from typing import Any, Dict, List, Optional, Set, Tuple
+from typing import Any
+
+# Constants for display limits
+MAX_DISPLAYED_FAILED_CONFIGS = 3
 
 
 class SubmissionLogger:
     """Logs all submission attempts to a JSON file for recovery/auditing."""
 
-    def __init__(self, log_file: Path):
+    def __init__(self, log_file: Path) -> None:
+        """Initialize submission logger with log file path."""
         self.log_file = log_file
-        self.submissions: List[Dict[str, Any]] = []
+        self.submissions: list[dict[str, Any]] = []
 
         # Load existing log if present
         if log_file.exists():
-            with open(log_file) as f:
+            with log_file.open() as f:
                 data = json.load(f)
                 self.submissions = data.get("submissions", [])
 
@@ -27,8 +31,8 @@ class SubmissionLogger:
         seed: int,
         job_id: str,
         success: bool,
-        error: Optional[str] = None,
-    ):
+        error: str | None = None,
+    ) -> None:
         """Log a submission attempt."""
         entry = {
             "timestamp": datetime.now().isoformat(),
@@ -41,12 +45,12 @@ class SubmissionLogger:
         self.submissions.append(entry)
         self._save()
 
-    def _save(self):
+    def _save(self) -> None:
         """Save log to disk."""
-        with open(self.log_file, "w") as f:
+        with self.log_file.open("w") as f:
             json.dump({"submissions": self.submissions}, f, indent=2)
 
-    def get_successful_submissions(self) -> Set[Tuple[str, int]]:
+    def get_successful_submissions(self) -> set[tuple[str, int]]:
         """Return set of (config, seed) tuples for successful submissions."""
         return {
             (s["config"], s["seed"])
@@ -58,11 +62,18 @@ class SubmissionLogger:
 class JobSubmitter:
     """Handles job submission with safety features."""
 
-    def __init__(self, base_path: Path, experiment: str, dry_run: bool = False):
+    def __init__(self, base_path: Path, experiment: str, dry_run: bool = False) -> None:
+        """Initialize job submitter with base path, experiment name, and dry run flag.
+
+        Args:
+            base_path: Base path for experiment
+            experiment: Experiment name
+            dry_run: If True, only preview submissions
+        """
         self.base_path = base_path
         self.experiment = experiment
         self.dry_run = dry_run
-        self.failed_jobs: List[Dict[str, Any]] = []
+        self.failed_jobs: list[dict[str, Any]] = []
 
         # Set up logging
         timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
@@ -70,11 +81,11 @@ class JobSubmitter:
         log_dir.mkdir(parents=True, exist_ok=True)
         self.logger = SubmissionLogger(log_dir / f"submission_{timestamp}.json")
 
-    def check_existing_jobs(self) -> Set[Tuple[str, int]]:
+    def check_existing_jobs(self) -> set[tuple[str, int]]:
         """Check for existing jobs to avoid duplicates."""
         try:
-            result = subprocess.run(
-                [
+            result = subprocess.run(  # noqa: S603
+                [  # noqa: S607
                     "dr_exp",
                     "--base-path",
                     str(self.base_path),
@@ -87,6 +98,7 @@ class JobSubmitter:
                 ],
                 capture_output=True,
                 text=True,
+                check=False,
             )
 
             existing = set()
@@ -112,7 +124,7 @@ class JobSubmitter:
                             seed = int(line[seed_start:seed_end].strip())
 
                             existing.add((config, seed))
-                        except:
+                        except (ValueError, IndexError):
                             # Skip malformed lines
                             pass
 
@@ -131,25 +143,21 @@ class JobSubmitter:
             Path.cwd() / config_path,
         ]
 
-        for path in paths_to_check:
-            if path.exists():
-                return True
-
-        return False
+        return any(path.exists() for path in paths_to_check)
 
     def submit_job(
         self,
         config: str,
         seed: int,
         priority: int = 0,
-        extra_overrides: Optional[str] = None,
-        tags: Optional[List[str]] = None,
-    ) -> Tuple[bool, Optional[str]]:
+        extra_overrides: str | None = None,
+        tags: list[str] | None = None,
+    ) -> tuple[bool, str | None]:
         """Submit a single job. Returns (success, job_id)."""
-
         if self.dry_run:
             print(
-                f"[DRY RUN] Would submit: config={config}, seed={seed}, priority={priority}"
+                f"[DRY RUN] Would submit: config={config}, seed={seed}, "
+                f"priority={priority}"
             )
             return True, "dry-run-job-id"
 
@@ -181,7 +189,7 @@ class JobSubmitter:
             cmd.extend(["--tags", ",".join(tags)])
 
         try:
-            result = subprocess.run(cmd, capture_output=True, text=True)
+            result = subprocess.run(cmd, capture_output=True, text=True, check=False)  # noqa: S603
 
             if result.returncode == 0:
                 # Extract job ID from output
@@ -191,11 +199,13 @@ class JobSubmitter:
                         job_id = line.split(":")[-1].strip()
                         break
 
-                self.logger.log_submission(config, seed, job_id or "unknown", True)
+                self.logger.log_submission(
+                    config, seed, job_id or "unknown", success=True
+                )
                 return True, job_id
             else:
                 error = result.stderr.strip() or "Unknown error"
-                self.logger.log_submission(config, seed, "", False, error)
+                self.logger.log_submission(config, seed, "", success=False, error=error)
                 self.failed_jobs.append(
                     {"config": config, "seed": seed, "error": error}
                 )
@@ -203,11 +213,11 @@ class JobSubmitter:
 
         except Exception as e:
             error = str(e)
-            self.logger.log_submission(config, seed, "", False, error)
+            self.logger.log_submission(config, seed, "", success=False, error=error)
             self.failed_jobs.append({"config": config, "seed": seed, "error": error})
             return False, None
 
-    def print_summary(self):
+    def print_summary(self) -> None:
         """Print submission summary with failure details."""
         if self.failed_jobs:
             print("\n❌ FAILED SUBMISSIONS:")
@@ -219,13 +229,13 @@ class JobSubmitter:
 
             # Generate rerun command
             failed_configs = sorted(
-                set((j["config"], j["seed"]) for j in self.failed_jobs)
+                {(j["config"], j["seed"]) for j in self.failed_jobs}
             )
             print("\n📝 To retry failed jobs, run:")
             print("python submit_jobs.py --only-failed", end="")
-            for config, seed in failed_configs[:3]:  # Show first 3 as example
+            for config, seed in failed_configs[:3]:  # Show first few as example
                 print(f" --job {config},{seed}", end="")
-            if len(failed_configs) > 3:
+            if len(failed_configs) > MAX_DISPLAYED_FAILED_CONFIGS:
                 print(f" ... ({len(failed_configs) - 3} more)")
             else:
                 print()

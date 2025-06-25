@@ -1,13 +1,13 @@
 """Simple FastAPI application for remote monitoring."""
 
 import os
-from typing import Optional, Dict, Any
+from typing import Any
 from pathlib import Path
 
 from fastapi import FastAPI, HTTPException, Query
 from fastapi.middleware.cors import CORSMiddleware
 
-from ..core.job_db import JobDB
+from dr_exp.core.job_db import JobDB
 
 
 app = FastAPI(title="dr_exp API", version="1.0.0")
@@ -22,13 +22,13 @@ app.add_middleware(
 )
 
 # Global JobDB instance (initialized on startup)
-job_db: Optional[JobDB] = None
+job_db: JobDB | None = None
 
 
 @app.on_event("startup")
 async def startup_event() -> None:
     """Initialize JobDB with remote read enabled."""
-    global job_db
+    global job_db  # noqa: PLW0603
 
     # Get configuration from environment
     base_path = os.environ.get("DR_EXP_BASE_PATH")
@@ -50,7 +50,7 @@ async def startup_event() -> None:
 
 
 @app.get("/")
-async def root() -> Dict[str, Any]:
+async def root() -> dict[str, Any]:
     """API root endpoint."""
     return {
         "service": "dr_exp API",
@@ -61,7 +61,7 @@ async def root() -> Dict[str, Any]:
 
 
 @app.get("/experiment/info")
-async def get_experiment_info() -> Dict[str, Any]:
+async def get_experiment_info() -> dict[str, Any]:
     """Get experiment information and statistics."""
     if not job_db:
         raise HTTPException(status_code=503, detail="Service not initialized")
@@ -72,10 +72,10 @@ async def get_experiment_info() -> Dict[str, Any]:
 
 @app.get("/jobs")
 async def list_jobs(
-    status: Optional[str] = Query(None, description="Filter by status"),
+    status: str | None = Query(None, description="Filter by status"),
     limit: int = Query(100, ge=1, le=1000),
-    use_remote: bool = Query(True, description="Use remote data if available"),
-) -> Dict[str, Any]:
+    use_remote: bool = Query(default=True, description="Use remote data if available"),
+) -> dict[str, Any]:
     """List jobs in the experiment."""
     if not job_db:
         raise HTTPException(status_code=503, detail="Service not initialized")
@@ -98,8 +98,8 @@ async def list_jobs(
 @app.get("/jobs/{job_id}")
 async def get_job(
     job_id: str,
-    use_remote: bool = Query(True, description="Use remote data if available"),
-) -> Dict[str, Any]:
+    use_remote: bool = Query(default=True, description="Use remote data if available"),
+) -> dict[str, Any]:
     """Get details for a specific job."""
     if not job_db:
         raise HTTPException(status_code=503, detail="Service not initialized")
@@ -116,7 +116,7 @@ async def get_job(
 
 
 @app.get("/jobs/{job_id}/artifacts")
-async def list_job_artifacts(job_id: str) -> Dict[str, Any]:
+async def list_job_artifacts(job_id: str) -> dict[str, Any]:
     """List artifacts for a job."""
     if not job_db or not job_db.remote_enabled:
         raise HTTPException(status_code=503, detail="Remote storage not available")
@@ -127,27 +127,26 @@ async def list_job_artifacts(job_id: str) -> Dict[str, Any]:
         else:
             sync_records = []
 
-        artifacts = []
-        for record in sync_records:
-            if record["status"] == "completed":
-                artifacts.append(
-                    {
-                        "file_name": Path(record["file_path"]).name,
-                        "file_type": record["file_type"],
-                        "size_bytes": record["size_bytes"],
-                        "checksum": record["checksum"],
-                        "uploaded_at": record["completed_at"],
-                    }
-                )
+        artifacts = [
+            {
+                "file_name": Path(record["file_path"]).name,
+                "file_type": record["file_type"],
+                "size_bytes": record["size_bytes"],
+                "checksum": record["checksum"],
+                "uploaded_at": record["completed_at"],
+            }
+            for record in sync_records
+            if record["status"] == "completed"
+        ]
 
         return {"job_id": job_id, "artifacts": artifacts, "count": len(artifacts)}
 
     except Exception as e:
-        raise HTTPException(status_code=500, detail=str(e))
+        raise HTTPException(status_code=500, detail=str(e)) from e
 
 
 @app.post("/jobs/{job_id}/download")
-async def download_job_artifacts(job_id: str) -> Dict[str, Any]:
+async def download_job_artifacts(job_id: str) -> dict[str, Any]:
     """Download all artifacts for a job."""
     if not job_db:
         raise HTTPException(status_code=503, detail="Service not initialized")
@@ -166,11 +165,11 @@ async def download_job_artifacts(job_id: str) -> Dict[str, Any]:
         }
 
     except Exception as e:
-        raise HTTPException(status_code=500, detail=str(e))
+        raise HTTPException(status_code=500, detail=str(e)) from e
 
 
 @app.get("/queue/stats")
-async def get_queue_stats() -> Dict[str, Any]:
+async def get_queue_stats() -> dict[str, Any]:
     """Get job queue statistics."""
     if not job_db:
         raise HTTPException(status_code=503, detail="Service not initialized")
@@ -186,7 +185,7 @@ async def get_queue_stats() -> Dict[str, Any]:
 
 
 @app.get("/health")
-async def health_check() -> Dict[str, Any]:
+async def health_check() -> dict[str, Any]:
     """Health check endpoint."""
     health = {
         "status": "healthy" if job_db else "unhealthy",

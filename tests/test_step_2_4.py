@@ -8,7 +8,7 @@ from dr_exp.cli.main import cli
 from dr_exp.core.job_db import JobDB
 
 
-def test_cli_init():
+def test_cli_init() -> None:
     """Test experiment initialization."""
     runner = CliRunner()
 
@@ -28,7 +28,7 @@ def test_cli_init():
         assert (exp_path / "example_config.yaml").exists()
 
 
-def test_cli_submit():
+def test_cli_submit() -> None:
     """Test job submission."""
     runner = CliRunner()
 
@@ -69,7 +69,7 @@ epochs: 10
         assert jobs[0]["priority"] == 500
 
 
-def test_cli_list():
+def test_cli_list() -> None:
     """Test job listing."""
     runner = CliRunner()
 
@@ -119,7 +119,7 @@ def test_cli_list():
         assert job3 not in result.output
 
 
-def test_cli_status():
+def test_cli_status() -> None:
     """Test experiment status."""
     runner = CliRunner()
 
@@ -155,7 +155,7 @@ def test_cli_status():
         assert "Total: 5" in result.output
 
 
-def test_cli_worker():
+def test_cli_worker() -> None:
     """Test running a worker via CLI."""
     runner = CliRunner()
 
@@ -188,7 +188,7 @@ def test_cli_worker():
         assert "'completed': 1" in result.output
 
 
-def test_cli_worker_with_sync():
+def test_cli_worker_with_sync() -> None:
     """Test worker with sync enabled."""
     runner = CliRunner()
 
@@ -216,10 +216,11 @@ def test_cli_worker_with_sync():
 
         assert result.exit_code == 0
         assert "Sync: enabled" in result.output
-        # Note: sync messages may not appear if no files are added to sync queue during job execution
+        # Note: sync messages may not appear if no files are added to sync queue
+        # during job execution
 
 
-def test_cli_error_handling():
+def test_cli_error_handling() -> None:
     """Test CLI error handling."""
     runner = CliRunner()
 

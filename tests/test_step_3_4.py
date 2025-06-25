@@ -196,10 +196,11 @@ def test_sync_retry_logic() -> None:
         sync_worker.stop_background_threads()
 
         # Bad file should have failed attempts
-        failed_items = []
-        for item in sync_worker.sync_queue.get_pending_items():
-            if "nonexistent" in item.file_path:
-                failed_items.append(item)
+        failed_items = [
+            item
+            for item in sync_worker.sync_queue.get_pending_items()
+            if "nonexistent" in item.file_path
+        ]
 
         if failed_items:
             assert failed_items[0].attempts > 0

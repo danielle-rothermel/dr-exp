@@ -3,7 +3,6 @@
 
 import click
 from pathlib import Path
-from typing import Optional
 
 
 @click.command()
@@ -12,7 +11,7 @@ from typing import Optional
 @click.option("--experiment", required=True, help="Experiment name")
 @click.option("--job-id", help="SLURM job ID (defaults to all)")
 def main(
-    command: str, base_path: str, experiment: str, job_id: Optional[str] = None
+    command: str, base_path: str, experiment: str, job_id: str | None = None
 ) -> None:
     """Send control commands to launcher."""
     control_dir = Path(base_path) / experiment / "control"

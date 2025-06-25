@@ -59,8 +59,9 @@ try:
         try:
             files = client.storage.from_("experiments").list()
             print(f"   Files in bucket: {len(files) if files else 0}")
-        except:
-            pass
+        except Exception as e:
+            # Storage access may fail if permissions are restricted
+            print(f"   Could not access storage: {e}")
 
 except Exception as e:
     print(f"\n❌ Error checking storage: {e}")

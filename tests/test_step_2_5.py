@@ -2,6 +2,7 @@
 
 import tempfile
 from datetime import datetime, timedelta, UTC
+from pathlib import Path
 from click.testing import CliRunner
 
 from dr_exp.cli.main import cli
@@ -169,7 +170,7 @@ def test_cli_recover() -> None:
         assert job["status"] == "queued"
 
 
-def test_cli_sync_status() -> None:
+def test_cli_sync_status(tmp_path: Path) -> None:
     """Test sync status command."""
     runner = CliRunner()
 
@@ -186,7 +187,7 @@ def test_cli_sync_status() -> None:
         item1 = SyncItem(
             id="sync1",
             job_id="job1",
-            file_path="/tmp/file1.txt",
+            file_path=str(tmp_path / "file1.txt"),
             file_type="metrics",
             metadata={},
             created_at=datetime.now(UTC).isoformat(),
@@ -197,7 +198,7 @@ def test_cli_sync_status() -> None:
         item2 = SyncItem(
             id="sync2",
             job_id="job2",
-            file_path="/tmp/file2.txt",
+            file_path=str(tmp_path / "file2.txt"),
             file_type="model",
             metadata={},
             created_at=datetime.now(UTC).isoformat(),
@@ -261,7 +262,8 @@ def test_cli_run_one() -> None:
 
         assert result.exit_code == 0
         assert f"Running job: {job_id}" in result.output
-        assert "Job " in result.output and "COMPLETED" in result.output
+        assert "Job " in result.output
+        assert "COMPLETED" in result.output
 
         # Verify job completed
         job = job_db.get_job(job_id)
@@ -336,9 +338,7 @@ def test_cli_partial_id_matching() -> None:
         config = {"_target_": "test.train"}
 
         # Create multiple jobs
-        jobs = []
-        for _ in range(3):
-            jobs.append(job_db.create_job(config))
+        jobs = [job_db.create_job(config) for _ in range(3)]
 
         # Test unique partial match on first job
         partial = jobs[0][:8]

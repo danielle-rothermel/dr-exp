@@ -8,22 +8,28 @@ from pathlib import Path
 def test_local_supabase() -> tuple[str, str]:
     """Test local Supabase setup."""
     # Check if Supabase is installed
-    result = subprocess.run(["supabase", "--version"], capture_output=True, text=True)
+    result = subprocess.run(  # noqa: S603
+        ["supabase", "--version"], capture_output=True, text=True, check=False  # noqa: S607
+    )
     assert result.returncode == 0, "Supabase CLI not installed"
     print(f"Supabase version: {result.stdout.strip()}")
 
     # Start Supabase (if not already running)
     print("Starting local Supabase...")
-    result = subprocess.run(["supabase", "start"], capture_output=True, text=True)
+    result = subprocess.run(  # noqa: S603
+        ["supabase", "start"], capture_output=True, text=True, check=False  # noqa: S607
+    )
     if result.returncode != 0 and "is already running" not in result.stderr:
         print(f"Error starting Supabase: {result.stderr}")
-        assert False, "Failed to start Supabase"
+        raise AssertionError("Failed to start Supabase")
 
     # Wait for services to be ready
     time.sleep(2)
 
     # Get status
-    result = subprocess.run(["supabase", "status"], capture_output=True, text=True)
+    result = subprocess.run(  # noqa: S603
+        ["supabase", "status"], capture_output=True, text=True, check=False  # noqa: S607
+    )
     assert result.returncode == 0
     print("Supabase status:")
     print(result.stdout)
@@ -46,12 +52,12 @@ def test_local_supabase() -> tuple[str, str]:
     return api_url, service_key
 
 
-def test_database_schema() -> None:
+def test_database_schema(tmp_path: Path) -> None:
     """Test database schema with psycopg2."""
     try:
         import psycopg2
     except ImportError:
-        subprocess.run(["uv", "add", "psycopg2-binary"], check=True)
+        subprocess.run(["uv", "add", "psycopg2-binary"], check=True)  # noqa: S603, S607
         import psycopg2
 
     # Connect to local database
@@ -68,9 +74,9 @@ def test_database_schema() -> None:
 
         # Check tables exist
         cur.execute("""
-            SELECT table_name 
-            FROM information_schema.tables 
-            WHERE table_schema = 'public' 
+            SELECT table_name
+            FROM information_schema.tables
+            WHERE table_schema = 'public'
             AND table_type = 'BASE TABLE'
             ORDER BY table_name;
         """)
@@ -84,8 +90,8 @@ def test_database_schema() -> None:
 
         # Check views
         cur.execute("""
-            SELECT table_name 
-            FROM information_schema.views 
+            SELECT table_name
+            FROM information_schema.views
             WHERE table_schema = 'public'
             ORDER BY table_name;
         """)
@@ -98,9 +104,9 @@ def test_database_schema() -> None:
 
         # Check indexes
         cur.execute("""
-            SELECT indexname 
-            FROM pg_indexes 
-            WHERE schemaname = 'public' 
+            SELECT indexname
+            FROM pg_indexes
+            WHERE schemaname = 'public'
             AND tablename = 'jobs'
             ORDER BY indexname;
         """)
@@ -117,11 +123,14 @@ def test_database_schema() -> None:
         test_timestamp = int(time.time())
         cur.execute(
             """
-            INSERT INTO experiments (experiment_name, base_path) 
-            VALUES (%s, %s) 
+            INSERT INTO experiments (experiment_name, base_path)
+            VALUES (%s, %s)
             RETURNING id;
         """,
-            (f"schema_test_{test_timestamp}", f"/tmp/schema_test_{test_timestamp}"),
+            (
+                f"schema_test_{test_timestamp}",
+                str(tmp_path / f"schema_test_{test_timestamp}"),
+            ),
         )
 
         exp_id = cur.fetchone()[0]
@@ -141,7 +150,7 @@ def test_database_schema() -> None:
         # Test job queue view
         cur.execute(
             """
-            SELECT * FROM job_queue 
+            SELECT * FROM job_queue
             WHERE experiment_id = %s;
         """,
             (exp_id,),
@@ -154,7 +163,7 @@ def test_database_schema() -> None:
         # Test experiment stats view
         cur.execute(
             """
-            SELECT * FROM experiment_stats 
+            SELECT * FROM experiment_stats
             WHERE id = %s;
         """,
             (exp_id,),
@@ -189,8 +198,8 @@ def test_storage_bucket() -> None:
 
         # Check bucket exists
         cur.execute("""
-            SELECT id, name, public, allowed_mime_types 
-            FROM storage.buckets 
+            SELECT id, name, public, allowed_mime_types
+            FROM storage.buckets
             WHERE id = 'experiments';
         """)
 
@@ -225,7 +234,8 @@ def test_storage_bucket() -> None:
             assert len(policies) >= 4, "Expected at least 4 storage policies"
         else:
             print(
-                "  Note: No explicit storage policies found (using default service role access)"
+                "  Note: No explicit storage policies found "
+                "(using default service role access)"
             )
 
     finally:
@@ -259,7 +269,7 @@ def test_migrations() -> None:
         assert content.strip().endswith(";"), "SQL should end with semicolon"
 
 
-def test_database_operations() -> None:
+def test_database_operations(tmp_path: Path) -> None:
     """Test common database operations."""
     import psycopg2
     import json
@@ -284,7 +294,7 @@ def test_database_operations() -> None:
             VALUES (%s, %s, %s)
             RETURNING id;
         """,
-            (exp_name, "/tmp/test", json.dumps({"test": True})),
+            (exp_name, str(tmp_path / "test"), json.dumps({"test": True})),
         )
 
         exp_id = cur.fetchone()[0]
@@ -305,12 +315,12 @@ def test_database_operations() -> None:
         # Test claiming a job (highest priority first)
         cur.execute(
             """
-            UPDATE jobs 
-            SET status = 'running', 
+            UPDATE jobs
+            SET status = 'running',
                 worker_id = 'test_worker',
                 started_at = NOW()
             WHERE id = (
-                SELECT id FROM jobs 
+                SELECT id FROM jobs
                 WHERE experiment_id = %s AND status = 'queued'
                 ORDER BY priority DESC, created_at ASC
                 LIMIT 1
@@ -328,7 +338,7 @@ def test_database_operations() -> None:
         # Test heartbeat update
         cur.execute(
             """
-            UPDATE jobs 
+            UPDATE jobs
             SET last_heartbeat = NOW()
             WHERE id = %s AND status = 'running'
             RETURNING last_heartbeat;
@@ -342,7 +352,7 @@ def test_database_operations() -> None:
         # Test job completion
         cur.execute(
             """
-            UPDATE jobs 
+            UPDATE jobs
             SET status = 'completed',
                 completed_at = NOW(),
                 final_metrics = %s
@@ -362,7 +372,7 @@ def test_database_operations() -> None:
             VALUES (%s, %s, %s, %s)
             RETURNING id;
         """,
-            (claimed_id, "/tmp/model.pt", "model", 1024000),
+            (claimed_id, str(tmp_path / "model.pt"), "model", 1024000),
         )
 
         sync_id = cur.fetchone()[0]

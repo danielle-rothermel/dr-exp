@@ -1,11 +1,11 @@
 """DeconCNN integration for dr_exp."""
 
 from pathlib import Path
-from typing import Dict, Any
+from typing import Any
 import traceback
 from omegaconf import OmegaConf
 
-from ..logging.structured_logger import StructuredLogger
+from dr_exp.logging.structured_logger import StructuredLogger
 
 # Import from deconCNN
 from deconcnn import factory
@@ -16,8 +16,8 @@ def train_classification(
     job_id: str,
     worker_id: str,
     storage_path: str,
-    **config: Any,
-) -> Dict[str, Any]:
+    **config: Any,  # noqa: ANN401
+) -> dict[str, Any]:
     """Train a classification model using deconCNN.
 
     Args:

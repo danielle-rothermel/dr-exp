@@ -2,8 +2,8 @@
 """Run a worker specifically for deconCNN training jobs."""
 
 import argparse
-import os
 import sys
+from pathlib import Path
 
 from dr_exp.utils.factory import create_system, SystemConfig
 from dr_exp.job_db import JobDBConfig
@@ -88,7 +88,7 @@ def main() -> None:
 
     try:
         # Create job database config from CLI arguments
-        storage_path = args.storage_path or os.path.join(args.base_path, "storage")
+        storage_path = args.storage_path or str(Path(args.base_path) / "storage")
         job_db_config = JobDBConfig(
             base_path=args.base_path, storage_path=storage_path, mode=args.mode
         )

@@ -1,9 +1,12 @@
+"""Tests for priority and concurrency handling fixes."""
+
 import threading
 import time
+from pathlib import Path
 from dr_exp.core.job_db import JobDB
 
 
-def test_concurrent_priority_order(tmp_path):
+def test_concurrent_priority_order(tmp_path: Path) -> None:
     # Create JobDB
     job_db = JobDB(base_path=str(tmp_path), experiment_name="test_exp", validate=False)
 
@@ -20,7 +23,7 @@ def test_concurrent_priority_order(tmp_path):
     claimed_priorities = []
     lock = threading.Lock()
 
-    def worker_claim(worker_id):
+    def worker_claim(worker_id: str) -> None:
         for _ in range(2):  # Each worker claims 2 jobs
             job = job_db.claim_next_job(worker_id)
             if job:
@@ -53,7 +56,7 @@ def test_concurrent_priority_order(tmp_path):
     assert inversions < len(claimed_priorities) * 0.25
 
 
-def test_lock_contention_handling(tmp_path):
+def test_lock_contention_handling(tmp_path: Path) -> None:
     job_db = JobDB(base_path=str(tmp_path), experiment_name="test_exp", validate=False)
 
     # Create single job
@@ -63,7 +66,7 @@ def test_lock_contention_handling(tmp_path):
     results = []
     lock = threading.Lock()
 
-    def try_claim(worker_id):
+    def try_claim(worker_id: str) -> None:
         job = job_db.claim_next_job(worker_id)
         with lock:
             results.append(job)

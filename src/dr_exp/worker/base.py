@@ -6,15 +6,16 @@ import time
 import threading
 import traceback
 from pathlib import Path
-from typing import Dict, Any, Optional, Callable
+from typing import Any
+from collections.abc import Callable
 from datetime import datetime, UTC
 
 import hydra
 from omegaconf import OmegaConf
 
-from ..core.job_db import JobDB
-from ..sync.queue import SyncQueue, SyncItem
-from ..sync.sync_handler import SyncHandler
+from dr_exp.core.job_db import JobDB
+from dr_exp.sync.queue import SyncQueue, SyncItem
+from dr_exp.sync.sync_handler import SyncHandler
 
 
 class Worker:
@@ -24,14 +25,14 @@ class Worker:
         self,
         job_db: JobDB,
         worker_id: str,
-        working_dir: Optional[str] = None,
-        experiment_path: Optional[str] = None,
+        working_dir: str | None = None,
+        experiment_path: str | None = None,
         sync_interval: int = 30,
         heartbeat_interval: int = 60,
         sync_enabled: bool = True,
-        supabase_url: Optional[str] = None,
-        supabase_key: Optional[str] = None,
-    ):
+        supabase_url: str | None = None,
+        supabase_key: str | None = None,
+    ) -> None:
         """Initialize worker.
 
         Args:
@@ -52,7 +53,7 @@ class Worker:
         self.heartbeat_interval = heartbeat_interval
         self.sync_enabled = sync_enabled
 
-        self.current_job_id: Optional[str] = None
+        self.current_job_id: str | None = None
         self.should_stop = threading.Event()
 
         # Ensure working directory exists
@@ -66,7 +67,7 @@ class Worker:
             log_dir = Path(experiment_path) / "logs"
             log_dir.mkdir(exist_ok=True)
             log_path = log_dir / f"worker_{worker_id}.log"
-            self.log_file = open(log_path, "a", buffering=1)  # Line buffered
+            self.log_file = log_path.open("a", buffering=1)  # Line buffered
 
             # Redirect stdout and stderr
             self._original_stdout = sys.stdout
@@ -86,11 +87,11 @@ class Worker:
         self.sync_queue = SyncQueue(job_db.get_sync_queue_path())
 
         # Thread references
-        self.sync_thread: Optional[threading.Thread] = None
-        self.heartbeat_thread: Optional[threading.Thread] = None
+        self.sync_thread: threading.Thread | None = None
+        self.heartbeat_thread: threading.Thread | None = None
 
         # Sync metrics tracking
-        self.sync_metrics: Dict[str, Any] = {
+        self.sync_metrics: dict[str, Any] = {
             "files_synced": 0,
             "bytes_uploaded": 0,
             "sync_errors": 0,
@@ -101,7 +102,7 @@ class Worker:
         # Initialize sync handler if enabled
         if sync_enabled:
             try:
-                self.sync_handler: Optional[SyncHandler] = SyncHandler(
+                self.sync_handler: SyncHandler | None = SyncHandler(
                     experiment_name=job_db.experiment_name,
                     base_path=str(job_db.base_path),
                     supabase_url=supabase_url,
@@ -126,9 +127,7 @@ class Worker:
                             )
                             raise
 
-                    self.sync_fn: Optional[Callable[[SyncItem], None]] = (
-                        sync_with_metrics
-                    )
+                    self.sync_fn: Callable[[SyncItem], None] | None = sync_with_metrics
                 else:
                     self.sync_fn = None
                     print(f"[{self.worker_id}] Sync disabled - Supabase not available")
@@ -178,7 +177,8 @@ class Worker:
                     success = self.job_db.heartbeat(self.current_job_id)
                     if not success:
                         print(
-                            f"[{self.worker_id}] Failed to heartbeat job {self.current_job_id}"
+                            f"[{self.worker_id}] Failed to heartbeat job "
+                            f"{self.current_job_id}"
                         )
 
             except Exception as e:
@@ -213,7 +213,7 @@ class Worker:
         if self.heartbeat_thread and self.heartbeat_thread.is_alive():
             self.heartbeat_thread.join(timeout=5)
 
-    def _update_sync_metrics(self, result: Dict[str, Any]) -> None:
+    def _update_sync_metrics(self, result: dict[str, Any]) -> None:
         """Update sync metrics based on sync result.
 
         Args:
@@ -247,7 +247,7 @@ class Worker:
         job_id: str,
         file_path: str,
         file_type: str,
-        metadata: Optional[Dict[str, Any]] = None,
+        metadata: dict[str, Any] | None = None,
     ) -> None:
         """Add a file to the sync queue.
 
@@ -271,7 +271,7 @@ class Worker:
         # Add to queue
         self.sync_queue.add_item(sync_item)
 
-    def execute_job(self, job: Dict[str, Any]) -> Dict[str, Any]:
+    def execute_job(self, job: dict[str, Any]) -> dict[str, Any]:
         """Execute a single job using Hydra.
 
         Args:
@@ -307,7 +307,8 @@ class Worker:
 
             # Execute using Hydra's call mechanism
             print(
-                f"[{self.worker_id}] Executing job {job_id} with _target_={config._target_}"
+                f"[{self.worker_id}] Executing job {job_id} with "
+                f"_target_={config._target_}"
             )
             result = hydra.utils.call(config)
 
@@ -322,13 +323,16 @@ class Worker:
                         ".pth",
                     ]:
                         file_type = "model"
-                    elif file_path.name in [
-                        "events.jsonl",
-                        "config.json",
-                        "metadata.json",
-                    ]:
-                        file_type = "logs"
-                    elif file_path.suffix == ".log" or "log" in file_path.name:
+                    elif (
+                        file_path.name
+                        in [
+                            "events.jsonl",
+                            "config.json",
+                            "metadata.json",
+                        ]
+                        or file_path.suffix == ".log"
+                        or "log" in file_path.name
+                    ):
                         file_type = "logs"
                     else:
                         file_type = "other"
@@ -346,7 +350,7 @@ class Worker:
 
         except Exception as e:
             # Job failed
-            error_msg = f"{type(e).__name__}: {str(e)}"
+            error_msg = f"{type(e).__name__}: {e!s}"
             tb = traceback.format_exc()
 
             print(f"[{self.worker_id}] Job {job_id} failed: {error_msg}")
@@ -413,7 +417,7 @@ class Worker:
         self.current_job_id = None
         return status
 
-    def run(self, max_jobs: Optional[int] = None) -> Dict[str, int]:
+    def run(self, max_jobs: int | None = None) -> dict[str, int]:
         """Run worker until no more jobs or max_jobs reached.
 
         Args:

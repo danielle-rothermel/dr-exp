@@ -4,13 +4,13 @@ from __future__ import annotations
 
 import logging
 from datetime import datetime, UTC, timedelta
-from typing import Any, Dict
+from typing import Any
 
 
 logger = logging.getLogger(__name__)
 
 
-def reap_stale_jobs(client: Any, max_age_mins: int) -> int:
+def reap_stale_jobs(client: Any, max_age_mins: int) -> int:  # noqa: ANN401
     """Mark running jobs with stale heartbeats as failed.
 
     Parameters
@@ -20,7 +20,7 @@ def reap_stale_jobs(client: Any, max_age_mins: int) -> int:
     max_age_mins : int
         Maximum allowed age of the heartbeat in minutes.
 
-    Returns
+    Returns:
     -------
     int
         Number of jobs updated.
@@ -44,7 +44,7 @@ def reap_stale_jobs(client: Any, max_age_mins: int) -> int:
     return stale_count
 
 
-def _get_jobs_list(client: Any) -> list[Dict[str, Any]]:
+def _get_jobs_list(client: Any) -> list[dict[str, Any]]:  # noqa: ANN401
     """Get list of jobs from client."""
     if hasattr(client, "list_jobs"):
         return list(client.list_jobs())
@@ -56,7 +56,7 @@ def _get_jobs_list(client: Any) -> list[Dict[str, Any]]:
 
 
 def _should_mark_job_stale(
-    job: Dict[str, Any], now: datetime, cutoff: timedelta
+    job: dict[str, Any], now: datetime, cutoff: timedelta
 ) -> bool:
     """Check if job should be marked stale with fail-fast validation.
 
@@ -69,7 +69,7 @@ def _should_mark_job_stale(
     cutoff : timedelta
         Maximum allowed age for heartbeat
 
-    Returns
+    Returns:
     -------
     bool
         True if job should be marked stale
@@ -85,13 +85,13 @@ def _should_mark_job_stale(
     try:
         hb_time = datetime.fromisoformat(hb_str.replace("Z", ""))
     except ValueError as e:
-        assert False, f"Invalid timestamp format '{hb_str}': {e}"
+        raise AssertionError(f"Invalid timestamp format '{hb_str}': {e}") from e
 
     # Check staleness
     return now - hb_time > cutoff
 
 
-def _mark_job_stale(client: Any, job: Dict[str, Any]) -> None:
+def _mark_job_stale(client: Any, job: dict[str, Any]) -> None:  # noqa: ANN401
     """Mark a job as failed due to stale heartbeat.
 
     Parameters

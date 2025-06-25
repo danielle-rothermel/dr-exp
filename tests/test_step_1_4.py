@@ -4,10 +4,12 @@ import tempfile
 import time
 from datetime import datetime, timedelta, UTC
 
+import pytest
+
 from dr_exp.core.job_db import JobDB
 
 
-def test_mark_job_failed():
+def test_mark_job_failed() -> None:
     """Test marking jobs as failed."""
     with tempfile.TemporaryDirectory() as tmpdir:
         job_db = JobDB(base_path=tmpdir, experiment_name="test_exp", validate=False)
@@ -55,7 +57,7 @@ def test_mark_job_failed():
         assert not success
 
 
-def test_boost_priority():
+def test_boost_priority() -> None:
     """Test priority boosting."""
     with tempfile.TemporaryDirectory() as tmpdir:
         job_db = JobDB(base_path=tmpdir, experiment_name="test_exp", validate=False)
@@ -92,14 +94,11 @@ def test_boost_priority():
         assert updated == 0  # No jobs updated
 
         # Cannot boost with invalid priority
-        try:
+        with pytest.raises(AssertionError, match="Priority must be 0-1000"):
             job_db.boost_priority([job3_id], 1500)
-            assert False, "Should have failed"
-        except AssertionError as e:
-            assert "Priority must be 0-1000" in str(e)
 
 
-def test_recover_stale_jobs():
+def test_recover_stale_jobs() -> None:
     """Test stale job recovery."""
     with tempfile.TemporaryDirectory() as tmpdir:
         job_db = JobDB(base_path=tmpdir, experiment_name="test_exp", validate=False)
@@ -140,7 +139,7 @@ def test_recover_stale_jobs():
         assert fresh_job["status"] == "running"
 
 
-def test_complete_jobdb():
+def test_complete_jobdb() -> None:
     """Integration test of complete JobDB functionality."""
     with tempfile.TemporaryDirectory() as tmpdir:
         job_db = JobDB(base_path=tmpdir, experiment_name="final_test", validate=False)

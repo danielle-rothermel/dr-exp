@@ -8,19 +8,26 @@ import uuid
 import logging
 from datetime import datetime, UTC
 from pathlib import Path
-from typing import Optional, Dict, Any, List
+from typing import Any
 
 logger = logging.getLogger(__name__)
+
+# Priority constants
+MAX_PRIORITY = 1000
+MIN_PRIORITY = 0
 
 
 class JobDB:
     """File-based job database with priority queue."""
 
-    def __init__(self, base_path: str, experiment_name: str, validate: bool = True):
+    def __init__(
+        self, base_path: str, experiment_name: str, validate: bool = True
+    ) -> None:
         """Initialize JobDB with base path and experiment name.
 
         Args:
-            base_path: Base directory for all experiments (e.g., /scratch/users/jane/experiments)
+            base_path: Base directory for all experiments
+                (e.g., /scratch/users/jane/experiments)
             experiment_name: Name of this experiment (e.g., resnet_sweep)
             validate: Whether to validate directory structure exists
         """
@@ -54,8 +61,10 @@ class JobDB:
             if missing:
                 missing_names = [d.name for d in missing]
                 raise RuntimeError(
-                    f"Experiment not initialized. Missing directories: {missing_names}\n"
-                    f"Run: dr_exp --base-path {base_path} --experiment {experiment_name} init"
+                    f"Experiment not initialized. "
+                    f"Missing directories: {missing_names}\n"
+                    f"Run: dr_exp --base-path {base_path} "
+                    f"--experiment {experiment_name} init"
                 )
         else:
             # Create directories if they don't exist (for init command)
@@ -70,18 +79,19 @@ class JobDB:
 
         # Remote read support (disabled by default)
         self.remote_enabled = False
-        self.remote_client: Optional[Any] = None
-        self.remote_experiment_id: Optional[str] = None
+        self.remote_client: Any | None = None
+        self.remote_experiment_id: str | None = None
 
         logger.info(
-            f"JobDB initialized for experiment '{experiment_name}' at {self.experiment_path}"
+            f"JobDB initialized for experiment '{experiment_name}' "
+            f"at {self.experiment_path}"
         )
 
     def create_job(
         self,
-        config: Dict[str, Any],
+        config: dict[str, Any],
         priority: int = 100,
-        tags: Optional[List[str]] = None,
+        tags: list[str] | None = None,
     ) -> str:
         """Create a new job with given config and priority.
 
@@ -94,7 +104,9 @@ class JobDB:
             job_id: Unique ID for the created job
         """
         # Validate priority
-        assert 0 <= priority <= 1000, f"Priority must be 0-1000, got {priority}"
+        assert MIN_PRIORITY <= priority <= MAX_PRIORITY, (
+            f"Priority must be {MIN_PRIORITY}-{MAX_PRIORITY}, got {priority}"
+        )
 
         # Validate _target_ exists
         assert "_target_" in config, "Config must include _target_ field"
@@ -107,7 +119,9 @@ class JobDB:
 
             importlib.import_module(module_path)
         except ImportError as e:
-            assert False, f"Cannot import target module {module_path}: {e}"
+            raise AssertionError(
+                f"Cannot import target module {module_path}: {e}"
+            ) from e
 
         # Create job metadata
         job_id = str(uuid.uuid4())
@@ -128,13 +142,13 @@ class JobDB:
 
         # Write to file
         job_path = self.jobs_dir / f"{job_id}.json"
-        with open(job_path, "w") as f:
+        with job_path.open("w") as f:
             json.dump(job_data, f, indent=2)
 
         logger.info(f"Created job {job_id} with priority {priority}")
         return job_id
 
-    def get_job(self, job_id: str) -> Optional[Dict[str, Any]]:
+    def get_job(self, job_id: str) -> dict[str, Any] | None:
         """Retrieve a job by ID.
 
         Args:
@@ -147,8 +161,8 @@ class JobDB:
         if not job_path.exists():
             return None
 
-        with open(job_path, "r") as f:
-            job_data: Dict[str, Any] = json.load(f)
+        with job_path.open() as f:
+            job_data: dict[str, Any] = json.load(f)
             return job_data
 
     def get_storage_path(self, job_id: str) -> Path:
@@ -162,7 +176,7 @@ class JobDB:
         """
         return self.storage_dir / f"run_{job_id}"
 
-    def _list_job_files(self) -> List[Path]:
+    def _list_job_files(self) -> list[Path]:
         """List all job files sorted by priority (highest first) then creation time.
 
         Returns:
@@ -171,7 +185,7 @@ class JobDB:
         job_files = []
         for job_file in self.jobs_dir.glob("*.json"):
             try:
-                with open(job_file, "r") as f:
+                with job_file.open() as f:
                     job_data = json.load(f)
                     # Only include queued jobs
                     if job_data.get("status") == "queued":
@@ -182,7 +196,7 @@ class JobDB:
                                 job_data.get("created_at", ""),
                             )
                         )
-            except (json.JSONDecodeError, IOError):
+            except (OSError, json.JSONDecodeError):
                 # Skip corrupted files
                 continue
 
@@ -190,13 +204,13 @@ class JobDB:
         job_files.sort(key=lambda x: (-x[1], x[2]))
         return [f[0] for f in job_files]
 
-    def claim_next_job(self, worker_id: str) -> Optional[Dict[str, Any]]:
+    def claim_next_job(self, worker_id: str) -> dict[str, Any] | None:
         """Claim the highest priority unclaimed job with enhanced locking."""
         # Use a lock file to ensure atomic priority scanning
         lock_file = self.jobs_dir / ".claim_lock"
         lock_file.touch(exist_ok=True)
 
-        with open(lock_file, "w") as lock_fd:
+        with lock_file.open("w") as lock_fd:
             # Exclusive lock with small random backoff to reduce contention
             max_attempts = 5
             for attempt in range(max_attempts):
@@ -205,7 +219,9 @@ class JobDB:
                     break
                 except BlockingIOError:
                     if attempt < max_attempts - 1:
-                        time.sleep(0.001 * random.uniform(0.5, 1.5))  # 0.5-1.5ms
+                        # Using random for jitter to reduce lock contention
+                        # Not cryptographic use - safe for this purpose
+                        time.sleep(0.001 * random.uniform(0.5, 1.5))  # noqa: S311
                     else:
                         return None
 
@@ -219,7 +235,7 @@ class JobDB:
                         continue
 
                     try:
-                        with open(job_file, "r") as f:
+                        with job_file.open() as f:
                             job_data = json.load(f)
 
                         if (
@@ -239,8 +255,8 @@ class JobDB:
                 job_file = self.jobs_dir / f"{best_job['id']}.json"
 
                 # Re-read and update atomically
-                with open(job_file, "r") as f:
-                    current_job: Dict[str, Any] = json.load(f)
+                with job_file.open() as f:
+                    current_job: dict[str, Any] = json.load(f)
 
                 # Double-check status
                 if current_job["status"] != "queued":
@@ -255,7 +271,7 @@ class JobDB:
 
                 # Write atomically
                 temp_file = job_file.with_suffix(".tmp")
-                with open(temp_file, "w") as f:
+                with temp_file.open("w") as f:
                     json.dump(current_job, f, indent=2)
                 temp_file.replace(job_file)
 
@@ -264,7 +280,7 @@ class JobDB:
             finally:
                 fcntl.flock(lock_fd, fcntl.LOCK_UN)
 
-    def update_job(self, job_id: str, updates: Dict[str, Any]) -> bool:
+    def update_job(self, job_id: str, updates: dict[str, Any]) -> bool:
         """Update a job atomically.
 
         Args:
@@ -279,7 +295,7 @@ class JobDB:
             return False
 
         try:
-            with open(job_path, "r+") as f:
+            with job_path.open("r+") as f:
                 # Acquire exclusive lock
                 fcntl.flock(f.fileno(), fcntl.LOCK_EX)
 
@@ -306,9 +322,7 @@ class JobDB:
         except Exception:
             return False
 
-    def complete_job(
-        self, job_id: str, metrics: Optional[Dict[str, Any]] = None
-    ) -> bool:
+    def complete_job(self, job_id: str, metrics: dict[str, Any] | None = None) -> bool:
         """Mark a job as completed successfully.
 
         Args:
@@ -318,7 +332,7 @@ class JobDB:
         Returns:
             True if updated, False if job not found
         """
-        updates: Dict[str, Any] = {
+        updates: dict[str, Any] = {
             "status": "completed",
             "completed_at": datetime.now(UTC).isoformat(),
             "error": None,
@@ -361,7 +375,7 @@ class JobDB:
 
         return self.update_job(job_id, updates)
 
-    def list_jobs(self, status: Optional[str] = None) -> List[Dict[str, Any]]:
+    def list_jobs(self, status: str | None = None) -> list[dict[str, Any]]:
         """List all jobs, optionally filtered by status.
 
         Args:
@@ -374,13 +388,13 @@ class JobDB:
 
         for job_file in self.jobs_dir.glob("*.json"):
             try:
-                with open(job_file, "r") as f:
+                with job_file.open() as f:
                     job_data = json.load(f)
 
                     if status is None or job_data.get("status") == status:
                         jobs.append(job_data)
 
-            except (json.JSONDecodeError, IOError):
+            except (OSError, json.JSONDecodeError):
                 # Skip corrupted files
                 continue
 
@@ -401,7 +415,7 @@ class JobDB:
         job_id: str,
         file_path: str,
         file_type: str,
-        metadata: Optional[Dict[str, Any]] = None,
+        metadata: dict[str, Any] | None = None,
     ) -> str:
         """Add a file to the sync queue.
 
@@ -431,12 +445,12 @@ class JobDB:
         timestamp = int(time.time() * 1000000)  # Microseconds
         sync_file = self.sync_queue_dir / f"{timestamp}_{sync_id}.json"
 
-        with open(sync_file, "w") as f:
+        with sync_file.open("w") as f:
             json.dump(sync_item, f, indent=2)
 
         return sync_id
 
-    def get_experiment_info(self) -> Dict[str, Any]:
+    def get_experiment_info(self) -> dict[str, Any]:
         """Get information about this experiment.
 
         Returns:
@@ -445,7 +459,7 @@ class JobDB:
         jobs = self.list_jobs()
 
         # Count by status
-        status_counts: Dict[str, int] = {}
+        status_counts: dict[str, int] = {}
         for job in jobs:
             status = job.get("status", "unknown")
             status_counts[status] = status_counts.get(status, 0) + 1
@@ -483,7 +497,7 @@ class JobDB:
             )
         return False
 
-    def recover_stale_jobs(self, heartbeat_timeout: int = 300) -> List[str]:
+    def recover_stale_jobs(self, heartbeat_timeout: int = 300) -> list[str]:
         """Reset jobs with stale heartbeats back to queued.
 
         Args:
@@ -498,7 +512,7 @@ class JobDB:
         recovered = []
 
         for job_file in self.jobs_dir.glob("*.json"):
-            with open(job_file, "r") as f:
+            with job_file.open() as f:
                 job = json.load(f)
 
             if job["status"] == "running":
@@ -519,7 +533,7 @@ class JobDB:
 
         return recovered
 
-    def boost_priority(self, job_ids: List[str], new_priority: int) -> int:
+    def boost_priority(self, job_ids: list[str], new_priority: int) -> int:
         """Boost priority of multiple jobs.
 
         Args:
@@ -529,7 +543,9 @@ class JobDB:
         Returns:
             Number of jobs updated
         """
-        assert 0 <= new_priority <= 1000, f"Priority must be 0-1000, got {new_priority}"
+        assert MIN_PRIORITY <= new_priority <= MAX_PRIORITY, (
+            f"Priority must be {MIN_PRIORITY}-{MAX_PRIORITY}, got {new_priority}"
+        )
 
         updated = 0
         for job_id in job_ids:
@@ -571,9 +587,7 @@ class JobDB:
             },
         )
 
-    def claim_reserved_job(
-        self, job_id: str, worker_id: str
-    ) -> Optional[Dict[str, Any]]:
+    def claim_reserved_job(self, job_id: str, worker_id: str) -> dict[str, Any] | None:
         """Claim a previously reserved job.
 
         Args:
@@ -613,7 +627,7 @@ class JobDB:
         return None
 
     def enable_remote_read(
-        self, supabase_url: Optional[str] = None, supabase_key: Optional[str] = None
+        self, supabase_url: str | None = None, supabase_key: str | None = None
     ) -> bool:
         """Enable remote read operations from Supabase.
 
@@ -625,7 +639,7 @@ class JobDB:
             True if remote read enabled successfully
         """
         try:
-            from ..sync.supabase_client import SupabaseClient
+            from dr_exp.sync.supabase_client import SupabaseClient
 
             self.remote_client = SupabaseClient(url=supabase_url, key=supabase_key)
             self.remote_experiment_id = self.remote_client.get_or_create_experiment(
@@ -641,7 +655,7 @@ class JobDB:
             self.remote_enabled = False
             return False
 
-    def list_jobs_remote(self, status: Optional[str] = None) -> List[Dict[str, Any]]:
+    def list_jobs_remote(self, status: str | None = None) -> list[dict[str, Any]]:
         """List jobs from remote Supabase database.
 
         Args:
@@ -661,7 +675,7 @@ class JobDB:
             print(f"Failed to list remote jobs: {e}")
             return []
 
-    def get_job_remote(self, job_id: str) -> Optional[Dict[str, Any]]:
+    def get_job_remote(self, job_id: str) -> dict[str, Any] | None:
         """Get a job from remote Supabase database.
 
         Args:
@@ -690,7 +704,7 @@ class JobDB:
             print(f"Failed to get remote job: {e}")
             return None
 
-    def get_experiment_info_remote(self) -> Dict[str, Any]:
+    def get_experiment_info_remote(self) -> dict[str, Any]:
         """Get experiment info from remote Supabase.
 
         Returns:
@@ -723,8 +737,8 @@ class JobDB:
             return self.get_experiment_info()
 
     def download_job_artifacts(
-        self, job_id: str, target_dir: Optional[Path] = None
-    ) -> List[Path]:
+        self, job_id: str, target_dir: Path | None = None
+    ) -> list[Path]:
         """Download job artifacts from remote storage.
 
         Args:

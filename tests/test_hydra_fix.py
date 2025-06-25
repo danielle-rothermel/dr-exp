@@ -1,9 +1,12 @@
+"""Tests for Hydra configuration fixes."""
+
 import yaml
+from pathlib import Path
 from click.testing import CliRunner
 from dr_exp.cli.main import cli
 
 
-def test_hydra_config_composition(tmp_path):
+def test_hydra_config_composition(tmp_path: Path) -> None:
     # Create config structure
     config_dir = tmp_path / "configs"
     config_dir.mkdir()
@@ -57,7 +60,7 @@ def test_hydra_config_composition(tmp_path):
     assert job_data["config"]["epochs"] == 10  # From train.yaml
 
 
-def test_overrides(tmp_path):
+def test_overrides(tmp_path: Path) -> None:
     # Create simple config
     config_dir = tmp_path / "configs"
     config_dir.mkdir()

@@ -4,7 +4,7 @@ import os
 import hashlib
 import time
 from pathlib import Path
-from typing import Dict, Any, Optional, Tuple, List
+from typing import Any
 import mimetypes
 from datetime import datetime, UTC
 
@@ -14,7 +14,7 @@ from supabase import create_client, Client
 class SupabaseClient:
     """Client for interacting with Supabase storage and database."""
 
-    def __init__(self, url: Optional[str] = None, key: Optional[str] = None) -> None:
+    def __init__(self, url: str | None = None, key: str | None = None) -> None:
         """Initialize Supabase client with retry logic.
 
         Args:
@@ -30,17 +30,18 @@ class SupabaseClient:
             )
 
         # Create client with retry logic
-        for attempt in range(3):
+        MAX_ATTEMPTS = 3
+        for attempt in range(MAX_ATTEMPTS):
             try:
                 self.client: Client = create_client(self.url, self.key)
                 # Test the connection
                 self.client.storage.list_buckets()
                 break
             except Exception as e:
-                if attempt == 2:
+                if attempt == MAX_ATTEMPTS - 1:
                     raise Exception(
                         f"Failed to connect to Supabase after 3 attempts: {e}"
-                    )
+                    ) from e
                 print(f"Connection attempt {attempt + 1} failed, retrying...")
                 time.sleep(1)
 
@@ -56,7 +57,7 @@ class SupabaseClient:
             Hex string of checksum
         """
         sha256_hash = hashlib.sha256()
-        with open(file_path, "rb") as f:
+        with file_path.open("rb") as f:
             for byte_block in iter(lambda: f.read(4096), b""):
                 sha256_hash.update(byte_block)
         return sha256_hash.hexdigest()
@@ -82,8 +83,8 @@ class SupabaseClient:
         experiment_name: str,
         job_id: str,
         file_type: str,
-        metadata: Optional[Dict[str, Any]] = None,
-    ) -> Tuple[str, str]:
+        metadata: dict[str, Any] | None = None,  # noqa: ARG002
+    ) -> tuple[str, str]:
         """Upload a file to Supabase storage.
 
         Storage Limits:
@@ -111,12 +112,14 @@ class SupabaseClient:
         file_size = file_path.stat().st_size
         if file_size > 5 * 1024 * 1024 * 1024:  # 5GB
             raise ValueError(
-                f"File too large ({file_size / 1024 / 1024 / 1024:.1f}GB). Maximum size is 5GB for direct upload."
+                f"File too large ({file_size / 1024 / 1024 / 1024:.1f}GB). "
+                "Maximum size is 5GB for direct upload."
             )
 
         if file_size > 100 * 1024 * 1024:  # 100MB
             print(
-                f"Warning: Large file ({file_size / 1024 / 1024:.1f}MB). Consider using multipart upload for better reliability."
+                f"Warning: Large file ({file_size / 1024 / 1024:.1f}MB). "
+                "Consider using multipart upload for better reliability."
             )
 
         # Calculate checksum
@@ -137,12 +140,7 @@ class SupabaseClient:
         else:
             # Only guess for types we don't have mapped
             guessed_type, _ = mimetypes.guess_type(file_path)
-            if guessed_type is None:
-                mime_type = "application/octet-stream"
-            # Filter out potentially problematic MIME types
-            elif guessed_type.startswith("chemical/") or guessed_type.startswith(
-                "model/"
-            ):
+            if guessed_type is None or guessed_type.startswith(("chemical/", "model/")):
                 mime_type = "application/octet-stream"
             else:
                 mime_type = guessed_type
@@ -151,7 +149,7 @@ class SupabaseClient:
         storage_path = self._get_storage_path(experiment_name, job_id, file_path.name)
 
         # Read file content
-        with open(file_path, "rb") as f:
+        with file_path.open("rb") as f:
             file_content = f.read()
 
         # Upload to storage
@@ -166,7 +164,10 @@ class SupabaseClient:
             )
 
             # Generate public URL (requires auth to access)
-            storage_url = f"{self.url}/storage/v1/object/authenticated/{self.bucket_name}/{storage_path}"
+            storage_url = (
+                f"{self.url}/storage/v1/object/authenticated/"
+                f"{self.bucket_name}/{storage_path}"
+            )
 
             return storage_url, checksum
 
@@ -175,10 +176,13 @@ class SupabaseClient:
             error_msg = str(e)
             if "already exists" in error_msg:
                 # File already uploaded, return URL
-                storage_url = f"{self.url}/storage/v1/object/authenticated/{self.bucket_name}/{storage_path}"
+                storage_url = (
+                    f"{self.url}/storage/v1/object/authenticated/"
+                    f"{self.bucket_name}/{storage_path}"
+                )
                 return storage_url, checksum
             else:
-                raise Exception(f"Failed to upload {file_path}: {error_msg}")
+                raise Exception(f"Failed to upload {file_path}: {error_msg}") from e
 
     def download_file(self, storage_path: str, local_path: Path) -> Path:
         """Download a file from Supabase storage.
@@ -203,15 +207,15 @@ class SupabaseClient:
             )
 
             # Write to local file
-            with open(local_path, "wb") as f:
+            with local_path.open("wb") as f:
                 f.write(response)
 
             return local_path
 
         except Exception as e:
-            raise Exception(f"Failed to download {storage_path}: {str(e)}")
+            raise Exception(f"Failed to download {storage_path}: {e!s}") from e
 
-    def list_files(self, prefix: str, limit: int = 100) -> list[Dict[str, Any]]:
+    def list_files(self, prefix: str, limit: int = 100) -> list[dict[str, Any]]:
         """List files in storage with a given prefix.
 
         Args:
@@ -233,7 +237,7 @@ class SupabaseClient:
             return response  # type: ignore
 
         except Exception as e:
-            raise Exception(f"Failed to list files with prefix {prefix}: {str(e)}")
+            raise Exception(f"Failed to list files with prefix {prefix}: {e!s}") from e
 
     def delete_file(self, storage_path: str) -> bool:
         """Delete a file from storage.
@@ -268,13 +272,13 @@ class SupabaseClient:
             return response["signedURL"]  # type: ignore
 
         except Exception as e:
-            raise Exception(f"Failed to create signed URL: {str(e)}")
+            raise Exception(f"Failed to create signed URL: {e!s}") from e
 
     def get_or_create_experiment(
         self,
         experiment_name: str,
         base_path: str,
-        metadata: Optional[Dict[str, Any]] = None,
+        metadata: dict[str, Any] | None = None,
     ) -> str:
         """Get or create an experiment in the database.
 
@@ -314,9 +318,9 @@ class SupabaseClient:
                 raise Exception("Failed to create experiment")
 
         except Exception as e:
-            raise Exception(f"Failed to get/create experiment: {str(e)}")
+            raise Exception(f"Failed to get/create experiment: {e!s}") from e
 
-    def sync_job(self, job_data: Dict[str, Any], experiment_id: str) -> bool:
+    def sync_job(self, job_data: dict[str, Any], experiment_id: str) -> bool:
         """Sync a job to the database.
 
         Args:
@@ -361,7 +365,7 @@ class SupabaseClient:
             return response.data is not None
 
         except Exception as e:
-            raise Exception(f"Failed to sync job {job_data.get('id')}: {str(e)}")
+            raise Exception(f"Failed to sync job {job_data.get('id')}: {e!s}") from e
 
     def create_sync_status(
         self,
@@ -371,7 +375,7 @@ class SupabaseClient:
         checksum: str,
         size_bytes: int,
         storage_url: str,
-        metadata: Optional[Dict[str, Any]] = None,
+        metadata: dict[str, Any] | None = None,
     ) -> str:
         """Create a sync status record.
 
@@ -408,10 +412,10 @@ class SupabaseClient:
                 raise Exception("Failed to create sync status")
 
         except Exception as e:
-            raise Exception(f"Failed to create sync status: {str(e)}")
+            raise Exception(f"Failed to create sync status: {e!s}") from e
 
     def update_sync_status(
-        self, sync_id: str, status: str, error: Optional[str] = None
+        self, sync_id: str, status: str, error: str | None = None
     ) -> bool:
         """Update sync status for a file.
 
@@ -443,11 +447,11 @@ class SupabaseClient:
             return response.data is not None
 
         except Exception as e:
-            raise Exception(f"Failed to update sync status: {str(e)}")
+            raise Exception(f"Failed to update sync status: {e!s}") from e
 
     def get_experiment_jobs(
-        self, experiment_id: str, status: Optional[str] = None, limit: int = 100
-    ) -> List[Dict[str, Any]]:
+        self, experiment_id: str, status: str | None = None, limit: int = 100
+    ) -> list[dict[str, Any]]:
         """Get jobs for an experiment.
 
         Args:
@@ -475,9 +479,9 @@ class SupabaseClient:
             return response.data or []
 
         except Exception as e:
-            raise Exception(f"Failed to get experiment jobs: {str(e)}")
+            raise Exception(f"Failed to get experiment jobs: {e!s}") from e
 
-    def get_experiment_stats(self, experiment_id: str) -> Dict[str, Any]:
+    def get_experiment_stats(self, experiment_id: str) -> dict[str, Any]:
         """Get statistics for an experiment.
 
         Args:
@@ -513,9 +517,9 @@ class SupabaseClient:
             return stats
 
         except Exception as e:
-            raise Exception(f"Failed to get experiment stats: {str(e)}")
+            raise Exception(f"Failed to get experiment stats: {e!s}") from e
 
-    def get_job_sync_status(self, job_id: str) -> List[Dict[str, Any]]:
+    def get_job_sync_status(self, job_id: str) -> list[dict[str, Any]]:
         """Get sync status for all files from a job.
 
         Args:
@@ -536,11 +540,11 @@ class SupabaseClient:
             return response.data or []
 
         except Exception as e:
-            raise Exception(f"Failed to get job sync status: {str(e)}")
+            raise Exception(f"Failed to get job sync status: {e!s}") from e
 
     def batch_sync_jobs(
-        self, jobs: List[Dict[str, Any]], experiment_id: str
-    ) -> Dict[str, int]:
+        self, jobs: list[dict[str, Any]], experiment_id: str
+    ) -> dict[str, int]:
         """Sync multiple jobs in batch.
 
         Args:

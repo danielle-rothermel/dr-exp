@@ -3,9 +3,9 @@
 import time
 import random
 from pathlib import Path
-from typing import Dict, Any
+from typing import Any
 
-from ..logging.structured_logger import StructuredLogger
+from dr_exp.logging.structured_logger import StructuredLogger
 
 
 def train(
@@ -14,8 +14,8 @@ def train(
     storage_path: str,
     epochs: int = 10,
     fail_rate: float = 0.0,
-    **kwargs: Any,
-) -> Dict[str, Any]:
+    **kwargs: Any,  # noqa: ANN401
+) -> dict[str, Any]:
     """Simple test training function.
 
     Args:
@@ -39,7 +39,7 @@ def train(
     print(f"Test trainer started: job_id={job_id}, epochs={epochs}")
 
     # Simulate failure if requested
-    if fail_rate > 0 and random.random() < fail_rate:
+    if fail_rate > 0 and random.random() < fail_rate:  # noqa: S311
         logger.log_event("training_failed", {"reason": "simulated_failure"})
         raise RuntimeError("Simulated training failure")
 
@@ -52,8 +52,8 @@ def train(
 
     # Simulate training with metrics
     for epoch in range(epochs):
-        loss = 1.0 / (epoch + 1) + random.random() * 0.1
-        accuracy = min(0.99, epoch / epochs + random.random() * 0.1)
+        loss = 1.0 / (epoch + 1) + random.random() * 0.1  # noqa: S311
+        accuracy = min(0.99, epoch / epochs + random.random() * 0.1)  # noqa: S311
 
         # Log metrics using structured logger
         metrics = {"epoch": epoch, "loss": loss, "accuracy": accuracy}
