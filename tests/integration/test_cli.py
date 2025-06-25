@@ -36,8 +36,10 @@ def test_cli_submit() -> None:
         # Initialize experiment
         runner.invoke(cli, ["--base-path", tmpdir, "--experiment", "test_exp", "init"])
 
-        # Create config file
-        config_file = Path(tmpdir) / "test_config.yaml"
+        # Create config directory and file
+        config_dir = Path(tmpdir) / "configs"
+        config_dir.mkdir()
+        config_file = config_dir / "test_config.yaml"
         config_file.write_text("""
 _target_: dr_exp.trainers.test_trainer.train
 epochs: 10
@@ -51,8 +53,12 @@ epochs: 10
                 tmpdir,
                 "--experiment",
                 "test_exp",
+                "job",
                 "submit",
-                str(config_file),
+                "--config-path",
+                str(config_dir),
+                "--config-name",
+                "test_config",
                 "--priority",
                 "500",
             ],
@@ -89,14 +95,14 @@ def test_cli_list() -> None:
 
         # List all jobs
         result = runner.invoke(
-            cli, ["--base-path", tmpdir, "--experiment", "test_exp", "list"]
+            cli, ["--base-path", tmpdir, "--experiment", "test_exp", "job", "list"]
         )
 
         assert result.exit_code == 0
         assert "Total: 3 jobs" in result.output
-        assert job1 in result.output
-        assert job2 in result.output
-        assert job3 in result.output
+        assert job1[:12] in result.output  # Check truncated ID
+        assert job2[:12] in result.output  # Check truncated ID
+        assert job3[:12] in result.output  # Check truncated ID
 
         # List only queued
         result = runner.invoke(
@@ -106,6 +112,7 @@ def test_cli_list() -> None:
                 tmpdir,
                 "--experiment",
                 "test_exp",
+                "job",
                 "list",
                 "--status",
                 "queued",
@@ -114,9 +121,9 @@ def test_cli_list() -> None:
 
         assert result.exit_code == 0
         assert "Total: 2 jobs" in result.output
-        assert job1 in result.output
-        assert job2 in result.output
-        assert job3 not in result.output
+        assert job1[:12] in result.output  # Check truncated ID
+        assert job2[:12] in result.output  # Check truncated ID
+        assert job3[:12] not in result.output  # Check truncated ID
 
 
 def test_cli_status() -> None:
@@ -229,8 +236,10 @@ def test_cli_error_handling() -> None:
         runner.invoke(cli, ["--base-path", tmpdir, "--experiment", "test_exp", "init"])
 
         # Try to submit without _target_
-        bad_config = Path(tmpdir) / "bad_config.json"
-        bad_config.write_text('{"epochs": 10}')
+        bad_config_dir = Path(tmpdir) / "bad_configs"
+        bad_config_dir.mkdir()
+        bad_config = bad_config_dir / "bad_config.yaml"
+        bad_config.write_text('epochs: 10')
 
         result = runner.invoke(
             cli,
@@ -239,15 +248,19 @@ def test_cli_error_handling() -> None:
                 tmpdir,
                 "--experiment",
                 "test_exp",
+                "job",
                 "submit",
-                str(bad_config),
+                "--config-path",
+                str(bad_config_dir),
+                "--config-name",
+                "bad_config",
             ],
         )
 
         assert result.exit_code == 1
         assert "Config must contain '_target_'" in result.output
 
-        # Try to submit non-existent file
+        # Try to submit non-existent config
         result = runner.invoke(
             cli,
             [
@@ -255,9 +268,13 @@ def test_cli_error_handling() -> None:
                 tmpdir,
                 "--experiment",
                 "test_exp",
+                "job",
                 "submit",
-                "nonexistent.yaml",
+                "--config-path",
+                str(bad_config_dir),
+                "--config-name",
+                "nonexistent",
             ],
         )
 
-        assert result.exit_code == 2  # Click file not found
+        assert result.exit_code == 1  # Hydra config not found
