@@ -41,7 +41,8 @@ def test_jobdb_basic(temp_job_db: JobDB, temp_experiment_dir: Path) -> None:
 
     # Test storage path
     storage_path = temp_job_db.get_storage_path(job_id)
-    assert storage_path == exp_path / "storage" / f"run_{job_id}"
+    expected_path = (exp_path / "storage" / f"run_{job_id}").resolve()
+    assert storage_path == expected_path
 
     # Test validation mode
     # Delete a directory and try with validation=True

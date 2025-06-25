@@ -142,12 +142,16 @@ def test_concurrent_priority_order(tmp_path: Path) -> None:
     lock = threading.Lock()
 
     def worker_claim(worker_id: str) -> None:
-        for _ in range(2):  # Each worker claims 2 jobs
+        # Each worker keeps trying to claim jobs until none are available
+        while True:
             job = job_db.claim_next_job(worker_id)
             if job:
                 with lock:
                     claimed_priorities.append(job["priority"])
-            time.sleep(0.001)  # Small delay between claims
+                time.sleep(0.001)  # Small delay between claims
+            else:
+                # No more jobs available
+                break
 
     # Start 4 concurrent workers
     threads = []
