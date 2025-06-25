@@ -4,7 +4,7 @@ import tempfile
 import time
 import json
 from pathlib import Path
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, UTC
 
 from dr_exp.sync.queue import SyncQueue, SyncItem
 
@@ -26,7 +26,7 @@ def test_sync_queue_basic() -> None:
             file_path=str(test_file),
             file_type="test",
             metadata={"key": "value"},
-            created_at=datetime.utcnow().isoformat(),
+            created_at=datetime.now(UTC).isoformat(),
         )
 
         queue_file = queue.add_item(item)
@@ -68,7 +68,7 @@ def test_sync_queue_processing() -> None:
                 file_path=str(test_file),
                 file_type="test",
                 metadata={"index": i},
-                created_at=datetime.utcnow().isoformat(),
+                created_at=datetime.now(UTC).isoformat(),
             )
             queue.add_item(item)
             time.sleep(0.001)  # Ensure different timestamps
@@ -117,7 +117,7 @@ def test_sync_queue_retry() -> None:
             file_path=str(test_file),
             file_type="test",
             metadata={},
-            created_at=datetime.utcnow().isoformat(),
+            created_at=datetime.now(UTC).isoformat(),
         )
         queue.add_item(item)
 
@@ -140,7 +140,7 @@ def test_sync_queue_retry() -> None:
         # Simulate time passing (bypass backoff for testing)
         queue.update_item(
             "retry_test",
-            {"last_attempt": (datetime.utcnow() - timedelta(minutes=5)).isoformat()},
+            {"last_attempt": (datetime.now(UTC) - timedelta(minutes=5)).isoformat()},
         )
 
         # Now available again
@@ -154,7 +154,7 @@ def test_sync_queue_retry() -> None:
                 "retry_test",
                 {
                     "last_attempt": (
-                        datetime.utcnow() - timedelta(minutes=5)
+                        datetime.now(UTC) - timedelta(minutes=5)
                     ).isoformat()
                 },
             )
@@ -187,7 +187,7 @@ def test_sync_queue_complete() -> None:
             file_path=str(test_file),
             file_type="test",
             metadata={},
-            created_at=datetime.utcnow().isoformat(),
+            created_at=datetime.now(UTC).isoformat(),
         )
         queue.add_item(item)
 
@@ -231,7 +231,7 @@ def test_sync_queue_ordering() -> None:
                 file_path=str(test_file),
                 file_type="test",
                 metadata={"order": i},
-                created_at=datetime.utcnow().isoformat(),
+                created_at=datetime.now(UTC).isoformat(),
             )
             queue.add_item(item)
             ids.append(item.id)
@@ -264,7 +264,7 @@ def test_sync_queue_error_handling() -> None:
                 file_path=str(test_file),
                 file_type="test",
                 metadata={},
-                created_at=datetime.utcnow().isoformat(),
+                created_at=datetime.now(UTC).isoformat(),
             )
             queue.add_item(item)
 
