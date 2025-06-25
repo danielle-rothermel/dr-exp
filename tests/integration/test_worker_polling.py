@@ -8,10 +8,10 @@ from pathlib import Path
 from dr_exp.core.job_db import JobDB
 from dr_exp.worker.base import Worker
 from tests.utils.polling_helpers import (
-    test_infinite_polling,
-    test_max_jobs_termination,
+    run_infinite_polling_test,
+    run_max_jobs_termination_test,
     create_background_job_adder,
-    test_polling_with_delayed_jobs,
+    run_polling_with_delayed_jobs_test,
 )
 
 
@@ -28,7 +28,7 @@ def test_worker_infinite_polling_no_jobs() -> None:
         )
         
         # Test infinite polling behavior (worker polls every 10 seconds)
-        result = test_infinite_polling(worker, timeout_seconds=1.0, no_job_threshold=1)
+        result = run_infinite_polling_test(worker, timeout_seconds=1.0, no_job_threshold=1)
         
         # Verify polling behavior
         assert result.worker_started, "Worker should have started"
@@ -59,7 +59,7 @@ def test_worker_max_jobs_termination() -> None:
         )
         
         # Test max_jobs termination
-        result = test_max_jobs_termination(worker, max_jobs=2)
+        result = run_max_jobs_termination_test(worker, max_jobs=2)
         
         # Verify termination behavior
         assert result.worker_started, "Worker should have started"
@@ -120,7 +120,7 @@ def test_worker_polling_with_sync_enabled() -> None:
         )
         
         # Test infinite polling behavior (shorter test since sync is disabled)
-        result = test_infinite_polling(worker, timeout_seconds=0.5, no_job_threshold=1)
+        result = run_infinite_polling_test(worker, timeout_seconds=0.5, no_job_threshold=1)
         
         # Verify polling behavior with threads
         assert result.worker_started, "Worker should have started"

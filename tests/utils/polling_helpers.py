@@ -18,7 +18,7 @@ class PollingTestResult:
         self.no_job_count = 0
 
 
-def test_infinite_polling(
+def run_infinite_polling_test(
     worker: Worker,
     timeout_seconds: float = 2.0,
     no_job_threshold: int = 3
@@ -72,7 +72,7 @@ def test_infinite_polling(
     return result
 
 
-def test_max_jobs_termination(
+def run_max_jobs_termination_test(
     worker: Worker,
     max_jobs: int,
     timeout_seconds: float = 5.0
@@ -137,7 +137,7 @@ def create_background_job_adder(
     return add_jobs
 
 
-def test_polling_with_delayed_jobs(
+def run_polling_with_delayed_jobs_test(
     worker: Worker,
     job_adder: Callable[[], None],
     timeout_seconds: float = 5.0
