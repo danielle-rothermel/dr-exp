@@ -53,47 +53,47 @@ The test suite uses pytest markers to categorize tests:
 
 ### Run All Tests
 ```bash
-pytest
+uv run pytest
 ```
 
 ### Run by Test Type
 ```bash
 # Unit tests only (fast)
-pytest tests/unit
+uv run pytest tests/unit
 
 # Integration tests only
-pytest tests/integration
+uv run pytest tests/integration
 
 # Validation tests only
-pytest tests/validation
+uv run pytest tests/validation
 ```
 
 ### Run by Markers
 ```bash
 # Skip slow tests
-pytest -m "not slow"
+uv run pytest -m "not slow"
 
 # Skip Supabase tests (useful when offline)
-pytest -m "not supabase"
+uv run pytest -m "not supabase"
 
 # Run only GPU tests
-pytest -m gpu
+uv run pytest -m gpu
 
 # Skip both slow and Supabase tests
-pytest -m "not slow and not supabase"
+uv run pytest -m "not slow and not supabase"
 ```
 
 ### Run Specific Test Files
 ```bash
 # Test specific functionality
-pytest tests/unit/test_job_db.py
-pytest tests/integration/test_cli.py
+uv run pytest tests/unit/test_job_db.py
+uv run pytest tests/integration/test_cli.py
 
 # Test with verbose output
-pytest tests/unit/test_job_db.py -v
+uv run pytest tests/unit/test_job_db.py -v
 
 # Test with detailed output on failures
-pytest tests/unit/test_job_db.py -vvs
+uv run pytest tests/unit/test_job_db.py -vvs
 ```
 
 ## Test Configuration
