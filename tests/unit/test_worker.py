@@ -1,6 +1,5 @@
 """Unit tests for Worker base functionality."""
 
-import pytest
 import tempfile
 from pathlib import Path
 from typing import Any

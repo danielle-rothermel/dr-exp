@@ -1,6 +1,5 @@
 """Integration tests for worker with sync functionality."""
 
-import pytest
 import tempfile
 import time
 import threading
