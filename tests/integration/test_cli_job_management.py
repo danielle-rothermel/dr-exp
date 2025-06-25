@@ -30,6 +30,7 @@ def test_cli_kill() -> None:
                 tmpdir,
                 "--experiment",
                 "test_exp",
+                "job",
                 "kill",
                 job2[:8],  # Partial ID
             ],
@@ -45,14 +46,14 @@ def test_cli_kill() -> None:
 
         # Kill running job (job1 is running)
         result = runner.invoke(
-            cli, ["--base-path", tmpdir, "--experiment", "test_exp", "kill", job1]
+            cli, ["--base-path", tmpdir, "--experiment", "test_exp", "job", "kill", job1]
         )
 
         assert result.exit_code == 0
 
         # Try to kill non-existent job
         result = runner.invoke(
-            cli, ["--base-path", tmpdir, "--experiment", "test_exp", "kill", "fake_id"]
+            cli, ["--base-path", tmpdir, "--experiment", "test_exp", "job", "kill", "fake_id"]
         )
 
         assert result.exit_code == 1
@@ -79,6 +80,7 @@ def test_cli_boost() -> None:
                 tmpdir,
                 "--experiment",
                 "test_exp",
+                "job",
                 "boost",
                 job1[:8],  # Partial ID
                 "--priority",
@@ -101,6 +103,7 @@ def test_cli_boost() -> None:
                 tmpdir,
                 "--experiment",
                 "test_exp",
+                "job",
                 "boost",
                 job1,
                 job2,
@@ -137,6 +140,7 @@ def test_cli_recover() -> None:
                 tmpdir,
                 "--experiment",
                 "test_exp",
+                "job",
                 "recover",
                 "--dry-run",
                 "--threshold",
@@ -156,6 +160,7 @@ def test_cli_recover() -> None:
                 tmpdir,
                 "--experiment",
                 "test_exp",
+                "job",
                 "recover",
                 "--threshold",
                 "300",
@@ -209,7 +214,7 @@ def test_cli_sync_status(tmp_path: Path) -> None:
 
         # Get status
         result = runner.invoke(
-            cli, ["--base-path", tmpdir, "--experiment", "test_exp", "sync-status"]
+            cli, ["--base-path", tmpdir, "--experiment", "test_exp", "job", "sync-status"]
         )
 
         assert result.exit_code == 0
@@ -224,6 +229,7 @@ def test_cli_sync_status(tmp_path: Path) -> None:
                 tmpdir,
                 "--experiment",
                 "test_exp",
+                "job",
                 "sync-status",
                 "--verbose",
             ],
@@ -254,6 +260,7 @@ def test_cli_run_one() -> None:
                 tmpdir,
                 "--experiment",
                 "test_exp",
+                "job",
                 "run-one",
                 job_id[:8],  # Partial ID
                 "--no-sync",
@@ -275,7 +282,7 @@ def test_cli_run_one() -> None:
 
         result = runner.invoke(
             cli,
-            ["--base-path", tmpdir, "--experiment", "test_exp", "run-one", fail_job_id],
+            ["--base-path", tmpdir, "--experiment", "test_exp", "job", "run-one", fail_job_id],
         )
 
         assert result.exit_code == 1
@@ -349,6 +356,7 @@ def test_cli_partial_id_matching() -> None:
                 tmpdir,
                 "--experiment",
                 "test_exp",
+                "job",
                 "boost",
                 partial,  # Use boost instead of kill to avoid marking as failed
                 "--priority",
@@ -369,6 +377,7 @@ def test_cli_partial_id_matching() -> None:
                 tmpdir,
                 "--experiment",
                 "test_exp",
+                "job",
                 "kill",
                 "a",  # Very short partial that might match multiple
             ],
