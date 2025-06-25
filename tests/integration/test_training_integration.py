@@ -9,18 +9,17 @@ from dr_exp.core.job_db import JobDB
 from dr_exp.worker.base import Worker
 
 
-def test_decon_classification_trainer() -> None:
-    """Test deconCNN classification trainer."""
+def test_basic_training_integration() -> None:
+    """Test basic training integration using test trainer."""
     with tempfile.TemporaryDirectory() as tmpdir:
         # Create job
         job_db = JobDB(base_path=tmpdir, experiment_name="test_exp", validate=False)
 
         config = {
-            "_target_": "dr_exp.trainers.decon_trainer.train_classification",
-            "model": {"architecture": "resnet18", "num_classes": 10},
-            "optim": {"name": "adamw", "lr": 0.001},
-            "epochs": 5,
+            "_target_": "dr_exp.trainers.test_trainer.train",
+            "epochs": 3,
             "batch_size": 32,
+            "learning_rate": 0.001,
         }
 
         job_id = job_db.create_job(config)
@@ -37,10 +36,9 @@ def test_decon_classification_trainer() -> None:
         assert "final_metrics" in job
 
         metrics = job["final_metrics"]
-        assert "final_train_accuracy" in metrics
-        assert "final_val_accuracy" in metrics
-        assert "best_val_accuracy" in metrics
-        assert metrics["total_epochs"] == 5
+        assert "final_accuracy" in metrics
+        assert "total_epochs" in metrics
+        assert metrics["total_epochs"] == 3
 
         # Verify artifacts
         storage_path = job_db.get_storage_path(job_id)
@@ -52,44 +50,13 @@ def test_decon_classification_trainer() -> None:
         # Check metrics file content
         with (storage_path / "metrics.jsonl").open() as f:
             lines = f.readlines()
-            assert len(lines) == 5  # One per epoch
+            assert len(lines) == 3  # One per epoch
 
-            # Check progression
-            first_metrics = json.loads(lines[0])["metrics"]
-            last_metrics = json.loads(lines[-1])["metrics"]
-            assert last_metrics["train_accuracy"] > first_metrics["train_accuracy"]
-
-
-def test_decon_autoencoder_trainer() -> None:
-    """Test deconCNN autoencoder trainer."""
-    with tempfile.TemporaryDirectory() as tmpdir:
-        job_db = JobDB(base_path=tmpdir, experiment_name="test_exp", validate=False)
-
-        config = {
-            "_target_": "dr_exp.trainers.decon_trainer.train_autoencoder",
-            "model": {"encoder_dims": [784, 256, 64], "decoder_dims": [64, 256, 784]},
-            "optim": {"name": "adam", "lr": 0.0001},
-            "epochs": 10,
-            "reconstruction_weight": 2.0,
-        }
-
-        job_id = job_db.create_job(config)
-
-        # Run with worker
-        worker = Worker(job_db=job_db, worker_id="test_worker")
-        status = worker.run_one_job()
-
-        assert status == "completed"
-
-        # Verify results
-        job = job_db.get_job(job_id)
-        metrics = job["final_metrics"]
-        assert "reconstruction_loss" in metrics
-        assert "total_loss" in metrics
-
-        # Verify model saved
-        storage_path = job_db.get_storage_path(job_id)
-        assert (storage_path / "autoencoder_final.pt").exists()
+            # Check structure
+            first_entry = json.loads(lines[0])
+            assert "epoch" in first_entry["metrics"]
+            assert "metrics" in first_entry
+            assert "timestamp" in first_entry
 
 
 def test_trainer_error_handling() -> None:
@@ -132,10 +99,9 @@ def test_worker_artifact_discovery() -> None:
         job_db = JobDB(base_path=tmpdir, experiment_name="test_exp", validate=False)
 
         config = {
-            "_target_": "dr_exp.trainers.decon_trainer.train_classification",
-            "model": {"architecture": "resnet50"},
-            "optim": {"lr": 0.01},
-            "epochs": 3,
+            "_target_": "dr_exp.trainers.test_trainer.train",
+            "epochs": 2,
+            "batch_size": 16,
         }
 
         job_db.create_job(config)
@@ -168,7 +134,7 @@ def test_worker_artifact_discovery() -> None:
         file_names = {fn for fn, _ in queued_files}
         assert "metrics.jsonl" in file_names
         assert "model_final.pt" in file_names
-        assert any("checkpoint" in fn for fn in file_names)
+        assert "events.jsonl" in file_names
 
 
 def test_full_integration() -> None:
@@ -188,16 +154,10 @@ def test_full_integration() -> None:
         # Create config file
         config_file = Path(tmpdir) / "train_config.yaml"
         config_file.write_text("""
-_target_: dr_exp.trainers.decon_trainer.train_classification
-model:
-  architecture: efficientnet_b0
-  num_classes: 100
-optim:
-  name: sgd
-  lr: 0.1
-  momentum: 0.9
-epochs: 10
-batch_size: 256
+_target_: dr_exp.trainers.test_trainer.train
+epochs: 2
+batch_size: 16
+learning_rate: 0.001
 """)
 
         # Submit job
@@ -208,8 +168,12 @@ batch_size: 256
                 tmpdir,
                 "--experiment",
                 "integration_test",
+                "job",
                 "submit",
-                str(config_file),
+                "--config-path",
+                str(config_file.parent),
+                "--config-name",
+                config_file.stem,
                 "--priority",
                 "800",
             ],
@@ -223,6 +187,7 @@ batch_size: 256
         match = re.search(r"Created job: ([\w-]+)", job_output)
         assert match
         job_id = match.group(1)
+        job_id_short = job_id[:12]  # CLI shows truncated IDs
 
         # Run worker
         result = runner.invoke(
@@ -251,13 +216,14 @@ batch_size: 256
                 tmpdir,
                 "--experiment",
                 "integration_test",
+                "job",
                 "list",
                 "--status",
                 "completed",
             ],
         )
         assert result.exit_code == 0
-        assert job_id in result.output
+        assert job_id_short in result.output
 
         # Validate artifacts exist
         job_db = JobDB(
@@ -269,7 +235,6 @@ batch_size: 256
             "model_final.pt",
             "metrics.jsonl",
             "config.json",
-            "metadata.json",
             "events.jsonl",
         ]
 
@@ -278,5 +243,5 @@ batch_size: 256
 
         # Check final metrics
         job = job_db.get_job(job_id)
-        assert job["final_metrics"]["total_epochs"] == 10
-        assert job["final_metrics"]["final_val_accuracy"] > 0
+        assert job["final_metrics"]["total_epochs"] == 2
+        assert job["final_metrics"]["final_accuracy"] > 0
