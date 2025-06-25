@@ -6,7 +6,10 @@ import uuid
 from pathlib import Path
 from datetime import datetime, timedelta, UTC
 from dotenv import load_dotenv
+import subprocess
+import requests
 
+import pytest
 from dr_exp.sync.supabase_client import SupabaseClient
 
 
@@ -22,6 +25,28 @@ def setup_test_env() -> None:
         )
 
 
+def check_supabase_available() -> bool:
+    """Check if local Supabase is available."""
+    try:
+        # Primary check: Is the API responding?
+        response = requests.get(
+            "http://localhost:54321/rest/v1/",
+            headers={"apikey": os.environ.get("SUPABASE_KEY", "")},
+            timeout=2
+        )
+        return response.status_code in [200, 404]  # 404 is ok, means API is up
+    except requests.RequestException:
+        return False
+
+
+# Skip all tests if Supabase is not available
+pytestmark = pytest.mark.skipif(
+    not check_supabase_available(),
+    reason="Supabase not available (requires local Supabase instance)"
+)
+
+
+@pytest.mark.supabase
 def test_experiment_operations(tmp_path: Path) -> str:
     """Test experiment creation and retrieval."""
     setup_test_env()
@@ -48,6 +73,7 @@ def test_experiment_operations(tmp_path: Path) -> str:
     return exp_id
 
 
+@pytest.mark.supabase
 def test_job_sync(tmp_path: Path) -> tuple[str, str]:
     """Test syncing jobs to database."""
     setup_test_env()
@@ -94,6 +120,7 @@ def test_job_sync(tmp_path: Path) -> tuple[str, str]:
     return exp_id, job_id
 
 
+@pytest.mark.supabase
 def test_sync_status(tmp_path: Path) -> None:
     """Test sync status tracking."""
     setup_test_env()
@@ -135,6 +162,7 @@ def test_sync_status(tmp_path: Path) -> None:
     assert sync_records[0]["status"] == "completed"
 
 
+@pytest.mark.supabase
 def test_experiment_stats(tmp_path: Path) -> None:
     """Test getting experiment statistics."""
     setup_test_env()
@@ -187,6 +215,7 @@ def test_experiment_stats(tmp_path: Path) -> None:
     assert stats["failed_jobs"] == 1
 
 
+@pytest.mark.supabase
 def test_batch_operations(tmp_path: Path) -> None:
     """Test batch syncing of jobs."""
     setup_test_env()
@@ -224,6 +253,7 @@ def test_batch_operations(tmp_path: Path) -> None:
     assert db_jobs[0]["config"]["index"] == 0  # Most recent
 
 
+@pytest.mark.supabase
 def test_job_queries(tmp_path: Path) -> None:
     """Test querying jobs with filters."""
     setup_test_env()
@@ -266,6 +296,7 @@ def test_job_queries(tmp_path: Path) -> None:
     assert len(limited_jobs) == 3
 
 
+@pytest.mark.supabase
 def test_full_sync_workflow() -> None:
     """Test complete sync workflow from file upload to status tracking."""
     setup_test_env()
