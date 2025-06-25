@@ -9,6 +9,7 @@ class MockSupabaseClient(SupabaseClient):
     """Mock Supabase client for testing."""
 
     def __init__(self) -> None:
+        """Initialize mock Supabase client."""
         self.uploaded_files = []
         self.bucket_name = "experiments"
 
@@ -25,17 +26,17 @@ class MockSupabaseClient(SupabaseClient):
 class MockWorker(Worker):
     """Mock worker for testing."""
 
-    def __init__(self, *args: Any, **kwargs: Any) -> None:
+    def __init__(self, *args: Any, **kwargs: Any) -> None:  # noqa: ANN401
         """Initialize mock worker."""
         super().__init__(*args, **kwargs)
         self.executed_jobs = []
 
-    def execute_job(self, job: dict[str, Any]) -> Any:
+    def execute_job(self, job: dict[str, Any]) -> Any:  # noqa: ANN401
         """Mock job execution."""
         self.executed_jobs.append(job["id"])
         return super().execute_job(job)
 
 
-def mock_sync_function(item: Any) -> bool:
+def mock_sync_function(item: Any) -> bool:  # noqa: ANN401
     """Mock sync function for testing."""
     return True

@@ -6,7 +6,6 @@ import uuid
 from pathlib import Path
 from datetime import datetime, timedelta, UTC
 from dotenv import load_dotenv
-import subprocess
 import requests
 
 import pytest
@@ -32,7 +31,7 @@ def check_supabase_available() -> bool:
         response = requests.get(
             "http://localhost:54321/rest/v1/",
             headers={"apikey": os.environ.get("SUPABASE_KEY", "")},
-            timeout=2
+            timeout=2,
         )
         return response.status_code in [200, 404]  # 404 is ok, means API is up
     except requests.RequestException:
@@ -42,7 +41,7 @@ def check_supabase_available() -> bool:
 # Skip all tests if Supabase is not available
 pytestmark = pytest.mark.skipif(
     not check_supabase_available(),
-    reason="Supabase not available (requires local Supabase instance)"
+    reason="Supabase not available (requires local Supabase instance)",
 )
 
 

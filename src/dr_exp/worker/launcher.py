@@ -136,7 +136,10 @@ class WorkerLauncher:
         """
         # Create unique worker ID
         if gpu_index is not None:
-            worker_id = f"slurm{self.slurm_job_id}_{self.slurm_node_name}_gpu{gpu_index}_{worker_index}"
+            worker_id = (
+                f"slurm{self.slurm_job_id}_{self.slurm_node_name}_"
+                f"gpu{gpu_index}_{worker_index}"
+            )
         else:
             worker_id = (
                 f"slurm{self.slurm_job_id}_{self.slurm_node_name}_cpu_{worker_index}"

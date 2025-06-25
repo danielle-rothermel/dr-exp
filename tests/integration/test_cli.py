@@ -239,7 +239,7 @@ def test_cli_error_handling() -> None:
         bad_config_dir = Path(tmpdir) / "bad_configs"
         bad_config_dir.mkdir()
         bad_config = bad_config_dir / "bad_config.yaml"
-        bad_config.write_text('epochs: 10')
+        bad_config.write_text("epochs: 10")
 
         result = runner.invoke(
             cli,

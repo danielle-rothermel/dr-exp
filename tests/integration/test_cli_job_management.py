@@ -46,14 +46,24 @@ def test_cli_kill() -> None:
 
         # Kill running job (job1 is running)
         result = runner.invoke(
-            cli, ["--base-path", tmpdir, "--experiment", "test_exp", "job", "kill", job1]
+            cli,
+            ["--base-path", tmpdir, "--experiment", "test_exp", "job", "kill", job1],
         )
 
         assert result.exit_code == 0
 
         # Try to kill non-existent job
         result = runner.invoke(
-            cli, ["--base-path", tmpdir, "--experiment", "test_exp", "job", "kill", "fake_id"]
+            cli,
+            [
+                "--base-path",
+                tmpdir,
+                "--experiment",
+                "test_exp",
+                "job",
+                "kill",
+                "fake_id",
+            ],
         )
 
         assert result.exit_code == 1
@@ -214,7 +224,8 @@ def test_cli_sync_status(tmp_path: Path) -> None:
 
         # Get status
         result = runner.invoke(
-            cli, ["--base-path", tmpdir, "--experiment", "test_exp", "job", "sync-status"]
+            cli,
+            ["--base-path", tmpdir, "--experiment", "test_exp", "job", "sync-status"],
         )
 
         assert result.exit_code == 0
@@ -282,7 +293,15 @@ def test_cli_run_one() -> None:
 
         result = runner.invoke(
             cli,
-            ["--base-path", tmpdir, "--experiment", "test_exp", "job", "run-one", fail_job_id],
+            [
+                "--base-path",
+                tmpdir,
+                "--experiment",
+                "test_exp",
+                "job",
+                "run-one",
+                fail_job_id,
+            ],
         )
 
         assert result.exit_code == 1

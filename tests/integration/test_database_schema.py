@@ -11,12 +11,12 @@ import pytest
 def check_docker_available() -> bool:
     """Check if Docker is available and running."""
     try:
-        result = subprocess.run(
-            ["docker", "info"],
+        result = subprocess.run(  # noqa: S603
+            ["docker", "info"],  # noqa: S607
             capture_output=True,
             text=True,
             check=False,
-            timeout=5
+            timeout=5,
         )
         return result.returncode == 0
     except (subprocess.TimeoutExpired, FileNotFoundError):
@@ -36,7 +36,7 @@ def check_dependencies() -> bool:
 # Skip all tests if dependencies are not available
 pytestmark = pytest.mark.skipif(
     not check_dependencies(),
-    reason="Docker and Supabase CLI required for database schema tests"
+    reason="Docker and Supabase CLI required for database schema tests",
 )
 
 
@@ -45,7 +45,7 @@ def test_local_supabase() -> tuple[str, str]:
     """Test local Supabase setup."""
     # Check if Supabase is installed
     result = subprocess.run(  # noqa: S603
-        ["supabase", "--version"],
+        ["supabase", "--version"],  # noqa: S607
         capture_output=True,
         text=True,
         check=False,
@@ -56,7 +56,7 @@ def test_local_supabase() -> tuple[str, str]:
     # Start Supabase (if not already running)
     print("Starting local Supabase...")
     result = subprocess.run(  # noqa: S603
-        ["supabase", "start"],
+        ["supabase", "start"],  # noqa: S607
         capture_output=True,
         text=True,
         check=False,
@@ -65,9 +65,9 @@ def test_local_supabase() -> tuple[str, str]:
         # Check for common acceptable errors
         acceptable_errors = [
             "is already running",
-            "port is already allocated", 
+            "port is already allocated",
             "already exists",
-            "WARNING: You are running different service versions"
+            "WARNING: You are running different service versions",
         ]
         if not any(error in result.stderr for error in acceptable_errors):
             print(f"Error starting Supabase: {result.stderr}")
@@ -80,12 +80,12 @@ def test_local_supabase() -> tuple[str, str]:
 
     # Get status (may fail if containers have issues, but that's ok if API works)
     result = subprocess.run(  # noqa: S603
-        ["supabase", "status"],
+        ["supabase", "status"],  # noqa: S607
         capture_output=True,
         text=True,
         check=False,
     )
-    
+
     if result.returncode == 0:
         print("Supabase status:")
         print(result.stdout)
@@ -93,6 +93,7 @@ def test_local_supabase() -> tuple[str, str]:
         print(f"Supabase status check failed (may be ok): {result.stderr}")
         # Try to connect to API directly to verify it's working
         import requests
+
         try:
             response = requests.get("http://localhost:54321/rest/v1/", timeout=2)
             if response.status_code in [200, 404]:
@@ -102,8 +103,8 @@ def test_local_supabase() -> tuple[str, str]:
             else:
                 raise AssertionError(f"API not responding: {response.status_code}")
         except requests.RequestException as e:
-            raise AssertionError(f"Cannot connect to Supabase API: {e}")
-    
+            raise AssertionError(f"Cannot connect to Supabase API: {e}") from e
+
     assert result.returncode == 0
 
     # Extract connection info
@@ -336,10 +337,17 @@ def test_migrations() -> None:
         content = mig_file.read_text()
 
         # Basic checks - migrations should contain SQL DDL statements
-        has_sql = any(keyword in content for keyword in [
-            "CREATE TABLE", "CREATE SCHEMA", "CREATE POLICY", 
-            "INSERT INTO", "ALTER TABLE", "SELECT"
-        ])
+        has_sql = any(
+            keyword in content
+            for keyword in [
+                "CREATE TABLE",
+                "CREATE SCHEMA",
+                "CREATE POLICY",
+                "INSERT INTO",
+                "ALTER TABLE",
+                "SELECT",
+            ]
+        )
         assert has_sql, f"Migration {mig_file.name} should contain SQL statements"
         assert "--" in content  # Should have comments
 

@@ -243,7 +243,8 @@ class JobDB:
                             priority = job_data["priority"]
                             created_at = job_data.get("created_at", "")
 
-                            # Select if higher priority, or same priority but earlier creation
+                            # Select if higher priority, or same priority but earlier
+                            # creation
                             if priority > best_priority or (
                                 priority == best_priority
                                 and (
