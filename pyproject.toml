@@ -10,7 +10,6 @@ requires-python = ">=3.12"
 dependencies = [
     "cachetools>=6.0.0",
     "click>=8.2.1",
-    "deconcnn",
     "fastapi>=0.115.12",
     "httpx>=0.28.1",
     "hydra-core==1.3.2",
@@ -255,8 +254,6 @@ addopts = [
 asyncio_mode = "auto"
 asyncio_default_fixture_loop_scope = "function"
 
-[tool.uv.sources]
-deconcnn = { git = "ssh://git@github.com/drothermel/deconCNN.git" }
 
 [tool.coverage.report]
 exclude_lines = [
