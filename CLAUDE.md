@@ -162,6 +162,21 @@ slurm logs <job_id> [--worker <id>] [--tail N]  # Show worker logs
 ```bash
 ckdr  # ruff + mypy checks
 pt    # pytest (all tests)
+pt_ci # pytest (skip Supabase tests - CI/local friendly)
+```
+
+**Test Commands** (local aliases):
+```bash
+# Full test suite (may fail on Supabase connectivity)
+pt       # uv run pytest
+
+# CI-friendly tests (skip Supabase tests)
+pt_ci    # uv run pytest -m "not supabase"
+
+# Alternative direct commands
+uv run pytest                    # Full test suite
+uv run pytest -m "not supabase"  # Skip Supabase tests
+uv run pytest -m "not slow"      # Skip slow tests
 ```
 
 **Dependencies**:

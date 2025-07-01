@@ -6,6 +6,7 @@ import shutil
 import time
 from pathlib import Path
 from dotenv import load_dotenv
+import pytest
 
 from fastapi.testclient import TestClient
 
@@ -26,6 +27,7 @@ def setup_test_env() -> None:
         )
 
 
+@pytest.mark.supabase
 def test_remote_read_operations() -> None:
     """Test JobDB remote read functionality."""
     setup_test_env()
@@ -128,6 +130,7 @@ def test_artifact_download() -> None:
             assert file_path.exists()
 
 
+@pytest.mark.supabase
 def test_api_endpoints() -> None:
     """Test API endpoints with remote data."""
     setup_test_env()
@@ -298,6 +301,7 @@ def test_remote_status_filter() -> None:
         assert isinstance(completed, list)
 
 
+@pytest.mark.supabase
 def test_full_remote_workflow() -> None:
     """Test complete workflow with remote operations."""
     setup_test_env()
