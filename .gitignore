@@ -21,6 +21,7 @@ venv/
 .env
 dist/
 build/
+.pytest_cache/
 
 # Node
 node_modules/
@@ -43,3 +44,6 @@ package-lock.json # Or yarn.lock, depending on preference if you add package man
 .DS_Store
 Thumbs.db
 work/
+
+# Test remnants (job directories from experiment runs)
+job_*/
