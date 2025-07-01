@@ -12,7 +12,7 @@ dr_exp is a **local-first deep learning experiment manager** for HPC clusters. I
 - **Worker**: Executes jobs using Hydra dispatch, manages artifacts, logs to files
 - **CLI**: All commands operational (init, submit, worker, list, sweep, launcher, etc.)
 - **Sync Queue**: Tracks files for upload with retry logic
-- **Integration**: Test trainer and DeconCNN wrapper working
+- **Integration**: Test trainer working
 - **Multi-Worker Launcher**: Spawns workers across GPUs with health monitoring
 - **Config Sweeps**: Parameter sweep generation and submission
 - **SLURM Integration**: Scripts and commands for HPC clusters

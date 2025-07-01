@@ -1,9 +1,0 @@
-source: custom
-name: alexnet
-architecture: CifarAlexNet
-layers: 8
-nonlinearity: relu
-norm_type: batchnorm
-dropout_prob: 0.5
-use_residual: false
-init_method: he

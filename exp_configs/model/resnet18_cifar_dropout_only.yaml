@@ -1,8 +1,0 @@
-source: deconcnn
-architecture: resnet18
-nonlinearity: relu
-norm_type: identity  # No normalization
-dropout_prob: 0.4
-use_residual: false  # Step 7 already removed residuals
-init_method: xavier  # Step 9 already switched to Xavier
-use_imagenet_head: false  # CIFAR-optimized: 3x3 conv1, no maxpool

@@ -1,8 +1,0 @@
-source: torchvision
-name: resnet18
-weights: DEFAULT
-nonlinearity: tanh
-norm_type: batchnorm
-dropout_prob: 0.0
-use_residual: true
-init_method: he
