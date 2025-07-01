@@ -105,6 +105,7 @@ model:
 ## Documentation
 
 - **[Quick Start Guide](docs/quick_start_guide.md)** - Detailed setup and examples
+- **[Project Workflows](docs/project_workflows.md)** - Job submission and monitoring workflows
 - **[API Reference](docs/api_reference.md)** - REST API for remote monitoring  
 - **[CLAUDE.md](CLAUDE.md)** - Development guide and standards
 
