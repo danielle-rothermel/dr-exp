@@ -5,6 +5,7 @@ import time
 import os
 from pathlib import Path
 from dotenv import load_dotenv
+import pytest
 
 from dr_exp.core.job_db import JobDB
 from dr_exp.worker.base import Worker
@@ -23,6 +24,7 @@ def setup_test_env() -> None:
         )
 
 
+@pytest.mark.supabase
 def test_worker_with_supabase_sync() -> None:
     """Test worker with real Supabase sync."""
     setup_test_env()
@@ -156,6 +158,7 @@ def test_worker_without_sync() -> None:
         assert sync_stats["completed"] == 0  # Nothing synced
 
 
+@pytest.mark.supabase
 def test_sync_retry_logic() -> None:
     """Test that sync retries failed uploads."""
     setup_test_env()
@@ -209,6 +212,7 @@ def test_sync_retry_logic() -> None:
             assert failed_items[0].attempts > 0
 
 
+@pytest.mark.supabase
 def test_experiment_isolation() -> None:
     """Test that different experiments are isolated."""
     setup_test_env()
@@ -247,6 +251,7 @@ def test_experiment_isolation() -> None:
         assert exp2_jobs[0]["id"] == job2
 
 
+@pytest.mark.supabase
 def test_cli_integration() -> None:
     """Test CLI with Supabase sync."""
     setup_test_env()

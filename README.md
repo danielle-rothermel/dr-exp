@@ -113,10 +113,11 @@ model:
 ```bash
 # Quality checks
 lint_fix  # Linting and formatting
-uv run pytest
+uv run pytest -m "not supabase"  # Skip tests requiring Supabase
 
 # Available shortcuts (see CLAUDE.md)
 lint_fix  # Combined ruff + formatting
-pt        # Pytest
+pt        # Pytest (all tests)
+pt_ci     # Pytest (skip Supabase tests)
 ```
 
