@@ -9,6 +9,7 @@ import logging
 from datetime import datetime, UTC
 from pathlib import Path
 from typing import Any
+import importlib
 
 logger = logging.getLogger(__name__)
 
@@ -108,20 +109,11 @@ class JobDB:
             f"Priority must be {MIN_PRIORITY}-{MAX_PRIORITY}, got {priority}"
         )
 
-        # Validate _target_ exists
-        assert "_target_" in config, "Config must include _target_ field"
-
         # Validate target is importable
+        assert "_target_" in config, "Config must include _target_ field"
         target = config["_target_"]
         module_path, func_name = target.rsplit(".", 1)
-        try:
-            import importlib
-
-            importlib.import_module(module_path)
-        except ImportError as e:
-            raise AssertionError(
-                f"Cannot import target module {module_path}: {e}"
-            ) from e
+        assert importlib.import_module(module_path), f"Module {module_path} not found"
 
         # Create job metadata
         job_id = str(uuid.uuid4())
