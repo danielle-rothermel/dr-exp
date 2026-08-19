@@ -1,4 +1,4 @@
-# dr_exp - Deep Learning Experiment Manager
+# dr-exp - Deep Learning Experiment Manager
 
 A **local-first deep learning experiment manager** for HPC clusters. Manages ML training jobs via filesystem operations with optional cloud sync.
 
