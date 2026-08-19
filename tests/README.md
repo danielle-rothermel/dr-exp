@@ -13,11 +13,15 @@ tests/
 
 ## Running Tests
 
+Install test dependencies first (`uv sync --group test` or `--all-groups`). Default `addopts` include `-n auto`, so **pytest-xdist must be installed** for a normal `uv run pytest` invocation.
+
 ```bash
-uv run pytest                    # full suite
+uv sync --all-groups
+uv run pytest                    # full suite (parallel via xdist)
 uv run pytest -m "not slow"      # skip slow tests
 uv run pytest tests/unit/        # unit only
 uv run pytest -x                 # stop on first failure
+uv run pytest -n0                # disable parallelism
 ```
 
 ## Conventions

@@ -1,7 +1,6 @@
 """Base worker implementation for job execution."""
 
 import os
-import sys
 import threading
 import time
 import traceback
@@ -23,7 +22,6 @@ class Worker:
         job_db: JobDB,
         worker_id: str,
         working_dir: str | None = None,
-        experiment_path: str | None = None,
         heartbeat_interval: int = 60,
     ) -> None:
         """Initialize worker."""
@@ -36,27 +34,6 @@ class Worker:
         self.should_stop = threading.Event()
 
         self.working_dir.mkdir(parents=True, exist_ok=True)
-
-        # KNOWN ISSUE (see README): experiment_path unused at CLI call sites
-        self.log_file = None
-        self._original_stdout = None
-        self._original_stderr = None
-        if experiment_path:
-            log_dir = Path(experiment_path) / "logs"
-            log_dir.mkdir(exist_ok=True)
-            log_path = log_dir / f"worker_{worker_id}.log"
-            self.log_file = log_path.open("a", buffering=1)
-
-            self._original_stdout = sys.stdout
-            self._original_stderr = sys.stderr
-            sys.stdout = self.log_file
-            sys.stderr = self.log_file
-
-            print(
-                f"=== Worker {worker_id} started at {datetime.now(UTC).isoformat()} ==="
-            )
-            print(f"Experiment: {Path(experiment_path).name}")
-            print("=" * 60)
 
         self.heartbeat_thread: threading.Thread | None = None
 
@@ -207,11 +184,6 @@ class Worker:
         finally:
             self.stop_background_threads()
 
-            if self.log_file and not self.log_file.closed:
-                sys.stdout = getattr(self, "_original_stdout", sys.__stdout__)
-                sys.stderr = getattr(self, "_original_stderr", sys.__stderr__)
-                self.log_file.close()
-
         print(f"[{self.worker_id}] Worker finished: {stats}")
         return stats
 
@@ -219,11 +191,3 @@ class Worker:
         """Shutdown worker gracefully."""
         # KNOWN ISSUE (see README): never called; no SIGTERM handler registers this
         print(f"\n=== Worker {self.worker_id} shutting down: {reason} ===")
-
-        if self.log_file:
-            if self._original_stdout:
-                sys.stdout = self._original_stdout
-            if self._original_stderr:
-                sys.stderr = self._original_stderr
-            self.log_file.close()
-            self.log_file = None

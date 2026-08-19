@@ -95,13 +95,12 @@ These are documented for Phase 1; fixes are deferred until the queue/worker/conf
 
 1. **`job kill` does not signal the running trainer** — only rewrites the job JSON to `failed`; the worker may overwrite status on completion.
 2. **Worker has no SIGTERM handler** — `Worker.shutdown()` is never called; graceful drain relies on the launcher control file.
-3. **Worker file logging is dead at CLI call sites** — `experiment_path` is never passed to `Worker(...)`, so stdout/stderr redirection in `Worker.__init__` never runs unless set explicitly.
-4. **`attempts` is uncapped** — incremented on claim but never limited; deterministically failing jobs are re-queued forever by `recover_stale_jobs`. Launcher `worker_restarts` is counted but not capped.
-5. **`job boost` sets absolute priority** despite the name suggesting a relative increase.
-6. **`reserve_job` / `claim_reserved_job` race** — read-then-write without the claim lock.
-7. **`claim_next_job` lock contention** — gives up after 5 attempts; under contention workers sleep 10 s between polls. All scheduling ops are O(N) directory scans.
-8. **Heartbeat daemon thread starvation** — a GIL-holding trainer can starve the heartbeat thread and trigger false stale recovery.
-9. **`_target_` validation duplicated** — checked in `JobDB.create_job`, CLI submit, and sweep utilities.
+3. **`attempts` is uncapped** — incremented on claim but never limited; deterministically failing jobs are re-queued forever by `recover_stale_jobs`. Launcher `worker_restarts` is counted but not capped.
+4. **`job boost` sets absolute priority** despite the name suggesting a relative increase.
+5. **`reserve_job` / `claim_reserved_job` race** — read-then-write without the claim lock.
+6. **`claim_next_job` lock contention** — gives up after 5 attempts; under contention workers sleep 10 s between polls. All scheduling ops are O(N) directory scans.
+7. **Heartbeat daemon thread starvation** — a GIL-holding trainer can starve the heartbeat thread and trigger false stale recovery.
+8. **`_target_` validation duplicated** — checked in `JobDB.create_job`, CLI submit, and sweep utilities.
 
 ## Development
 

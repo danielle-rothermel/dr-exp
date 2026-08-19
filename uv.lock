@@ -239,7 +239,6 @@ trainers = [
 [package.dev-dependencies]
 dev = [
     { name = "mypy" },
-    { name = "pytest" },
     { name = "pytest-asyncio" },
     { name = "ruff" },
     { name = "tomlkit" },
@@ -275,7 +274,6 @@ provides-extras = ["trainers"]
 [package.metadata.requires-dev]
 dev = [
     { name = "mypy", specifier = ">=1.16.0" },
-    { name = "pytest", specifier = ">=8.3.5" },
     { name = "pytest-asyncio", specifier = ">=1.0.0" },
     { name = "ruff", specifier = ">=0.11.13" },
     { name = "tomlkit", specifier = ">=0.12.0" },

@@ -133,7 +133,11 @@ def test_concurrent_priority_order(tmp_path: Path) -> None:
     priorities = [100, 500, 300, 700, 200, 600, 400, 800]
     for priority in priorities:
         job_id = job_db.create_job(
-            config={"_target_": "dr_exp.training.dummy_trainer.train", "priority": priority}, priority=priority
+            config={
+                "_target_": "dr_exp.training.dummy_trainer.train",
+                "priority": priority,
+            },
+            priority=priority,
         )
         job_ids.append((job_id, priority))
 
@@ -183,7 +187,9 @@ def test_lock_contention_handling(tmp_path: Path) -> None:
     job_db = JobDB(base_path=str(tmp_path), experiment_name="test_exp", validate=False)
 
     # Create single job
-    job_db.create_job(config={"_target_": "dr_exp.training.dummy_trainer.train"}, priority=100)
+    job_db.create_job(
+        config={"_target_": "dr_exp.training.dummy_trainer.train"}, priority=100
+    )
 
     # Try to claim from multiple threads simultaneously
     results = []

@@ -12,6 +12,7 @@ def test_deprecated_directories_removed() -> None:
         "src/dr_exp/api",
         "src/dr_exp/trainers",
         "src/dr_exp/logging",
+        "src/dr_exp/utils",
         "react-babysitter-ui",
         "supabase",
     ]
@@ -60,7 +61,6 @@ def test_core_directories_exist() -> None:
 def test_essential_structure_preserved() -> None:
     """Verify essential project structure is maintained."""
     kept_dirs = [
-        "src/dr_exp/utils",
         "src/dr_exp/core",
         "src/dr_exp/cli",
     ]
