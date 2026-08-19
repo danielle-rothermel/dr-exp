@@ -9,6 +9,14 @@ sweep read every live attempt as ``stale_app_version`` and fail it.
 So dr-exp pins the version itself, derived from the versions of the three
 packages whose code defines the wrapped workflows. Recovery is only promised
 within one version, which is exactly the granularity these pins express.
+
+Limitation: this hashes *distribution versions*, not source. Editing dr-exp's
+own stage code in an editable install leaves the version unchanged, so a
+worker started after the edit will adopt PENDING attempts enqueued before it
+and run them against the new code. That is the right default for development,
+where the alternative -- a new version on every keystroke -- would fail live
+work constantly. Bump the version, or clear the queue, when a stage-body change
+must not be applied to already-enqueued work.
 """
 
 from __future__ import annotations

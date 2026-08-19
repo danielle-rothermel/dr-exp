@@ -23,7 +23,24 @@ class AttemptCancellationRegistry:
         self._lock = threading.Lock()
         self._tokens: set[CancelToken] = set()
         self._shutting_down = False
+        self._idle = threading.Event()
+        self._idle.set()
         self.process_token = CancelToken()
+
+    @property
+    def in_flight(self) -> int:
+        """How many attempts are registered right now."""
+        with self._lock:
+            return len(self._tokens)
+
+    def wait_for_idle(self, timeout: float) -> bool:
+        """Block until no attempt is registered, or ``timeout`` elapses.
+
+        Returns whether the registry became idle. A worker calls this after
+        :meth:`cancel_all` so its DBOS runtime is not torn down underneath a
+        stage body that is still waiting for its child to die.
+        """
+        return self._idle.wait(timeout)
 
     @property
     def shutting_down(self) -> bool:
@@ -51,6 +68,7 @@ class AttemptCancellationRegistry:
         with self._lock:
             already_shutting_down = self._shutting_down
             self._tokens.add(token)
+            self._idle.clear()
         if already_shutting_down:
             token.cancel()
         try:
@@ -58,6 +76,8 @@ class AttemptCancellationRegistry:
         finally:
             with self._lock:
                 self._tokens.discard(token)
+                if not self._tokens:
+                    self._idle.set()
 
 
 @contextmanager

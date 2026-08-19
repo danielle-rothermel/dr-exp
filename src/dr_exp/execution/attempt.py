@@ -15,6 +15,7 @@ from pathlib import Path
 
 from dr_exec import (
     Budgets,
+    CancelledOutcome,
     CancelToken,
     CompletedExecution,
     DirectoryRunStore,
@@ -77,9 +78,24 @@ class AttemptOutcome:
 
     @property
     def cancelled(self) -> bool:
-        """Whether the attempt ended because it was cancelled."""
-        outcome = self.completed.result.outcome
-        return outcome.kind.value == "cancelled"
+        """Whether the attempt ended because it was cancelled.
+
+        The stage body branches on this to raise ``CancelledError`` instead of
+        an application failure, so it reads dr-exec's typed outcome rather
+        than matching on a string.
+        """
+        return isinstance(self.completed.result.outcome, CancelledOutcome)
+
+    def require_failure_message(self) -> str:
+        """Return the failure message, refusing to describe a success.
+
+        The caller reaches this only after checking :attr:`succeeded`, but an
+        explicit raise keeps that contract enforced under ``python -O``, where
+        an assertion would vanish.
+        """
+        if self.failure_message is None:
+            raise ValueError("attempt succeeded; there is no failure message")
+        return self.failure_message
 
     def evidence(self) -> Jsonable:
         """A strict-JSON record of this attempt for failure evidence."""
@@ -128,6 +144,11 @@ def build_execution_job(
         job_id if job_id is not None else JobId(uuid.uuid4()),
         ImportableEntryPoint(module_name=module_name, attribute_name=attribute_name),
         build_trainer_request(request, workspace=workspace),
+        # `overlay` snapshots the worker's own environment and layers the
+        # device variables on top, so a training child inherits everything the
+        # worker was started with. That is what a local trainer needs (HF
+        # caches, tokens, proxies) but it is not a sandbox; a profile-level
+        # exclusion list belongs here if untrusted trainers ever run.
         env=EnvGrant.overlay(profile.resolve_device_env(DEFAULT_DEVICE_SLOT)),
         budgets=budgets,
     )

@@ -35,6 +35,7 @@ from dr_exp.config.names import (
     QueueName,
 )
 from dr_exp.execution.attempt import (
+    AttemptOutcome,
     AttemptRequest,
     build_executor,
     run_attempt,
@@ -70,6 +71,34 @@ class StageContext:
     cancellation: AttemptCancellationRegistry
 
 
+#: Slack added to a profile's termination grace before the stage body stops
+#: waiting for dr-exec's teardown. dr-exec's own SIGTERM-to-SIGKILL window is
+#: the grace, so this only covers process reaping and run-record finalization.
+TEARDOWN_MARGIN_SECONDS = 10.0
+
+
+async def _await_teardown(
+    attempt_task: asyncio.Task[AttemptOutcome], *, grace_seconds: float
+) -> None:
+    """Wait out dr-exec's child teardown, bounded by the termination grace.
+
+    The task is shielded because awaiting it from an already-cancelled
+    coroutine would otherwise cancel it again immediately. A timeout here
+    means dr-exec did not reap the child within its own budget: the stage
+    still reports cancellation, since blocking the worker forever is worse
+    than a possibly-surviving child.
+    """
+    try:
+        await asyncio.wait_for(
+            asyncio.shield(attempt_task),
+            timeout=grace_seconds + TEARDOWN_MARGIN_SECONDS,
+        )
+    except (TimeoutError, asyncio.CancelledError):
+        return
+    except Exception:
+        return
+
+
 def build_pipeline(context: StageContext) -> PipelineDefinition:
     """Build the unwrapped pipeline bound to one worker's resources."""
     executor = build_executor(context.profile)
@@ -82,21 +111,35 @@ def build_pipeline(context: StageContext) -> PipelineDefinition:
             config=config,
         )
         with context.cancellation.attempt() as token:
-            try:
-                outcome = await run_attempt(
+            attempt_task = asyncio.create_task(
+                run_attempt(
                     request,
                     profile=context.profile,
                     executor=executor,
                     cancellation=token,
                 )
+            )
+            try:
+                outcome = await attempt_task
             except asyncio.CancelledError:
-                # Tear the child down, then let dr-platform record CANCELLED.
+                # `ProcessExecutor.run` offloads to a thread, so cancelling
+                # this coroutine does not touch the child. Signal the token,
+                # then wait for dr-exec's own SIGTERM/SIGKILL teardown to
+                # finish before letting dr-platform record CANCELLED --
+                # otherwise the ledger says CANCELLED while the child runs on.
                 token.cancel()
+                await _await_teardown(
+                    attempt_task,
+                    grace_seconds=context.profile.termination_grace_seconds,
+                )
                 raise
+        if outcome.cancelled:
+            # dr-exec observed the cancellation and stopped the child. This is
+            # not an application failure; dr-platform records CANCELLED.
+            raise asyncio.CancelledError
         if not outcome.succeeded:
-            assert outcome.failure_message is not None
             raise StageApplicationFailure(
-                outcome.failure_message, evidence=outcome.evidence()
+                outcome.require_failure_message(), evidence=outcome.evidence()
             )
         return StageCompletion(output_reference=str(outcome.workspace))
 
@@ -135,6 +178,7 @@ def build_registry(
 __all__ = [
     "LABEL_QUEUE_ROUTES",
     "PIPELINE_IDENTITY",
+    "TEARDOWN_MARGIN_SECONDS",
     "TRAIN_STAGE_KEY",
     "StageContext",
     "build_pipeline",

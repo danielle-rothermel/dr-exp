@@ -178,3 +178,36 @@ def test_concurrent_attempts_are_all_cancelled() -> None:
     for thread in threads:
         thread.join(timeout=5)
     assert observed == [True, True, True]
+
+
+def test_registry_is_idle_when_no_attempt_is_registered() -> None:
+    registry = AttemptCancellationRegistry()
+    assert registry.in_flight == 0
+    assert registry.wait_for_idle(timeout=0)
+
+
+def test_wait_for_idle_blocks_while_an_attempt_is_in_flight() -> None:
+    """Worker shutdown joins on this before destroying its DBOS runtime.
+
+    The wait is released by the attempt deregistering, not by elapsed time:
+    the release event below is what unblocks it.
+    """
+    registry = AttemptCancellationRegistry()
+    entered = threading.Event()
+    release = threading.Event()
+
+    def hold() -> None:
+        with registry.attempt():
+            entered.set()
+            release.wait(timeout=5)
+
+    thread = threading.Thread(target=hold)
+    thread.start()
+    assert entered.wait(timeout=5)
+    assert registry.in_flight == 1
+    assert not registry.wait_for_idle(timeout=0)
+
+    release.set()
+    assert registry.wait_for_idle(timeout=5)
+    assert registry.in_flight == 0
+    thread.join(timeout=5)

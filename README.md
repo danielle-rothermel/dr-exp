@@ -54,7 +54,14 @@ placeholders: cluster bootstrap is a later phase and no dr-exp code runs
 against it yet.
 
 The platform tables and the DBOS system schema must share one PostgreSQL
-database; dr-platform validates that and refuses to start otherwise.
+database, because admission and the DBOS enqueue commit together. Nothing
+downstream enforces this, so `MachineProfile` rejects a profile whose
+`database_url` and `system_database_url` differ.
+
+Paths in a profile may be written with `~`, which is expanded when the profile
+loads. `python_executable` must be an interpreter that has dr-exp installed:
+dr-exec runs training children under `python -I`, so `PYTHONPATH` cannot
+supply the trainer's package.
 
 ## Job configuration
 
@@ -128,7 +135,10 @@ ignored: the trainer's package must actually be installed in that interpreter's
 environment.
 
 `dr_exp.training.dummy_trainer` implements this contract and is what the tests
-and smoke run use.
+and smoke run use. Its `params` include switches that exist only to drive
+tests deterministically -- a gate file to hold an attempt in flight, a
+shutdown delay to model checkpointing, and failure injection -- so cancellation
+and retry can be exercised without timing guesses.
 
 ## Queues, capacity, and priority
 
@@ -187,10 +197,26 @@ without it a worker runs until SIGTERM or SIGINT, then drains its in-flight
 attempts and exits.
 
 `--with-dispatcher` runs admission, the run barrier, and the abandoned-work
-sweep in the same process, which is the normal single-machine setup. With
-several workers, run the dispatcher in exactly one of them, or give that one
-every live executor id through `sweep_executor_ids`, so peer work is not
-mistaken for abandoned.
+sweep in the same process, which is the normal single-machine setup.
+`dr_exp dispatcher` runs those without declaring any queue, so it dispatches
+without executing work.
+
+### Operational limits
+
+- **One live process per executor id.** `executor_id` is how the sweep tells
+  live work from abandoned work, so two processes sharing an id will read each
+  other's attempts as abandoned. Only the single-worker local setup is
+  exercised; multi-worker is untested.
+- With several workers, run the dispatcher in exactly one of them, or give that
+  one every live executor id through `sweep_executor_ids`, so peer work is not
+  mistaken for abandoned.
+- **Upgrading changes the application version.** It is derived from the
+  installed versions of dr-exp, dr-platform, dr-exec, and dbos, so upgrading
+  any of them makes a new version. The sweep then fails work that is still
+  PENDING from the old one as `stale_app_version`. This is intended --
+  recovery is only promised within a version -- so drain the queue before
+  upgrading, or expect to `dr_exp retry` what was in flight. The version does
+  *not* change when dr-exp's own source is edited in an editable install.
 
 ## Development
 

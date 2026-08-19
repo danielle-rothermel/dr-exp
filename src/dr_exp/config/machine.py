@@ -59,6 +59,23 @@ class MachineProfile(BaseModel):
             )
         return self
 
+    @model_validator(mode="after")
+    def _databases_are_one_database(self) -> Self:
+        """Reject a profile that splits the ledger from the DBOS system tables.
+
+        dr-platform's admission and its DBOS enqueue must commit together, so
+        the platform tables and the DBOS system schema have to live in one
+        database. Nothing downstream checks this, and the failure it produces
+        is a confusing partial-commit at runtime, so it is caught here.
+        """
+        if self.database_url != self.system_database_url:
+            raise ValueError(
+                "database_url and system_database_url must name the same "
+                f"database, got {self.database_url!r} and "
+                f"{self.system_database_url!r}"
+            )
+        return self
+
     @property
     def queue_name(self) -> QueueName:
         """The DBOS queue this machine's accelerator routes to."""

@@ -15,6 +15,7 @@ Startup order is load-bearing:
 
 from __future__ import annotations
 
+import math
 from collections.abc import Callable, Iterator
 from contextlib import contextmanager
 from dataclasses import dataclass
@@ -65,6 +66,22 @@ def _runtime_initializer(
         )
 
     return initialize
+
+
+#: Slack over a profile's termination grace when waiting for in-flight stage
+#: bodies at shutdown. It covers the stage body's own bounded teardown wait
+#: plus DBOS's workflow bookkeeping, so a worker exits promptly after its
+#: children are reaped rather than hanging on a wedged one.
+TEARDOWN_MARGIN_SECONDS = 15
+
+
+def _teardown_timeout_seconds(profile: MachineProfile) -> int:
+    """How long shutdown waits for in-flight attempts to finish.
+
+    dr-exec gives a child ``termination_grace_seconds`` between SIGTERM and
+    SIGKILL, so a clean drain cannot be faster than that.
+    """
+    return math.ceil(profile.termination_grace_seconds) + TEARDOWN_MARGIN_SECONDS
 
 
 @dataclass(frozen=True, slots=True)
@@ -122,6 +139,7 @@ def worker_runtime(
     profile: MachineProfile,
     *,
     with_dispatcher: bool,
+    declare_queues: bool = True,
     max_recovery_attempts: int = DEFAULT_MAX_RECOVERY_ATTEMPTS,
     forward_signals: bool = True,
 ) -> Iterator[WorkerRuntime]:
@@ -131,6 +149,11 @@ def worker_runtime(
     in-flight attempts. It requires the main thread, so a test driving a
     worker from a helper thread turns it off and cancels the registry
     directly instead.
+
+    ``declare_queues`` is what separates a worker from a dispatcher. Declaring
+    a DBOS ``Queue`` starts a listener that dequeues and runs work, so a
+    dispatcher-only process must not declare any: it admits, reconciles, and
+    sweeps, and leaves execution to the workers.
     """
     app_version = application_version()
 
@@ -166,12 +189,13 @@ def worker_runtime(
         max_recovery_attempts=max_recovery_attempts,
     )
 
-    for queue_name in profile.dequeued_queue_names:
-        Queue(
-            queue_name.value,
-            priority_enabled=True,
-            worker_concurrency=profile.worker_concurrency,
-        )
+    if declare_queues:
+        for queue_name in profile.dequeued_queue_names:
+            Queue(
+                queue_name.value,
+                priority_enabled=True,
+                worker_concurrency=profile.worker_concurrency,
+            )
 
     with engine_for(profile) as engine:
         dispatcher = None
@@ -206,10 +230,20 @@ def worker_runtime(
         finally:
             if dispatcher is not None:
                 dispatcher.close()
+            # Stop in-flight attempts and wait for their stage bodies to
+            # finish before tearing DBOS down. `DBOS.destroy` defaults to a
+            # zero completion timeout, which would drop running workflows
+            # mid-attempt and leave their children to be swept later.
+            teardown_timeout = _teardown_timeout_seconds(profile)
+            cancellation.cancel_all()
+            cancellation.wait_for_idle(teardown_timeout)
             # Clear the decorator registry too: this runtime's wrapped stage
             # workflows and queues were declared into it, and DBOS rejects a
             # second declaration of the same name in one process.
-            DBOS.destroy(destroy_registry=True)
+            DBOS.destroy(
+                destroy_registry=True,
+                workflow_completion_timeout_sec=teardown_timeout,
+            )
 
 
 __all__ = [
@@ -217,6 +251,7 @@ __all__ = [
     "DEFAULT_MAX_RECOVERY_ATTEMPTS",
     "LOCAL_BATCH_SIZE",
     "LOCAL_POOL_SIZE",
+    "TEARDOWN_MARGIN_SECONDS",
     "WorkerRuntime",
     "ensure_stage_capacity",
     "worker_runtime",

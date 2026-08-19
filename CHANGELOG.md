@@ -29,6 +29,12 @@ CLI, and Hydra configuration with a durable stack:
 Removed `hydra-core` and `omegaconf`; added `dr-exec`, `dr-platform`,
 `dr-serialize`, `psycopg[binary]`, and `sqlalchemy`.
 
+Known limits of this phase: only the single-worker local setup is exercised
+(one live process per `executor_id`), and upgrading dr-exp, dr-platform,
+dr-exec, or dbos changes the pinned DBOS application version, so work still
+PENDING from the previous version is failed by the sweep as
+`stale_app_version`.
+
 Priority direction is dr-platform's: lower numbers run sooner and 0 is highest.
 dr-exp submits at a baseline of 100 so `dr_exp boost` can move work ahead.
 

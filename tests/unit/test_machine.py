@@ -7,6 +7,7 @@ from pathlib import Path
 from typing import Any
 
 import pytest
+import yaml
 from pydantic import ValidationError
 
 from dr_exp.config.job import ConfigError
@@ -133,6 +134,40 @@ def test_bundled_mini_profile_is_valid_for_this_machine() -> None:
     assert profile.name == "mini"
     assert profile.accelerator is Accelerator.MPS
     assert profile.database_url == profile.system_database_url
+
+
+def test_bundled_mini_profile_carries_no_machine_specific_literal_home() -> None:
+    """The shipped profile must survive a merge onto another checkout.
+
+    Its interpreter and roots are written with ``~`` so they resolve against
+    whoever runs it. Existence is deliberately not asserted: CI has no such
+    path, and the profile is not exercised there.
+    """
+    document = yaml.safe_load((BUNDLED / "mini.yaml").read_text())
+    for field in ("python_executable", "workspace_root", "run_store_root"):
+        assert document[field].startswith("~/"), field
+
+    profile = load_machine_profile("mini")
+    assert profile.python_executable.is_absolute()
+    assert profile.python_executable.is_relative_to(Path.home())
+    assert profile.workspace_root.is_relative_to(Path.home())
+
+
+def test_python_executable_expands_the_user_home(tmp_path: Path) -> None:
+    profile = make_profile(tmp_path, python_executable="~/some-venv/bin/python")
+    assert profile.python_executable == Path.home() / "some-venv/bin/python"
+
+
+def test_database_urls_must_name_one_database(tmp_path: Path) -> None:
+    """The ledger and the DBOS system tables must share a database.
+
+    dr-platform does not check this, so the profile does.
+    """
+    with pytest.raises(ValidationError, match="same database"):
+        make_profile(
+            tmp_path,
+            system_database_url="postgresql+psycopg:///dr_exp_other_test",
+        )
 
 
 def test_bundled_torch_profile_parses_as_declared_data() -> None:

@@ -118,6 +118,25 @@ class SweepSpec(BaseModel):
             raise ValueError(f"sweep grid axes must list at least one value: {empty}")
         return value
 
+    @field_validator("grid")
+    @classmethod
+    def _grid_axes_are_flat_param_names(
+        cls, value: dict[str, list[JsonValue]]
+    ) -> dict[str, list[JsonValue]]:
+        """Reject dotted axis names instead of creating a flat param for them.
+
+        Hydra read ``a.b`` as a path into nested config. This model does not:
+        an axis name is one ``params`` key, so ``a.b`` would silently produce a
+        literal ``"a.b"`` param that the trainer never reads.
+        """
+        dotted = sorted(name for name in value if "." in name)
+        if dotted:
+            raise ValueError(
+                f"sweep grid axes must be flat 'params' keys, not dotted paths: "
+                f"{dotted}"
+            )
+        return value
+
     def expand(self) -> tuple[JobConfig, ...]:
         """Return one ``JobConfig`` per point of the Cartesian grid.
 

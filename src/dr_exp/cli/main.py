@@ -56,7 +56,37 @@ def _fail(error: Exception) -> None:
     raise click.ClickException(str(error)) from error
 
 
-@click.group()
+class _OperatorErrorGroup(click.Group):
+    """A group that reports operator mistakes without a traceback.
+
+    Bad input reaches dr-exp as three unrelated exception families: pydantic
+    and dr-exp validation raise ``ValueError``, dr-platform's ledger conflicts
+    (``PipelineRunConflictError``, ``RegistrationClosureError``, and their
+    siblings) are ``RuntimeError``s, and inspection raises ``LookupError`` for
+    a key that does not exist. None of them is a dr-exp bug, so all of them
+    become a ``ClickException`` here rather than a stack trace at the terminal.
+    """
+
+    def invoke(self, ctx: click.Context) -> Any:  # noqa: ANN401 -- click's type
+        try:
+            return super().invoke(ctx)
+        except click.ClickException:
+            raise
+        except (LookupError, RuntimeError, ValueError) as error:
+            raise click.ClickException(_operator_message(error)) from error
+
+
+def _operator_message(error: Exception) -> str:
+    """Render an operator-facing message for a non-bug failure."""
+    message = str(error) or error.__class__.__name__
+    if isinstance(error, LookupError) and not isinstance(error, KeyError):
+        return message
+    if isinstance(error, KeyError):
+        return f"not found: {message}"
+    return message
+
+
+@click.group(cls=_OperatorErrorGroup)
 @click.version_option(package_name="dr-exp")
 def cli() -> None:
     """dr_exp - durable experiment manager for local and cluster training."""
@@ -548,7 +578,9 @@ def dispatcher(machine: str, deadline_seconds: float | None) -> None:
 
     profile = _profile(machine)
     click.echo(f"Dispatcher {profile.executor_id} on {profile.name}")
-    with worker_runtime(profile, with_dispatcher=True) as runtime:
+    # No queues: declaring one would start a listener and this process would
+    # execute training work as well as dispatch it.
+    with worker_runtime(profile, with_dispatcher=True, declare_queues=False) as runtime:
         drain_until(
             engine=runtime.engine,
             campaign_key=DEFAULT_CAMPAIGN_KEY,

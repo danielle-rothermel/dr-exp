@@ -8,10 +8,12 @@ evidence that something happened.
 from __future__ import annotations
 
 import json
+import os
 import threading
 import time
 from collections.abc import Callable, Iterator
 from pathlib import Path
+from typing import Any
 
 import pytest
 from dr_platform import StageExecutionState, set_work_priority
@@ -25,13 +27,31 @@ from dr_exp.platform import inspection
 from dr_exp.platform.drain import drain_until
 from dr_exp.platform.submission import submit_jobs
 from dr_exp.platform.worker import worker_runtime
-from dr_exp.training.dummy_trainer import STARTED_FILENAME
+from dr_exp.training.dummy_trainer import PID_FILENAME, STARTED_FILENAME
 
 pytestmark = pytest.mark.integration
 
 #: Watchdog for anything that should settle promptly. Exceeding it is a bug.
 WATCHDOG_SECONDS = 90.0
 POLL_SECONDS = 0.1
+
+#: Gate timeout for a trainer a test intends to cancel. It must comfortably
+#: exceed every watchdog that test waits on: a trainer that gives up on its own
+#: gate would exit without being torn down, and the cancellation assertions
+#: would pass without cancellation ever having worked.
+UNREACHABLE_GATE_TIMEOUT_SECONDS = 600.0
+
+#: How long a cancelled child may take to die. dr-exec sends SIGTERM and
+#: escalates to SIGKILL after the profile's termination grace, so this only
+#: needs to cover that window plus process reaping.
+CHILD_EXIT_WATCHDOG_SECONDS = 30.0
+
+#: How long the cancelled trainer spends "checkpointing" after SIGTERM. A real
+#: trainer does not exit instantly, and the stage body must not report
+#: CANCELLED until dr-exec has finished tearing the child down. Comfortably
+#: under the profile's termination grace, so SIGTERM -- not SIGKILL -- is what
+#: ends the child.
+TRAINER_SHUTDOWN_DELAY_SECONDS = 3.0
 
 CAMPAIGN = "itest"
 
@@ -56,6 +76,38 @@ def wait_until(
             return
         time.sleep(POLL_SECONDS)
     pytest.fail(f"timed out after {timeout}s waiting for {what}")
+
+
+def process_alive(pid: int) -> bool:
+    """Whether ``pid`` still names a live process.
+
+    Signal 0 performs the permission and existence checks without delivering
+    anything, which is the cheapest true liveness probe available here.
+    """
+    try:
+        os.kill(pid, 0)
+    except ProcessLookupError:
+        return False
+    except PermissionError:  # pragma: no cover -- same-user children only
+        return True
+    return True
+
+
+def read_evidence(engine: Engine, reference: str) -> dict[str, Any]:
+    """Resolve a stage-failure evidence reference to its stored document.
+
+    dr-platform writes evidence into dr-store and records only the reference,
+    so asserting on its content means reading it back the same way the
+    dispatcher wrote it.
+    """
+    from dr_store import ObjectStore, parse_object_reference
+    from dr_store.storage_backends.postgresql import PostgresBackend
+
+    store = ObjectStore(PostgresBackend.open_sync(engine))
+    with engine.connect() as connection:
+        document = store.get_enlisted(connection, parse_object_reference(reference))
+    assert isinstance(document, dict)
+    return document
 
 
 def states(engine: Engine) -> dict[str, StageExecutionState]:
@@ -209,7 +261,53 @@ def test_failing_trainer_records_failure_evidence(
     assert summary["outcome"] == "failed"
     assert summary["producer"] == "application_failure"
     assert "StageApplicationFailure" in str(summary["error_type"])
-    assert members[0].evidence_reference is not None
+
+    # The reference must actually resolve to dr-exec's own account of the
+    # failure. A trainer that raises never writes its JSON result, so dr-exec
+    # reports `protocol_failed` and attributes it to the payload -- not to the
+    # platform, which is the distinction an operator triages on.
+    reference = members[0].evidence_reference
+    assert reference is not None
+    evidence = read_evidence(engine, reference)
+    assert evidence["outcome"]["kind"] == "protocol_failed"
+    assert evidence["attribution"]["owner"] == "payload"
+    workspace = profile.workspace_for(compute_work_key(config), 1)
+    assert evidence["workspace"] == str(workspace)
+
+
+def test_a_non_json_trainer_result_is_attributed_to_the_payload(
+    profile: MachineProfile, engine: Engine
+) -> None:
+    """The other half of the trainer contract: the result must be strict JSON.
+
+    The trainer exits cleanly here, so the failure is caught at the result
+    boundary rather than by the process outcome.
+    """
+    config = base_config(return_non_json=True)
+    submit_jobs(
+        (config,),
+        campaign_key=CAMPAIGN,
+        run_key="non-json",
+        profile=profile,
+        engine=engine,
+    )
+
+    with worker_runtime(profile, with_dispatcher=True) as runtime:
+        drain_until(
+            engine=runtime.engine,
+            campaign_key=CAMPAIGN,
+            cancellation=runtime.cancellation,
+            max_jobs=1,
+            deadline_seconds=WATCHDOG_SECONDS,
+        )
+
+    assert states(engine) == {compute_work_key(config): StageExecutionState.FAILED}
+    members = inspection.failed_run_members(engine, run_key="non-json")
+    assert len(members) == 1
+    reference = members[0].evidence_reference
+    assert reference is not None
+    evidence = read_evidence(engine, reference)
+    assert evidence["attribution"]["owner"] == "payload"
 
 
 def test_cancelling_an_in_flight_attempt_stops_its_child(
@@ -220,7 +318,11 @@ def test_cancelling_an_in_flight_attempt_stops_its_child(
 
     engine = running_worker
     gate = tmp_path / "gate"
-    config = base_config(gate_file=str(gate), gate_timeout_seconds=WATCHDOG_SECONDS)
+    config = base_config(
+        gate_file=str(gate),
+        gate_timeout_seconds=UNREACHABLE_GATE_TIMEOUT_SECONDS,
+        shutdown_delay_seconds=TRAINER_SHUTDOWN_DELAY_SECONDS,
+    )
     key = compute_work_key(config)
     submit_jobs(
         (config,),
@@ -234,6 +336,10 @@ def test_cancelling_an_in_flight_attempt_stops_its_child(
     # presence is evidence the child is really running.
     started = profile.workspace_for(key, 1) / STARTED_FILENAME
     wait_until(started.exists, what="the trainer child to start")
+    # The trainer writes its PID before the started marker, so it is readable
+    # by the time that marker exists.
+    child_pid = int((profile.workspace_for(key, 1) / PID_FILENAME).read_text())
+    assert process_alive(child_pid), "the trainer child was gone before cancelling"
 
     item = inspection.resolve_work_item(engine, campaign_key=CAMPAIGN, work_key=key)
     client = DBOSClient(system_database_url=profile.system_database_url)
@@ -248,6 +354,17 @@ def test_cancelling_an_in_flight_attempt_stops_its_child(
     wait_until(
         lambda: states(engine).get(key) is StageExecutionState.CANCELLED,
         what="the work item to reach CANCELLED",
+    )
+    # The ledger saying CANCELLED proves nothing about the child: a trainer
+    # still blocked on its gate leaves exactly the same workspace behind, and
+    # its gate here outlasts every watchdog in this test, so the only way it
+    # exits is by being torn down. DBOS writes the CANCELLED row from its own
+    # poller before the stage body finishes, so this is a bounded wait rather
+    # than an immediate assertion.
+    wait_until(
+        lambda: not process_alive(child_pid),
+        what=f"the trainer child {child_pid} to be torn down",
+        timeout=CHILD_EXIT_WATCHDOG_SECONDS,
     )
     # The gate was never opened, so a surviving child would still be waiting
     # on it and could not have written a result.
@@ -279,3 +396,227 @@ def test_boost_lowers_priority_on_ready_work(
     after = inspection.work_item_stages(engine, work_item_id=item.work_item_id)
     assert after[0].execution.priority == 5
     assert after[0].execution.stage_execution_id in (result.updated_stage_execution_ids)
+
+
+def dbos_workflow_rows(engine: Engine) -> tuple[dict[str, Any], ...]:
+    """The DBOS rows for this pipeline's stage workflows, oldest first.
+
+    Priority only exists once admission enqueues a workflow, so this is where
+    the queue-level effect of `priority` is observable at all. dr-platform's
+    own scheduled dispatcher workflows share the table and are excluded by
+    queue name.
+    """
+    from sqlalchemy import text
+
+    from dr_exp.config.names import QueueName
+
+    train_queues = tuple(queue.value for queue in QueueName)
+    with engine.connect() as connection:
+        rows = connection.execute(
+            text(
+                "SELECT workflow_uuid, status, priority, started_at_epoch_ms "
+                "FROM dbos.workflow_status "
+                "WHERE queue_name = ANY(:queues) "
+                "ORDER BY started_at_epoch_ms"
+            ),
+            {"queues": list(train_queues)},
+        ).mappings()
+        return tuple(dict(row) for row in rows)
+
+
+def test_priority_orders_admitted_work_on_a_single_slot_worker(
+    profile: MachineProfile, engine: Engine, tmp_path: Path
+) -> None:
+    """Lower priority runs sooner, which is dr-platform's direction.
+
+    Both items are submitted before any worker exists and held behind one
+    concurrency slot, so the queue -- not submission order or timing -- decides
+    which trainer starts first. The urgent job is submitted *second* so that
+    passing cannot be an artifact of insertion order.
+    """
+    single_slot = profile.model_copy(update={"worker_concurrency": 1})
+    background = base_config(seed=1, priority_marker="background")
+    urgent = base_config(seed=2, priority_marker="urgent")
+    background_key = compute_work_key(background)
+    urgent_key = compute_work_key(urgent)
+
+    # One run: a run's expected member count is declared at submission, so
+    # both points must be registered together.
+    submit_jobs(
+        (
+            background.model_copy(update={"priority": 200}),
+            urgent.model_copy(update={"priority": 1}),
+        ),
+        campaign_key=CAMPAIGN,
+        run_key="priority",
+        profile=single_slot,
+        engine=engine,
+    )
+
+    with worker_runtime(single_slot, with_dispatcher=True) as runtime:
+        summary = drain_until(
+            engine=runtime.engine,
+            campaign_key=CAMPAIGN,
+            cancellation=runtime.cancellation,
+            max_jobs=2,
+            deadline_seconds=WATCHDOG_SECONDS,
+        )
+
+    assert summary.reached_limit
+    assert set(states(engine).values()) == {StageExecutionState.SUCCEEDED}
+
+    # The queue carried the priorities through to DBOS rather than defaulting
+    # them, which is what `priority_enabled=True` on the queue buys.
+    priorities = sorted(row["priority"] for row in dbos_workflow_rows(engine))
+    assert priorities == [1, 200]
+
+    # And the urgent job's trainer really started first.
+    urgent_started = single_slot.workspace_for(urgent_key, 1) / STARTED_FILENAME
+    background_started = single_slot.workspace_for(background_key, 1) / STARTED_FILENAME
+    assert urgent_started.stat().st_mtime_ns < background_started.stat().st_mtime_ns
+
+
+def test_boost_reprioritises_an_admitted_item_in_dbos(
+    profile: MachineProfile, running_worker: Engine, tmp_path: Path
+) -> None:
+    """Boost must reach the DBOS queue row, not just the dr-exp ledger.
+
+    An item is only enqueued once admission has run, so this boosts a job that
+    a live worker has already admitted and is holding on its gate.
+    """
+    engine = running_worker
+    gate = tmp_path / "boost-gate"
+    config = base_config(gate_file=str(gate), gate_timeout_seconds=WATCHDOG_SECONDS)
+    key = compute_work_key(config)
+    submit_jobs(
+        (config,),
+        campaign_key=CAMPAIGN,
+        run_key="boosted-live",
+        profile=profile,
+        engine=engine,
+    )
+
+    started = profile.workspace_for(key, 1) / STARTED_FILENAME
+    wait_until(started.exists, what="the trainer child to start")
+
+    rows = dbos_workflow_rows(engine)
+    assert len(rows) == 1
+    assert rows[0]["priority"] == config.priority
+
+    result = set_work_priority(
+        campaign_key=CAMPAIGN, work_key=key, priority=3, engine=engine
+    )
+    assert result.priority == 3
+
+    item = inspection.resolve_work_item(engine, campaign_key=CAMPAIGN, work_key=key)
+    stages = inspection.work_item_stages(engine, work_item_id=item.work_item_id)
+    assert stages[0].execution.priority == 3
+
+    # Let the trainer finish so the worker fixture can shut down cleanly.
+    gate.write_text("open")
+    wait_until(
+        lambda: states(engine).get(key) is StageExecutionState.SUCCEEDED,
+        what="the boosted work item to succeed",
+    )
+
+
+def test_retry_creates_a_new_attempt_that_can_succeed(
+    profile: MachineProfile, engine: Engine, tmp_path: Path
+) -> None:
+    """An operator retry is the recovery path for an application failure.
+
+    The trainer fails while a sentinel file is absent, so the first attempt
+    fails for a real reason and the retried attempt succeeds against the same
+    work item -- no resubmission, no new work key.
+    """
+    from dr_platform import retry_stage
+
+    sentinel = tmp_path / "trainer-fixed"
+    config = base_config(fail_until_file=str(sentinel))
+    key = compute_work_key(config)
+    submit_jobs(
+        (config,),
+        campaign_key=CAMPAIGN,
+        run_key="retried",
+        profile=profile,
+        engine=engine,
+    )
+
+    with worker_runtime(profile, with_dispatcher=True) as runtime:
+        drain_until(
+            engine=runtime.engine,
+            campaign_key=CAMPAIGN,
+            cancellation=runtime.cancellation,
+            max_jobs=1,
+            deadline_seconds=WATCHDOG_SECONDS,
+        )
+    assert states(engine) == {key: StageExecutionState.FAILED}
+
+    item = inspection.resolve_work_item(engine, campaign_key=CAMPAIGN, work_key=key)
+    failed = inspection.work_item_stages(engine, work_item_id=item.work_item_id)[0]
+    assert failed.execution.state is StageExecutionState.FAILED
+    assert len(failed.attempts) == 1
+
+    # Fix the trainer, then retry the failed stage.
+    sentinel.write_text("fixed")
+    result = retry_stage(failed.execution.stage_execution_id, engine=engine)
+    assert result.new_attempt.attempt_number == 2
+
+    with worker_runtime(profile, with_dispatcher=True) as runtime:
+        summary = drain_until(
+            engine=runtime.engine,
+            campaign_key=CAMPAIGN,
+            cancellation=runtime.cancellation,
+            max_jobs=1,
+            deadline_seconds=WATCHDOG_SECONDS,
+        )
+
+    assert summary.reached_limit, "the retried attempt did not finish"
+    assert states(engine) == {key: StageExecutionState.SUCCEEDED}
+
+    # The retry ran as a genuinely separate attempt, in its own workspace.
+    stages = inspection.work_item_stages(engine, work_item_id=item.work_item_id)
+    assert len(stages[0].attempts) == 2
+    written = json.loads((profile.workspace_for(key, 2) / RESULT_FILENAME).read_text())
+    assert written["attempt"] == 2
+    assert not (profile.workspace_for(key, 1) / RESULT_FILENAME).exists()
+
+
+def test_worker_shutdown_tears_down_its_in_flight_child(
+    profile: MachineProfile, engine: Engine, tmp_path: Path
+) -> None:
+    """Leaving `worker_runtime` must not strand a running trainer.
+
+    This is the shutdown path rather than the operator-cancel path: nothing
+    has cancelled the *workflow*, so DBOS is not reaping anything on dr-exp's
+    behalf. The worker cancels its own registry, waits for the stage bodies to
+    finish, and only then destroys the runtime -- so the child must be gone by
+    the time the context manager returns.
+    """
+    gate = tmp_path / "shutdown-gate"
+    config = base_config(
+        gate_file=str(gate),
+        gate_timeout_seconds=UNREACHABLE_GATE_TIMEOUT_SECONDS,
+        shutdown_delay_seconds=TRAINER_SHUTDOWN_DELAY_SECONDS,
+    )
+    key = compute_work_key(config)
+    submit_jobs(
+        (config,),
+        campaign_key=CAMPAIGN,
+        run_key="shutdown",
+        profile=profile,
+        engine=engine,
+    )
+
+    started = profile.workspace_for(key, 1) / STARTED_FILENAME
+    with worker_runtime(profile, with_dispatcher=True, forward_signals=False):
+        wait_until(started.exists, what="the trainer child to start")
+        child_pid = int((profile.workspace_for(key, 1) / PID_FILENAME).read_text())
+        assert process_alive(child_pid)
+
+    # The gate never opened, so the only thing that can have ended this child
+    # is the worker's own shutdown.
+    assert not gate.exists()
+    assert not process_alive(child_pid), (
+        f"worker shutdown returned while trainer child {child_pid} was still running"
+    )

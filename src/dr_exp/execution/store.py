@@ -9,6 +9,8 @@ the same machine can resolve a work item without another database round trip.
 from __future__ import annotations
 
 import json
+import os
+import uuid
 from pathlib import Path
 
 from dr_exp.config.job import ConfigError, JobConfig
@@ -23,9 +25,15 @@ def store_job_config(config: JobConfig, *, work_key: str, workspace_root: Path) 
     path = workspace_root / "configs" / f"{work_key}.json"
     path.parent.mkdir(parents=True, exist_ok=True)
     document = config.model_dump(mode="json")
-    temporary = path.with_name(f"{path.name}.tmp")
-    temporary.write_text(json.dumps(document, indent=2, sort_keys=True))
-    temporary.replace(path)
+    # A per-writer temp name: two processes submitting the same work key
+    # concurrently would otherwise share one scratch file and could rename a
+    # half-written document into place.
+    temporary = path.with_name(f"{path.name}.{os.getpid()}.{uuid.uuid4().hex}.tmp")
+    try:
+        temporary.write_text(json.dumps(document, indent=2, sort_keys=True))
+        temporary.replace(path)
+    finally:
+        temporary.unlink(missing_ok=True)
     return str(path)
 
 

@@ -155,6 +155,16 @@ def test_sweep_rejects_an_empty_axis() -> None:
         SweepSpec(base=make_config(), grid={"lr": []})
 
 
+def test_sweep_rejects_a_dotted_axis_name() -> None:
+    """A Hydra-style dotted path would silently become a flat literal key.
+
+    ``optim.lr`` used to address nested config. Here it would produce a param
+    named ``"optim.lr"`` that no trainer reads, so it is rejected outright.
+    """
+    with pytest.raises(ValidationError, match="not dotted paths"):
+        SweepSpec(base=make_config(), grid={"optim.lr": [0.1]})
+
+
 def test_load_job_config_reads_the_bundled_example() -> None:
     config = load_job_config(Path("configs/examples/dummy_train.yaml"))
     assert config.entry_point == VALID_ENTRY_POINT

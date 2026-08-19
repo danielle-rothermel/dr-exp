@@ -1,9 +1,11 @@
 # Danielle's Mac mini: the local-first development and smoke-test machine.
 name: mini
 accelerator: mps
-python_executable: /Users/daniellerothermel/drotherm/worktrees/dr-exp-phase3/.venv/bin/python
-workspace_root: /Users/daniellerothermel/drotherm/data/dr-exp/mini/workspace
-run_store_root: /Users/daniellerothermel/drotherm/data/dr-exp/mini/runs
+# Must be an interpreter with dr-exp installed: dr-exec runs children under
+# `python -I`, so PYTHONPATH cannot supply the trainer's package.
+python_executable: ~/drotherm/repos/dr-exp/.venv/bin/python
+workspace_root: ~/drotherm/data/dr-exp/mini/workspace
+run_store_root: ~/drotherm/data/dr-exp/mini/runs
 database_url: postgresql+psycopg:///dr_exp_dev
 system_database_url: postgresql+psycopg:///dr_exp_dev
 executor_id: mini-0
