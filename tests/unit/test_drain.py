@@ -134,4 +134,5 @@ def test_the_watchdog_reports_failure_to_make_progress(
 
     assert not summary.reached_limit
     assert not summary.interrupted
+    assert summary.deadline_expired
     assert summary.terminal_count == 0

@@ -56,6 +56,22 @@ def _fail(error: Exception) -> None:
     raise click.ClickException(str(error)) from error
 
 
+def _drain_failed(
+    summary: Any,  # noqa: ANN401 -- DrainSummary
+    *,
+    max_jobs: int | None,
+    deadline_seconds: float | None,
+) -> bool:
+    """Return whether a bounded drain ended in a failure state."""
+    if max_jobs is not None and not summary.reached_limit:
+        return True
+    return (
+        deadline_seconds is not None
+        and summary.deadline_expired
+        and not summary.interrupted
+    )
+
+
 class _OperatorErrorGroup(click.Group):
     """A group that reports operator mistakes without a traceback.
 
@@ -559,7 +575,9 @@ def worker(
         f"limit_reached={summary.reached_limit} "
         f"interrupted={summary.interrupted}"
     )
-    if max_jobs is not None and not summary.reached_limit:
+    if _drain_failed(
+        summary, max_jobs=max_jobs, deadline_seconds=deadline_seconds
+    ):
         sys.exit(1)
 
 
@@ -581,7 +599,7 @@ def dispatcher(machine: str, deadline_seconds: float | None) -> None:
     # No queues: declaring one would start a listener and this process would
     # execute training work as well as dispatch it.
     with worker_runtime(profile, with_dispatcher=True, declare_queues=False) as runtime:
-        drain_until(
+        summary = drain_until(
             engine=runtime.engine,
             campaign_key=DEFAULT_CAMPAIGN_KEY,
             cancellation=runtime.cancellation,
@@ -589,6 +607,10 @@ def dispatcher(machine: str, deadline_seconds: float | None) -> None:
             deadline_seconds=deadline_seconds,
         )
     click.echo("Dispatcher stopped.")
+    if _drain_failed(
+        summary, max_jobs=None, deadline_seconds=deadline_seconds
+    ):
+        sys.exit(1)
 
 
 def main() -> None:

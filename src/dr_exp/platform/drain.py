@@ -39,6 +39,7 @@ class DrainSummary:
     terminal_count: int
     reached_limit: bool
     interrupted: bool
+    deadline_expired: bool = False
 
 
 def terminal_work_keys(engine: Engine, *, campaign_key: str) -> frozenset[str]:
@@ -81,7 +82,10 @@ def drain_until(
     while True:
         if cancellation.shutting_down:
             return DrainSummary(
-                terminal_count=terminal, reached_limit=False, interrupted=True
+                terminal_count=terminal,
+                reached_limit=False,
+                interrupted=True,
+                deadline_expired=False,
             )
         if max_jobs is not None:
             current = terminal_work_keys(engine, campaign_key=campaign_key)
@@ -91,6 +95,7 @@ def drain_until(
                     terminal_count=terminal,
                     reached_limit=True,
                     interrupted=False,
+                    deadline_expired=False,
                 )
         if (
             deadline_seconds is not None
@@ -100,6 +105,7 @@ def drain_until(
                 terminal_count=terminal,
                 reached_limit=False,
                 interrupted=False,
+                deadline_expired=True,
             )
         stop.wait(POLL_INTERVAL_SECONDS)
 

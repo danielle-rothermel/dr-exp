@@ -2,7 +2,7 @@
 
 Every path, database URL, interpreter, and concurrency setting flows from a
 profile, so no dr-exp module hardcodes a machine-specific value. Profiles ship
-as YAML under ``configs/machines/`` and are addressed by bare name.
+as YAML under ``dr_exp.config.machines`` and are addressed by bare name.
 """
 
 from __future__ import annotations
@@ -19,8 +19,8 @@ from dr_exp.config.names import QUEUE_NAME_BY_ACCELERATOR, Accelerator, QueueNam
 #: dr-exec's SIGTERM-to-SIGKILL grace window for a training child process.
 DEFAULT_TERMINATION_GRACE_SECONDS = 30
 
-#: Directory of the bundled machine profiles, resolved from the repository.
-BUNDLED_PROFILE_DIR = Path(__file__).resolve().parents[3] / "configs" / "machines"
+#: Directory of the bundled machine profiles shipped inside the package.
+BUNDLED_PROFILE_DIR = Path(__file__).resolve().parent / "machines"
 
 
 class MachineProfile(BaseModel):

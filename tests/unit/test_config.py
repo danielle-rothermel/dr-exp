@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+import subprocess
+import sys
 from pathlib import Path
 
 import pytest
@@ -96,28 +98,50 @@ def test_budget_wall_time_must_be_positive() -> None:
 
 
 def test_entry_point_importability_accepts_the_dummy_trainer() -> None:
-    validate_entry_point_importable(make_config())
+    validate_entry_point_importable(
+        make_config(), python_executable=Path(sys.executable)
+    )
 
 
 def test_entry_point_importability_rejects_a_missing_module() -> None:
     with pytest.raises(ConfigError, match="not importable"):
         validate_entry_point_importable(
-            make_config(entry_point="dr_exp.no_such_module:train")
+            make_config(entry_point="dr_exp.no_such_module:train"),
+            python_executable=Path(sys.executable),
         )
 
 
 def test_entry_point_importability_rejects_a_missing_attribute() -> None:
     with pytest.raises(ConfigError, match="no attribute"):
         validate_entry_point_importable(
-            make_config(entry_point="dr_exp.training.dummy_trainer:absent")
+            make_config(entry_point="dr_exp.training.dummy_trainer:absent"),
+            python_executable=Path(sys.executable),
         )
 
 
 def test_entry_point_importability_rejects_a_non_callable() -> None:
     with pytest.raises(ConfigError, match="not callable"):
         validate_entry_point_importable(
-            make_config(entry_point="dr_exp.training.dummy_trainer:DEFAULT_EPOCHS")
+            make_config(entry_point="dr_exp.training.dummy_trainer:DEFAULT_EPOCHS"),
+            python_executable=Path(sys.executable),
         )
+
+
+def test_entry_point_importability_uses_the_profile_interpreter(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    calls: list[list[str]] = []
+
+    def fake_run(
+        args: list[str], *, capture_output: bool, text: bool, check: bool
+    ) -> subprocess.CompletedProcess[str]:
+        calls.append(args)
+        return subprocess.CompletedProcess(args, 0, "", "")
+
+    monkeypatch.setattr(subprocess, "run", fake_run)
+    other = Path("/opt/train-venv/bin/python")
+    validate_entry_point_importable(make_config(), python_executable=other)
+    assert calls[0][0] == str(other)
 
 
 def test_sweep_without_a_grid_is_a_single_point() -> None:

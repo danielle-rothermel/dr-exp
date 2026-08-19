@@ -35,6 +35,7 @@ from dr_exp.platform.pipeline import (
     PIPELINE_IDENTITY,
     TRAIN_STAGE_KEY,
     StageContext,
+    _await_teardown,
     build_pipeline,
     build_registry,
 )
@@ -209,6 +210,104 @@ async def test_a_failed_dr_exec_outcome_raises_a_stage_application_failure(
     )
     with pytest.raises(StageApplicationFailure):
         await run_stage_body(context, reference=stored_config)
+
+
+async def test_operator_cancellation_waits_for_teardown(
+    context: StageContext, stored_config: str, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """A cancelled stage body must call teardown before re-raising."""
+    teardown_calls = 0
+    release = asyncio.Event()
+
+    async def blocking_run_attempt(*_args: object, **_kwargs: object) -> None:
+        await release.wait()
+
+    async def counting_teardown(
+        attempt_task: asyncio.Task[object], *, grace_seconds: float
+    ) -> None:
+        nonlocal teardown_calls
+        teardown_calls += 1
+        attempt_task.cancel()
+        with pytest.raises(asyncio.CancelledError):
+            await attempt_task
+
+    monkeypatch.setattr(pipeline_module, "run_attempt", blocking_run_attempt)
+    monkeypatch.setattr(pipeline_module, "_await_teardown", counting_teardown)
+
+    body = asyncio.create_task(run_stage_body(context, reference=stored_config))
+    await asyncio.sleep(0.05)
+    body.cancel()
+    release.set()
+    with pytest.raises(asyncio.CancelledError):
+        await body
+    assert teardown_calls == 1
+
+
+async def test_await_teardown_waits_for_a_shielded_attempt_task() -> None:
+    finished = asyncio.Event()
+
+    async def attempt_work() -> None:
+        try:
+            await asyncio.sleep(0.1)
+        finally:
+            finished.set()
+
+    attempt_task = asyncio.create_task(attempt_work())
+    await asyncio.sleep(0.02)
+
+    async def cancelled_caller() -> None:
+        task = asyncio.current_task()
+        assert task is not None
+        task.cancel()
+        await _await_teardown(attempt_task, grace_seconds=1.0)
+
+    caller = asyncio.create_task(cancelled_caller())
+    with pytest.raises(asyncio.CancelledError):
+        await caller
+    await asyncio.wait_for(finished.wait(), timeout=1)
+    assert finished.is_set()
+
+
+async def test_concurrency_gate_limits_parallel_stage_bodies(
+    profile: MachineProfile, stored_config: str, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    gate = asyncio.Semaphore(1)
+    context = StageContext(
+        profile=profile,
+        cancellation=AttemptCancellationRegistry(),
+        concurrency=gate,
+    )
+    in_flight = 0
+    peak = 0
+    original_run_attempt = pipeline_module.run_attempt
+
+    async def slow_run_attempt(*args: object, **kwargs: object) -> object:
+        nonlocal in_flight, peak
+        in_flight += 1
+        peak = max(peak, in_flight)
+        await asyncio.sleep(0.05)
+        try:
+            return await original_run_attempt(*args, **kwargs)
+        finally:
+            in_flight -= 1
+
+    monkeypatch.setattr(
+        pipeline_module,
+        "build_executor",
+        lambda _profile: FakeExecutor(
+            [
+                completion(ExitedOutcome(exit_code=0), payload={"ok": True}),
+                completion(ExitedOutcome(exit_code=0), payload={"ok": True}),
+            ]
+        ),
+    )
+    monkeypatch.setattr(pipeline_module, "run_attempt", slow_run_attempt)
+
+    await asyncio.gather(
+        run_stage_body(context, reference=stored_config),
+        run_stage_body(context, reference=stored_config),
+    )
+    assert peak == 1
 
 
 def test_registry_cancels_registered_attempts() -> None:

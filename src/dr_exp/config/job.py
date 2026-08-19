@@ -7,8 +7,9 @@ config across a Cartesian grid.
 
 from __future__ import annotations
 
-import importlib
 import itertools
+import subprocess
+import sys
 from pathlib import Path
 from typing import Annotated, Any, Self
 
@@ -160,12 +161,61 @@ class SweepSpec(BaseModel):
         )
 
 
-def validate_entry_point_importable(config: JobConfig) -> None:
-    """Reject a job whose entry point cannot be imported and called.
+def validate_entry_point_importable(
+    config: JobConfig, *, python_executable: Path
+) -> None:
+    """Reject a job whose entry point cannot be imported in the training venv.
 
     Submission is the one place this is checked; the worker trusts the ledger.
+    Validation runs under ``python_executable``, not the CLI process, so a
+    controller can submit against a profile whose interpreter differs.
     """
     module_name, attribute_name = config.entry_point_parts
+    if python_executable == Path(sys.executable):
+        _validate_entry_point_in_process(module_name, attribute_name, config)
+        return
+
+    script = f"""
+import importlib
+import sys
+
+module_name = {module_name!r}
+attribute_name = {attribute_name!r}
+try:
+    module = importlib.import_module(module_name)
+except ImportError as error:
+    print(f"entry_point module is not importable: {{module_name!r}}: {{error}}")
+    sys.exit(1)
+try:
+    attribute = getattr(module, attribute_name)
+except AttributeError:
+    print(
+        f"entry_point module {{module_name!r}} has no attribute {{attribute_name!r}}"
+    )
+    sys.exit(2)
+if not callable(attribute):
+    print(f"entry_point {module_name}:{attribute_name!r} is not callable")
+    sys.exit(3)
+"""
+    result = subprocess.run(  # noqa: S603 -- interpreter comes from a validated profile
+        [str(python_executable), "-c", script],
+        capture_output=True,
+        text=True,
+        check=False,
+    )
+    if result.returncode == 0:
+        return
+    message = (
+        result.stderr.strip() or result.stdout.strip() or "entry_point check failed"
+    )
+    raise ConfigError(message)
+
+
+def _validate_entry_point_in_process(
+    module_name: str, attribute_name: str, config: JobConfig
+) -> None:
+    import importlib
+
     try:
         module = importlib.import_module(module_name)
     except ImportError as error:

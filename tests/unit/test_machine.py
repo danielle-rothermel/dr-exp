@@ -12,14 +12,13 @@ from pydantic import ValidationError
 
 from dr_exp.config.job import ConfigError
 from dr_exp.config.machine import (
+    BUNDLED_PROFILE_DIR,
     DEFAULT_TERMINATION_GRACE_SECONDS,
     MachineProfile,
     load_machine_profile,
     profile_path,
 )
 from dr_exp.config.names import Accelerator, QueueName
-
-BUNDLED = Path("configs/machines")
 
 
 def make_profile(tmp_path: Path, **overrides: Any) -> MachineProfile:  # noqa: ANN401
@@ -143,7 +142,7 @@ def test_bundled_mini_profile_carries_no_machine_specific_literal_home() -> None
     whoever runs it. Existence is deliberately not asserted: CI has no such
     path, and the profile is not exercised there.
     """
-    document = yaml.safe_load((BUNDLED / "mini.yaml").read_text())
+    document = yaml.safe_load((BUNDLED_PROFILE_DIR / "mini.yaml").read_text())
     for field in ("python_executable", "workspace_root", "run_store_root"):
         assert document[field].startswith("~/"), field
 
@@ -177,8 +176,18 @@ def test_bundled_torch_profile_parses_as_declared_data() -> None:
     assert profile.sweeping_executor_ids == frozenset({"torch-0"})
 
 
+def test_bundled_profile_dir_lives_inside_the_package() -> None:
+    assert BUNDLED_PROFILE_DIR.is_dir()
+    assert BUNDLED_PROFILE_DIR.name == "machines"
+    assert "dr_exp" in BUNDLED_PROFILE_DIR.parts
+    assert (BUNDLED_PROFILE_DIR / "mini.yaml").is_file()
+    assert (BUNDLED_PROFILE_DIR / "torch.yaml").is_file()
+
+
 def test_profile_path_resolves_bare_names_against_the_bundle() -> None:
-    assert profile_path("mini", directory=BUNDLED) == BUNDLED / "mini.yaml"
+    assert profile_path("mini", directory=BUNDLED_PROFILE_DIR) == (
+        BUNDLED_PROFILE_DIR / "mini.yaml"
+    )
     assert profile_path("/opt/custom.yaml") == Path("/opt/custom.yaml")
 
 

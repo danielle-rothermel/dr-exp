@@ -15,6 +15,7 @@ Startup order is load-bearing:
 
 from __future__ import annotations
 
+import asyncio
 import math
 from collections.abc import Callable, Iterator
 from contextlib import contextmanager
@@ -24,7 +25,7 @@ from dbos import DBOSConfig
 from sqlalchemy import Engine
 
 from dr_exp.config.machine import MachineProfile
-from dr_exp.config.names import LabelKey
+from dr_exp.config.names import LabelKey, QueueName
 from dr_exp.execution.cancellation import AttemptCancellationRegistry
 from dr_exp.platform.version import application_version
 
@@ -115,7 +116,7 @@ def ensure_stage_capacity(profile: MachineProfile, *, engine: Engine) -> None:
     )
     selectors = {tuple(sorted(control.selector.items())) for control in existing}
 
-    if () not in selectors:
+    if () not in selectors and profile.queue_name is QueueName.TRAIN_CPU:
         set_stage_capacity(
             pipeline=PIPELINE_IDENTITY,
             stage_key=TRAIN_STAGE_KEY,
@@ -124,7 +125,10 @@ def ensure_stage_capacity(profile: MachineProfile, *, engine: Engine) -> None:
         )
 
     accelerator_selector = {LabelKey.ACCELERATOR.value: profile.accelerator.value}
-    if tuple(sorted(accelerator_selector.items())) not in selectors:
+    if (
+        profile.queue_name is not QueueName.TRAIN_CPU
+        and tuple(sorted(accelerator_selector.items())) not in selectors
+    ):
         set_selector_capacity(
             pipeline=PIPELINE_IDENTITY,
             stage_key=TRAIN_STAGE_KEY,
@@ -184,8 +188,13 @@ def worker_runtime(
     )
 
     cancellation = AttemptCancellationRegistry()
+    concurrency = asyncio.Semaphore(profile.worker_concurrency)
     registry = build_registry(
-        StageContext(profile=profile, cancellation=cancellation),
+        StageContext(
+            profile=profile,
+            cancellation=cancellation,
+            concurrency=concurrency,
+        ),
         max_recovery_attempts=max_recovery_attempts,
     )
 

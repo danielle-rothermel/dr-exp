@@ -48,7 +48,9 @@ def submit_jobs(
     if not configs:
         raise ValueError("submission requires at least one job configuration")
     for config in configs:
-        validate_entry_point_importable(config)
+        validate_entry_point_importable(
+            config, python_executable=profile.python_executable
+        )
 
     members: list[RunMemberInput] = []
     seen: set[str] = set()
