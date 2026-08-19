@@ -141,6 +141,46 @@ def test_explicit_baseline_counts_a_key_that_finishes_during_startup(
     assert summary.terminal_count == 1
 
 
+def test_retried_work_that_was_terminal_at_baseline_counts_toward_the_limit(
+    ledger: list[list[FakeItem]],
+) -> None:
+    """An operator retry must count even when the key was FAILED at startup."""
+    failed = [item("retry-me", StageExecutionState.FAILED)]
+    ledger.extend(
+        [
+            failed,
+            [item("retry-me", StageExecutionState.ADMITTED)],
+            [item("retry-me", StageExecutionState.SUCCEEDED)],
+        ]
+    )
+
+    summary = drain(
+        1,
+        deadline_seconds=5,
+        already_terminal=frozenset({"retry-me"}),
+    )
+
+    assert summary.reached_limit
+    assert summary.terminal_count == 1
+
+
+def test_pre_existing_terminal_without_retry_does_not_count(
+    ledger: list[list[FakeItem]],
+) -> None:
+    failed = [item("stuck", StageExecutionState.FAILED)]
+    ledger.extend([failed, failed, failed])
+
+    summary = drain(
+        1,
+        deadline_seconds=0.3,
+        already_terminal=frozenset({"stuck"}),
+    )
+
+    assert not summary.reached_limit
+    assert summary.deadline_expired
+    assert summary.terminal_count == 0
+
+
 def test_the_watchdog_reports_failure_to_make_progress(
     ledger: list[list[FakeItem]],
 ) -> None:

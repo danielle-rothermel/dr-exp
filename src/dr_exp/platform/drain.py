@@ -56,6 +56,38 @@ def capture_drain_baseline(engine: Engine, *, campaign_key: str) -> frozenset[st
     return terminal_work_keys(engine, campaign_key=campaign_key)
 
 
+def _work_item_states(
+    engine: Engine, *, campaign_key: str
+) -> dict[str, StageExecutionState]:
+    return {
+        item.work_key.value: item.state
+        for item in list_work_items(campaign_key, engine=engine)
+    }
+
+
+def _count_completions_during_drain(
+    *,
+    states: dict[str, StageExecutionState],
+    baseline_terminal: frozenset[str],
+    seen_nonterminal: set[str],
+    counted: set[str],
+) -> int:
+    """Count work keys that newly reached a terminal state during this drain.
+
+    Keys that were already terminal at the baseline snapshot are ignored unless
+    this drain observed them leave a non-terminal state first, which covers an
+    operator retry while the worker is running.
+    """
+    for key, state in states.items():
+        if state not in TERMINAL_STATES:
+            seen_nonterminal.add(key)
+        elif key not in counted and (
+            key not in baseline_terminal or key in seen_nonterminal
+        ):
+            counted.add(key)
+    return len(counted)
+
+
 def drain_until(
     *,
     engine: Engine,
@@ -67,11 +99,10 @@ def drain_until(
 ) -> DrainSummary:
     """Block until ``max_jobs`` items finish during this drain.
 
-    ``max_jobs`` counts work items that become terminal after the drain
-    starts, measured against a snapshot taken here. Counting every terminal
-    item in the campaign instead would let a campaign with old finished work
-    satisfy the limit immediately, so a smoke run would exit before it ran
-    anything.
+    ``max_jobs`` counts work items that reach a terminal state during this
+    drain. A pre-launch baseline excludes work that was already terminal when
+    the worker started, but a retried item that was terminal at baseline and
+    later observed non-terminal counts again when it finishes.
 
     With ``max_jobs=None`` this waits for a shutdown signal. ``deadline_seconds``
     is a watchdog for tests and smoke runs: reaching it is a failure to make
@@ -79,12 +110,17 @@ def drain_until(
     """
     stop = threading.Event()
     started_at = time.monotonic()
-    if already_terminal is None:
-        already_terminal = (
+    baseline_terminal = (
+        already_terminal
+        if already_terminal is not None
+        else (
             terminal_work_keys(engine, campaign_key=campaign_key)
             if max_jobs is not None
             else frozenset()
         )
+    )
+    seen_nonterminal: set[str] = set()
+    counted: set[str] = set()
     terminal = 0
     while True:
         if cancellation.shutting_down:
@@ -95,8 +131,12 @@ def drain_until(
                 deadline_expired=False,
             )
         if max_jobs is not None:
-            current = terminal_work_keys(engine, campaign_key=campaign_key)
-            terminal = len(current - already_terminal)
+            terminal = _count_completions_during_drain(
+                states=_work_item_states(engine, campaign_key=campaign_key),
+                baseline_terminal=baseline_terminal,
+                seen_nonterminal=seen_nonterminal,
+                counted=counted,
+            )
             if terminal >= max_jobs:
                 return DrainSummary(
                     terminal_count=terminal,
