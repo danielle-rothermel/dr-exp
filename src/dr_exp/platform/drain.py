@@ -41,15 +41,6 @@ class DrainSummary:
     interrupted: bool
 
 
-def count_terminal_work_items(engine: Engine, *, campaign_key: str) -> int:
-    """Count work items of one campaign that have reached a terminal state."""
-    return sum(
-        1
-        for item in list_work_items(campaign_key, engine=engine)
-        if item.state in TERMINAL_STATES
-    )
-
-
 def terminal_work_keys(engine: Engine, *, campaign_key: str) -> frozenset[str]:
     """The work keys of one campaign that have already reached a terminal state."""
     return frozenset(
@@ -117,7 +108,6 @@ __all__ = [
     "POLL_INTERVAL_SECONDS",
     "TERMINAL_STATES",
     "DrainSummary",
-    "count_terminal_work_items",
     "drain_until",
     "terminal_work_keys",
 ]

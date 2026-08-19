@@ -372,6 +372,46 @@ def test_cancelling_an_in_flight_attempt_stops_its_child(
     assert not (profile.workspace_for(key, 1) / RESULT_FILENAME).exists()
 
 
+def declared_train_queues() -> frozenset[str]:
+    """The train queues this process has declared to DBOS.
+
+    Declaring a DBOS ``Queue`` is what starts a listener thread, and the
+    in-memory registry is where that declaration lands -- so it, not the
+    database, is where "did this process declare a queue" is answerable.
+    """
+    from dbos._dbos import _get_or_create_dbos_registry
+
+    from dr_exp.config.names import QueueName
+
+    declared = frozenset(_get_or_create_dbos_registry().queue_info_map)
+    return declared & frozenset(queue.value for queue in QueueName)
+
+
+def test_a_dispatcher_only_runtime_declares_no_train_queue(
+    profile: MachineProfile, engine: Engine
+) -> None:
+    """`declare_queues=False` is the whole difference between the two roles.
+
+    A declared queue starts a listener that dequeues and runs work, so a
+    dispatcher that declared one would execute training work as well as
+    dispatch it -- silently, since nothing else about the process changes.
+    """
+    with worker_runtime(
+        profile, with_dispatcher=True, declare_queues=False, forward_signals=False
+    ):
+        assert declared_train_queues() == frozenset()
+
+
+def test_a_worker_runtime_declares_the_queues_it_drains(
+    profile: MachineProfile, engine: Engine
+) -> None:
+    """The control for the test above: the default really does declare them."""
+    with worker_runtime(profile, with_dispatcher=True, forward_signals=False):
+        assert declared_train_queues() == frozenset(
+            queue.value for queue in profile.dequeued_queue_names
+        )
+
+
 def test_boost_lowers_priority_on_ready_work(
     profile: MachineProfile, engine: Engine
 ) -> None:
@@ -511,6 +551,13 @@ def test_boost_reprioritises_an_admitted_item_in_dbos(
     item = inspection.resolve_work_item(engine, campaign_key=CAMPAIGN, work_key=key)
     stages = inspection.work_item_stages(engine, work_item_id=item.work_item_id)
     assert stages[0].execution.priority == 3
+
+    # The dr-exp ledger agreeing is not the claim under test: a boost that
+    # never reached DBOS would leave the queue row at its original priority
+    # and the item would still be dequeued in its old order.
+    boosted = dbos_workflow_rows(engine)
+    assert len(boosted) == 1
+    assert boosted[0]["priority"] == 3
 
     # Let the trainer finish so the worker fixture can shut down cleanly.
     gate.write_text("open")

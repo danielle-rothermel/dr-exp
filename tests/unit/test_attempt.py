@@ -4,8 +4,6 @@ from __future__ import annotations
 
 import json
 import sys
-import uuid
-from datetime import UTC, datetime
 from pathlib import Path
 from typing import Any
 
@@ -13,27 +11,13 @@ import pytest
 from dr_exec import (
     CancelToken,
     CancelledOutcome,
-    CompletedExecution,
     EnvGrantKind,
-    ExecutionAttribution,
-    ExecutionId,
-    ExecutionMeasurements,
-    ExecutionOutcome,
-    ExecutionResult,
     ExitedOutcome,
-    FailureOwner,
     FakeExecutor,
-    FakeRecordReceipt,
-    JobId,
     LimitKind,
-    PayloadOutputs,
-    RetainedPayloadStream,
     TrustedPythonTarget,
     WorkingDirectoryGrantKind,
 )
-from dr_exec.importable_json import ENVELOPE_SCHEMA, ENVELOPE_SCHEMA_VERSION
-from dr_exec.recording.references import attempt_id_for_job
-from dr_serialize import Jsonable, build_identity_document
 
 from dr_exp.config.job import Budgets, JobConfig
 from dr_exp.config.machine import MachineProfile
@@ -45,6 +29,7 @@ from dr_exp.execution.attempt import (
     run_attempt,
 )
 from dr_exp.execution.store import load_job_config_reference, store_job_config
+from tests.unit.conftest import make_completion
 
 CONFIG = JobConfig(
     entry_point="dr_exp.training.dummy_trainer:train",
@@ -67,50 +52,6 @@ def profile(tmp_path: Path) -> MachineProfile:
             "executor_id": "test-0",
             "worker_concurrency": 1,
         }
-    )
-
-
-def make_completion(
-    outcome: ExecutionOutcome, *, payload: Jsonable | None = None
-) -> CompletedExecution:
-    """Build a scripted completion a ``FakeExecutor`` will accept."""
-    job_id = JobId(uuid.uuid4())
-    execution_id = ExecutionId(job_id=job_id, attempt_id=attempt_id_for_job(job_id))
-    now = datetime.now(UTC)
-    empty = RetainedPayloadStream(head=b"", tail=b"", produced_bytes=0, dropped_bytes=0)
-    outputs = (
-        ()
-        if payload is None
-        else (
-            build_identity_document(
-                schema=ENVELOPE_SCHEMA,
-                schema_version=ENVELOPE_SCHEMA_VERSION,
-                payload=payload,
-            ),
-        )
-    )
-    owner = (
-        FailureOwner.NONE
-        if isinstance(outcome, ExitedOutcome) and outcome.exit_code == 0
-        else FailureOwner.PAYLOAD
-    )
-    return CompletedExecution(
-        result=ExecutionResult(
-            execution_id=execution_id,
-            outcome=outcome,
-            attribution=ExecutionAttribution(owner=owner),
-            protocol_outputs=outputs,
-            payload_outputs=PayloadOutputs(stdout=empty, stderr=empty),
-            measurements=ExecutionMeasurements(
-                started_at=now,
-                finished_at=now,
-                duration_ns=0,
-                teardown_duration_ns=0,
-                input_bytes=0,
-                protocol_bytes_received=0,
-            ),
-        ),
-        record_receipt=FakeRecordReceipt(execution_id=execution_id),
     )
 
 

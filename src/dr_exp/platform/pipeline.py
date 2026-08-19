@@ -86,14 +86,19 @@ async def _await_teardown(
     coroutine would otherwise cancel it again immediately. A timeout here
     means dr-exec did not reap the child within its own budget: the stage
     still reports cancellation, since blocking the worker forever is worse
-    than a possibly-surviving child.
+    than a possibly-surviving child. The shield means the timeout leaves the
+    attempt task running, so it is cancelled explicitly rather than left
+    pending on a loop nobody will await again.
     """
     try:
         await asyncio.wait_for(
             asyncio.shield(attempt_task),
             timeout=grace_seconds + TEARDOWN_MARGIN_SECONDS,
         )
-    except (TimeoutError, asyncio.CancelledError):
+    except TimeoutError:
+        attempt_task.cancel()
+        return
+    except asyncio.CancelledError:
         return
     except Exception:
         return

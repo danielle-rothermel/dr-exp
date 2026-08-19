@@ -2,17 +2,22 @@
 
 from __future__ import annotations
 
+import asyncio
 import sys
 import threading
 from pathlib import Path
+from typing import Any
 
 import pytest
+from dr_exec import CancelledOutcome, ExitedOutcome, FakeExecutor
 from dr_platform import (
     PipelineRegistry,
+    StageApplicationFailure,
     resolve_stage_queue_name,
     selector_matches,
 )
 
+from dr_exp.config.job import JobConfig
 from dr_exp.config.machine import MachineProfile
 from dr_exp.config.names import (
     PIPELINE_KEY,
@@ -23,6 +28,8 @@ from dr_exp.config.names import (
     QueueName,
 )
 from dr_exp.execution.cancellation import AttemptCancellationRegistry
+from dr_exp.execution.store import store_job_config
+from dr_exp.platform import pipeline as pipeline_module
 from dr_exp.platform.pipeline import (
     LABEL_QUEUE_ROUTES,
     PIPELINE_IDENTITY,
@@ -32,6 +39,7 @@ from dr_exp.platform.pipeline import (
     build_registry,
 )
 from dr_exp.platform.registry import submission_registry
+from tests.unit.conftest import make_completion as completion
 
 
 @pytest.fixture
@@ -130,6 +138,77 @@ def test_submission_registry_declares_the_same_identity_and_routing() -> None:
     assert stage.key == TRAIN_STAGE_KEY
     assert stage.queue_name == QueueName.TRAIN_CPU.value
     assert stage.label_queue_routes == LABEL_QUEUE_ROUTES
+
+
+def admission_payload(reference: str) -> Any:  # noqa: ANN401
+    """The dr-platform payload the stage body is invoked with."""
+    from dr_platform import AdmissionPayload, CampaignKey, RunKey, StageKey, WorkKey
+
+    return AdmissionPayload(
+        campaign_key=CampaignKey(value="unit"),
+        work_key=WorkKey(value="abc"),
+        work_item_id=1,
+        origin_run_key=RunKey(value="run"),
+        input_reference=reference,
+        labels={LabelKey.ACCELERATOR.value: Accelerator.CPU.value},
+        pipeline_key=PIPELINE_KEY,
+        pipeline_version=PIPELINE_VERSION,
+        stage_key=StageKey(value=STAGE_KEY),
+        stage_index=0,
+        attempt_number=1,
+    )
+
+
+async def run_stage_body(context: StageContext, *, reference: str) -> None:
+    """Invoke the stage body once; the patched executor supplies the outcome."""
+    await build_pipeline(context).stages[0].workflow(admission_payload(reference))
+
+
+@pytest.fixture
+def stored_config(profile: MachineProfile) -> str:
+    """A stored job config the stage body can resolve by reference."""
+    config = JobConfig(
+        entry_point="dr_exp.training.dummy_trainer:train",
+        params={"epochs": 1},
+        labels={LabelKey.ACCELERATOR.value: Accelerator.CPU.value},
+    )
+    return store_job_config(
+        config, work_key="abc", workspace_root=profile.workspace_root
+    )
+
+
+async def test_a_cancelled_dr_exec_outcome_raises_cancelled_error(
+    context: StageContext, stored_config: str, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """A cancelled attempt is cancelled work, not failed work.
+
+    dr-platform decides the terminal ledger state from what the stage body
+    raises: `CancelledError` records CANCELLED, while `StageApplicationFailure`
+    records FAILED and puts the item in front of an operator. dr-exec reporting
+    a `CancelledOutcome` means the child was torn down on request, so the two
+    must not be conflated -- hence the explicit `pytest.raises` on the exact
+    type rather than a `not StageApplicationFailure` assertion.
+    """
+    monkeypatch.setattr(
+        pipeline_module,
+        "build_executor",
+        lambda _profile: FakeExecutor([completion(CancelledOutcome())]),
+    )
+    with pytest.raises(asyncio.CancelledError):
+        await run_stage_body(context, reference=stored_config)
+
+
+async def test_a_failed_dr_exec_outcome_raises_a_stage_application_failure(
+    context: StageContext, stored_config: str, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """The other side of that branch: a real failure must still reach FAILED."""
+    monkeypatch.setattr(
+        pipeline_module,
+        "build_executor",
+        lambda _profile: FakeExecutor([completion(ExitedOutcome(exit_code=1))]),
+    )
+    with pytest.raises(StageApplicationFailure):
+        await run_stage_body(context, reference=stored_config)
 
 
 def test_registry_cancels_registered_attempts() -> None:
