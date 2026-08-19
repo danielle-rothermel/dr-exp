@@ -9,7 +9,6 @@ from __future__ import annotations
 
 import itertools
 import subprocess
-import sys
 from pathlib import Path
 from typing import Annotated, Any, Self
 
@@ -167,14 +166,10 @@ def validate_entry_point_importable(
     """Reject a job whose entry point cannot be imported in the training venv.
 
     Submission is the one place this is checked; the worker trusts the ledger.
-    Validation runs under ``python_executable``, not the CLI process, so a
-    controller can submit against a profile whose interpreter differs.
+    Validation runs under ``python_executable -I``, matching dr-exec's
+    isolated child interpreter.
     """
     module_name, attribute_name = config.entry_point_parts
-    if python_executable == Path(sys.executable):
-        _validate_entry_point_in_process(module_name, attribute_name, config)
-        return
-
     script = f"""
 import importlib
 import sys
@@ -198,7 +193,7 @@ if not callable(attribute):
     sys.exit(3)
 """
     result = subprocess.run(  # noqa: S603 -- interpreter comes from a validated profile
-        [str(python_executable), "-c", script],
+        [str(python_executable), "-I", "-c", script],
         capture_output=True,
         text=True,
         check=False,
@@ -209,27 +204,6 @@ if not callable(attribute):
         result.stderr.strip() or result.stdout.strip() or "entry_point check failed"
     )
     raise ConfigError(message)
-
-
-def _validate_entry_point_in_process(
-    module_name: str, attribute_name: str, config: JobConfig
-) -> None:
-    import importlib
-
-    try:
-        module = importlib.import_module(module_name)
-    except ImportError as error:
-        raise ConfigError(
-            f"entry_point module is not importable: {module_name!r}: {error}"
-        ) from error
-    try:
-        attribute = getattr(module, attribute_name)
-    except AttributeError as error:
-        raise ConfigError(
-            f"entry_point module {module_name!r} has no attribute {attribute_name!r}"
-        ) from error
-    if not callable(attribute):
-        raise ConfigError(f"entry_point {config.entry_point!r} is not callable")
 
 
 def _load_yaml_mapping(path: Path) -> dict[str, Any]:

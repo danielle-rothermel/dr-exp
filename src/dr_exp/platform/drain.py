@@ -51,6 +51,11 @@ def terminal_work_keys(engine: Engine, *, campaign_key: str) -> frozenset[str]:
     )
 
 
+def capture_drain_baseline(engine: Engine, *, campaign_key: str) -> frozenset[str]:
+    """Snapshot terminal work keys before ``DBOS.launch()`` starts queue listeners."""
+    return terminal_work_keys(engine, campaign_key=campaign_key)
+
+
 def drain_until(
     *,
     engine: Engine,
@@ -58,6 +63,7 @@ def drain_until(
     cancellation: AttemptCancellationRegistry,
     max_jobs: int | None,
     deadline_seconds: float | None = None,
+    already_terminal: frozenset[str] | None = None,
 ) -> DrainSummary:
     """Block until ``max_jobs`` items finish during this drain.
 
@@ -73,11 +79,12 @@ def drain_until(
     """
     stop = threading.Event()
     started_at = time.monotonic()
-    already_terminal = (
-        terminal_work_keys(engine, campaign_key=campaign_key)
-        if max_jobs is not None
-        else frozenset()
-    )
+    if already_terminal is None:
+        already_terminal = (
+            terminal_work_keys(engine, campaign_key=campaign_key)
+            if max_jobs is not None
+            else frozenset()
+        )
     terminal = 0
     while True:
         if cancellation.shutting_down:
@@ -114,6 +121,7 @@ __all__ = [
     "POLL_INTERVAL_SECONDS",
     "TERMINAL_STATES",
     "DrainSummary",
+    "capture_drain_baseline",
     "drain_until",
     "terminal_work_keys",
 ]

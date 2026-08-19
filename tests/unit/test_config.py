@@ -127,6 +127,24 @@ def test_entry_point_importability_rejects_a_non_callable() -> None:
         )
 
 
+def test_entry_point_importability_uses_isolated_subprocess_with_dash_i(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    calls: list[list[str]] = []
+
+    def fake_run(
+        args: list[str], *, capture_output: bool, text: bool, check: bool
+    ) -> subprocess.CompletedProcess[str]:
+        calls.append(args)
+        return subprocess.CompletedProcess(args, 0, "", "")
+
+    monkeypatch.setattr(subprocess, "run", fake_run)
+    validate_entry_point_importable(
+        make_config(), python_executable=Path(sys.executable)
+    )
+    assert calls[0][:3] == [str(Path(sys.executable)), "-I", "-c"]
+
+
 def test_entry_point_importability_uses_the_profile_interpreter(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
@@ -142,6 +160,7 @@ def test_entry_point_importability_uses_the_profile_interpreter(
     other = Path("/opt/train-venv/bin/python")
     validate_entry_point_importable(make_config(), python_executable=other)
     assert calls[0][0] == str(other)
+    assert calls[0][1] == "-I"
 
 
 def test_sweep_without_a_grid_is_a_single_point() -> None:

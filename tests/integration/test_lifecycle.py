@@ -9,6 +9,7 @@ from __future__ import annotations
 
 import json
 import os
+import sys
 import threading
 import time
 from collections.abc import Callable, Iterator
@@ -20,11 +21,11 @@ from dr_platform import StageExecutionState, set_work_priority
 from sqlalchemy import Engine
 
 from dr_exp.config.identity import work_key as compute_work_key
-from dr_exp.config.job import JobConfig, SweepSpec
-from dr_exp.config.machine import MachineProfile
+from dr_exp.config.job import JobConfig, SweepSpec, load_job_config
+from dr_exp.config.machine import MachineProfile, load_machine_profile
 from dr_exp.execution.attempt import RESULT_FILENAME
 from dr_exp.platform import inspection
-from dr_exp.platform.drain import drain_until
+from dr_exp.platform.drain import DrainSummary, capture_drain_baseline, drain_until
 from dr_exp.platform.submission import submit_jobs
 from dr_exp.platform.worker import worker_runtime
 from dr_exp.training.dummy_trainer import PID_FILENAME, STARTED_FILENAME
@@ -115,6 +116,26 @@ def states(engine: Engine) -> dict[str, StageExecutionState]:
         item.work_key.value: item.state
         for item in inspection.work_items(engine, campaign_key=CAMPAIGN)
     }
+
+
+def run_bounded_worker(
+    profile: MachineProfile,
+    engine: Engine,
+    *,
+    max_jobs: int,
+    deadline_seconds: float = WATCHDOG_SECONDS,
+) -> DrainSummary:
+    """Run a worker until ``max_jobs`` items finish, with a pre-launch baseline."""
+    baseline = capture_drain_baseline(engine, campaign_key=CAMPAIGN)
+    with worker_runtime(profile, with_dispatcher=True) as runtime:
+        return drain_until(
+            engine=runtime.engine,
+            campaign_key=CAMPAIGN,
+            cancellation=runtime.cancellation,
+            max_jobs=max_jobs,
+            deadline_seconds=deadline_seconds,
+            already_terminal=baseline,
+        )
 
 
 @pytest.fixture
@@ -210,14 +231,7 @@ def test_worker_runs_a_sweep_to_success(
         engine=engine,
     )
 
-    with worker_runtime(profile, with_dispatcher=True) as runtime:
-        summary = drain_until(
-            engine=runtime.engine,
-            campaign_key=CAMPAIGN,
-            cancellation=runtime.cancellation,
-            max_jobs=2,
-            deadline_seconds=WATCHDOG_SECONDS,
-        )
+    summary = run_bounded_worker(profile, engine, max_jobs=2)
 
     assert summary.reached_limit, "sweep did not finish within the watchdog"
     assert set(states(engine).values()) == {StageExecutionState.SUCCEEDED}
@@ -242,14 +256,7 @@ def test_failing_trainer_records_failure_evidence(
         engine=engine,
     )
 
-    with worker_runtime(profile, with_dispatcher=True) as runtime:
-        drain_until(
-            engine=runtime.engine,
-            campaign_key=CAMPAIGN,
-            cancellation=runtime.cancellation,
-            max_jobs=1,
-            deadline_seconds=WATCHDOG_SECONDS,
-        )
+    run_bounded_worker(profile, engine, max_jobs=1)
 
     assert states(engine) == {compute_work_key(config): StageExecutionState.FAILED}
     # Terminal summaries and evidence references are only populated on the
@@ -292,14 +299,7 @@ def test_a_non_json_trainer_result_is_attributed_to_the_payload(
         engine=engine,
     )
 
-    with worker_runtime(profile, with_dispatcher=True) as runtime:
-        drain_until(
-            engine=runtime.engine,
-            campaign_key=CAMPAIGN,
-            cancellation=runtime.cancellation,
-            max_jobs=1,
-            deadline_seconds=WATCHDOG_SECONDS,
-        )
+    run_bounded_worker(profile, engine, max_jobs=1)
 
     assert states(engine) == {compute_work_key(config): StageExecutionState.FAILED}
     members = inspection.failed_run_members(engine, run_key="non-json")
@@ -493,14 +493,7 @@ def test_priority_orders_admitted_work_on_a_single_slot_worker(
         engine=engine,
     )
 
-    with worker_runtime(single_slot, with_dispatcher=True) as runtime:
-        summary = drain_until(
-            engine=runtime.engine,
-            campaign_key=CAMPAIGN,
-            cancellation=runtime.cancellation,
-            max_jobs=2,
-            deadline_seconds=WATCHDOG_SECONDS,
-        )
+    summary = run_bounded_worker(single_slot, engine, max_jobs=2)
 
     assert summary.reached_limit
     assert set(states(engine).values()) == {StageExecutionState.SUCCEEDED}
@@ -589,14 +582,7 @@ def test_retry_creates_a_new_attempt_that_can_succeed(
         engine=engine,
     )
 
-    with worker_runtime(profile, with_dispatcher=True) as runtime:
-        drain_until(
-            engine=runtime.engine,
-            campaign_key=CAMPAIGN,
-            cancellation=runtime.cancellation,
-            max_jobs=1,
-            deadline_seconds=WATCHDOG_SECONDS,
-        )
+    run_bounded_worker(profile, engine, max_jobs=1)
     assert states(engine) == {key: StageExecutionState.FAILED}
 
     item = inspection.resolve_work_item(engine, campaign_key=CAMPAIGN, work_key=key)
@@ -609,14 +595,7 @@ def test_retry_creates_a_new_attempt_that_can_succeed(
     result = retry_stage(failed.execution.stage_execution_id, engine=engine)
     assert result.new_attempt.attempt_number == 2
 
-    with worker_runtime(profile, with_dispatcher=True) as runtime:
-        summary = drain_until(
-            engine=runtime.engine,
-            campaign_key=CAMPAIGN,
-            cancellation=runtime.cancellation,
-            max_jobs=1,
-            deadline_seconds=WATCHDOG_SECONDS,
-        )
+    summary = run_bounded_worker(profile, engine, max_jobs=1)
 
     assert summary.reached_limit, "the retried attempt did not finish"
     assert states(engine) == {key: StageExecutionState.SUCCEEDED}
@@ -627,6 +606,46 @@ def test_retry_creates_a_new_attempt_that_can_succeed(
     written = json.loads((profile.workspace_for(key, 2) / RESULT_FILENAME).read_text())
     assert written["attempt"] == 2
     assert not (profile.workspace_for(key, 1) / RESULT_FILENAME).exists()
+
+
+def test_mini_worker_runs_a_cpu_labelled_example_job(
+    tmp_path: Path, clean_database: str
+) -> None:
+    """The documented quick start uses MPS ``mini`` with CPU-labelled jobs."""
+    from dr_exp.platform.database import build_engine, initialize_schema
+
+    mini = load_machine_profile("mini").model_copy(
+        update={
+            "python_executable": sys.executable,
+            "workspace_root": tmp_path / "workspace",
+            "run_store_root": tmp_path / "runs",
+            "database_url": clean_database,
+            "system_database_url": clean_database,
+            "executor_id": "mini-itest-0",
+        }
+    )
+    initialize_schema(mini)
+    engine = build_engine(mini)
+    try:
+        config = load_job_config(Path("configs/examples/dummy_train.yaml"))
+        key = compute_work_key(config)
+        submit_jobs(
+            (config,),
+            campaign_key=CAMPAIGN,
+            run_key="mini-cpu",
+            profile=mini,
+            engine=engine,
+        )
+
+        summary = run_bounded_worker(mini, engine, max_jobs=1)
+
+        assert summary.reached_limit, "mini worker did not finish the CPU-labelled job"
+        assert states(engine) == {key: StageExecutionState.SUCCEEDED}
+        written = json.loads((mini.workspace_for(key, 1) / RESULT_FILENAME).read_text())
+        assert written["work_key"] == key
+        assert written["epochs_completed"] == config.params["epochs"]
+    finally:
+        engine.dispose()
 
 
 def test_worker_shutdown_tears_down_its_in_flight_child(

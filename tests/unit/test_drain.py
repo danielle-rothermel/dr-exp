@@ -124,6 +124,23 @@ def test_a_cancelled_item_counts_toward_the_limit(
     assert summary.terminal_count == 1
 
 
+def test_explicit_baseline_counts_a_key_that_finishes_during_startup(
+    ledger: list[list[FakeItem]],
+) -> None:
+    """A pre-captured baseline must not hide fast completions during launch."""
+    settled = [item("fast", StageExecutionState.SUCCEEDED)]
+    ledger.extend([settled, settled])
+
+    summary = drain(
+        1,
+        deadline_seconds=5,
+        already_terminal=frozenset(),
+    )
+
+    assert summary.reached_limit
+    assert summary.terminal_count == 1
+
+
 def test_the_watchdog_reports_failure_to_make_progress(
     ledger: list[list[FakeItem]],
 ) -> None:

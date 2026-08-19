@@ -29,9 +29,10 @@ uv run dr_exp list --machine mini
 
 ## Machine profiles
 
-Every host-specific value lives in a machine profile under `configs/machines/`,
-and every command takes `--machine`. Nothing else in dr-exp hardcodes a path,
-a database, or an interpreter.
+Every host-specific value lives in a bundled machine profile shipped inside
+the `dr_exp` package (`dr_exp.config.machines`), and every command takes
+`--machine`. Nothing else in dr-exp hardcodes a path, a database, or an
+interpreter.
 
 | Field | Meaning |
 | --- | --- |

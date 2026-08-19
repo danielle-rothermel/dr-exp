@@ -116,7 +116,7 @@ def ensure_stage_capacity(profile: MachineProfile, *, engine: Engine) -> None:
     )
     selectors = {tuple(sorted(control.selector.items())) for control in existing}
 
-    if () not in selectors and profile.queue_name is QueueName.TRAIN_CPU:
+    if () not in selectors:
         set_stage_capacity(
             pipeline=PIPELINE_IDENTITY,
             stage_key=TRAIN_STAGE_KEY,

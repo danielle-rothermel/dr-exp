@@ -16,9 +16,9 @@ CLI, and Hydra configuration with a durable stack:
   OmegaConf. Sweeps expand a base job across a Cartesian grid.
 - **Job identity** is content-addressed: `work_key` digests the resolved
   configuration excluding priority and tags, so identical work deduplicates.
-- **Machine profiles** under `configs/machines/` own every host-specific value.
-  `mini` is the local Mac profile; `torch` declares a SLURM/CUDA profile as
-  placeholder data.
+- **Machine profiles** ship inside the `dr_exp` package (`dr_exp.config.machines`)
+  and own every host-specific value. `mini` is the local Mac profile; `torch`
+  declares a SLURM/CUDA profile as placeholder data.
 - **Trainer contract** is `def train(request: dict) -> dict`, strict JSON in and
   out, artifacts under `request["workspace"]`, SIGTERM meaning checkpoint and
   exit.

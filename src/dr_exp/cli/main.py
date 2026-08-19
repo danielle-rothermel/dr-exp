@@ -553,7 +553,8 @@ def worker(
     deadline_seconds: float | None,
 ) -> None:
     """Run a worker that executes training attempts."""
-    from dr_exp.platform.drain import drain_until
+    from dr_exp.platform.database import engine_for
+    from dr_exp.platform.drain import capture_drain_baseline, drain_until
     from dr_exp.platform.worker import worker_runtime
 
     profile = _profile(machine)
@@ -562,6 +563,12 @@ def worker(
         f"{', '.join(q.value for q in profile.dequeued_queue_names)} "
         f"(concurrency {profile.worker_concurrency})"
     )
+    already_terminal = frozenset[str]()
+    if max_jobs is not None:
+        with engine_for(profile) as engine:
+            already_terminal = capture_drain_baseline(
+                engine, campaign_key=campaign_key
+            )
     with worker_runtime(profile, with_dispatcher=with_dispatcher) as runtime:
         summary = drain_until(
             engine=runtime.engine,
@@ -569,6 +576,7 @@ def worker(
             cancellation=runtime.cancellation,
             max_jobs=max_jobs,
             deadline_seconds=deadline_seconds,
+            already_terminal=already_terminal,
         )
     click.echo(
         f"Worker stopped: {summary.terminal_count} terminal, "
