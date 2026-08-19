@@ -1,600 +1,566 @@
-"""Main CLI entry point for dr_exp."""
+"""The ``dr_exp`` command line.
 
-import importlib
-import os
+Every command resolves a machine profile first: the profile owns the database,
+the interpreter, and the filesystem roots, so no command carries a host-specific
+default of its own.
+"""
+
+from __future__ import annotations
+
 import sys
-import time
-from datetime import UTC, datetime
 from pathlib import Path
-from typing import Any, cast
+from typing import Any
 
 import click
 
-from dr_exp.core.job_db import JobDB
-from dr_exp.worker.base import Worker
-from .commands.slurm import slurm
-from .commands.sweep import sweep
+from dr_exp.config.identity import work_key as compute_work_key
+from dr_exp.config.job import (
+    DEFAULT_PRIORITY,
+    ConfigError,
+    JobConfig,
+    load_job_config,
+    load_sweep_spec,
+)
+from dr_exp.config.machine import MachineProfile, load_machine_profile
+from dr_exp.config.names import LabelKey
+from dr_exp.platform import inspection
+from dr_exp.platform.database import engine_for, initialize_schema
+from dr_exp.platform.submission import submit_jobs
 
-DESCRIPTION_MAX_LENGTH = 30
-DESCRIPTION_TRUNCATE_LENGTH = 27
-STALE_JOB_THRESHOLD_SECONDS = 300
+#: Default campaign for commands invoked without an explicit one.
+DEFAULT_CAMPAIGN_KEY = "default"
+
+_MACHINE_OPTION = click.option(
+    "--machine",
+    "machine",
+    required=True,
+    help="Machine profile name or path to a profile YAML.",
+)
+_CAMPAIGN_OPTION = click.option(
+    "--campaign",
+    "campaign_key",
+    default=DEFAULT_CAMPAIGN_KEY,
+    show_default=True,
+    help="Campaign the work belongs to.",
+)
+
+
+def _profile(machine: str) -> MachineProfile:
+    try:
+        return load_machine_profile(machine)
+    except (ConfigError, ValueError) as error:
+        raise click.ClickException(str(error)) from error
+
+
+def _fail(error: Exception) -> None:
+    raise click.ClickException(str(error)) from error
 
 
 @click.group()
-@click.option("--base-path", required=True, help="Base path for experiments")
-@click.option("--experiment", required=True, help="Experiment name")
-@click.pass_context
-def cli(ctx: click.Context, base_path: str, experiment: str) -> None:
-    """dr_exp - ML experiment manager."""
-    ctx.ensure_object(dict)
-    ctx.obj["base_path"] = base_path
-    ctx.obj["experiment"] = experiment
+@click.version_option(package_name="dr-exp")
+def cli() -> None:
+    """dr_exp - durable experiment manager for local and cluster training."""
 
 
 @cli.command()
-@click.option("--worker-id", required=True, help="Unique worker ID")
-@click.option("--working-dir", help="Working directory for job execution")
-@click.option("--max-jobs", type=int, help="Maximum jobs to run")
-@click.pass_context
-def worker(
-    ctx: click.Context,
-    worker_id: str,
-    working_dir: str | None,
-    max_jobs: int | None,
-) -> None:
-    """Run a worker to process jobs."""
-    job_db = JobDB(
-        base_path=ctx.obj["base_path"], experiment_name=ctx.obj["experiment"]
-    )
-
-    worker_instance = Worker(
-        job_db=job_db,
-        worker_id=worker_id,
-        working_dir=working_dir,
-    )
-
-    print(f"Starting worker {worker_id}")
-    print(f"Experiment: {ctx.obj['experiment']} at {ctx.obj['base_path']}")
-    print("-" * 60)
-
-    stats = worker_instance.run(max_jobs=max_jobs)
-
-    print("-" * 60)
-    print(f"Worker completed: {stats}")
-
-    if stats["failed"] > 0:
-        sys.exit(1)
+@_MACHINE_OPTION
+def init(machine: str) -> None:
+    """Create the platform schema and this machine's filesystem roots."""
+    profile = _profile(machine)
+    profile.workspace_root.mkdir(parents=True, exist_ok=True)
+    profile.run_store_root.mkdir(parents=True, exist_ok=True)
+    initialize_schema(profile)
+    click.echo(f"Initialized {profile.name} at {profile.database_url}")
+    click.echo(f"  workspace_root: {profile.workspace_root}")
+    click.echo(f"  run_store_root: {profile.run_store_root}")
 
 
-@cli.group()
-@click.pass_context
-def system(ctx: click.Context) -> None:
-    """System and launcher commands."""
-
-
-@system.command()
-@click.option("--workers-per-gpu", default=2, help="Workers per GPU")
-@click.option("--max-hours", default=47, help="Maximum runtime in hours")
-@click.pass_context
-def launcher(ctx: click.Context, workers_per_gpu: int, max_hours: float) -> None:
-    """Run multi-worker launcher for SLURM jobs."""
-    from dr_exp.worker.launcher import WorkerLauncher
-
-    job_db = JobDB(
-        base_path=ctx.obj["base_path"], experiment_name=ctx.obj["experiment"]
-    )
-    experiment_name = ctx.obj["experiment"]
-    log_dir = job_db.logs_dir
-
-    launcher_instance = WorkerLauncher(
-        job_db=job_db,
-        experiment_name=experiment_name,
-        base_log_dir=log_dir,
-        workers_per_gpu=workers_per_gpu,
-        max_runtime_hours=max_hours,
-    )
-
-    launcher_instance.run()
-
-
-@cli.group()
-@click.pass_context
-def job(ctx: click.Context) -> None:
-    """Job management commands."""
-
-
-job.add_command(sweep)
-cli.add_command(slurm)
-
-
-@job.command()
-@click.option("--config-path", default="configs", help="Path to config directory")
+@cli.command()
+@_MACHINE_OPTION
+@_CAMPAIGN_OPTION
+@click.option("--run", "run_key", required=True, help="Run key for this batch.")
 @click.option(
-    "--config-name", required=True, help="Name of config file (without .yaml)"
+    "--priority",
+    type=int,
+    default=None,
+    help=(
+        "Override the config priority. Lower is sooner; 0 is highest. "
+        f"Configs default to {DEFAULT_PRIORITY}."
+    ),
 )
-@click.option("--priority", default=100, help="Job priority (0-1000)")
-@click.option(
-    "--tags", help="Comma-separated job tags (e.g., 'baseline,gpu-test,ablation')"
+@click.argument(
+    "config_path", type=click.Path(exists=True, dir_okay=False, path_type=Path)
 )
-@click.option("--overrides", help="Hydra overrides (key=value,key2=value2)")
-@click.pass_context
 def submit(
-    ctx: click.Context,
-    config_path: str,
-    config_name: str,
-    priority: int,
-    tags: str | None,
-    overrides: str | None,
+    machine: str,
+    campaign_key: str,
+    run_key: str,
+    priority: int | None,
+    config_path: Path,
 ) -> None:
-    """Submit a job using Hydra config composition."""
-    from hydra import compose, initialize_config_dir
-    from hydra.core.global_hydra import GlobalHydra
-    from omegaconf import OmegaConf
-
-    GlobalHydra.instance().clear()
-
-    config_path_obj = Path(config_path)
-    if not config_path_obj.is_absolute():
-        config_path = str(config_path_obj.resolve())
-
-    override_list = []
-    if overrides:
-        override_list = [o.strip() for o in overrides.split(",")]
-
+    """Submit one job configuration."""
+    profile = _profile(machine)
     try:
-        with initialize_config_dir(config_dir=config_path, version_base="1.3"):
-            cfg = compose(config_name=config_name, overrides=override_list)
-            config_dict = OmegaConf.to_container(cfg, resolve=True)
-            assert isinstance(config_dict, dict), "Config must be a dictionary"
-            config_dict = cast(dict[str, Any], config_dict)
-    except Exception as e:
-        click.echo(f"Error composing config: {e}", err=True)
-        ctx.exit(1)
+        config = load_job_config(config_path)
+    except (ConfigError, ValueError) as error:
+        _fail(error)
+    _submit(
+        (_with_priority(config, priority),),
+        profile=profile,
+        campaign_key=campaign_key,
+        run_key=run_key,
+    )
 
-    if "_target_" not in config_dict:
-        click.echo("Error: Config must contain '_target_' field", err=True)
-        ctx.exit(1)
 
-    target = config_dict["_target_"]
-    module_path = target.rsplit(".", 1)[0]
+@cli.command()
+@_MACHINE_OPTION
+@_CAMPAIGN_OPTION
+@click.option("--run", "run_key", required=True, help="Run key for this sweep.")
+@click.option(
+    "--priority",
+    type=int,
+    default=None,
+    help="Override the base config priority for every point.",
+)
+@click.option(
+    "--dry-run",
+    is_flag=True,
+    help="Print the expanded configurations without submitting them.",
+)
+@click.argument(
+    "spec_path", type=click.Path(exists=True, dir_okay=False, path_type=Path)
+)
+def sweep(
+    machine: str,
+    campaign_key: str,
+    run_key: str,
+    priority: int | None,
+    dry_run: bool,
+    spec_path: Path,
+) -> None:
+    """Expand a sweep specification and submit every point."""
+    profile = _profile(machine)
     try:
-        importlib.import_module(module_path)
-    except ImportError as e:
-        click.echo(f"Error: Cannot import target module {module_path}: {e}", err=True)
-        ctx.exit(1)
-
-    tag_list = []
-    if tags:
-        tag_list = [t.strip() for t in tags.split(",") if t.strip()]
-
-    job_db = JobDB(
-        base_path=ctx.obj["base_path"], experiment_name=ctx.obj["experiment"]
-    )
-    job_id = job_db.create_job(
-        config=config_dict,
-        priority=priority,
-        tags=tag_list,
-    )
-
-    click.echo(f"Created job: {job_id}")
-    click.echo(f"Priority: {priority}")
-    click.echo(f"Target: {target}")
-    if tag_list:
-        click.echo(f"Tags: {', '.join(tag_list)}")
-
-
-@job.command(name="list")
-@click.option("--status", help="Filter by status (queued, running, completed, failed)")
-@click.option("--tag", help="Filter by tag")
-@click.pass_context
-def list_jobs(ctx: click.Context, status: str | None, tag: str | None) -> None:
-    """List jobs in the experiment."""
-    job_db = JobDB(
-        base_path=ctx.obj["base_path"], experiment_name=ctx.obj["experiment"]
-    )
-
-    jobs = job_db.list_jobs(status=status)
-
-    if tag:
-        jobs = [job for job in jobs if tag in job.get("tags", [])]
-
-    if not jobs:
-        click.echo("No jobs found")
-        return
-
-    header = (
-        f"{'ID':>12} {'Description':>30} {'Status':>10} {'Priority':>8} "
-        f"{'Worker':>15} {'Created'}"
-    )
-    click.echo(header)
-    click.echo("-" * 105)
-
-    for job in jobs:
-        job_id = job["id"][:12]
-        job_status = job["status"]
-        priority = job.get("priority", 0)
-        worker = job.get("worker_id") or "-"
-        created_at = job.get("created_at", "-")
-        created = created_at[:19] if created_at != "-" else "-"
-
-        config = job.get("config", {})
-        run_name = config.get("run_name", "unknown")
-        seed = config.get("seed", "?")
-        job_tags = job.get("tags", [])
-
-        description = f"{run_name}/seed_{seed}"
-        if job_tags:
-            description += f" [{','.join(job_tags)}]"
-
-        if len(description) > DESCRIPTION_MAX_LENGTH:
-            description = description[:DESCRIPTION_TRUNCATE_LENGTH] + "..."
-
-        if job_status == "completed":
-            status_str = click.style(f"{job_status:>10}", fg="green")
-        elif job_status == "failed":
-            status_str = click.style(f"{job_status:>10}", fg="red")
-        elif job_status == "running":
-            status_str = click.style(f"{job_status:>10}", fg="yellow")
-        else:
-            status_str = f"{job_status:>10}"
-
-        job_line = (
-            f"{job_id:>12} {description:>30} {status_str} {priority:>8} "
-            f"{worker:>15} {created}"
+        configs = tuple(
+            _with_priority(config, priority)
+            for config in load_sweep_spec(spec_path).expand()
         )
-        click.echo(job_line)
-
-    click.echo("-" * 105)
-    click.echo(f"Total: {len(jobs)} jobs")
-
-
-@cli.command()
-@click.pass_context
-def init(ctx: click.Context) -> None:
-    """Initialize a new experiment."""
-    click.echo(f"Initializing experiment: {ctx.obj['experiment']}")
-    click.echo(f"Base path: {ctx.obj['base_path']}")
-
-    exp_path = Path(ctx.obj["base_path"]) / ctx.obj["experiment"]
-    if (exp_path / "jobs").exists():
-        click.echo("Experiment already initialized")
-        return
-
-    dirs = ["jobs", "storage", "logs", "control"]
-    for dir_name in dirs:
-        dir_path = exp_path / dir_name
-        dir_path.mkdir(parents=True, exist_ok=True)
-        click.echo(f"Created: {dir_path}")
-
-    example_config = exp_path / "example_config.yaml"
-    example_config.write_text("""# Example job configuration
-_target_: dr_exp.training.dummy_trainer.train
-
-epochs: 10
-batch_size: 32
-lr: 0.001
-model: resnet18
-""")
-    click.echo(f"Created: {example_config}")
-
-    click.echo("\nExperiment initialized successfully!")
-    submit_example = (
-        f"\nTo submit a job: dr_exp --base-path {ctx.obj['base_path']} "
-        f"--experiment {ctx.obj['experiment']} job submit --config-path configs "
-        f"--config-name your_config"
-    )
-    click.echo(submit_example)
-
-
-@cli.command()
-@click.pass_context
-def status(ctx: click.Context) -> None:
-    """Show experiment status."""
-    job_db = JobDB(
-        base_path=ctx.obj["base_path"], experiment_name=ctx.obj["experiment"]
-    )
-
-    info = job_db.get_experiment_info()
-
-    click.echo(f"Experiment: {info['experiment_name']}")
-    click.echo(f"Path: {info['experiment_path']}")
-    click.echo(f"Created: {info.get('created_at', 'Unknown')}")
-    click.echo()
-
-    click.echo("Job Status:")
-    for status_name, count in sorted(info["status_counts"].items()):
-        if status_name == "completed":
-            status_str = click.style(status_name, fg="green")
-        elif status_name == "failed":
-            status_str = click.style(status_name, fg="red")
-        elif status_name == "running":
-            status_str = click.style(status_name, fg="yellow")
-        else:
-            status_str = status_name
-
-        click.echo(f"  {status_str:>12}: {count}")
-
-    click.echo(f"  {'Total':>12}: {info['total_jobs']}")
-
-
-@job.command()
-@click.argument("job_ids", nargs=-1, required=True)
-@click.pass_context
-def kill(ctx: click.Context, job_ids: tuple[str, ...]) -> None:
-    """Kill one or more jobs."""
-    # KNOWN ISSUE (see README): only rewrites job JSON; running trainer is not signalled
-    job_db = JobDB(
-        base_path=ctx.obj["base_path"], experiment_name=ctx.obj["experiment"]
-    )
-
-    killed = 0
-    for job_id in job_ids:
-        matching_jobs = [j for j in job_db.list_jobs() if j["id"].startswith(job_id)]
-
-        if len(matching_jobs) == 0:
-            click.echo(f"No job found matching: {job_id}", err=True)
-        elif len(matching_jobs) > 1:
-            click.echo(f"Multiple jobs match '{job_id}':", err=True)
-            for job in matching_jobs:
-                click.echo(f"  {job['id']}", err=True)
-        else:
-            full_job_id = matching_jobs[0]["id"]
-            job = matching_jobs[0]
-
-            if job["status"] in ["queued", "running"]:
-                if job["status"] == "queued":
-                    success = job_db.fail_job(
-                        full_job_id, "Killed: User requested kill"
-                    )
-                else:
-                    success = job_db.mark_job_failed(full_job_id, "User requested kill")
-
-                if success:
-                    click.echo(f"Killed job: {full_job_id}")
-                    killed += 1
-                else:
-                    click.echo(f"Failed to kill job: {full_job_id}", err=True)
-            else:
-                click.echo(f"Job {full_job_id} is already {job['status']}", err=True)
-
-    if killed > 0:
-        click.echo(f"\nKilled {killed} job(s)")
-    else:
-        sys.exit(1)
-
-
-@job.command()
-@click.argument("job_ids", nargs=-1, required=True)
-@click.option("--priority", type=int, required=True, help="New priority (0-1000)")
-@click.pass_context
-def boost(ctx: click.Context, job_ids: tuple[str, ...], priority: int) -> None:
-    """Boost priority of one or more jobs."""
-    # KNOWN ISSUE (see README): sets absolute priority despite the name
-    job_db = JobDB(
-        base_path=ctx.obj["base_path"], experiment_name=ctx.obj["experiment"]
-    )
-
-    boosted = 0
-    for job_id in job_ids:
-        matching_jobs = [j for j in job_db.list_jobs() if j["id"].startswith(job_id)]
-
-        if len(matching_jobs) == 0:
-            click.echo(f"No job found matching: {job_id}", err=True)
-        elif len(matching_jobs) > 1:
-            click.echo(f"Multiple jobs match '{job_id}':", err=True)
-            for job in matching_jobs:
-                click.echo(f"  {job['id']}", err=True)
-        else:
-            full_job_id = matching_jobs[0]["id"]
-            old_priority = matching_jobs[0].get("priority", 0)
-
-            if job_db.boost_priority([full_job_id], priority) > 0:
-                click.echo(f"Boosted job: {full_job_id} ({old_priority} → {priority})")
-                boosted += 1
-            else:
-                click.echo(
-                    f"Failed to boost job: {full_job_id} (not queued?)", err=True
-                )
-
-    if boosted > 0:
-        click.echo(f"\nBoosted {boosted} job(s)")
-    else:
-        sys.exit(1)
-
-
-@job.command()
-@click.option(
-    "--threshold", type=int, default=300, help="Seconds before considering job stale"
-)
-@click.option(
-    "--dry-run", is_flag=True, help="Show what would be recovered without doing it"
-)
-@click.pass_context
-def recover(ctx: click.Context, threshold: int, dry_run: bool) -> None:
-    """Recover stale jobs that have stopped heartbeating."""
-    job_db = JobDB(
-        base_path=ctx.obj["base_path"], experiment_name=ctx.obj["experiment"]
-    )
+    except (ConfigError, ValueError) as error:
+        _fail(error)
 
     if dry_run:
-        now = datetime.now(UTC)
-
-        stale_jobs = []
-        for job in job_db.list_jobs(status="running"):
-            last_heartbeat = job.get("last_heartbeat")
-            if not last_heartbeat:
-                last_heartbeat = job.get("started_at")
-
-            if last_heartbeat:
-                last_time = datetime.fromisoformat(last_heartbeat)
-                if (now - last_time).total_seconds() > threshold:
-                    stale_jobs.append(job)
-
-        if stale_jobs:
-            click.echo(f"Would recover {len(stale_jobs)} stale job(s):")
-            for job in stale_jobs:
-                worker = job.get("worker_id", "unknown")
-                click.echo(f"  {job['id']} (worker: {worker})")
-        else:
-            click.echo("No stale jobs found")
-    else:
-        recovered = job_db.recover_stale_jobs(threshold)
-
-        if recovered:
-            click.echo(f"Recovered {len(recovered)} stale job(s):")
-            for job_id in recovered:
-                click.echo(f"  {job_id}")
-        else:
-            click.echo("No stale jobs found")
+        for config in configs:
+            click.echo(f"{compute_work_key(config)[:12]}  {config.params}")
+        click.echo(f"{len(configs)} configuration(s)")
+        return
+    _submit(configs, profile=profile, campaign_key=campaign_key, run_key=run_key)
 
 
-@job.command()
-@click.argument("job_id")
-@click.option("--working-dir", help="Working directory for execution")
-@click.pass_context
-def run_one(ctx: click.Context, job_id: str, working_dir: str | None) -> None:
-    """Run a specific job immediately by job ID."""
-    job_db = JobDB(
-        base_path=ctx.obj["base_path"], experiment_name=ctx.obj["experiment"]
+def _with_priority(config: JobConfig, priority: int | None) -> JobConfig:
+    if priority is None:
+        return config
+    return config.model_copy(update={"priority": priority})
+
+
+def _submit(
+    configs: tuple[JobConfig, ...],
+    *,
+    profile: MachineProfile,
+    campaign_key: str,
+    run_key: str,
+) -> None:
+    with engine_for(profile) as engine:
+        try:
+            result = submit_jobs(
+                configs,
+                campaign_key=campaign_key,
+                run_key=run_key,
+                profile=profile,
+                engine=engine,
+            )
+        except (ConfigError, ValueError) as error:
+            _fail(error)
+    receipt = result.receipt
+    click.echo(
+        f"Submitted run {receipt.run_key.value} to campaign {campaign_key}: "
+        f"{receipt.registered_member_count} member(s), "
+        f"{receipt.created_work_count} new, "
+        f"{receipt.reused_work_count} reused"
     )
+    for key in result.work_keys:
+        click.echo(f"  {key[:12]}")
 
-    matching_jobs = [j for j in job_db.list_jobs() if j["id"].startswith(job_id)]
 
-    if len(matching_jobs) == 0:
-        click.echo(f"No job found matching: {job_id}", err=True)
-        sys.exit(1)
-    if len(matching_jobs) > 1:
-        click.echo(f"Multiple jobs match '{job_id}':", err=True)
-        for job in matching_jobs:
-            click.echo(f"  {job['id']}", err=True)
-        sys.exit(1)
-
-    full_job_id = matching_jobs[0]["id"]
-    job = matching_jobs[0]
-
-    if job["status"] not in ["queued", "failed"]:
-        click.echo(
-            f"Job {full_job_id} is {job['status']} (must be queued or failed)", err=True
+@cli.command(name="list")
+@_MACHINE_OPTION
+@click.option(
+    "--campaign",
+    "campaign_key",
+    default=None,
+    help="Restrict output to one campaign.",
+)
+def list_campaigns(machine: str, campaign_key: str | None) -> None:
+    """List campaigns with their work-state counts."""
+    profile = _profile(machine)
+    with engine_for(profile) as engine:
+        overviews = inspection.overview(engine, campaign_key=campaign_key)
+    if not overviews:
+        click.echo("No campaigns found.")
+        return
+    for item in overviews:
+        counts = " ".join(
+            f"{state}={count}" for state, count in sorted(item.state_counts.items())
         )
-        sys.exit(1)
+        click.echo(
+            f"{item.summary.campaign_key.value}  "
+            f"runs={item.summary.run_count} "
+            f"work={item.summary.work_item_count}  {counts}"
+        )
 
-    worker_id = f"run_one_{int(time.time())}"
-    if not job_db.reserve_job(full_job_id, worker_id):
-        click.echo(f"Failed to reserve job {full_job_id}", err=True)
-        sys.exit(1)
 
-    click.echo(f"Running job: {full_job_id}")
-    click.echo(f"Target: {job['config']['_target_']}")
-    click.echo(f"Priority: {job.get('priority', 0)}")
-    click.echo("-" * 60)
+@cli.command()
+@_MACHINE_OPTION
+@_CAMPAIGN_OPTION
+@click.option("--run", "run_key", default=None, help="Show one run's members.")
+def status(machine: str, campaign_key: str, run_key: str | None) -> None:
+    """Show campaign or run status."""
+    profile = _profile(machine)
+    with engine_for(profile) as engine:
+        if run_key is None:
+            runs = inspection.campaign_runs(engine, campaign_key=campaign_key)
+            overviews = inspection.overview(engine, campaign_key=campaign_key)
+            if not overviews:
+                click.echo(f"No campaign named {campaign_key!r}.")
+                return
+            counts = overviews[0].state_counts
+            click.echo(f"Campaign {campaign_key}")
+            for state, count in sorted(counts.items()):
+                click.echo(f"  {state:>10}: {count}")
+            click.echo(f"  runs: {', '.join(runs) if runs else '(none)'}")
+            return
+        counts = inspection.run_overview(engine, run_key=run_key)
+        click.echo(f"Run {run_key}")
+        for state, count in sorted(counts.items()):
+            click.echo(f"  {state:>10}: {count}")
+        for member in inspection.run_members(engine, run_key=run_key):
+            state = member.state.value if member.state else "unknown"
+            click.echo(
+                f"  [{member.member_ordinal:>3}] {member.work_key.value[:12]}  {state}"
+            )
 
-    worker_instance = Worker(
-        job_db=job_db,
-        worker_id=worker_id,
-        working_dir=working_dir,
+
+@cli.command()
+@_MACHINE_OPTION
+@_CAMPAIGN_OPTION
+@click.argument("work_key")
+def show(machine: str, campaign_key: str, work_key: str) -> None:
+    """Show one work item's stages and attempts."""
+    profile = _profile(machine)
+    with engine_for(profile) as engine:
+        item = _resolve(engine, campaign_key=campaign_key, work_key=work_key)
+        click.echo(f"work_key: {item.work_key.value}")
+        click.echo(f"work_item_id: {item.work_item_id}")
+        click.echo(f"labels: {dict(item.labels)}")
+        click.echo(f"state: {item.state.value}")
+        for stage in inspection.work_item_stages(
+            engine, work_item_id=item.work_item_id
+        ):
+            execution = stage.execution
+            click.echo(
+                f"  stage {execution.stage_key.value} "
+                f"[{execution.stage_index}] {execution.state.value} "
+                f"priority={execution.priority}"
+            )
+            for attempt in stage.attempts:
+                summary = attempt.terminal_summary or {}
+                message = summary.get("message", "")
+                click.echo(
+                    f"    attempt {attempt.attempt_number}: "
+                    f"{summary.get('outcome', 'pending')} {message}"
+                )
+            if execution.output_reference:
+                click.echo(f"    output: {execution.output_reference}")
+
+
+def _resolve(engine: Any, *, campaign_key: str, work_key: str) -> Any:  # noqa: ANN401
+    try:
+        return inspection.resolve_work_item(
+            engine, campaign_key=campaign_key, work_key=work_key
+        )
+    except ConfigError as error:
+        raise click.ClickException(str(error)) from error
+
+
+@cli.command()
+@_MACHINE_OPTION
+@_CAMPAIGN_OPTION
+@click.argument("work_key")
+def cancel(machine: str, campaign_key: str, work_key: str) -> None:
+    """Cancel one work item, interrupting it if it is running."""
+    from dbos import DBOSClient
+    from dr_platform import cancel_work
+
+    profile = _profile(machine)
+    with engine_for(profile) as engine:
+        item = _resolve(engine, campaign_key=campaign_key, work_key=work_key)
+        client = DBOSClient(system_database_url=profile.system_database_url)
+        try:
+            result = cancel_work(
+                engine=engine,
+                client=client,
+                work_item_id=item.work_item_id,
+            )
+        finally:
+            client.destroy()
+    click.echo(f"Cancelled {item.work_key.value[:12]}")
+    for cancellation in result.cancellations:
+        click.echo(
+            f"  stage {cancellation.stage_execution.stage_key.value}: "
+            f"{cancellation.disposition.value}"
+        )
+
+
+@cli.command()
+@_MACHINE_OPTION
+@_CAMPAIGN_OPTION
+@click.option(
+    "--priority",
+    type=int,
+    required=True,
+    help="New priority. Lower is sooner; 0 is highest.",
+)
+@click.argument("work_key")
+def boost(machine: str, campaign_key: str, priority: int, work_key: str) -> None:
+    """Change one work item's admission priority."""
+    from dr_platform import set_work_priority
+
+    profile = _profile(machine)
+    with engine_for(profile) as engine:
+        item = _resolve(engine, campaign_key=campaign_key, work_key=work_key)
+        result = set_work_priority(
+            campaign_key=campaign_key,
+            work_key=item.work_key,
+            priority=priority,
+            engine=engine,
+        )
+    click.echo(
+        f"{item.work_key.value[:12]} priority={result.priority} "
+        f"({len(result.updated_stage_execution_ids)} stage(s) updated)"
     )
 
-    claimed_job = job_db.claim_reserved_job(full_job_id, worker_id)
-    if not claimed_job:
-        click.echo(f"Failed to claim reserved job {full_job_id}", err=True)
-        sys.exit(1)
 
-    worker_instance.current_job_id = claimed_job["id"]
-    result = worker_instance.execute_job(claimed_job)
+@cli.command()
+@_MACHINE_OPTION
+@_CAMPAIGN_OPTION
+@click.argument("work_key")
+def retry(machine: str, campaign_key: str, work_key: str) -> None:
+    """Create a new attempt for one work item's failed stage."""
+    from dr_platform import StageExecutionState, retry_stage
 
-    if result["status"] == "success":
-        metrics = None
-        if isinstance(result.get("result"), dict):
-            metrics = result["result"].get("metrics")
-        job_db.complete_job(claimed_job["id"], metrics)
-        status_msg = click.style("COMPLETED", fg="green")
-    else:
-        job_db.fail_job(claimed_job["id"], result["error"])
-        status_msg = click.style("FAILED", fg="red")
+    profile = _profile(machine)
+    with engine_for(profile) as engine:
+        item = _resolve(engine, campaign_key=campaign_key, work_key=work_key)
+        failed = [
+            stage.execution
+            for stage in inspection.work_item_stages(
+                engine, work_item_id=item.work_item_id
+            )
+            if stage.execution.state is StageExecutionState.FAILED
+        ]
+        if not failed:
+            raise click.ClickException(
+                f"{item.work_key.value[:12]} has no failed stage to retry"
+            )
+        for execution in failed:
+            result = retry_stage(execution.stage_execution_id, engine=engine)
+            click.echo(
+                f"{item.work_key.value[:12]} stage "
+                f"{execution.stage_key.value}: attempt "
+                f"{result.new_attempt.attempt_number}"
+            )
 
-    click.echo("-" * 60)
-    click.echo(f"Job {full_job_id}: {status_msg}")
 
-    if result["status"] == "failed":
-        click.echo(f"\nError: {result['error']}")
+@cli.command()
+@_MACHINE_OPTION
+@click.option(
+    "--accelerator",
+    default=None,
+    help="Pause only work labelled with this accelerator.",
+)
+def pause(machine: str, accelerator: str | None) -> None:
+    """Stop admitting new training work."""
+    _set_paused(machine, accelerator=accelerator, paused=True)
+
+
+@cli.command()
+@_MACHINE_OPTION
+@click.option(
+    "--accelerator",
+    default=None,
+    help="Resume only work labelled with this accelerator.",
+)
+def resume(machine: str, accelerator: str | None) -> None:
+    """Resume admitting training work."""
+    _set_paused(machine, accelerator=accelerator, paused=False)
+
+
+def _set_paused(machine: str, *, accelerator: str | None, paused: bool) -> None:
+    from dr_platform import pause as pause_stage
+    from dr_platform import resume as resume_stage
+
+    from dr_exp.platform.pipeline import PIPELINE_IDENTITY, TRAIN_STAGE_KEY
+
+    profile = _profile(machine)
+    labels = None if accelerator is None else {LabelKey.ACCELERATOR.value: accelerator}
+    action = pause_stage if paused else resume_stage
+    with engine_for(profile) as engine:
+        try:
+            record = action(
+                pipeline=PIPELINE_IDENTITY,
+                stage_key=TRAIN_STAGE_KEY,
+                labels=labels,
+                engine=engine,
+            )
+        except LookupError as error:
+            raise click.ClickException(
+                "no capacity control exists for that selector; run "
+                "'dr_exp capacity' first"
+            ) from error
+    click.echo(
+        f"train {dict(record.selector) or '(default)'}: "
+        f"paused={record.paused} capacity={record.capacity}"
+    )
+
+
+@cli.command()
+@_MACHINE_OPTION
+@click.option(
+    "--accelerator",
+    default=None,
+    help="Set capacity for one accelerator instead of the stage default.",
+)
+@click.option(
+    "--capacity", type=int, default=None, help="New concurrent-admission limit."
+)
+def capacity(machine: str, accelerator: str | None, capacity: int | None) -> None:
+    """Show or set admission capacity for the train stage."""
+    from dr_platform import (
+        read_controls,
+        set_selector_capacity,
+        set_stage_capacity,
+    )
+
+    from dr_exp.platform.pipeline import PIPELINE_IDENTITY, TRAIN_STAGE_KEY
+
+    profile = _profile(machine)
+    with engine_for(profile) as engine:
+        if capacity is not None:
+            if accelerator is None:
+                set_stage_capacity(
+                    pipeline=PIPELINE_IDENTITY,
+                    stage_key=TRAIN_STAGE_KEY,
+                    capacity=capacity,
+                    engine=engine,
+                )
+            else:
+                set_selector_capacity(
+                    pipeline=PIPELINE_IDENTITY,
+                    stage_key=TRAIN_STAGE_KEY,
+                    labels={LabelKey.ACCELERATOR.value: accelerator},
+                    capacity=capacity,
+                    engine=engine,
+                )
+        for record in read_controls(
+            pipeline=PIPELINE_IDENTITY,
+            stage_key=TRAIN_STAGE_KEY,
+            engine=engine,
+        ):
+            selector = dict(record.selector) or "(default)"
+            click.echo(f"{selector}: capacity={record.capacity} paused={record.paused}")
+
+
+@cli.command()
+@_MACHINE_OPTION
+@_CAMPAIGN_OPTION
+@click.option(
+    "--with-dispatcher",
+    is_flag=True,
+    help="Also run admission and reconciliation in this process.",
+)
+@click.option(
+    "--max-jobs",
+    type=int,
+    default=None,
+    help="Exit once this many work items in the campaign are terminal.",
+)
+@click.option(
+    "--deadline-seconds",
+    type=float,
+    default=None,
+    help="Watchdog: give up waiting after this long. Reaching it is a failure.",
+)
+def worker(
+    machine: str,
+    campaign_key: str,
+    with_dispatcher: bool,
+    max_jobs: int | None,
+    deadline_seconds: float | None,
+) -> None:
+    """Run a worker that executes training attempts."""
+    from dr_exp.platform.drain import drain_until
+    from dr_exp.platform.worker import worker_runtime
+
+    profile = _profile(machine)
+    click.echo(
+        f"Worker {profile.executor_id} on {profile.name} draining "
+        f"{', '.join(q.value for q in profile.dequeued_queue_names)} "
+        f"(concurrency {profile.worker_concurrency})"
+    )
+    with worker_runtime(profile, with_dispatcher=with_dispatcher) as runtime:
+        summary = drain_until(
+            engine=runtime.engine,
+            campaign_key=campaign_key,
+            cancellation=runtime.cancellation,
+            max_jobs=max_jobs,
+            deadline_seconds=deadline_seconds,
+        )
+    click.echo(
+        f"Worker stopped: {summary.terminal_count} terminal, "
+        f"limit_reached={summary.reached_limit} "
+        f"interrupted={summary.interrupted}"
+    )
+    if max_jobs is not None and not summary.reached_limit:
         sys.exit(1)
 
 
 @cli.command()
-@click.pass_context
-def validate(ctx: click.Context) -> None:  # noqa: C901
-    """Validate experiment setup and configuration."""
-    exp_path = Path(ctx.obj["base_path"]) / ctx.obj["experiment"]
+@_MACHINE_OPTION
+@click.option(
+    "--deadline-seconds",
+    type=float,
+    default=None,
+    help="Watchdog: stop after this long instead of running indefinitely.",
+)
+def dispatcher(machine: str, deadline_seconds: float | None) -> None:
+    """Run admission and reconciliation without executing training work."""
+    from dr_exp.platform.drain import drain_until
+    from dr_exp.platform.worker import worker_runtime
 
-    try:
-        job_db = JobDB(
-            base_path=ctx.obj["base_path"], experiment_name=ctx.obj["experiment"]
+    profile = _profile(machine)
+    click.echo(f"Dispatcher {profile.executor_id} on {profile.name}")
+    with worker_runtime(profile, with_dispatcher=True) as runtime:
+        drain_until(
+            engine=runtime.engine,
+            campaign_key=DEFAULT_CAMPAIGN_KEY,
+            cancellation=runtime.cancellation,
+            max_jobs=None,
+            deadline_seconds=deadline_seconds,
         )
-    except RuntimeError as e:
-        click.echo(click.style("✗ Validation FAILED", fg="red", bold=True))
-        click.echo("\nIssues found:")
-        click.echo(f"  ✗ {e}")
-        sys.exit(1)
-
-    issues = []
-    warnings = []
-
-    required_dirs = ["jobs", "storage"]
-    for dir_name in required_dirs:
-        dir_path = exp_path / dir_name
-        if not dir_path.exists():
-            issues.append(f"Missing directory: {dir_path}")
-        elif not dir_path.is_dir():
-            issues.append(f"Not a directory: {dir_path}")
-        elif not os.access(dir_path, os.W_OK):
-            issues.append(f"Not writable: {dir_path}")
-
-    try:
-        jobs = job_db.list_jobs()
-        if len(jobs) == 0:
-            warnings.append("No jobs found in experiment")
-        else:
-            running_jobs = [j for j in jobs if j["status"] == "running"]
-            if running_jobs:
-                now = datetime.now(UTC)
-
-                for job in running_jobs:
-                    last_heartbeat = job.get("last_heartbeat")
-                    if last_heartbeat:
-                        last_time = datetime.fromisoformat(last_heartbeat)
-                        stale_seconds = (now - last_time).total_seconds()
-                        if stale_seconds > STALE_JOB_THRESHOLD_SECONDS:
-                            stale_warning = (
-                                f"Job {job['id']} may be stale "
-                                f"(no heartbeat for {int(stale_seconds)}s)"
-                            )
-                            warnings.append(stale_warning)
-    except Exception as e:
-        issues.append(f"Error reading jobs: {e}")
-
-    if issues:
-        click.echo(click.style("✗ Validation FAILED", fg="red", bold=True))
-        click.echo("\nIssues found:")
-        for issue in issues:
-            click.echo(f"  ✗ {issue}")
-    else:
-        click.echo(click.style("✓ Validation PASSED", fg="green", bold=True))
-
-    if warnings:
-        click.echo("\nWarnings:")
-        for warning in warnings:
-            click.echo(f"  ⚠ {warning}")
-
-    info = job_db.get_experiment_info()
-    click.echo(f"\nExperiment: {info['experiment_name']}")
-    click.echo(f"Path: {info['experiment_path']}")
-    click.echo(f"Total jobs: {info['total_jobs']}")
-
-    sys.exit(1 if issues else 0)
+    click.echo("Dispatcher stopped.")
 
 
 def main() -> None:
-    """Main entry point."""
+    """Entry point for the ``dr_exp`` script."""
     cli()
 
 

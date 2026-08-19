@@ -1,1 +1,1 @@
-# Empty file to make this a package
+"""Trainers shipped with dr-exp."""

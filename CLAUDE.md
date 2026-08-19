@@ -1,134 +1,83 @@
-# dr_exp - Deep Learning Experiment Manager
+# dr-exp
 
-## System Overview
-dr_exp is a **local-first deep learning experiment manager** for HPC clusters. It manages ML training jobs via filesystem operations. No distributed systems, no complex abstractions — just files and locks.
+A durable experiment manager: a thin layer over **dr-platform** (durable
+queue/ledger on PostgreSQL + DBOS) and **dr-exec** (one training attempt as an
+isolated child process). dr-exp owns the config model, job identity, machine
+profiles, the training pipeline, and the CLI. Read `README.md` first — it is the
+user-facing contract and this file does not repeat it.
 
-**Core Purpose**: Submit jobs → Workers claim by priority → Execute training → Monitor locally
+## Layout
 
-## Current Implementation Status
+```
+src/dr_exp/
+├── config/      names.py (closed vocabularies + persisted literals)
+│                job.py (JobConfig, SweepSpec), identity.py (digests)
+│                machine.py (MachineProfile)
+├── execution/   attempt.py (dr-exec job construction and outcomes)
+│                cancellation.py (signal fan-out), store.py (input references)
+├── platform/    pipeline.py (the one pipeline and its stage body)
+│                worker.py (DBOS runtime), submission.py, drain.py
+│                inspection.py, database.py, registry.py, version.py
+├── training/    dummy_trainer.py (the reference trainer)
+└── cli/         main.py
+```
 
-### Complete
-- **JobDB**: File-based job queue with atomic operations via fcntl
-- **Worker**: Executes jobs using Hydra dispatch
-- **CLI**: init, submit, worker, list, sweep, launcher, SLURM commands
-- **Multi-Worker Launcher**: Spawns workers across GPUs with health monitoring
-- **Config Sweeps**: Parameter sweep generation and submission
-- **SLURM Integration**: Scripts and commands for HPC clusters
+## Invariants worth knowing before editing
 
-### Known Limitations
-- **Submit syntax**: Uses Hydra config composition with `--config-path` and `--config-name`
-- **Job IDs**: Support partial matching for convenience in CLI commands
-- **SLURM integration**: Requires specific directory structure and control files
-- See README **Known issues** for deferred bugs in kill, heartbeat, and scheduling
+**Persisted identity is pinned.** The literals in `config/names.py` and the
+digest documents in `config/identity.py` are stored in the ledger. Golden tests
+in `tests/unit/test_identity.py` pin them verbatim. A failure there means
+"confirm this re-identification is intended", never "update the expected value".
 
-## Dependency Management
+**Worker startup order is load-bearing.** `platform/worker.py` documents it.
+Three constraints interact: dr-platform requires wrapped workflows, queues, and
+the dispatcher to be registered before `DBOS.launch()`; DBOS does not settle an
+application version until launch, but the dispatcher captures it beforehand;
+and `build_dbos_config` exposes neither the executor id nor the app version. So
+dr-exp pins both through `initialize_dbos_runtime`'s `runtime_initializer`
+hook, using a version derived in `platform/version.py`. Supplying the wrong app
+version makes the sweep fail every live attempt as `stale_app_version`.
 
-Always use `uv add` / `uv remove` — never `uv pip install` or `pip install`.
+**Stage bodies are preemptible.** The `train` body in `platform/pipeline.py`
+runs inside a preemptible DBOS step: no DBOS steps or transactions inside it,
+re-raise `asyncio.CancelledError`, keep the return small, and tolerate
+at-least-once execution.
+
+**One live process per executor id.** Dead-executor detection reads executor
+identity, so two processes sharing an id make the sweep lie.
+
+**Register the wrapped pipeline.** `build_registry` wraps before registering;
+`register_scheduled_dispatcher` rejects an unwrapped one. The deliberately
+unwrapped `platform/registry.py` registry is for submission and inspection only.
+
+**A JobId is single-use.** dr-exec derives its run-record directory from the
+job id, so every attempt mints a fresh one.
+
+**Children run isolated.** dr-exec launches with `python -I`, so `PYTHONPATH`
+does not reach the child; a trainer's package must be installed in the
+profile's interpreter.
+
+**DBOS's registry is process-global.** `worker_runtime` tears down with
+`DBOS.destroy(destroy_registry=True)` so a second runtime in one process can
+redeclare its queues and workflows. Tests depend on this.
+
+## Conventions
+
+- Boundary and parsed types are pydantic `BaseModel`; internal value objects are
+  frozen slotted dataclasses.
+- Closed string sets are `StrEnum` with `@verify(UNIQUE)`; persisted-format
+  literals get a named owner plus a golden test.
+- Tests synchronize on state, never on elapsed time. Time appears only as a
+  watchdog, where reaching it is a failure.
+- Use `uv add` / `uv remove`, never `pip install`.
+
+## Gates
 
 ```bash
-uv add package-name
-uv add --dev package-name
-uv sync --all-groups
-```
-
-## Architecture
-
-```
-experiment_dir/
-├── jobs/         # Job JSON files (UUID.json)
-├── storage/      # Job outputs (run_UUID/)
-├── logs/         # Worker and launcher logs
-└── control/      # Control files for launcher
-```
-
-**Key Classes**:
-- `JobDB` (`core/job_db.py`): File-based job queue with atomic locking
-- `Worker` (`worker/base.py`): Claims jobs, executes via Hydra
-- `WorkerLauncher` (`worker/launcher.py`): Multi-GPU worker spawner with health monitoring
-- `CLI` (`cli/main.py`): Main CLI entry point with command groups
-- `SweepUtils` (`cli/sweep_utils.py`): Parameter sweep generation utilities
-
-**Job Flow**:
-1. User submits config with `_target_: module.function`
-2. Worker claims highest priority job atomically
-3. Hydra calls the target function with config
-4. Outputs saved to `storage/run_{job_id}/`
-5. Job marked complete/failed
-
-## CLI Commands
-
-```bash
-dr_exp --base-path <path> --experiment <name> <command> [options]
-```
-
-**Essential Commands**:
-```bash
-init
-validate
-status
-
-job submit --config-path <dir> --config-name <file> [--priority N] [--tags <tags>] [--overrides <overrides>]
-job sweep --config <file> --params "key=v1,v2" [--dry-run] [--verbose]
-job list [--status queued|running|completed|failed] [--tag <tag>]
-job kill <job_id...>
-job boost <job_id...> --priority N
-job run-one <job_id> [--working-dir <dir>]
-job recover [--threshold 300] [--dry-run]
-
-worker --worker-id <id> [--max-jobs N] [--working-dir <dir>]
-system launcher --workers-per-gpu N [--max-hours 47]
-
-slurm status
-slurm control <job_id> [--finish-current|--stop-now]
-slurm errors <job_id> [--tail N]
-slurm logs <job_id> [--worker <id>] [--tail N]
-```
-
-## Key Technical Components
-
-### File Locking (JobDB)
-- Uses fcntl for atomic operations
-- Microsecond timestamp prefixes prevent collisions
-- Global lock for claim operations
-- Job-specific locks for updates
-
-### Worker System
-- Health monitoring via launcher with automatic restarts
-- GPU assignment via CUDA_VISIBLE_DEVICES
-- Launcher redirects subprocess stdout for worker output
-- Graceful shutdown via launcher control file (not Worker SIGTERM)
-
-### SLURM Integration
-- 47-hour runtime limit (buffer before 48h)
-- Control files for graceful shutdown
-- Status JSON files for monitoring
-- Error aggregation from worker logs
-
-## Development Standards
-
-**Quality Gates**:
-```bash
-uv run ruff check .
+uv run ruff check . && uv run ruff format --check .
 uv run mypy src
-uv run pytest -m "not slow"
+uv run pytest -q
 ```
 
-**Dependencies**:
-```bash
-uv add <package>
-uv add --dev <package>
-```
-
-**Testing**:
-- Tests in `tests/unit/`, `tests/integration/`, `tests/validation/`
-- Use pytest fixtures, not standalone scripts
-- Mock external services where needed
-
-## Common Tasks
-
-**Submit parameter sweep**:
-```bash
-dr_exp --base-path ./exp --experiment test job sweep \
-  --config configs/dummy_train.yaml \
-  --params "lr=0.01,0.001 model=resnet18,resnet50"
-```
+Integration tests need `createdb dr_exp_test` and run in one process (DBOS
+registers a process-global dispatcher, so no `-n auto`).

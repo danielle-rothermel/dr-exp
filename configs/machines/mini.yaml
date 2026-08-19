@@ -1,0 +1,13 @@
+# Danielle's Mac mini: the local-first development and smoke-test machine.
+name: mini
+accelerator: mps
+python_executable: /Users/daniellerothermel/drotherm/worktrees/dr-exp-phase3/.venv/bin/python
+workspace_root: /Users/daniellerothermel/drotherm/data/dr-exp/mini/workspace
+run_store_root: /Users/daniellerothermel/drotherm/data/dr-exp/mini/runs
+database_url: postgresql+psycopg:///dr_exp_dev
+system_database_url: postgresql+psycopg:///dr_exp_dev
+executor_id: mini-0
+worker_concurrency: 2
+# mps and cpu need no device pinning; a CUDA profile sets CUDA_VISIBLE_DEVICES.
+device_env: {}
+termination_grace_seconds: 30

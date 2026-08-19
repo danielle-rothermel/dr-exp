@@ -1,0 +1,15 @@
+# A two-point sweep over the dummy trainer. Submit with:
+#   dr_exp sweep --machine mini --run demo configs/examples/dummy_sweep.yaml
+base:
+  entry_point: dr_exp.training.dummy_trainer:train
+  params:
+    epochs: 2
+  labels:
+    accelerator: cpu
+  priority: 100
+  budgets:
+    wall_time_seconds: 300
+grid:
+  learning_rate:
+    - 0.01
+    - 0.001

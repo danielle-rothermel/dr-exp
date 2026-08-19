@@ -1,5 +1,0 @@
-_target_: dr_exp.training.dummy_trainer.train
-epochs: 2
-batch_size: 32
-lr: 0.001
-model: resnet18

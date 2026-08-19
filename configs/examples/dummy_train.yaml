@@ -1,0 +1,12 @@
+# One dummy training job. Submit with:
+#   dr_exp submit --machine mini --run demo configs/examples/dummy_train.yaml
+entry_point: dr_exp.training.dummy_trainer:train
+params:
+  epochs: 3
+labels:
+  accelerator: cpu
+priority: 100
+budgets:
+  wall_time_seconds: 300
+tags:
+  - example
