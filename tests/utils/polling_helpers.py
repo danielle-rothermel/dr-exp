@@ -125,7 +125,7 @@ def create_background_job_adder(
         time.sleep(delay_seconds)
         for i in range(job_count):
             config = {
-                "_target_": "dr_exp.trainers.test_trainer.train",
+                "_target_": "dr_exp.training.dummy_trainer.train",
                 "epochs": 1,
                 "index": i,
             }

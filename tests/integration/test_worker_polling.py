@@ -21,7 +21,6 @@ def test_worker_infinite_polling_no_jobs() -> None:
         worker = Worker(
             job_db=job_db,
             worker_id="polling_worker",
-            sync_enabled=False,  # Disable sync for simpler testing
         )
 
         # Test infinite polling behavior (worker polls every 10 seconds)
@@ -52,7 +51,7 @@ def test_worker_max_jobs_termination() -> None:
         # Create 3 jobs
         for i in range(3):
             config = {
-                "_target_": "dr_exp.trainers.test_trainer.train",
+                "_target_": "dr_exp.training.dummy_trainer.train",
                 "epochs": 1,
                 "index": i,
             }
@@ -62,7 +61,6 @@ def test_worker_max_jobs_termination() -> None:
         worker = Worker(
             job_db=job_db,
             worker_id="terminating_worker",
-            sync_enabled=False,
         )
 
         # Test max_jobs termination
@@ -92,7 +90,6 @@ def test_worker_mixed_polling_and_jobs() -> None:
         worker = Worker(
             job_db=job_db,
             worker_id="mixed_worker",
-            sync_enabled=False,
         )
 
         # Add jobs after worker starts polling
@@ -100,7 +97,7 @@ def test_worker_mixed_polling_and_jobs() -> None:
             time.sleep(0.2)  # Short delay
             for i in range(2):
                 config = {
-                    "_target_": "dr_exp.trainers.test_trainer.train",
+                    "_target_": "dr_exp.training.dummy_trainer.train",
                     "epochs": 1,
                     "index": i,
                 }
@@ -120,54 +117,19 @@ def test_worker_mixed_polling_and_jobs() -> None:
         )
 
 
-def test_worker_polling_with_sync_enabled() -> None:
-    """Test infinite polling behavior with sync threads enabled."""
-    with tempfile.TemporaryDirectory() as tmpdir:
-        job_db = JobDB(
-            base_path=tmpdir, experiment_name="sync_polling_test", validate=False
-        )
-
-        # Create worker with sync enabled but no Supabase
-        worker = Worker(
-            job_db=job_db,
-            worker_id="sync_polling_worker",
-            sync_enabled=True,  # This should disable itself due to no Supabase
-            sync_interval=0.2,
-            heartbeat_interval=0.2,
-        )
-
-        # Test infinite polling behavior (shorter test since sync is disabled)
-        result = run_infinite_polling_test(
-            worker, timeout_seconds=0.5, no_job_threshold=1
-        )
-
-        # Verify polling behavior with threads
-        assert result.worker_started, "Worker should have started"
-        assert not result.worker_finished, (
-            "Worker should not finish with infinite polling"
-        )
-        assert result.no_job_count >= 1, (
-            f"Expected at least 1 no_job poll, got {result.no_job_count}"
-        )
-        assert result.exception is None, (
-            f"Worker should not raise exception: {result.exception}"
-        )
-
-
 def test_worker_thread_lifecycle_during_polling() -> None:
     """Test that background threads start and stop properly during polling."""
     with tempfile.TemporaryDirectory() as tmpdir:
         job_db = JobDB(base_path=tmpdir, experiment_name="thread_test", validate=False)
 
         # Create one job to process
-        config = {"_target_": "dr_exp.trainers.test_trainer.train", "epochs": 1}
+        config = {"_target_": "dr_exp.training.dummy_trainer.train", "epochs": 1}
         job_db.create_job(config)
 
         # Create worker with threads
         worker = Worker(
             job_db=job_db,
             worker_id="thread_lifecycle_worker",
-            sync_enabled=False,
             heartbeat_interval=0.1,
         )
 
@@ -211,7 +173,6 @@ def test_worker_shutdown_signal() -> None:
         worker = Worker(
             job_db=job_db,
             worker_id="shutdown_worker",
-            sync_enabled=False,
         )
 
         # Test that should_stop event works

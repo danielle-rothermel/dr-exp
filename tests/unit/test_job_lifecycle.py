@@ -2,8 +2,6 @@
 
 import tempfile
 import time
-import json
-from pathlib import Path
 
 from dr_exp.core.job_db import JobDB
 
@@ -14,7 +12,7 @@ def test_job_lifecycle() -> None:
         job_db = JobDB(base_path=tmpdir, experiment_name="test_exp", validate=False)
 
         # Create a job
-        config = {"_target_": "test.train", "epochs": 10}
+        config = {"_target_": "dr_exp.training.dummy_trainer.train", "epochs": 10}
         job_id = job_db.create_job(config, priority=200)
 
         # Verify initial state
@@ -60,7 +58,7 @@ def test_job_failure() -> None:
         job_db = JobDB(base_path=tmpdir, experiment_name="test_exp", validate=False)
 
         # Create and claim a job
-        config = {"_target_": "test.train"}
+        config = {"_target_": "dr_exp.training.dummy_trainer.train"}
         job_id = job_db.create_job(config)
         job_db.claim_next_job("worker_1")
 
@@ -82,7 +80,7 @@ def test_job_listing() -> None:
         job_db = JobDB(base_path=tmpdir, experiment_name="test_exp", validate=False)
 
         # Create jobs in different states
-        config = {"_target_": "test.train"}
+        config = {"_target_": "dr_exp.training.dummy_trainer.train"}
 
         # Create all jobs first, then manipulate their states
         all_job_ids = []
@@ -128,61 +126,13 @@ def test_job_listing() -> None:
         assert failed_jobs[0]["id"] == failed_id
 
 
-def test_sync_queue(tmp_path: Path) -> None:
-    """Test sync queue functionality."""
-    with tempfile.TemporaryDirectory() as tmpdir:
-        job_db = JobDB(base_path=tmpdir, experiment_name="test_exp", validate=False)
-
-        # Create a job
-        config = {"_target_": "test.train"}
-        job_id = job_db.create_job(config)
-
-        # Add items to sync queue
-        sync_ids = []
-
-        # Add metrics file
-        sync_id1 = job_db.add_to_sync_queue(
-            job_id=job_id,
-            file_path=str(tmp_path / "metrics.json"),
-            file_type="metrics",
-            metadata={"lines": 100},
-        )
-        sync_ids.append(sync_id1)
-
-        # Small delay to ensure different timestamps
-        time.sleep(0.001)
-
-        # Add model file
-        sync_id2 = job_db.add_to_sync_queue(
-            job_id=job_id,
-            file_path=str(tmp_path / "model.pt"),
-            file_type="model",
-            metadata={"epoch": 10, "size_mb": 250},
-        )
-        sync_ids.append(sync_id2)
-
-        # Verify sync files created
-        sync_files = list(job_db.sync_queue_dir.glob("*.json"))
-        assert len(sync_files) == 2
-
-        # Verify files are ordered by timestamp
-        sync_files.sort()
-        for sync_file in sync_files:
-            with Path(sync_file).open() as f:
-                sync_data = json.load(f)
-                assert sync_data["id"] in sync_ids
-                assert sync_data["job_id"] == job_id
-                assert sync_data["status"] == "pending"
-                assert sync_data["attempts"] == 0
-
-
 def test_experiment_info() -> None:
     """Test experiment info gathering."""
     with tempfile.TemporaryDirectory() as tmpdir:
         job_db = JobDB(base_path=tmpdir, experiment_name="test_exp", validate=False)
 
         # Create jobs in various states
-        config = {"_target_": "test.train"}
+        config = {"_target_": "dr_exp.training.dummy_trainer.train"}
 
         # Create a bunch of jobs first (11 total)
         job_ids = []

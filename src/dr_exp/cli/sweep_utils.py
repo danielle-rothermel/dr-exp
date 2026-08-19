@@ -98,6 +98,7 @@ def validate_sweep_config(config: dict[str, Any]) -> None:
     Raises:
         AssertionError: If config is invalid
     """
+    # KNOWN ISSUE (see README): _target_ also validated in JobDB and CLI
     assert isinstance(config, dict), "Config must be a dictionary"
     assert "_target_" in config, "Config must include _target_ field"
 

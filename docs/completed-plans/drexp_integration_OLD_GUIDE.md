@@ -1,1 +1,0 @@
-/Users/daniellerothermel/drotherm/repos/dr_ref/projects/integrate_drexp_deconcnn/drexp_integration_OLD_GUIDE.md

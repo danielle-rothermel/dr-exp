@@ -1,4 +1,4 @@
-"""Public API for dr_exp."""
+"""Programmatic job submission helpers."""
 
 from pathlib import Path
 from typing import Any
@@ -23,9 +23,9 @@ def submit_job(
         tags: Optional list of tags
 
     Returns:
-        str: Job ID (UUID)
+        Job ID (UUID)
     """
-    job_db = JobDB(base_path, experiment)
+    job_db = JobDB(str(base_path), experiment)
     return job_db.create_job(config, priority, tags)
 
 
@@ -36,20 +36,9 @@ def submit_jobs(
     priority: int = 100,
     tags: list[str] | None = None,
 ) -> list[str]:
-    """Submit a job to dr_exp programmatically.
-
-    Args:
-        base_path: Base directory for experiments
-        experiment: Experiment name
-        configs: List of job configuration dict (must include _target_)
-        priority: Job priority (0-1000)
-        tags: Optional list of tags
-
-    Returns:
-        str: Job ID (UUID)
-    """
-    job_db = JobDB(base_path, experiment)
+    """Submit multiple jobs to dr_exp programmatically."""
+    job_db = JobDB(str(base_path), experiment)
     return [job_db.create_job(config, priority, tags) for config in configs]
 
 
-__all__ = ["JobDB", "submit_job", "submit_jobs"]
+__all__ = ["submit_job", "submit_jobs"]

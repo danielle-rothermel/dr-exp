@@ -1,45 +1,31 @@
 [project]
 name = "dr-exp"
 version = "0.1.0"
-description = "Add your description here"
+description = "Local-first deep learning experiment manager for HPC clusters"
 readme = "README.md"
 authors = [
     { name = "Danielle Rothermel", email = "danielle.rothermel@gmail.com" }
 ]
 requires-python = ">=3.12"
 dependencies = [
-    "cachetools>=6.0.0",
     "click>=8.2.1",
-    "fastapi>=0.115.12",
-    "httpx>=0.28.1",
     "hydra-core==1.3.2",
-    "ipykernel>=6.29.5",
-    "jupyterlab-vim>=4.1.4",
+    "omegaconf>=2.3.0",
+    "pydantic>=2.11.5",
+    "pyyaml>=6.0.2",
+]
+
+[project.optional-dependencies]
+trainers = [
     "lightning>=2.5.1.post0",
     "matplotlib>=3.10.3",
-    "mypy>=1.16.0",
     "numpy>=2.3.0",
-    "omegaconf>=2.3.0",
     "pandas>=2.3.0",
-    "portalocker>=3.1.1",
-    "psycopg2-binary>=2.9.10",
-    "pydantic>=2.11.5",
-    "pytest-cov>=6.1.1",
-    "pytest-xdist>=3.7.0",
-    "python-dotenv>=1.1.0",
-    "pyyaml>=6.0.2",
-    "ruff>=0.11.13",
     "scikit-learn>=1.7.0",
     "scipy>=1.15.3",
     "seaborn>=0.13.2",
-    "supabase>=2.13.0",
     "torch>=2.7.1",
     "torchvision>=0.22.1",
-    "types-cachetools>=6.0.0.20250525",
-    "types-pyyaml>=6.0.12.20250516",
-    "types-requests>=2.32.4.20250611",
-    "uvicorn>=0.34.2",
-    "websockets>=15.0.1",
 ]
 
 [project.scripts]
@@ -51,28 +37,19 @@ build-backend = "hatchling.build"
 
 [dependency-groups]
 dev = [
+    "mypy>=1.16.0",
     "pytest>=8.3.5",
     "pytest-asyncio>=1.0.0",
-    "types-pyyaml>=6.0.12.20250516",
-    "mypy>=1.16.0",
     "ruff>=0.11.13",
     "tomlkit>=0.12.0",
+    "types-pyyaml>=6.0.12.20250516",
 ]
 test = [
     "pytest>=8.4.0",
-    "pytest-cov>=4.0",      # Coverage reports
-    "pytest-xdist>=3.0",    # Parallel execution
-    "pytest-timeout>=2.0",  # Timeout long-running tests
-    "pytest-mock>=3.0",     # Better mocking
-    "pytest-benchmark>=4.0", # Performance benchmarking
-]
-test-ml = [
-    "pytest-pytorch>=0.2",   # PyTorch test utilities
-    "pytest-randomly>=3.0",  # Randomize test order
-]
-all = [
-    {include-group = "dev"},
-    {include-group = "test"},
+    "pytest-cov>=4.0",
+    "pytest-mock>=3.0",
+    "pytest-timeout>=2.0",
+    "pytest-xdist>=3.0",
 ]
 
 [tool.ruff]
@@ -89,102 +66,97 @@ docstring-code-line-length = 72
 
 [tool.ruff.lint]
 extend-select = [
-    # Use for precommit hooks
-    "A",                    # Variable and argument shadowing
-    "B", "FBT003",          # bugbear criticals
-    "C4", "C90",            # perf / complexity
-    "F821",                 # undefined name
-    "INP",                  # missing __init__.py
-    "N999",                 # pep8 avoid invalid module naming
-    "NPY", "PD",            # data-science-specific
-    "PERF",                 # unnecessary casts, bad iteration patterns
-    "PIE",                  # duplicate class field defs, etc
-    "PLE",                  # pylint errors
-    "PLW",                  # pylint warning
-    "PLR",                  # safe comparisons
-    "PT",                   # pytest
-    "PTH",                  # use pathlib not os.path
-    "RUF",                  # ruff internals
-    "S",                    # security
-    "SLF",                  # private member accessed outside class
-    "SIM",                  # simplify code
-    "T10",                  # no pdb in code
-    "TID",                  # tidy imports
-    "UP",                   # upgrades
-    "YTT",                  # correct comparisons to sys version
-
-    # Use the rest of the time
-    "ARG",                  # argumetns
-    "ANN",                  # api clarity
-    "COM",                  # training comma enforcement
-    "D",                    # docstring styling
-    "E",                    # indentation and spaceing
-    "F",                    # unused import or local variable
-    "FA",                   # future annotations
-    "FLY",                  # fstrings instead of string joins
-    "ICN",                  # specific import names
-    "W",                    # space normalization
+    "A",
+    "B", "FBT003",
+    "C4", "C90",
+    "F821",
+    "INP",
+    "N999",
+    "NPY", "PD",
+    "PERF",
+    "PIE",
+    "PLE",
+    "PLW",
+    "PLR",
+    "PT",
+    "PTH",
+    "RUF",
+    "S",
+    "SLF",
+    "SIM",
+    "T10",
+    "TID",
+    "UP",
+    "YTT",
+    "ARG",
+    "ANN",
+    "COM",
+    "D",
+    "E",
+    "F",
+    "FA",
+    "FLY",
+    "ICN",
+    "W",
 ]
 ignore = [
-    "ARG001",               # callbacks
-    "COM812", "ISC001",     # Overlap with each other in formatting
-    "EXE",                  # Files generally don't need to be executable
-    "FBT001", "FBT002",     # bool kwargs common
-    "I",                    # sort imports: covered by ruff format
-    "ICN002", "ICN003",     # import rules that are overly restrictive
-    "INT",                  # Gettext rules, unused
-    "ISC",                  # String concat rules, strict
-    "LOG",                  # logger usage, strict
-    "PLR0913",              # Too many args, rough with ML code
-    "S101",                 # asserts for invariants
-    "TD",                   # TODOs are fine
+    "ARG001",
+    "COM812", "ISC001",
+    "EXE",
+    "FBT001", "FBT002",
+    "I",
+    "ICN002", "ICN003",
+    "INT",
+    "ISC",
+    "LOG",
+    "PLR0913",
+    "S101",
+    "TD",
 ]
 
 [tool.ruff.lint.per-file-ignores]
-"**/__init__.py" = [
-    "D",
-]
+"**/__init__.py" = ["D"]
 "tests/**/*.py" = [
-    "ARG",                  # unused arguments in fixtures
-    "PLR2004",              # Magic values are OK in tests
+    "ARG",
+    "PLR2004",
     "D103",
     "S106",
     "SLF001",
     "S101",
 ]
 "**/scripts/**/*.py" = [
-    "T201",                 # print() is fine in scripts
-    "D101", "D102", "D103", # don't require docstrings
+    "T201",
+    "D101", "D102", "D103",
 ]
 "*_notebook.py" = [
-    "E402",                 # Import order OK in notebooks
-    "F401",                 # Unused imports OK in notebooks
-]  
+    "E402",
+    "F401",
+]
 
 [tool.ruff.lint.mccabe]
-max-complexity = 15         # Higher threshold for ML
+max-complexity = 15
 
 [tool.ruff.lint.pydocstyle]
-convention = "google"       # Accepts: "google", "numpy", or "pep257".
+convention = "google"
 ignore-decorators = ["typing.overload", "typing.override"]
 
 [tool.ruff.lint.pylint]
-max-args            = 8     # allow up to 8 params before PLR0913 fires
-max-branches        = 20    # PLR0912
-max-statements      = 80    # PLR0915
-max-nested-blocks   = 8     # PLR1702
-max-returns         = 10    # PLR0911
+max-args = 8
+max-branches = 20
+max-statements = 80
+max-nested-blocks = 8
+max-returns = 10
 
 [tool.ruff.lint.flake8-import-conventions.aliases]
-numpy               = "np"
-"numpy.typing"      = "npt"
-pandas              = "pd"
+numpy = "np"
+"numpy.typing" = "npt"
+pandas = "pd"
 "matplotlib.pyplot" = "plt"
-seaborn             = "sns"
-"dask.dataframe"    = "dd"
-polars              = "pl"
-lightning			= "L"
-"jax.numpy" 	    = "jnp"
+seaborn = "sns"
+"dask.dataframe" = "dd"
+polars = "pl"
+lightning = "L"
+"jax.numpy" = "jnp"
 
 [tool.mypy]
 exclude = ["notebooks/*"]
@@ -194,7 +166,6 @@ python_version = "3.12"
 warn_return_any = true
 warn_unused_configs = true
 disallow_untyped_defs = true
-# Ignore missing imports for libraries without type stubs
 ignore_missing_imports = true
 strict = true
 check_untyped_defs = true
@@ -209,15 +180,11 @@ cache_dir = ".mypy_cache"
 show_error_codes = true
 
 [tool.pytest.ini_options]
-# Test discovery
 testpaths = ["tests"]
 python_files = ["test_*.py"]
 python_classes = ["Test*"]
 python_functions = ["test_*"]
-
-# Markers
 markers = [
-    "supabase: marks tests as requiring local Supabase (deselect with '-m \"not supabase\"')",
     "slow: marks tests as slow running (deselect with '-m \"not slow\"')",
     "fast: marks tests as fast running (select with '-m \"fast\"')",
     "concurrency: marks tests that test concurrent behavior",
@@ -225,58 +192,44 @@ markers = [
     "unit: marks tests as unit tests",
     "edge_case: marks tests for edge case scenarios",
     "timeout: marks tests that include timeouts (very slow)",
-    "slow: marks tests as slow",
     "serial: marks tests that must run serially",
-    "integration: marks integration tests"
+    "gpu: marks tests requiring GPU (deselect with '-m \"not gpu\"')",
 ]
-
-# Logging (disabled by default for clean test output)
-# Enable with: pytest --log-cli-level=INFO
 log_cli = false
 log_cli_level = "INFO"
 log_cli_format = "%(asctime)s [%(levelname)8s] %(name)s: %(message)s"
 log_cli_date_format = "%Y-%m-%d %H:%M:%S"
-
-# Warnings
 filterwarnings = [
     "ignore::UserWarning",
-    "ignore::DeprecationWarning"
+    "ignore::DeprecationWarning",
 ]
-
-# Coverage disabled during architecture redesign
 addopts = [
     "--strict-markers",
     "--strict-config",
     "-ra",
     "--verbose",
     "-n",
-    "auto"
+    "auto",
 ]
-
-# Asyncio configuration
 asyncio_mode = "auto"
 asyncio_default_fixture_loop_scope = "function"
 
-
 [tool.coverage.report]
 exclude_lines = [
-    # Standard exclusions
     "pragma: no cover",
     "def __repr__",
     "raise AssertionError",
     "raise NotImplementedError",
     "if TYPE_CHECKING:",
-    "@profile",  # Line profiler decorators
-    "if _debug:",  # Debug-only code
-    "if _profile:",  # Profiling-only code
-
-    # ML-specific exclusions
-    "if torch.cuda.is_available()",  # GPU-specific code
-    "@torch.no_grad()",  # Inference-only code
-    "if __name__ == .__main__.:",  # Script entry points
-    "def visualize",  # Visualization/debugging functions
-    "except KeyboardInterrupt:",  # User interruption handlers
-    "@torch.jit.script",  # JIT compiled code
+    "@profile",
+    "if _debug:",
+    "if _profile:",
+    "if torch.cuda.is_available()",
+    "@torch.no_grad()",
+    "if __name__ == .__main__.:",
+    "def visualize",
+    "except KeyboardInterrupt:",
+    "@torch.jit.script",
     "@torch.jit.export",
 ]
 
@@ -284,8 +237,8 @@ exclude_lines = [
 source = ["src"]
 omit = [
     "tests/*",
-    "scripts/*",  # Standalone scripts
-    "notebooks/*",  # Jupyter notebooks
-    "*/__init__.py",  # Empty init files
-    "*/config.py",  # Configuration files
+    "scripts/*",
+    "notebooks/*",
+    "*/__init__.py",
+    "*/config.py",
 ]

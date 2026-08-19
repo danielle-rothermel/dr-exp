@@ -20,11 +20,9 @@ def test_cli_init() -> None:
         assert result.exit_code == 0
         assert "Experiment initialized successfully" in result.output
 
-        # Verify directories created
         exp_path = Path(tmpdir) / "test_exp"
         assert (exp_path / "jobs").exists()
         assert (exp_path / "storage").exists()
-        assert (exp_path / "sync_queue").exists()
         assert (exp_path / "example_config.yaml").exists()
 
 
@@ -33,19 +31,16 @@ def test_cli_submit() -> None:
     runner = CliRunner()
 
     with tempfile.TemporaryDirectory() as tmpdir:
-        # Initialize experiment
         runner.invoke(cli, ["--base-path", tmpdir, "--experiment", "test_exp", "init"])
 
-        # Create config directory and file
         config_dir = Path(tmpdir) / "configs"
         config_dir.mkdir()
         config_file = config_dir / "test_config.yaml"
         config_file.write_text("""
-_target_: dr_exp.trainers.test_trainer.train
+_target_: dr_exp.training.dummy_trainer.train
 epochs: 10
 """)
 
-        # Submit job
         result = runner.invoke(
             cli,
             [
@@ -68,7 +63,6 @@ epochs: 10
         assert "Created job:" in result.output
         assert "Priority: 500" in result.output
 
-        # Verify job created
         job_db = JobDB(base_path=tmpdir, experiment_name="test_exp", validate=False)
         jobs = job_db.list_jobs()
         assert len(jobs) == 1
@@ -80,31 +74,26 @@ def test_cli_list() -> None:
     runner = CliRunner()
 
     with tempfile.TemporaryDirectory() as tmpdir:
-        # Create some jobs directly
         job_db = JobDB(base_path=tmpdir, experiment_name="test_exp", validate=False)
 
-        # Various job states
-        config = {"_target_": "test.train"}
+        config = {"_target_": "dr_exp.training.dummy_trainer.train"}
         job1 = job_db.create_job(config, priority=100)
         job2 = job_db.create_job(config, priority=500)
         job3 = job_db.create_job(config, priority=900)
 
-        # Claim and complete one
         job_db.claim_next_job("worker1")
         job_db.complete_job(job3)
 
-        # List all jobs
         result = runner.invoke(
             cli, ["--base-path", tmpdir, "--experiment", "test_exp", "job", "list"]
         )
 
         assert result.exit_code == 0
         assert "Total: 3 jobs" in result.output
-        assert job1[:12] in result.output  # Check truncated ID
-        assert job2[:12] in result.output  # Check truncated ID
-        assert job3[:12] in result.output  # Check truncated ID
+        assert job1[:12] in result.output
+        assert job2[:12] in result.output
+        assert job3[:12] in result.output
 
-        # List only queued
         result = runner.invoke(
             cli,
             [
@@ -121,9 +110,9 @@ def test_cli_list() -> None:
 
         assert result.exit_code == 0
         assert "Total: 2 jobs" in result.output
-        assert job1[:12] in result.output  # Check truncated ID
-        assert job2[:12] in result.output  # Check truncated ID
-        assert job3[:12] not in result.output  # Check truncated ID
+        assert job1[:12] in result.output
+        assert job2[:12] in result.output
+        assert job3[:12] not in result.output
 
 
 def test_cli_status() -> None:
@@ -131,12 +120,10 @@ def test_cli_status() -> None:
     runner = CliRunner()
 
     with tempfile.TemporaryDirectory() as tmpdir:
-        # Create experiment with various jobs
         job_db = JobDB(base_path=tmpdir, experiment_name="test_exp", validate=False)
 
-        config = {"_target_": "test.train"}
+        config = {"_target_": "dr_exp.training.dummy_trainer.train"}
 
-        # Create jobs in different states
         for _ in range(3):
             job_db.create_job(config)
 
@@ -148,7 +135,6 @@ def test_cli_status() -> None:
             else:
                 job_db.fail_job(claimed_job["id"], "Test error")
 
-        # Get status
         result = runner.invoke(
             cli, ["--base-path", tmpdir, "--experiment", "test_exp", "status"]
         )
@@ -167,12 +153,10 @@ def test_cli_worker() -> None:
     runner = CliRunner()
 
     with tempfile.TemporaryDirectory() as tmpdir:
-        # Create a job
         job_db = JobDB(base_path=tmpdir, experiment_name="test_exp", validate=False)
-        config = {"_target_": "dr_exp.trainers.test_trainer.train", "epochs": 2}
+        config = {"_target_": "dr_exp.training.dummy_trainer.train", "epochs": 2}
         job_db.create_job(config)
 
-        # Run worker
         result = runner.invoke(
             cli,
             [
@@ -185,7 +169,6 @@ def test_cli_worker() -> None:
                 "cli_worker",
                 "--max-jobs",
                 "1",
-                "--no-sync",  # Disable sync for testing
             ],
         )
 
@@ -195,47 +178,13 @@ def test_cli_worker() -> None:
         assert "'completed': 1" in result.output
 
 
-def test_cli_worker_with_sync() -> None:
-    """Test worker with sync enabled."""
-    runner = CliRunner()
-
-    with tempfile.TemporaryDirectory() as tmpdir:
-        # Create a job
-        job_db = JobDB(base_path=tmpdir, experiment_name="test_exp", validate=False)
-        config = {"_target_": "dr_exp.trainers.test_trainer.train", "epochs": 2}
-        job_db.create_job(config)
-
-        # Run worker with sync
-        result = runner.invoke(
-            cli,
-            [
-                "--base-path",
-                tmpdir,
-                "--experiment",
-                "test_exp",
-                "worker",
-                "--worker-id",
-                "sync_worker",
-                "--max-jobs",
-                "1",
-            ],
-        )
-
-        assert result.exit_code == 0
-        assert "Sync: enabled" in result.output
-        # Note: sync messages may not appear if no files are added to sync queue
-        # during job execution
-
-
 def test_cli_error_handling() -> None:
     """Test CLI error handling."""
     runner = CliRunner()
 
     with tempfile.TemporaryDirectory() as tmpdir:
-        # Initialize experiment first
         runner.invoke(cli, ["--base-path", tmpdir, "--experiment", "test_exp", "init"])
 
-        # Try to submit without _target_
         bad_config_dir = Path(tmpdir) / "bad_configs"
         bad_config_dir.mkdir()
         bad_config = bad_config_dir / "bad_config.yaml"
@@ -260,7 +209,6 @@ def test_cli_error_handling() -> None:
         assert result.exit_code == 1
         assert "Config must contain '_target_'" in result.output
 
-        # Try to submit non-existent config
         result = runner.invoke(
             cli,
             [
@@ -277,4 +225,4 @@ def test_cli_error_handling() -> None:
             ],
         )
 
-        assert result.exit_code == 1  # Hydra config not found
+        assert result.exit_code == 1

@@ -8,7 +8,13 @@ def test_deprecated_directories_removed() -> None:
     old_dirs = [
         "src/dr_exp/job_db",
         "src/dr_exp/manage",
-    ]  # CLI still exists but simplified
+        "src/dr_exp/sync",
+        "src/dr_exp/api",
+        "src/dr_exp/trainers",
+        "src/dr_exp/logging",
+        "react-babysitter-ui",
+        "supabase",
+    ]
 
     for dir_path in old_dirs:
         assert not Path(dir_path).exists(), f"Directory should be deleted: {dir_path}"
@@ -20,10 +26,14 @@ def test_deprecated_files_removed() -> None:
         "src/dr_exp/utils/factory.py",
         "src/dr_exp/utils/jobdb_factory.py",
         "src/dr_exp/utils/cli_config.py",
+        "src/dr_exp/utils/gpu_discovery.py",
+        "src/dr_exp/utils/job_reaper.py",
         "scripts/run_worker.py",
         "scripts/run_manager.py",
         "scripts/upload_configs.py",
         "scripts/reset_local_jobdb.py",
+        "scripts/start_backend.py",
+        "scripts/reap_stale_jobs.py",
     ]
 
     for file_path in old_files:
@@ -34,8 +44,8 @@ def test_core_directories_exist() -> None:
     """Verify core project directories exist with proper structure."""
     new_dirs = [
         "src/dr_exp/core",
-        "src/dr_exp/sync",
         "src/dr_exp/worker",
+        "src/dr_exp/training",
         "tests/unit",
         "tests/integration",
         "tests/validation",
@@ -50,9 +60,9 @@ def test_core_directories_exist() -> None:
 def test_essential_structure_preserved() -> None:
     """Verify essential project structure is maintained."""
     kept_dirs = [
-        "src/dr_exp/utils",  # Only utils remains from original dirs
-        "src/dr_exp/core",  # New core module
-        "src/dr_exp/cli",  # Simplified CLI
+        "src/dr_exp/utils",
+        "src/dr_exp/core",
+        "src/dr_exp/cli",
     ]
 
     for dir_path in kept_dirs:
