@@ -15,7 +15,7 @@ def test_mark_job_failed() -> None:
         job_db = JobDB(base_path=tmpdir, experiment_name="test_exp", validate=False)
 
         # Create jobs in different states
-        config = {"_target_": "dr_exp.trainers.test_trainer.train"}
+        config = {"_target_": "dr_exp.training.dummy_trainer.train"}
 
         # Running job (high priority so it gets claimed first)
         running_id = job_db.create_job(config, priority=200)
@@ -62,7 +62,7 @@ def test_boost_priority() -> None:
     with tempfile.TemporaryDirectory() as tmpdir:
         job_db = JobDB(base_path=tmpdir, experiment_name="test_exp", validate=False)
 
-        config = {"_target_": "dr_exp.trainers.test_trainer.train"}
+        config = {"_target_": "dr_exp.training.dummy_trainer.train"}
 
         # Create low priority jobs
         job1_id = job_db.create_job(config, priority=100)
@@ -94,7 +94,7 @@ def test_boost_priority() -> None:
         assert updated == 0  # No jobs updated
 
         # Cannot boost with invalid priority
-        with pytest.raises(AssertionError, match="Priority must be 0-1000"):
+        with pytest.raises(ValueError, match="Priority must be 0-1000"):
             job_db.boost_priority([job3_id], 1500)
 
 
@@ -103,7 +103,7 @@ def test_recover_stale_jobs() -> None:
     with tempfile.TemporaryDirectory() as tmpdir:
         job_db = JobDB(base_path=tmpdir, experiment_name="test_exp", validate=False)
 
-        config = {"_target_": "dr_exp.trainers.test_trainer.train"}
+        config = {"_target_": "dr_exp.training.dummy_trainer.train"}
 
         # Create and claim jobs
         fresh_id = job_db.create_job(config)
@@ -146,7 +146,7 @@ def test_complete_jobdb() -> None:
 
         # Simulate a complete workflow
         config = {
-            "_target_": "dr_exp.trainers.test_trainer.train",
+            "_target_": "dr_exp.training.dummy_trainer.train",
             "model": "resnet50",
             "epochs": 100,
         }
@@ -168,11 +168,6 @@ def test_complete_jobdb() -> None:
         for _ in range(5):
             job_db.heartbeat(urgent_id)
             time.sleep(0.01)
-
-        # 5. Add files to sync queue during training
-        job_db.add_to_sync_queue(
-            urgent_id, f"{job_db.get_storage_path(urgent_id)}/metrics.jsonl", "metrics"
-        )
 
         # 6. Complete the job
         job_db.complete_job(urgent_id, {"accuracy": 0.98})

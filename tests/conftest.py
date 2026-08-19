@@ -22,4 +22,8 @@ def temp_job_db(temp_experiment_dir: Path) -> JobDB:
 
 @pytest.fixture
 def mock_config() -> dict[str, str | int | float]:
-    return {"_target_": "dr_exp.trainers.test_trainer.train", "epochs": 10, "lr": 0.001}
+    return {
+        "_target_": "dr_exp.training.dummy_trainer.train",
+        "epochs": 10,
+        "lr": 0.001,
+    }

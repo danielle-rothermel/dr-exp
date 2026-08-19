@@ -1,11 +1,10 @@
 # dr_exp Package
 
-Core Python package implementing the backend, job database clients, manager logic and utilities.
+Local-first experiment manager: filesystem job queue, Hydra worker dispatch, SLURM launcher.
 
 Subpackages:
-- `api/` – FastAPI backend serving the UI and workers.
-- `job_db/` – Supabase and local database clients.
-- `manage/` – manager and worker implementations.
-- `logging/` – structured logging utilities.
-- `train_examples/` – dummy trainer and Hydra configs.
-- `utils/` – small helper utilities.
+- `core/` — JobDB file-based queue
+- `worker/` — job execution and multi-GPU launcher
+- `cli/` — Click CLI and sweep utilities
+- `training/` — dummy trainer for tests and smoke runs
+- `submit.py` — programmatic job submission helpers

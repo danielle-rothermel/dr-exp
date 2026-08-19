@@ -14,7 +14,6 @@ def test_jobdb_basic(temp_job_db: JobDB, temp_experiment_dir: Path) -> None:
     exp_path = temp_experiment_dir / "test_exp"
     assert (exp_path / "jobs").exists()
     assert (exp_path / "storage").exists()
-    assert (exp_path / "sync_queue").exists()
     assert (exp_path / "logs").exists()
     assert (exp_path / "control").exists()
 
@@ -58,14 +57,14 @@ def test_jobdb_basic(temp_job_db: JobDB, temp_experiment_dir: Path) -> None:
 
     # Test input validation
     # Missing _target_
-    with pytest.raises(AssertionError, match="_target_"):
+    with pytest.raises(ValueError, match="_target_"):
         temp_job_db.create_job({"model": "resnet"}, priority=100)
 
     # Invalid priority
-    with pytest.raises(AssertionError, match="Priority"):
+    with pytest.raises(ValueError, match="Priority"):
         temp_job_db.create_job(config, priority=1500)
 
     # Invalid target module
     bad_config = {"_target_": "nonexistent.module.train"}
-    with pytest.raises(AssertionError, match="Cannot import"):
+    with pytest.raises(ValueError, match="not found"):
         temp_job_db.create_job(bad_config, priority=100)

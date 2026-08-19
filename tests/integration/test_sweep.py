@@ -47,7 +47,7 @@ def test_generate_configs() -> None:
 
         config_file = config_dir / "test.yaml"
         config_file.write_text("""
-_target_: dr_exp.training.dummy_trainer.train_dummy
+_target_: dr_exp.training.dummy_trainer.train
 model: resnet18
 lr: 0.001
 epochs: 10
@@ -70,13 +70,13 @@ epochs: 10
 
         # All should have the target
         for cfg in configs:
-            assert cfg["_target_"] == "dr_exp.training.dummy_trainer.train_dummy"
+            assert cfg["_target_"] == "dr_exp.training.dummy_trainer.train"
 
 
 def test_validate_config() -> None:
     """Test config validation."""
     # Valid config
-    config = {"_target_": "dr_exp.training.dummy_trainer.train_dummy", "epochs": 10}
+    config = {"_target_": "dr_exp.training.dummy_trainer.train", "epochs": 10}
     validate_sweep_config(config)  # Should not raise
 
     # Missing target
@@ -97,7 +97,7 @@ def test_sweep_cli_dry_run() -> None:
         # Create test config
         config_file = Path(tmpdir) / "test.yaml"
         config_file.write_text("""
-_target_: dr_exp.training.dummy_trainer.train_dummy
+_target_: dr_exp.training.dummy_trainer.train
 model: resnet18
 lr: 0.001
 epochs: 10
@@ -142,7 +142,7 @@ def test_sweep_cli_create_jobs() -> None:
         # Create test config
         config_file = Path(tmpdir) / "test.yaml"
         config_file.write_text("""
-_target_: dr_exp.training.dummy_trainer.train_dummy
+_target_: dr_exp.training.dummy_trainer.train
 epochs: 10
 batch_size: 32
 """)
@@ -209,7 +209,7 @@ lr: 0.001
                 "--params",
                 "lr=0.1,0.01",
                 "--target",
-                "dr_exp.training.dummy_trainer.train_dummy",
+                "dr_exp.training.dummy_trainer.train",
                 "--priority",
                 "300",
             ],
@@ -222,9 +222,7 @@ lr: 0.001
         jobs = job_db.list_jobs()
         assert len(jobs) == 2
         for job in jobs:
-            assert (
-                job["config"]["_target_"] == "dr_exp.training.dummy_trainer.train_dummy"
-            )
+            assert job["config"]["_target_"] == "dr_exp.training.dummy_trainer.train"
 
 
 def test_large_sweep_progress() -> None:
@@ -234,7 +232,7 @@ def test_large_sweep_progress() -> None:
 
         config_file = Path(tmpdir) / "test.yaml"
         config_file.write_text("""
-_target_: dr_exp.training.dummy_trainer.train_dummy
+_target_: dr_exp.training.dummy_trainer.train
 model: resnet18
 lr: 0.001
 batch_size: 32

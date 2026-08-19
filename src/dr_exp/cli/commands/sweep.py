@@ -95,14 +95,12 @@ def sweep(  # noqa: C901
                 # Show only the swept parameters and target
                 click.echo(f"_target_: {cfg.get('_target_', 'NOT SET')}")
                 for key in sweep_params:
-                    # Navigate nested keys
-                    value = cfg
+                    value: object = cfg
                     for part in key.split("."):
-                        if isinstance(value, dict):
-                            value = value.get(part, "NOT FOUND")
-                        else:
+                        if not isinstance(value, dict):
                             value = "NOT FOUND"
                             break
+                        value = value.get(part, "NOT FOUND")
                     click.echo(f"{key}: {value}")
         return
 

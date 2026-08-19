@@ -2,7 +2,6 @@
 
 import tempfile
 from datetime import datetime, timedelta, UTC
-from pathlib import Path
 from click.testing import CliRunner
 
 from dr_exp.cli.main import cli
@@ -16,7 +15,7 @@ def test_cli_kill() -> None:
     with tempfile.TemporaryDirectory() as tmpdir:
         # Create jobs
         job_db = JobDB(base_path=tmpdir, experiment_name="test_exp", validate=False)
-        config = {"_target_": "test.train"}
+        config = {"_target_": "dr_exp.training.dummy_trainer.train"}
 
         job1 = job_db.create_job(config)
         job2 = job_db.create_job(config)
@@ -77,7 +76,7 @@ def test_cli_boost() -> None:
     with tempfile.TemporaryDirectory() as tmpdir:
         # Create jobs
         job_db = JobDB(base_path=tmpdir, experiment_name="test_exp", validate=False)
-        config = {"_target_": "test.train"}
+        config = {"_target_": "dr_exp.training.dummy_trainer.train"}
 
         job1 = job_db.create_job(config, priority=100)
         job2 = job_db.create_job(config, priority=200)
@@ -133,7 +132,7 @@ def test_cli_recover() -> None:
     with tempfile.TemporaryDirectory() as tmpdir:
         # Create stale job
         job_db = JobDB(base_path=tmpdir, experiment_name="test_exp", validate=False)
-        config = {"_target_": "test.train"}
+        config = {"_target_": "dr_exp.training.dummy_trainer.train"}
 
         job_id = job_db.create_job(config)
         job_db.claim_next_job("worker")
@@ -185,74 +184,6 @@ def test_cli_recover() -> None:
         assert job["status"] == "queued"
 
 
-def test_cli_sync_status(tmp_path: Path) -> None:
-    """Test sync status command."""
-    runner = CliRunner()
-
-    with tempfile.TemporaryDirectory() as tmpdir:
-        # Create experiment with sync items
-        job_db = JobDB(base_path=tmpdir, experiment_name="test_exp", validate=False)
-
-        # Add some sync items
-        from dr_exp.sync.queue import SyncQueue, SyncItem
-
-        sync_queue = SyncQueue(job_db.get_sync_queue_path())
-
-        # Add pending item
-        item1 = SyncItem(
-            id="sync1",
-            job_id="job1",
-            file_path=str(tmp_path / "file1.txt"),
-            file_type="metrics",
-            metadata={},
-            created_at=datetime.now(UTC).isoformat(),
-        )
-        sync_queue.add_item(item1)
-
-        # Add failed item
-        item2 = SyncItem(
-            id="sync2",
-            job_id="job2",
-            file_path=str(tmp_path / "file2.txt"),
-            file_type="model",
-            metadata={},
-            created_at=datetime.now(UTC).isoformat(),
-            attempts=1,
-            error="Network error",
-        )
-        sync_queue.add_item(item2)
-
-        # Get status
-        result = runner.invoke(
-            cli,
-            ["--base-path", tmpdir, "--experiment", "test_exp", "job", "sync-status"],
-        )
-
-        assert result.exit_code == 0
-        assert "Sync Queue Status:" in result.output
-        assert "Pending:   2" in result.output
-
-        # Get verbose status
-        result = runner.invoke(
-            cli,
-            [
-                "--base-path",
-                tmpdir,
-                "--experiment",
-                "test_exp",
-                "job",
-                "sync-status",
-                "--verbose",
-            ],
-        )
-
-        assert result.exit_code == 0
-        assert "Pending items:" in result.output
-        assert "sync1" in result.output
-        assert "sync2" in result.output
-        assert "Network error" in result.output
-
-
 def test_cli_run_one() -> None:
     """Test running a single job."""
     runner = CliRunner()
@@ -260,7 +191,7 @@ def test_cli_run_one() -> None:
     with tempfile.TemporaryDirectory() as tmpdir:
         # Create a job
         job_db = JobDB(base_path=tmpdir, experiment_name="test_exp", validate=False)
-        config = {"_target_": "dr_exp.trainers.test_trainer.train", "epochs": 2}
+        config = {"_target_": "dr_exp.training.dummy_trainer.train", "epochs": 2}
         job_id = job_db.create_job(config, priority=500)
 
         # Run the specific job
@@ -273,8 +204,7 @@ def test_cli_run_one() -> None:
                 "test_exp",
                 "job",
                 "run-one",
-                job_id[:8],  # Partial ID
-                "--no-sync",
+                job_id[:8],
             ],
         )
 
@@ -306,7 +236,7 @@ def test_cli_run_one() -> None:
 
         assert result.exit_code == 1
         assert "FAILED" in result.output
-        assert "Simulated training failure" in result.output
+        assert "Simulated failure" in result.output
 
 
 def test_cli_validate() -> None:
@@ -337,7 +267,7 @@ def test_cli_validate() -> None:
 
         # Add a stale job
         job_db = JobDB(base_path=tmpdir, experiment_name="good_exp", validate=False)
-        config = {"_target_": "test.train"}
+        config = {"_target_": "dr_exp.training.dummy_trainer.train"}
         job_id = job_db.create_job(config)
         job_db.claim_next_job("worker")
 
@@ -361,7 +291,7 @@ def test_cli_partial_id_matching() -> None:
     with tempfile.TemporaryDirectory() as tmpdir:
         # Create jobs with similar IDs
         job_db = JobDB(base_path=tmpdir, experiment_name="test_exp", validate=False)
-        config = {"_target_": "test.train"}
+        config = {"_target_": "dr_exp.training.dummy_trainer.train"}
 
         # Create multiple jobs
         jobs = [job_db.create_job(config) for _ in range(3)]

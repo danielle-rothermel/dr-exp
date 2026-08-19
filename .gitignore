@@ -29,9 +29,6 @@ npm-debug.log
 yarn-error.log
 package-lock.json # Or yarn.lock, depending on preference if you add package managers
 
-# Supabase
-.supabase/ # Local Supabase CLI state, if not desired in repo
-
 # IDE specific
 .idea/
 .vscode/

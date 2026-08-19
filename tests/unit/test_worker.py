@@ -15,7 +15,7 @@ def test_basic_worker() -> None:
         job_db = JobDB(base_path=tmpdir, experiment_name="test_exp", validate=False)
 
         # Create a test job
-        config = {"_target_": "dr_exp.trainers.test_trainer.train", "epochs": 5}
+        config = {"_target_": "dr_exp.training.dummy_trainer.train", "epochs": 5}
         job_id = job_db.create_job(config, priority=100)
 
         # Create worker with specific working directory
@@ -33,11 +33,11 @@ def test_basic_worker() -> None:
         assert job["status"] == "completed"
         assert job["error"] is None
         assert "final_metrics" in job
-        assert job["final_metrics"]["total_epochs"] == 5
+        assert "loss" in job["final_metrics"]
 
         # Verify artifacts created
         storage_path = job_db.get_storage_path(job_id)
-        assert (storage_path / "metrics.jsonl").exists()
+        assert (storage_path / "metrics.json").exists()
         assert (storage_path / "model_final.pt").exists()
 
         # Verify working directory structure
@@ -52,7 +52,7 @@ def test_worker_failure_handling() -> None:
 
         # Create a job that will fail
         config = {
-            "_target_": "dr_exp.trainers.test_trainer.train",
+            "_target_": "dr_exp.training.dummy_trainer.train",
             "epochs": 5,
             "fail_rate": 1.0,  # Always fail
         }
@@ -67,7 +67,7 @@ def test_worker_failure_handling() -> None:
         # Verify job marked as failed
         job = job_db.get_job(job_id)
         assert job["status"] == "failed"
-        assert "Simulated training failure" in job["error"]
+        assert "Simulated failure" in job["error"]
 
 
 def test_worker_no_jobs() -> None:
@@ -91,7 +91,7 @@ def test_worker_run_multiple() -> None:
         job_ids = []
         for i in range(5):
             config = {
-                "_target_": "dr_exp.trainers.test_trainer.train",
+                "_target_": "dr_exp.training.dummy_trainer.train",
                 "epochs": 2,
                 "index": i,
                 "fail_rate": 0.2 if i == 2 else 0.0,  # One job will fail
@@ -121,7 +121,7 @@ def test_worker_max_jobs() -> None:
 
         # Create 10 jobs
         for _i in range(10):
-            config = {"_target_": "dr_exp.trainers.test_trainer.train", "epochs": 1}
+            config = {"_target_": "dr_exp.training.dummy_trainer.train", "epochs": 1}
             job_db.create_job(config)
 
         # Run worker with limit
@@ -142,7 +142,7 @@ def test_worker_priority_order() -> None:
         job_db = JobDB(base_path=tmpdir, experiment_name="test_exp", validate=False)
 
         # Create jobs with different priorities
-        config = {"_target_": "dr_exp.trainers.test_trainer.train", "epochs": 1}
+        config = {"_target_": "dr_exp.training.dummy_trainer.train", "epochs": 1}
 
         low_id = job_db.create_job(config, priority=100)
         high_id = job_db.create_job(config, priority=900)

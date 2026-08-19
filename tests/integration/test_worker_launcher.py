@@ -93,7 +93,7 @@ def test_health_monitoring() -> None:
 
         # Create a queued job
         with patch("importlib.import_module"):
-            job_db.create_job({"_target_": "dr_exp.training.dummy_trainer.train_dummy"})
+            job_db.create_job({"_target_": "dr_exp.training.dummy_trainer.train"})
 
         launcher = WorkerLauncher(
             job_db=job_db,
@@ -148,8 +148,8 @@ def test_status_writing() -> None:
 
         # Create some jobs
         with patch("importlib.import_module"):
-            job_db.create_job({"_target_": "dr_exp.training.dummy_trainer.train_dummy"})
-            job_db.create_job({"_target_": "dr_exp.training.dummy_trainer.train_dummy"})
+            job_db.create_job({"_target_": "dr_exp.training.dummy_trainer.train"})
+            job_db.create_job({"_target_": "dr_exp.training.dummy_trainer.train"})
 
         launcher = WorkerLauncher(
             job_db=job_db,

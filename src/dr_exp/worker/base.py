@@ -1,174 +1,45 @@
 """Base worker implementation for job execution."""
 
 import os
-import sys
-import time
 import threading
+import time
 import traceback
+from datetime import UTC, datetime
 from pathlib import Path
 from typing import Any
-from collections.abc import Callable
-from datetime import datetime, UTC
 
 import hydra
 from omegaconf import OmegaConf
 
 from dr_exp.core.job_db import JobDB
-from dr_exp.sync.queue import SyncQueue, SyncItem
-from dr_exp.sync.sync_handler import SyncHandler
 
 
 class Worker:
-    """Base worker that executes jobs from JobDB with background sync."""
+    """Base worker that executes jobs from JobDB."""
 
     def __init__(
         self,
         job_db: JobDB,
         worker_id: str,
         working_dir: str | None = None,
-        experiment_path: str | None = None,
-        sync_interval: int = 30,
         heartbeat_interval: int = 60,
-        sync_enabled: bool = True,
-        supabase_url: str | None = None,
-        supabase_key: str | None = None,
     ) -> None:
-        """Initialize worker.
-
-        Args:
-            job_db: JobDB instance to get jobs from
-            worker_id: Unique identifier for this worker
-            working_dir: Directory to run jobs in (defaults to current dir)
-            experiment_path: Path to experiment directory for logs (optional)
-            sync_interval: Seconds between sync attempts
-            heartbeat_interval: Seconds between heartbeats
-            sync_enabled: Whether to enable background sync
-            supabase_url: Optional Supabase URL
-            supabase_key: Optional Supabase key
-        """
+        """Initialize worker."""
         self.job_db = job_db
         self.worker_id = worker_id
         self.working_dir = Path(working_dir) if working_dir else Path.cwd()
-        self.sync_interval = sync_interval
         self.heartbeat_interval = heartbeat_interval
-        self.sync_enabled = sync_enabled
 
         self.current_job_id: str | None = None
         self.should_stop = threading.Event()
 
-        # Ensure working directory exists
         self.working_dir.mkdir(parents=True, exist_ok=True)
 
-        # Set up file logging
-        self.log_file = None
-        self._original_stdout = None
-        self._original_stderr = None
-        if experiment_path:
-            log_dir = Path(experiment_path) / "logs"
-            log_dir.mkdir(exist_ok=True)
-            log_path = log_dir / f"worker_{worker_id}.log"
-            self.log_file = log_path.open("a", buffering=1)  # Line buffered
-
-            # Redirect stdout and stderr
-            self._original_stdout = sys.stdout
-            self._original_stderr = sys.stderr
-            sys.stdout = self.log_file
-            sys.stderr = self.log_file
-
-            # Write header
-            print(
-                f"=== Worker {worker_id} started at {datetime.now(UTC).isoformat()} ==="
-            )
-            print(f"Experiment: {Path(experiment_path).name}")
-            print(f"Sync: {'enabled' if sync_enabled else 'disabled'}")
-            print("=" * 60)
-
-        # Initialize sync queue
-        self.sync_queue = SyncQueue(job_db.get_sync_queue_path())
-
-        # Thread references
-        self.sync_thread: threading.Thread | None = None
         self.heartbeat_thread: threading.Thread | None = None
-
-        # Sync metrics tracking
-        self.sync_metrics: dict[str, Any] = {
-            "files_synced": 0,
-            "bytes_uploaded": 0,
-            "sync_errors": 0,
-            "sync_attempts": 0,
-            "last_sync_time": None,
-        }
-
-        # Initialize sync handler if enabled
-        if sync_enabled:
-            try:
-                self.sync_handler: SyncHandler | None = SyncHandler(
-                    experiment_name=job_db.experiment_name,
-                    base_path=str(job_db.base_path),
-                    supabase_url=supabase_url,
-                    supabase_key=supabase_key,
-                )
-
-                # Set sync function
-                if self.sync_handler.enabled:
-
-                    def sync_with_metrics(item: SyncItem) -> None:
-                        """Sync file and track metrics."""
-                        self.sync_metrics["sync_attempts"] = (
-                            self.sync_metrics.get("sync_attempts", 0) + 1
-                        )
-                        try:
-                            if self.sync_handler:
-                                result = self.sync_handler.sync_file(item)
-                                self._update_sync_metrics(result)
-                        except Exception:
-                            self.sync_metrics["sync_errors"] = (
-                                self.sync_metrics.get("sync_errors", 0) + 1
-                            )
-                            raise
-
-                    self.sync_fn: Callable[[SyncItem], None] | None = sync_with_metrics
-                else:
-                    self.sync_fn = None
-                    print(f"[{self.worker_id}] Sync disabled - Supabase not available")
-            except Exception as e:
-                print(f"[{self.worker_id}] Failed to initialize sync: {e}")
-                self.sync_handler = None
-                self.sync_fn = None
-        else:
-            self.sync_handler = None
-            self.sync_fn = None
-
-    def _sync_worker(self) -> None:
-        """Background thread that processes sync queue."""
-        print(f"[{self.worker_id}] Sync thread started")
-
-        while not self.should_stop.wait(self.sync_interval):
-            try:
-                if self.sync_fn:
-                    # Process a batch of items
-                    results = self.sync_queue.process_queue(self.sync_fn, batch_size=5)
-
-                    if results["success"] > 0 or results["failed"] > 0:
-                        print(
-                            f"[{self.worker_id}] Sync: {results['success']} success, "
-                            f"{results['failed']} failed, {results['skipped']} pending"
-                        )
-                else:
-                    # No sync function configured - just track items
-                    stats = self.sync_queue.get_stats()
-                    if stats["pending"] > 0:
-                        print(
-                            f"[{self.worker_id}] Sync pending: {stats['pending']} items"
-                        )
-
-            except Exception as e:
-                print(f"[{self.worker_id}] Sync error: {e}")
-
-        print(f"[{self.worker_id}] Sync thread stopped")
 
     def _heartbeat_worker(self) -> None:
         """Background thread that sends heartbeats for current job."""
+        # KNOWN ISSUE (see README): daemon thread can be starved by GIL-holding trainer
         print(f"[{self.worker_id}] Heartbeat thread started")
 
         while not self.should_stop.wait(self.heartbeat_interval):
@@ -187,14 +58,7 @@ class Worker:
         print(f"[{self.worker_id}] Heartbeat thread stopped")
 
     def start_background_threads(self) -> None:
-        """Start background sync and heartbeat threads."""
-        if self.sync_enabled and not self.sync_thread:
-            self.sync_thread = threading.Thread(
-                target=self._sync_worker, name=f"{self.worker_id}_sync"
-            )
-            self.sync_thread.daemon = True
-            self.sync_thread.start()
-
+        """Start background heartbeat thread."""
         if not self.heartbeat_thread:
             self.heartbeat_thread = threading.Thread(
                 target=self._heartbeat_worker, name=f"{self.worker_id}_heartbeat"
@@ -206,142 +70,37 @@ class Worker:
         """Stop background threads gracefully."""
         self.should_stop.set()
 
-        # Wait for threads to finish
-        if self.sync_thread and self.sync_thread.is_alive():
-            self.sync_thread.join(timeout=5)
-
         if self.heartbeat_thread and self.heartbeat_thread.is_alive():
             self.heartbeat_thread.join(timeout=5)
 
-    def _update_sync_metrics(self, result: dict[str, Any]) -> None:
-        """Update sync metrics based on sync result.
-
-        Args:
-            result: Result from sync operation
-        """
-        if "bytes_uploaded" in result:
-            self.sync_metrics["files_synced"] = (
-                self.sync_metrics.get("files_synced", 0) + 1
-            )
-            self.sync_metrics["bytes_uploaded"] = (
-                self.sync_metrics.get("bytes_uploaded", 0) + result["bytes_uploaded"]
-            )
-            self.sync_metrics["last_sync_time"] = datetime.now(UTC).isoformat()
-
-    def _sync_job_on_completion(self, job_id: str) -> None:
-        """Sync job data to Supabase after completion.
-
-        Args:
-            job_id: Job ID to sync
-        """
-        if self.sync_handler and self.sync_handler.enabled:
-            try:
-                job_data = self.job_db.get_job(job_id)
-                if job_data:
-                    self.sync_handler.sync_job_data(job_data)
-            except Exception as e:
-                print(f"[{self.worker_id}] Failed to sync job data: {e}")
-
-    def add_artifact_to_sync(
-        self,
-        job_id: str,
-        file_path: str,
-        file_type: str,
-        metadata: dict[str, Any] | None = None,
-    ) -> None:
-        """Add a file to the sync queue.
-
-        Args:
-            job_id: Job that created this file
-            file_path: Path to file
-            file_type: Type of file (metrics, logs, model, etc.)
-            metadata: Optional metadata
-        """
-        # Always add to queue, even if sync is disabled
-        # Create sync item
-        sync_item = SyncItem(
-            id=f"{job_id}_{file_type}_{int(time.time() * 1000)}",
-            job_id=job_id,
-            file_path=file_path,
-            file_type=file_type,
-            metadata=metadata or {},
-            created_at=datetime.now(UTC).isoformat(),
-        )
-
-        # Add to queue
-        self.sync_queue.add_item(sync_item)
-
     def execute_job(self, job: dict[str, Any]) -> dict[str, Any]:
-        """Execute a single job using Hydra.
-
-        Args:
-            job: Job data from JobDB
-
-        Returns:
-            Result dict with status and optional error
-        """
+        """Execute a single job using Hydra."""
         job_id = job["id"]
         config = job["config"]
 
-        # Create job-specific working directory
         job_dir = self.working_dir / f"job_{job_id}"
         job_dir.mkdir(parents=True, exist_ok=True)
 
-        # Change to job directory
         original_cwd = Path.cwd()
         os.chdir(job_dir)
 
+        storage_path = self.job_db.get_storage_path(job_id)
+        storage_path.mkdir(parents=True, exist_ok=True)
+
         try:
-            # Convert config to OmegaConf
             if isinstance(config, dict):
                 config = OmegaConf.create(config)
 
-            # Inject job metadata into config
             config.job_id = job_id
             config.worker_id = self.worker_id
-            config.storage_path = str(self.job_db.get_storage_path(job_id))
+            config.storage_path = str(storage_path)
 
-            # Ensure storage directory exists
-            storage_path = Path(config.storage_path)
-            storage_path.mkdir(parents=True, exist_ok=True)
-
-            # Execute using Hydra's call mechanism
             print(
                 f"[{self.worker_id}] Executing job {job_id} with "
                 f"_target_={config._target_}"
             )
             result = hydra.utils.call(config)
 
-            # Add any created artifacts to sync queue
-            for file_path in storage_path.iterdir():
-                if file_path.is_file():
-                    # Determine file type from extension/name
-                    if "metrics" in file_path.name or file_path.suffix == ".jsonl":
-                        file_type = "metrics"
-                    elif "model" in file_path.name or file_path.suffix in [
-                        ".pt",
-                        ".pth",
-                    ]:
-                        file_type = "model"
-                    elif (
-                        file_path.name
-                        in [
-                            "events.jsonl",
-                            "config.json",
-                            "metadata.json",
-                        ]
-                        or file_path.suffix == ".log"
-                        or "log" in file_path.name
-                    ):
-                        file_type = "logs"
-                    else:
-                        file_type = "other"
-
-                    self.add_artifact_to_sync(
-                        job_id, str(file_path), file_type, {"filename": file_path.name}
-                    )
-
-            # Job succeeded
             return {
                 "status": "success",
                 "result": result,
@@ -349,17 +108,14 @@ class Worker:
             }
 
         except Exception as e:
-            # Job failed
             error_msg = f"{type(e).__name__}: {e!s}"
             tb = traceback.format_exc()
 
             print(f"[{self.worker_id}] Job {job_id} failed: {error_msg}")
             print(f"Traceback:\n{tb}")
 
-            # Save error to file
             error_file = storage_path / "error.txt"
             error_file.write_text(f"{error_msg}\n\n{tb}")
-            self.add_artifact_to_sync(job_id, str(error_file), "error")
 
             return {
                 "status": "failed",
@@ -369,16 +125,10 @@ class Worker:
             }
 
         finally:
-            # Always return to original directory
             os.chdir(original_cwd)
 
     def run_one_job(self) -> str:
-        """Claim and execute one job.
-
-        Returns:
-            Status: 'completed', 'failed', or 'no_job'
-        """
-        # Try to claim a job
+        """Claim and execute one job."""
         job = self.job_db.claim_next_job(self.worker_id)
 
         if not job:
@@ -390,15 +140,11 @@ class Worker:
             f"[{self.worker_id}] Claimed job {job['id']} (priority={job['priority']})"
         )
 
-        # Send initial heartbeat
         self.job_db.heartbeat(job["id"])
 
-        # Execute the job
         result = self.execute_job(job)
 
-        # Update job status based on result
         if result["status"] == "success":
-            # Extract metrics if provided
             metrics = None
             if isinstance(result.get("result"), dict):
                 metrics = result["result"].get("metrics")
@@ -411,26 +157,15 @@ class Worker:
             print(f"[{self.worker_id}] Job {job['id']} failed")
             status = "failed"
 
-        # Sync job data to Supabase
-        self._sync_job_on_completion(job["id"])
-
         self.current_job_id = None
         return status
 
     def run(self, max_jobs: int | None = None) -> dict[str, int]:
-        """Run worker until no more jobs or max_jobs reached.
-
-        Args:
-            max_jobs: Maximum number of jobs to execute (None = unlimited)
-
-        Returns:
-            Dict with counts of completed, failed, and total jobs
-        """
+        """Run worker until no more jobs or max_jobs reached."""
         stats = {"completed": 0, "failed": 0, "total": 0}
 
         print(f"[{self.worker_id}] Worker started")
 
-        # Start background threads
         self.start_background_threads()
 
         try:
@@ -438,37 +173,21 @@ class Worker:
                 status = self.run_one_job()
 
                 if status == "no_job":
-                    # Wait before checking again
-                    time.sleep(10)  # Poll every 10 seconds
+                    time.sleep(10)
                     continue
-                elif status == "completed":
+                if status == "completed":
                     stats["completed"] += 1
                     stats["total"] += 1
                 elif status == "failed":
                     stats["failed"] += 1
                     stats["total"] += 1
         finally:
-            # Stop background threads
             self.stop_background_threads()
-
-            # Ensure log cleanup even on unexpected exit
-            if self.log_file and not self.log_file.closed:
-                sys.stdout = getattr(self, "_original_stdout", sys.__stdout__)
-                sys.stderr = getattr(self, "_original_stderr", sys.__stderr__)
-                self.log_file.close()
 
         print(f"[{self.worker_id}] Worker finished: {stats}")
         return stats
 
     def shutdown(self, reason: str = "signal") -> None:
         """Shutdown worker gracefully."""
+        # KNOWN ISSUE (see README): never called; no SIGTERM handler registers this
         print(f"\n=== Worker {self.worker_id} shutting down: {reason} ===")
-
-        if self.log_file:
-            # Restore original stdout/stderr
-            if self._original_stdout:
-                sys.stdout = self._original_stdout
-            if self._original_stderr:
-                sys.stderr = self._original_stderr
-            self.log_file.close()
-            self.log_file = None

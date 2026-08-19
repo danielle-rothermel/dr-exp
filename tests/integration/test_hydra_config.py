@@ -14,7 +14,7 @@ def test_hydra_config_composition(tmp_path: Path) -> None:
     # Create base config with composition
     base_config = {
         "defaults": ["model"],
-        "_target_": "dr_exp.trainers.test_trainer.train",
+        "_target_": "dr_exp.training.dummy_trainer.train",
         "epochs": 10,
     }
     (config_dir / "train.yaml").write_text(yaml.dump(base_config))
@@ -67,7 +67,7 @@ def test_overrides(tmp_path: Path) -> None:
     config_dir.mkdir()
 
     config = {
-        "_target_": "dr_exp.trainers.test_trainer.train",
+        "_target_": "dr_exp.training.dummy_trainer.train",
         "epochs": 10,
         "lr": 0.01,
     }
