@@ -1,164 +1,98 @@
-"""Unit tests for Worker base functionality."""
+"""Worker startup helpers such as stage capacity bootstrapping."""
 
-import tempfile
+from __future__ import annotations
+
+from dataclasses import dataclass
 from pathlib import Path
 from typing import Any
+from unittest.mock import MagicMock
 
-from dr_exp.core.job_db import JobDB
-from dr_exp.worker.base import Worker
+import pytest
 
-
-def test_basic_worker() -> None:
-    """Test worker can execute a single job."""
-    with tempfile.TemporaryDirectory() as tmpdir:
-        # Initialize JobDB
-        job_db = JobDB(base_path=tmpdir, experiment_name="test_exp", validate=False)
-
-        # Create a test job
-        config = {"_target_": "dr_exp.training.dummy_trainer.train", "epochs": 5}
-        job_id = job_db.create_job(config, priority=100)
-
-        # Create worker with specific working directory
-        work_dir = Path(tmpdir) / "worker_dir"
-        worker = Worker(
-            job_db=job_db, worker_id="test_worker", working_dir=str(work_dir)
-        )
-
-        # Run one job
-        status = worker.run_one_job()
-        assert status == "completed"
-
-        # Verify job completed
-        job = job_db.get_job(job_id)
-        assert job["status"] == "completed"
-        assert job["error"] is None
-        assert "final_metrics" in job
-        assert "loss" in job["final_metrics"]
-
-        # Verify artifacts created
-        storage_path = job_db.get_storage_path(job_id)
-        assert (storage_path / "metrics.json").exists()
-        assert (storage_path / "model_final.pt").exists()
-
-        # Verify working directory structure
-        assert work_dir.exists()
-        assert (work_dir / f"job_{job_id}").exists()
+from dr_exp.config.machine import MachineProfile
+from dr_exp.config.names import Accelerator, LabelKey
+from dr_exp.platform.worker import ensure_stage_capacity
 
 
-def test_worker_failure_handling() -> None:
-    """Test worker handles job failures correctly."""
-    with tempfile.TemporaryDirectory() as tmpdir:
-        job_db = JobDB(base_path=tmpdir, experiment_name="test_exp", validate=False)
-
-        # Create a job that will fail
-        config = {
-            "_target_": "dr_exp.training.dummy_trainer.train",
-            "epochs": 5,
-            "fail_rate": 1.0,  # Always fail
+def make_profile(
+    tmp_path: Path, *, accelerator: Accelerator = Accelerator.MPS
+) -> MachineProfile:
+    return MachineProfile.model_validate(
+        {
+            "name": "unit",
+            "accelerator": accelerator.value,
+            "python_executable": Path("/opt/venv/bin/python"),
+            "workspace_root": tmp_path / "workspace",
+            "run_store_root": tmp_path / "runs",
+            "database_url": "postgresql+psycopg:///dr_exp_test",
+            "system_database_url": "postgresql+psycopg:///dr_exp_test",
+            "executor_id": "unit-0",
+            "worker_concurrency": 2,
         }
-        job_id = job_db.create_job(config)
-
-        # Create and run worker
-        worker = Worker(job_db=job_db, worker_id="test_worker")
-        status = worker.run_one_job()
-
-        assert status == "failed"
-
-        # Verify job marked as failed
-        job = job_db.get_job(job_id)
-        assert job["status"] == "failed"
-        assert "Simulated failure" in job["error"]
+    )
 
 
-def test_worker_no_jobs() -> None:
-    """Test worker behavior when no jobs available."""
-    with tempfile.TemporaryDirectory() as tmpdir:
-        job_db = JobDB(base_path=tmpdir, experiment_name="test_exp", validate=False)
+@dataclass(frozen=True)
+class FakeControl:
+    """Minimal stand-in for dr-platform capacity control records."""
 
-        # No jobs created
-        worker = Worker(job_db=job_db, worker_id="test_worker")
-        status = worker.run_one_job()
-
-        assert status == "no_job"
+    selector: dict[str, str]
+    capacity: int = 1
 
 
-def test_worker_run_multiple() -> None:
-    """Test worker running multiple jobs."""
-    with tempfile.TemporaryDirectory() as tmpdir:
-        job_db = JobDB(base_path=tmpdir, experiment_name="test_exp", validate=False)
+def test_ensure_stage_capacity_seeds_default_and_mps_selector(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    calls: list[tuple[str, dict[str, Any]]] = []
 
-        # Create multiple jobs
-        job_ids = []
-        for i in range(5):
-            config = {
-                "_target_": "dr_exp.training.dummy_trainer.train",
-                "epochs": 2,
-                "index": i,
-                "fail_rate": 0.2 if i == 2 else 0.0,  # One job will fail
-            }
-            job_id = job_db.create_job(config, priority=i * 100)
-            job_ids.append(job_id)
+    def fake_set_stage_capacity(**kwargs: Any) -> None:  # noqa: ANN401
+        calls.append(("stage", kwargs))
 
-        # Run worker with max_jobs=5 to process exactly these jobs
-        worker = Worker(job_db=job_db, worker_id="batch_worker")
-        stats = worker.run(max_jobs=5)
+    def fake_set_selector_capacity(**kwargs: Any) -> None:  # noqa: ANN401
+        calls.append(("selector", kwargs))
 
-        # Verify stats
-        assert stats["total"] == 5
-        assert stats["completed"] >= 4  # At least 4 should complete
-        assert stats["failed"] <= 1  # At most 1 should fail
+    monkeypatch.setattr("dr_platform.read_controls", lambda **_kwargs: [])
+    monkeypatch.setattr("dr_platform.set_stage_capacity", fake_set_stage_capacity)
+    monkeypatch.setattr(
+        "dr_platform.set_selector_capacity",
+        fake_set_selector_capacity,
+    )
 
-        # Verify all jobs processed
-        for job_id in job_ids:
-            job = job_db.get_job(job_id)
-            assert job["status"] in ["completed", "failed"]
+    ensure_stage_capacity(
+        make_profile(tmp_path, accelerator=Accelerator.MPS), engine=MagicMock()
+    )
+
+    assert len(calls) == 2
+    assert calls[0][0] == "stage"
+    assert calls[0][1]["capacity"] == 2
+    assert calls[1][0] == "selector"
+    assert calls[1][1]["labels"] == {LabelKey.ACCELERATOR.value: Accelerator.MPS.value}
+    assert calls[1][1]["capacity"] == 2
 
 
-def test_worker_max_jobs() -> None:
-    """Test worker respects max_jobs limit."""
-    with tempfile.TemporaryDirectory() as tmpdir:
-        job_db = JobDB(base_path=tmpdir, experiment_name="test_exp", validate=False)
+def test_ensure_stage_capacity_skips_controls_that_already_exist(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    existing = [
+        FakeControl(selector={}),
+        FakeControl(selector={LabelKey.ACCELERATOR.value: Accelerator.MPS.value}),
+    ]
+    stage_calls: list[object] = []
+    selector_calls: list[object] = []
 
-        # Create 10 jobs
-        for _i in range(10):
-            config = {"_target_": "dr_exp.training.dummy_trainer.train", "epochs": 1}
-            job_db.create_job(config)
+    monkeypatch.setattr("dr_platform.read_controls", lambda **_kwargs: existing)
+    monkeypatch.setattr(
+        "dr_platform.set_stage_capacity",
+        lambda **_kwargs: stage_calls.append(True),
+    )
+    monkeypatch.setattr(
+        "dr_platform.set_selector_capacity",
+        lambda **_kwargs: selector_calls.append(True),
+    )
 
-        # Run worker with limit
-        worker = Worker(job_db=job_db, worker_id="limited_worker")
-        stats = worker.run(max_jobs=3)
+    ensure_stage_capacity(
+        make_profile(tmp_path, accelerator=Accelerator.MPS), engine=MagicMock()
+    )
 
-        assert stats["total"] == 3
-        assert stats["completed"] == 3
-
-        # Verify only 3 jobs processed
-        queued_count = len(job_db.list_jobs(status="queued"))
-        assert queued_count == 7
-
-
-def test_worker_priority_order() -> None:
-    """Test worker processes jobs in priority order."""
-    with tempfile.TemporaryDirectory() as tmpdir:
-        job_db = JobDB(base_path=tmpdir, experiment_name="test_exp", validate=False)
-
-        # Create jobs with different priorities
-        config = {"_target_": "dr_exp.training.dummy_trainer.train", "epochs": 1}
-
-        low_id = job_db.create_job(config, priority=100)
-        high_id = job_db.create_job(config, priority=900)
-        med_id = job_db.create_job(config, priority=500)
-
-        # Track execution order
-        execution_order = []
-
-        # Custom worker that tracks order
-        class TrackingWorker(Worker):
-            def execute_job(self, job: dict[str, Any]) -> dict[str, Any]:
-                execution_order.append(job["id"])
-                return super().execute_job(job)
-
-        worker = TrackingWorker(job_db=job_db, worker_id="tracking_worker")
-        worker.run(max_jobs=3)  # Process exactly the 3 jobs we created
-
-        # Verify priority order (high, med, low)
-        assert execution_order == [high_id, med_id, low_id]
+    assert stage_calls == []
+    assert selector_calls == []

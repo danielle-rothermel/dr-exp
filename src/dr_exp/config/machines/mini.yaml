@@ -1,0 +1,15 @@
+# Danielle's Mac mini: the local-first development and smoke-test machine.
+name: mini
+accelerator: mps
+# Must be an interpreter with dr-exp installed: dr-exec runs children under
+# `python -I`, so PYTHONPATH cannot supply the trainer's package.
+python_executable: ~/drotherm/repos/dr-exp/.venv/bin/python
+workspace_root: ~/drotherm/data/dr-exp/mini/workspace
+run_store_root: ~/drotherm/data/dr-exp/mini/runs
+database_url: postgresql+psycopg:///dr_exp_dev
+system_database_url: postgresql+psycopg:///dr_exp_dev
+executor_id: mini-0
+worker_concurrency: 2
+# mps and cpu need no device pinning; a CUDA profile sets CUDA_VISIBLE_DEVICES.
+device_env: {}
+termination_grace_seconds: 30

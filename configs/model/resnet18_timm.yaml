@@ -1,3 +1,0 @@
-source: timm
-name: resnet18
-weights: resnet18.a1_in1k

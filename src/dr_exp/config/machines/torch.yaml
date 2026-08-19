@@ -1,0 +1,22 @@
+# PLACEHOLDER PROFILE -- not exercised yet.
+#
+# The SLURM/CUDA cluster profile is declared as data so the routing, capacity,
+# and device-pinning model can be reviewed, but no dr-exp phase runs against it
+# yet. Cluster bootstrap (Tailscale networking, sbatch submission, and a squeue
+# executor resolver for the sweep) is a later phase. Replace every value below
+# with real cluster settings before using this profile.
+name: torch
+accelerator: cuda
+python_executable: /PLACEHOLDER/venv/bin/python
+workspace_root: /PLACEHOLDER/scratch/dr-exp/workspace
+run_store_root: /PLACEHOLDER/scratch/dr-exp/runs
+database_url: postgresql+psycopg://PLACEHOLDER/dr_exp
+system_database_url: postgresql+psycopg://PLACEHOLDER/dr_exp
+executor_id: torch-0
+worker_concurrency: 1
+device_env:
+  CUDA_VISIBLE_DEVICES: "{device}"
+termination_grace_seconds: 120
+# Static stand-in until a squeue-backed resolver supplies live executor ids.
+sweep_executor_ids:
+  - torch-0

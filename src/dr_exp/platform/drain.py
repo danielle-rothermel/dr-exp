@@ -1,0 +1,167 @@
+"""Bounded and unbounded worker drain loops.
+
+A worker's actual work happens on DBOS queue-listener threads, so the main
+thread's only job is to decide when to stop. Both loops below synchronize on
+ledger state rather than elapsed time: ``--max-jobs`` waits for that many work
+items to reach a terminal state *during this drain*, and the unbounded loop
+waits for a signal.
+"""
+
+from __future__ import annotations
+
+import threading
+import time
+from dataclasses import dataclass
+
+from dr_platform import StageExecutionState, list_work_items
+from sqlalchemy import Engine
+
+from dr_exp.execution.cancellation import AttemptCancellationRegistry
+
+#: States a work item never leaves.
+TERMINAL_STATES = frozenset(
+    {
+        StageExecutionState.SUCCEEDED,
+        StageExecutionState.FAILED,
+        StageExecutionState.CANCELLED,
+    }
+)
+
+#: How often a bounded drain re-reads the ledger. Latency here adds to a
+#: worker's exit time only, never to job throughput.
+POLL_INTERVAL_SECONDS = 0.25
+
+
+@dataclass(frozen=True, slots=True)
+class DrainSummary:
+    """What a drain loop observed before returning."""
+
+    terminal_count: int
+    reached_limit: bool
+    interrupted: bool
+    deadline_expired: bool = False
+
+
+def terminal_work_keys(engine: Engine, *, campaign_key: str) -> frozenset[str]:
+    """The work keys of one campaign that have already reached a terminal state."""
+    return frozenset(
+        item.work_key.value
+        for item in list_work_items(campaign_key, engine=engine)
+        if item.state in TERMINAL_STATES
+    )
+
+
+def capture_drain_baseline(engine: Engine, *, campaign_key: str) -> frozenset[str]:
+    """Snapshot terminal work keys before ``DBOS.launch()`` starts queue listeners."""
+    return terminal_work_keys(engine, campaign_key=campaign_key)
+
+
+def _work_item_states(
+    engine: Engine, *, campaign_key: str
+) -> dict[str, StageExecutionState]:
+    return {
+        item.work_key.value: item.state
+        for item in list_work_items(campaign_key, engine=engine)
+    }
+
+
+def _count_completions_during_drain(
+    *,
+    states: dict[str, StageExecutionState],
+    baseline_terminal: frozenset[str],
+    seen_nonterminal: set[str],
+    counted: set[str],
+) -> int:
+    """Count work keys that newly reached a terminal state during this drain.
+
+    Keys that were already terminal at the baseline snapshot are ignored unless
+    this drain observed them leave a non-terminal state first, which covers an
+    operator retry while the worker is running.
+    """
+    for key, state in states.items():
+        if state not in TERMINAL_STATES:
+            seen_nonterminal.add(key)
+        elif key not in counted and (
+            key not in baseline_terminal or key in seen_nonterminal
+        ):
+            counted.add(key)
+    return len(counted)
+
+
+def drain_until(
+    *,
+    engine: Engine,
+    campaign_key: str,
+    cancellation: AttemptCancellationRegistry,
+    max_jobs: int | None,
+    deadline_seconds: float | None = None,
+    already_terminal: frozenset[str] | None = None,
+) -> DrainSummary:
+    """Block until ``max_jobs`` items finish during this drain.
+
+    ``max_jobs`` counts work items that reach a terminal state during this
+    drain. A pre-launch baseline excludes work that was already terminal when
+    the worker started, but a retried item that was terminal at baseline and
+    later observed non-terminal counts again when it finishes.
+
+    With ``max_jobs=None`` this waits for a shutdown signal. ``deadline_seconds``
+    is a watchdog for tests and smoke runs: reaching it is a failure to make
+    progress, not a success condition.
+    """
+    stop = threading.Event()
+    started_at = time.monotonic()
+    baseline_terminal = (
+        already_terminal
+        if already_terminal is not None
+        else (
+            terminal_work_keys(engine, campaign_key=campaign_key)
+            if max_jobs is not None
+            else frozenset()
+        )
+    )
+    seen_nonterminal: set[str] = set()
+    counted: set[str] = set()
+    terminal = 0
+    while True:
+        if cancellation.shutting_down:
+            return DrainSummary(
+                terminal_count=terminal,
+                reached_limit=False,
+                interrupted=True,
+                deadline_expired=False,
+            )
+        if max_jobs is not None:
+            terminal = _count_completions_during_drain(
+                states=_work_item_states(engine, campaign_key=campaign_key),
+                baseline_terminal=baseline_terminal,
+                seen_nonterminal=seen_nonterminal,
+                counted=counted,
+            )
+            if terminal >= max_jobs:
+                return DrainSummary(
+                    terminal_count=terminal,
+                    reached_limit=True,
+                    interrupted=False,
+                    deadline_expired=False,
+                )
+        if (
+            deadline_seconds is not None
+            and time.monotonic() - started_at >= deadline_seconds
+        ):
+            return DrainSummary(
+                terminal_count=terminal,
+                reached_limit=False,
+                interrupted=False,
+                deadline_expired=True,
+            )
+        stop.wait(POLL_INTERVAL_SECONDS)
+
+
+__all__ = [
+    "POLL_INTERVAL_SECONDS",
+    "TERMINAL_STATES",
+    "DrainSummary",
+    "capture_drain_baseline",
+    "drain_until",
+    "terminal_work_keys",
+]
