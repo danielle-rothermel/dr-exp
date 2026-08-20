@@ -412,6 +412,24 @@ def test_a_worker_runtime_declares_the_queues_it_drains(
         )
 
 
+def test_a_launched_runtime_carries_the_pinned_dbos_identity(
+    profile: MachineProfile, engine: Engine
+) -> None:
+    """The sweep reads identity off DBOS, so the config pin must reach it.
+
+    ``application_version`` and ``executor_id`` are passed through
+    ``build_platform_dbos_config``; if DBOS were to derive its own version
+    instead, the sweep would read live attempts as ``stale_app_version``.
+    """
+    from dbos import DBOS
+
+    from dr_exp.platform.version import application_version
+
+    with worker_runtime(profile, with_dispatcher=True, forward_signals=False):
+        assert DBOS.application_version == application_version()
+        assert DBOS.executor_id == profile.executor_id
+
+
 def test_boost_lowers_priority_on_ready_work(
     profile: MachineProfile, engine: Engine
 ) -> None:

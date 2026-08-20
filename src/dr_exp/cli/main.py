@@ -566,9 +566,7 @@ def worker(
     already_terminal = frozenset[str]()
     if max_jobs is not None:
         with engine_for(profile) as engine:
-            already_terminal = capture_drain_baseline(
-                engine, campaign_key=campaign_key
-            )
+            already_terminal = capture_drain_baseline(engine, campaign_key=campaign_key)
     with worker_runtime(profile, with_dispatcher=with_dispatcher) as runtime:
         summary = drain_until(
             engine=runtime.engine,
@@ -583,9 +581,7 @@ def worker(
         f"limit_reached={summary.reached_limit} "
         f"interrupted={summary.interrupted}"
     )
-    if _drain_failed(
-        summary, max_jobs=max_jobs, deadline_seconds=deadline_seconds
-    ):
+    if _drain_failed(summary, max_jobs=max_jobs, deadline_seconds=deadline_seconds):
         sys.exit(1)
 
 
@@ -615,9 +611,7 @@ def dispatcher(machine: str, deadline_seconds: float | None) -> None:
             deadline_seconds=deadline_seconds,
         )
     click.echo("Dispatcher stopped.")
-    if _drain_failed(
-        summary, max_jobs=None, deadline_seconds=deadline_seconds
-    ):
+    if _drain_failed(summary, max_jobs=None, deadline_seconds=deadline_seconds):
         sys.exit(1)
 
 

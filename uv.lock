@@ -454,7 +454,7 @@ test = [
 requires-dist = [
     { name = "click", specifier = ">=8.2.1" },
     { name = "dr-exec", specifier = "==0.1.11" },
-    { name = "dr-platform", specifier = "==0.2.2" },
+    { name = "dr-platform", specifier = "==0.2.4" },
     { name = "dr-serialize", specifier = "==0.1.2" },
     { name = "lightning", marker = "extra == 'trainers'", specifier = ">=2.5.1.post0" },
     { name = "matplotlib", marker = "extra == 'trainers'", specifier = ">=3.10.3" },
@@ -490,7 +490,7 @@ test = [
 
 [[package]]
 name = "dr-platform"
-version = "0.2.2"
+version = "0.2.4"
 source = { registry = "https://pypi.org/simple" }
 dependencies = [
     { name = "alembic" },
@@ -501,9 +501,9 @@ dependencies = [
     { name = "pydantic" },
     { name = "sqlalchemy" },
 ]
-sdist = { url = "https://files.pythonhosted.org/packages/f9/43/81044717f8f616351f18040e432d08718fd241137d684566729b011e9d02/dr_platform-0.2.2.tar.gz", hash = "sha256:27138bf5a8cd9fbff022482440270a8071a087bdaed64a91391491017ea47992", size = 72201, upload-time = "2026-08-19T18:42:08.798Z" }
+sdist = { url = "https://files.pythonhosted.org/packages/d4/3c/a2f7fa3c7462c6b681741d38c5096af39db95720c04c52b4b93fe1bd070e/dr_platform-0.2.4.tar.gz", hash = "sha256:d056218b821ad992532022d8a756e2a6f037891c093495c69ecd41609cb03a63", size = 84137, upload-time = "2026-08-20T01:14:12.236Z" }
 wheels = [
-    { url = "https://files.pythonhosted.org/packages/a5/cc/f4817d12b05d33354b311f834e373391452d9b8598b2b265db1d01a90eb8/dr_platform-0.2.2-py3-none-any.whl", hash = "sha256:7a33c3843cb0cf10d503bf051f9d1cde45d7ab42eeb329ef47c30b807fe4ab6e", size = 105340, upload-time = "2026-08-19T18:42:07.546Z" },
+    { url = "https://files.pythonhosted.org/packages/db/3d/eb5624a4db0d56d6ededbd5a8fd8da5d5b3992e6cd3b7c177602a4ffaa79/dr_platform-0.2.4-py3-none-any.whl", hash = "sha256:86a2aca41bc3ba773c603e8e0b244599f3343a36e915865bee90ce3426bd69b5", size = 110173, upload-time = "2026-08-20T01:14:10.66Z" },
 ]
 
 [[package]]

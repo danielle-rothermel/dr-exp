@@ -29,14 +29,14 @@ digest documents in `config/identity.py` are stored in the ledger. Golden tests
 in `tests/unit/test_identity.py` pin them verbatim. A failure there means
 "confirm this re-identification is intended", never "update the expected value".
 
-**Worker startup order is load-bearing.** `platform/worker.py` documents it.
-Three constraints interact: dr-platform requires wrapped workflows, queues, and
-the dispatcher to be registered before `DBOS.launch()`; DBOS does not settle an
-application version until launch, but the dispatcher captures it beforehand;
-and `build_dbos_config` exposes neither the executor id nor the app version. So
-dr-exp pins both through `initialize_dbos_runtime`'s `runtime_initializer`
-hook, using a version derived in `platform/version.py`. Supplying the wrong app
-version makes the sweep fail every live attempt as `stale_app_version`.
+**Worker registration order is load-bearing.** `platform/worker.py` documents
+it: dr-platform requires wrapped workflows, queues, and the dispatcher to be
+registered before `DBOS.launch()`. DBOS identity is separate and comes from
+config — `build_platform_dbos_config`'s `application_version` and `executor_id`
+fields pin this process, using a version derived in `platform/version.py`.
+dr-exp pins an explicit version rather than letting DBOS hash workflow source,
+so the version is stable across local edits; the sweep fails live attempts
+carrying any other version as `stale_app_version`.
 
 **Stage bodies are preemptible.** The `train` body in `platform/pipeline.py`
 runs inside a preemptible DBOS step: no DBOS steps or transactions inside it,

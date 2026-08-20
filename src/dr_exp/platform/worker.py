@@ -1,27 +1,25 @@
 """The dr-exp worker process: a DBOS runtime that drains training queues.
 
-Startup order is load-bearing:
+This process's DBOS identity is pinned through ``PlatformDbosConfig``'s
+``application_version`` and ``executor_id`` fields, which dr-platform passes
+into DBOS's own config. dr-exp supplies an explicit version because DBOS
+otherwise derives one by hashing workflow source, which changes on any local
+edit; a stable pin keeps recovery promised across restarts of the same
+installation (see ``dr_exp.platform.version``).
 
-* dr-platform's ``build_dbos_config`` does not expose DBOS's ``executor_id``
-  or ``application_version``, and DBOS itself does not settle an application
-  version until ``DBOS.launch()``. The sweep, however, needs both *before*
-  launch, when ``register_scheduled_dispatcher`` captures them in a
-  ``LiveDbosIdentity``. A mismatch makes the sweep read every live attempt as
-  ``stale_app_version`` and fail it. So dr-exp pins both through
-  ``initialize_dbos_runtime``'s ``runtime_initializer`` hook.
-* dr-platform then requires that wrapped workflows, application queues, and
-  the scheduled dispatcher all be registered before ``DBOS.launch()``.
+Registration order is load-bearing: dr-platform requires that wrapped
+workflows, application queues, and the scheduled dispatcher all be registered
+before ``DBOS.launch()``.
 """
 
 from __future__ import annotations
 
 import asyncio
 import math
-from collections.abc import Callable, Iterator
+from collections.abc import Iterator
 from contextlib import contextmanager
 from dataclasses import dataclass
 
-from dbos import DBOSConfig
 from sqlalchemy import Engine
 
 from dr_exp.config.machine import MachineProfile
@@ -41,32 +39,6 @@ DEFAULT_MAX_RECOVERY_ATTEMPTS = 3
 #: requires the DBOS application pool to be at least the largest batch size.
 LOCAL_BATCH_SIZE = 256
 LOCAL_POOL_SIZE = 256
-
-
-def _runtime_initializer(
-    *, executor_id: str, app_version: str
-) -> Callable[[DBOSConfig], None]:
-    """Return a DBOS initializer that pins this process's identity.
-
-    DBOS copies ``executor_id`` and ``application_version`` out of its config
-    into process globals while constructing the runtime. That is the only
-    supported way to pin them, since the corresponding environment variables
-    are read when ``dbos`` is first imported -- which dr-platform has already
-    done by the time a worker starts.
-    """
-
-    def initialize(config: DBOSConfig) -> None:
-        from dbos import DBOS
-
-        DBOS(
-            config={
-                **config,
-                "executor_id": executor_id,
-                "application_version": app_version,
-            }
-        )
-
-    return initialize
 
 
 #: Slack over a profile's termination grace when waiting for in-flight stage
@@ -159,8 +131,6 @@ def worker_runtime(
     dispatcher-only process must not declare any: it admits, reconciles, and
     sweeps, and leaves execution to the workers.
     """
-    app_version = application_version()
-
     from dbos import DBOS, Queue
     from dr_platform import (
         LiveDbosIdentity,
@@ -178,14 +148,10 @@ def worker_runtime(
         system_database_url=profile.system_database_url,
         max_recovery_attempts=max_recovery_attempts,
         pool_size=LOCAL_POOL_SIZE,
+        application_version=application_version(),
+        executor_id=profile.executor_id,
     )
-    initialize_dbos_runtime(
-        config,
-        app_name=APP_NAME,
-        runtime_initializer=_runtime_initializer(
-            executor_id=profile.executor_id, app_version=app_version
-        ),
-    )
+    initialize_dbos_runtime(config, app_name=APP_NAME)
 
     cancellation = AttemptCancellationRegistry()
     concurrency = asyncio.Semaphore(profile.worker_concurrency)
@@ -215,7 +181,6 @@ def worker_runtime(
                     engine=engine,
                     registry=registry,
                     live_dbos_identity=LiveDbosIdentity(
-                        app_version=app_version,
                         executor_ids=profile.sweeping_executor_ids,
                     ),
                     batch_size=LOCAL_BATCH_SIZE,

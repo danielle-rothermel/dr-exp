@@ -1,14 +1,12 @@
 """The DBOS application version dr-exp pins for its workers.
 
-DBOS computes an application version by hashing workflow source, but only
-inside ``DBOS.launch()``. dr-platform needs that version *before* launch, when
-``register_scheduled_dispatcher`` builds the ``LiveDbosIdentity`` its sweep
-compares against: an identity built from the pre-launch empty string makes the
-sweep read every live attempt as ``stale_app_version`` and fail it.
-
-So dr-exp pins the version itself, derived from the versions of the three
-packages whose code defines the wrapped workflows. Recovery is only promised
-within one version, which is exactly the granularity these pins express.
+Left to itself, DBOS computes an application version by hashing workflow
+source, so any local edit yields a new version and orphans work enqueued by
+the previous one. dr-exp instead pins the version explicitly -- through
+``PlatformDbosConfig.application_version`` -- deriving it from the versions of
+the packages whose code defines the wrapped workflows. Recovery is only
+promised within one version, which is exactly the granularity these pins
+express.
 
 Limitation: this hashes *distribution versions*, not source. Editing dr-exp's
 own stage code in an editable install leaves the version unchanged, so a
