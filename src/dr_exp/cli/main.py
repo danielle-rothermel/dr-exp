@@ -7,6 +7,7 @@ default of its own.
 
 from __future__ import annotations
 
+import logging
 import sys
 from pathlib import Path
 from typing import Any
@@ -29,6 +30,15 @@ from dr_exp.platform.submission import submit_jobs
 
 #: Default campaign for commands invoked without an explicit one.
 DEFAULT_CAMPAIGN_KEY = "default"
+
+#: Log levels the CLI offers.
+LOG_LEVELS = ("DEBUG", "INFO", "WARNING", "ERROR")
+
+#: Default log level. INFO carries dr-platform's reconciliation summaries.
+DEFAULT_LOG_LEVEL = "INFO"
+
+_LOG_FORMAT = "%(asctime)s %(levelname)-7s %(name)s: %(message)s"
+_LOG_DATE_FORMAT = "%Y-%m-%dT%H:%M:%S"
 
 _MACHINE_OPTION = click.option(
     "--machine",
@@ -102,10 +112,40 @@ def _operator_message(error: Exception) -> str:
     return message
 
 
+def _configure_logging(level: str) -> None:
+    """Send library log records to stderr at ``level``.
+
+    Only the CLI configures logging; dr-exp's library modules never do. Without
+    this, dr-platform's INFO reconciliation lines -- notably the dispatcher's
+    sweep summary -- go nowhere, and the terminal shows only DBOS's own logs.
+
+    ``basicConfig`` is deliberately called without ``force``: it is a no-op once
+    the root logger has handlers, so an embedding process keeps its own setup.
+    DBOS is unaffected either way, since it attaches a handler to its own
+    ``dbos`` logger and turns propagation off.
+    """
+    logging.basicConfig(
+        stream=sys.stderr,
+        format=_LOG_FORMAT,
+        datefmt=_LOG_DATE_FORMAT,
+        level=level.upper(),
+    )
+    logging.getLogger().setLevel(level.upper())
+
+
 @click.group(cls=_OperatorErrorGroup)
 @click.version_option(package_name="dr-exp")
-def cli() -> None:
+@click.option(
+    "--log-level",
+    "log_level",
+    type=click.Choice(LOG_LEVELS, case_sensitive=False),
+    default=DEFAULT_LOG_LEVEL,
+    show_default=True,
+    help="Verbosity of dr-exp and dr-platform log output on stderr.",
+)
+def cli(log_level: str) -> None:
     """dr_exp - durable experiment manager for local and cluster training."""
+    _configure_logging(log_level)
 
 
 @cli.command()
