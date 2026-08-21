@@ -9,8 +9,8 @@ authors = [
 requires-python = ">=3.12"
 dependencies = [
     "click>=8.2.1",
-    "dr-exec==0.1.11",
-    "dr-platform==0.2.4",
+    "dr-exec==0.1.12",
+    "dr-platform==0.2.6",
     "dr-serialize==0.1.2",
     "psycopg[binary]>=3.3.4",
     "pydantic>=2.11.5",

@@ -38,6 +38,8 @@ PENDING from the previous version is failed by the sweep as
 Priority direction is dr-platform's: lower numbers run sooner and 0 is highest.
 dr-exp submits at a baseline of 100 so `dr_exp boost` can move work ahead.
 
+- Bump dr-exec to 0.1.12 and dr-platform to 0.2.6 (dr-store 0.2.5 transitively).
+
 ## 2026-08-18 — Phase 1 strip
 
 Removed Supabase sync, FastAPI remote API, React UI, sync queue, obsolete
