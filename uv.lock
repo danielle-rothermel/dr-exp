@@ -450,6 +450,9 @@ test = [
     { name = "pytest-timeout" },
     { name = "pytest-xdist" },
 ]
+vision = [
+    { name = "dr-vision" },
+]
 
 [package.metadata]
 requires-dist = [
@@ -489,6 +492,7 @@ test = [
     { name = "pytest-timeout", specifier = ">=2.0" },
     { name = "pytest-xdist", specifier = ">=3.0" },
 ]
+vision = [{ name = "dr-vision", editable = "../dr-vision" }]
 
 [[package]]
 name = "dr-platform"
@@ -533,6 +537,33 @@ dependencies = [
 sdist = { url = "https://files.pythonhosted.org/packages/16/5b/6b8d34c4e2217d2f06981792f7ec06aa83608c606e70d9f141ca35b4192b/dr_store-0.2.5.tar.gz", hash = "sha256:2710e6af17b61d7748eff0ed8bb217e03c427ee85b00b1c1089ded817c61d4d2", size = 82810, upload-time = "2026-08-21T05:19:32.304Z" }
 wheels = [
     { url = "https://files.pythonhosted.org/packages/15/9e/83d5ddb187ccc56a30fe602ebea1ac2a37b34d2af64109b25f3927f4a76b/dr_store-0.2.5-py3-none-any.whl", hash = "sha256:b54bc03d298e57c41bd6f657de151bbde798f4921726c20ff74dfda79edaee49", size = 99079, upload-time = "2026-08-21T05:19:30.741Z" },
+]
+
+[[package]]
+name = "dr-vision"
+version = "0.1.0"
+source = { editable = "../dr-vision" }
+dependencies = [
+    { name = "numpy" },
+    { name = "pydantic" },
+    { name = "torch" },
+    { name = "torchvision" },
+]
+
+[package.metadata]
+requires-dist = [
+    { name = "numpy", specifier = ">=2.0" },
+    { name = "pydantic", specifier = ">=2" },
+    { name = "torch", specifier = ">=2.6" },
+    { name = "torchvision", specifier = ">=0.21" },
+]
+
+[package.metadata.requires-dev]
+dev = [
+    { name = "pytest", specifier = ">=8.4.2" },
+    { name = "pytest-timeout", specifier = ">=2.3.1" },
+    { name = "ruff", specifier = ">=0.16.1" },
+    { name = "ty", specifier = ">=0.0.65" },
 ]
 
 [[package]]

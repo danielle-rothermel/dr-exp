@@ -46,6 +46,11 @@ dr-exp submits at a baseline of 100 so `dr_exp boost` can move work ahead.
   PENDING work is failed as `stale_app_version`. Do not retry pre-cutover
   failures; resubmit matching configs into a new campaign if the old one
   still holds filesystem-path work items.
+- Added a dev-only `vision` dependency group installing dr-vision editable
+  from `../dr-vision` (`[tool.uv.sources]`), so the `mini` profile's
+  interpreter can import a real trainer under `python -I`. It is not a
+  runtime dependency; plain `uv sync` and CI do not install it, and it
+  becomes a PyPI pin once dr-vision publishes.
 
 ## 2026-08-18 — Phase 1 strip
 

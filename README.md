@@ -154,6 +154,36 @@ tests deterministically -- a gate file to hold an attempt in flight, a
 shutdown delay to model checkpointing, and failure injection -- so cancellation
 and retry can be exercised without timing guesses.
 
+### Local trainer packages
+
+Real trainers live in their own repositories and are installed into this
+venv, because the `mini` profile's `python_executable` is `.venv/bin/python`
+and `python -I` ignores `PYTHONPATH`. dr-vision is wired up that way as a
+dev-only dependency group with a path source:
+
+```toml
+[dependency-groups]
+vision = ["dr-vision"]
+
+[tool.uv.sources]
+dr-vision = { path = "../dr-vision", editable = true }
+```
+
+```bash
+uv sync --group dev --group test --group vision
+```
+
+Name every group you want: `--group` replaces the default selection rather
+than adding to it, so omitting `dev`/`test` uninstalls them.
+
+- The group is machine-local: it assumes the sibling checkout `../dr-vision`
+  exists. Plain `uv sync` and CI never install it, and dr-vision is not a
+  runtime dependency of dr-exp.
+- The install is editable, so a dr-vision edit is live on the next job with
+  no reinstall.
+- When dr-vision publishes to PyPI, the group becomes a pinned release and the
+  `[tool.uv.sources]` entry goes away.
+
 ## Queues, capacity, and priority
 
 There is one pipeline, `dr-exp-train` v1, with one stage, `train`. Work routes

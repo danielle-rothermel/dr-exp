@@ -54,6 +54,15 @@ test = [
     "pytest-timeout>=2.0",
     "pytest-xdist>=3.0",
 ]
+# Machine-local trainer packages. Not installed by `uv sync` or by CI; the
+# path source below assumes the sibling checkout exists. See README
+# "Local trainer packages".
+vision = [
+    "dr-vision",
+]
+
+[tool.uv.sources]
+dr-vision = { path = "../dr-vision", editable = true }
 
 [tool.ruff]
 include = ["src/**/*.py", "scripts/**/*.py", "tests/**/*.py"]
