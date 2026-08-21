@@ -105,9 +105,9 @@ def _registered_work_keys(run_key: str, *, engine: Engine) -> frozenset[str]:
         page = list_run_members(
             run_key, engine=engine, cursor=cursor, limit=_MEMBERSHIP_PAGE_SIZE
         )
-        if not page:
-            return frozenset(keys)
         keys.update(member.work_key.value for member in page)
+        if len(page) < _MEMBERSHIP_PAGE_SIZE:
+            return frozenset(keys)
         cursor = page[-1].member_ordinal
 
 
