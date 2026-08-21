@@ -54,8 +54,10 @@ test = [
     "pytest-timeout>=2.0",
     "pytest-xdist>=3.0",
 ]
-# Machine-local trainer packages. Not installed by `uv sync` or by CI; the
-# path source below assumes the sibling checkout exists. See README
+# Machine-local trainer packages. Only `--group vision` installs dr-vision,
+# but the `[tool.uv.sources]` path entry below is resolved by every uv
+# command, so the sibling checkout `../dr-vision` must exist for any
+# `uv lock`/`uv sync`/`uv run` in this repo. See README
 # "Local trainer packages".
 vision = [
     "dr-vision",

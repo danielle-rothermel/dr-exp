@@ -190,11 +190,13 @@ uv sync --group dev --group test --group vision
 Name every group you want: `--group` replaces the default selection rather
 than adding to it, so omitting `dev`/`test` uninstalls them.
 
-- The group is machine-local: it assumes the sibling checkout `../dr-vision`
-  exists. It is not in the default group selection, so a plain `uv sync`
-  does not install it and any environment that syncs without `--group vision`
-  will not pull dr-vision or torch. dr-vision is not a runtime dependency of
-  dr-exp.
+- The group is machine-local. Only `--group vision` *installs* dr-vision, so
+  a sync without it pulls neither dr-vision nor torch, and dr-vision is never
+  a runtime dependency of dr-exp. But uv resolves `[tool.uv.sources]`
+  regardless of group selection, so the sibling checkout `../dr-vision` must
+  exist for *every* `uv lock`, `uv sync`, and `uv run` in this repo — without
+  it they all fail with `Distribution not found at: .../dr-vision`. This repo
+  is developed only where that checkout is present.
 - The install is editable, so a dr-vision edit is live on the next job with
   no reinstall.
 - When dr-vision publishes to PyPI, the group becomes a pinned release and the

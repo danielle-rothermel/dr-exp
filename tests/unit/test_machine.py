@@ -153,6 +153,27 @@ def test_workspaces_do_not_collide_across_work_keys_in_one_campaign(
     assert profile.workspace_for("camp", "abc") != profile.workspace_for("camp", "def")
 
 
+@pytest.mark.parametrize("campaign_key", ["a/../b", "a/../../../etc", "a/./b", "a//b"])
+def test_traversal_campaign_keys_are_rejected(
+    tmp_path: Path, campaign_key: str
+) -> None:
+    """dr-platform's key grammar admits these; a workspace path must not.
+
+    ``a/../b`` resolves onto campaign ``b``'s workspace and ``a/../../../etc``
+    escapes ``workspace_root`` entirely, so both break the per-campaign
+    distinctness this method promises.
+    """
+    profile = make_profile(tmp_path)
+    with pytest.raises(ConfigError, match="not usable as a workspace path"):
+        profile.workspace_for(campaign_key, "abc")
+
+
+def test_traversal_work_keys_are_rejected(tmp_path: Path) -> None:
+    profile = make_profile(tmp_path)
+    with pytest.raises(ConfigError, match="not usable as a workspace path"):
+        profile.workspace_for("camp", "abc/../def")
+
+
 def test_bundled_mini_profile_is_valid_for_this_machine() -> None:
     profile = load_machine_profile("mini")
     assert profile.name == "mini"

@@ -39,7 +39,9 @@ dr-vision = { path = "../dr-vision", editable = true }
 ```
 
 - `uv sync --group vision` installs it (pulls torch/torchvision via dr-vision's
-  own dependencies); plain `uv sync` and CI never do.
+  own dependencies); a sync without the group installs neither. The
+  `[tool.uv.sources]` entry is resolved by every uv command, though, so
+  `../dr-vision` must exist for any `uv lock`/`uv sync`/`uv run` here.
 - Editable means a dr-vision edit is live on the next job without reinstalling,
   which is what we want while both repos move.
 - The group is documented as machine-local tooling: it assumes `../dr-vision`
@@ -58,11 +60,12 @@ trainer does.
   `~/drotherm/repos/dr-exp` (the committed `mini` profile depends on that venv
   holding both packages).
 - Database `dr_exp_dev` exists (`createdb -h 127.0.0.1 dr_exp_dev`) and
-  `dr_exp --machine mini init` has run.
+  `dr_exp init --machine mini` has run (`--machine` is a subcommand option,
+  not a top-level one).
 - CIFAR-10 downloaded once into the data root dr-vision's params point at, so
   the first concurrent jobs do not race the download.
-- `dr_exp --machine mini --log-level INFO` output captured to a file per
-  session; sweep summaries and `identity_unavailable` must be visible.
+- `dr_exp --log-level INFO <subcommand> --machine mini` output captured to a
+  file per session; sweep summaries and `identity_unavailable` must be visible.
 
 ## What gets validated, and how
 

@@ -127,8 +127,29 @@ class MachineProfile(BaseModel):
         is part of the key because ``work_key`` alone repeats across campaigns
         -- the same config submitted twice is deliberately the same work key --
         and two campaigns must not write over each other's artifacts.
+
+        dr-platform's key grammar allows ``/`` and ``.``, so ``a/../b`` is a
+        legal campaign key that would resolve onto campaign ``b``'s workspace.
+        Distinctness is this method's own invariant, so it enforces it here
+        rather than assuming the key grammar upstream.
         """
+        _reject_traversal("campaign_key", campaign_key)
+        _reject_traversal("work_key", work_key)
         return self.workspace_root / "runs" / campaign_key / work_key
+
+
+def _reject_traversal(field: str, key: str) -> None:
+    """Reject a workspace key whose segments are not plain path components.
+
+    A key containing ``.`` or ``..`` segments collapses on resolution, so two
+    distinct keys could name one directory or escape ``workspace_root``.
+    """
+    segments = key.split("/")
+    if any(segment in {"", ".", ".."} for segment in segments):
+        raise ConfigError(
+            f"{field} is not usable as a workspace path: {key!r} "
+            "(empty, '.', or '..' segments are not allowed)"
+        )
 
 
 def profile_path(name: str, *, directory: Path | None = None) -> Path:
