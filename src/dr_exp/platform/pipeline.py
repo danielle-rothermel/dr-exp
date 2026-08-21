@@ -25,6 +25,7 @@ from dr_platform import (
     StageKey,
     wrap_pipeline_workflows,
 )
+from sqlalchemy import Engine
 
 from dr_exp.config.machine import MachineProfile
 from dr_exp.config.names import (
@@ -70,6 +71,7 @@ class StageContext:
 
     profile: MachineProfile
     cancellation: AttemptCancellationRegistry
+    engine: Engine
     concurrency: asyncio.Semaphore | None = None
 
 
@@ -118,7 +120,7 @@ async def _run_training_attempt(
     payload: AdmissionPayload,
     executor: Executor,
 ) -> AttemptOutcome:
-    config = load_job_config_reference(payload.input_reference)
+    config = load_job_config_reference(payload.input_reference, engine=context.engine)
     request = AttemptRequest(
         work_key=payload.work_key.value,
         attempt=payload.attempt_number,

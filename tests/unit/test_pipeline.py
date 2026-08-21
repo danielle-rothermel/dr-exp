@@ -16,6 +16,7 @@ from dr_platform import (
     resolve_stage_queue_name,
     selector_matches,
 )
+from sqlalchemy import create_engine
 
 from dr_exp.config.job import JobConfig
 from dr_exp.config.machine import MachineProfile
@@ -28,7 +29,7 @@ from dr_exp.config.names import (
     QueueName,
 )
 from dr_exp.execution.cancellation import AttemptCancellationRegistry
-from dr_exp.execution.store import store_job_config
+from dr_exp.execution.store import reference_for_job_config
 from dr_exp.platform import pipeline as pipeline_module
 from dr_exp.platform.pipeline import (
     LABEL_QUEUE_ROUTES,
@@ -62,7 +63,11 @@ def profile(tmp_path: Path) -> MachineProfile:
 
 @pytest.fixture
 def context(profile: MachineProfile) -> StageContext:
-    return StageContext(profile=profile, cancellation=AttemptCancellationRegistry())
+    return StageContext(
+        profile=profile,
+        cancellation=AttemptCancellationRegistry(),
+        engine=create_engine(profile.database_url),
+    )
 
 
 def test_pipeline_identity_matches_the_pinned_names() -> None:
@@ -166,16 +171,19 @@ async def run_stage_body(context: StageContext, *, reference: str) -> None:
 
 
 @pytest.fixture
-def stored_config(profile: MachineProfile) -> str:
-    """A stored job config the stage body can resolve by reference."""
+def stored_config(monkeypatch: pytest.MonkeyPatch) -> str:
+    """A job-config reference the stage body can resolve without a database."""
     config = JobConfig(
         entry_point="dr_exp.training.dummy_trainer:train",
         params={"epochs": 1},
         labels={LabelKey.ACCELERATOR.value: Accelerator.CPU.value},
     )
-    return store_job_config(
-        config, work_key="abc", workspace_root=profile.workspace_root
-    )
+
+    def load_fixture(_reference: str, **_kwargs: object) -> JobConfig:
+        return config
+
+    monkeypatch.setattr(pipeline_module, "load_job_config_reference", load_fixture)
+    return reference_for_job_config(config)
 
 
 async def test_a_cancelled_dr_exec_outcome_raises_cancelled_error(
@@ -275,6 +283,7 @@ async def test_concurrency_gate_limits_parallel_stage_bodies(
     context = StageContext(
         profile=profile,
         cancellation=AttemptCancellationRegistry(),
+        engine=create_engine(profile.database_url),
         concurrency=gate,
     )
     in_flight = 0

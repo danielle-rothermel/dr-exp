@@ -130,9 +130,6 @@ def test_workspace_paths_are_per_work_key_and_attempt(tmp_path: Path) -> None:
     assert profile.workspace_for("abc", 2) == (
         profile.workspace_root / "runs" / "abc" / "attempt-2"
     )
-    assert profile.config_document_path("abc") == (
-        profile.workspace_root / "configs" / "abc.json"
-    )
 
 
 def test_bundled_mini_profile_is_valid_for_this_machine() -> None:

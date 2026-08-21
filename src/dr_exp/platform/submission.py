@@ -64,11 +64,7 @@ def submit_jobs(
                 ordinal=len(members),
                 work=WorkInput(
                     work_key=key,
-                    input_reference=store_job_config(
-                        config,
-                        work_key=key,
-                        workspace_root=profile.workspace_root,
-                    ),
+                    input_reference=store_job_config(config, engine=engine),
                     labels=dict(config.labels),
                     priority=config.priority,
                 ),

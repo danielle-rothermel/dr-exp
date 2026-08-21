@@ -1,9 +1,10 @@
 """Closed string vocabularies and persisted-format literals.
 
 The literals in this module are persisted identity: they enter ``work_key``
-and ``execution_config_reference`` digests, DBOS queue names, and the trainer
-request envelope. Golden tests in ``tests/unit/test_identity.py`` pin them
-verbatim. Never derive them from field names or enum iteration.
+and ``execution_config_reference`` digests, DBOS queue names, the trainer
+request envelope, and the job-config object-store schema. Golden tests in
+``tests/unit/test_identity.py`` pin them verbatim. Never derive them from
+field names or enum iteration.
 """
 
 from enum import UNIQUE, StrEnum, auto, verify
@@ -58,6 +59,9 @@ STAGE_KEY: Final = "train"
 # Persisted-format contract: the child-process request/result contract version.
 TRAINER_CONTRACT: Final = "dr-exp/importable-json/v1"
 
+# Persisted-format contract: dr-store schema for a resolved JobConfig.
+JOB_CONFIG_SCHEMA: Final = "dr_exp.job_config/v1"
+
 # Persisted-format contract: keys of the execution-config identity document.
 EXECUTION_CONFIG_PIPELINE_FIELD: Final = "pipeline"
 EXECUTION_CONFIG_VERSION_FIELD: Final = "version"
@@ -79,6 +83,7 @@ __all__ = [
     "EXECUTION_CONFIG_CONTRACT_FIELD",
     "EXECUTION_CONFIG_PIPELINE_FIELD",
     "EXECUTION_CONFIG_VERSION_FIELD",
+    "JOB_CONFIG_SCHEMA",
     "PIPELINE_KEY",
     "PIPELINE_VERSION",
     "QUEUE_NAME_BY_ACCELERATOR",

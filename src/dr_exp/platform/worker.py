@@ -155,24 +155,26 @@ def worker_runtime(
 
     cancellation = AttemptCancellationRegistry()
     concurrency = asyncio.Semaphore(profile.worker_concurrency)
-    registry = build_registry(
-        StageContext(
-            profile=profile,
-            cancellation=cancellation,
-            concurrency=concurrency,
-        ),
-        max_recovery_attempts=max_recovery_attempts,
-    )
-
-    if declare_queues:
-        for queue_name in profile.dequeued_queue_names:
-            Queue(
-                queue_name.value,
-                priority_enabled=True,
-                worker_concurrency=profile.worker_concurrency,
-            )
 
     with engine_for(profile) as engine:
+        registry = build_registry(
+            StageContext(
+                profile=profile,
+                cancellation=cancellation,
+                engine=engine,
+                concurrency=concurrency,
+            ),
+            max_recovery_attempts=max_recovery_attempts,
+        )
+
+        if declare_queues:
+            for queue_name in profile.dequeued_queue_names:
+                Queue(
+                    queue_name.value,
+                    priority_enabled=True,
+                    worker_concurrency=profile.worker_concurrency,
+                )
+
         dispatcher = None
         try:
             if with_dispatcher:

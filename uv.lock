@@ -408,13 +408,14 @@ wheels = [
 
 [[package]]
 name = "dr-exp"
-version = "0.1.0"
+version = "0.1.1"
 source = { editable = "." }
 dependencies = [
     { name = "click" },
     { name = "dr-exec" },
     { name = "dr-platform" },
     { name = "dr-serialize" },
+    { name = "dr-store" },
     { name = "psycopg", extra = ["binary"] },
     { name = "pydantic" },
     { name = "pyyaml" },
@@ -456,6 +457,7 @@ requires-dist = [
     { name = "dr-exec", specifier = "==0.1.12" },
     { name = "dr-platform", specifier = "==0.2.6" },
     { name = "dr-serialize", specifier = "==0.1.2" },
+    { name = "dr-store", specifier = "==0.2.5" },
     { name = "lightning", marker = "extra == 'trainers'", specifier = ">=2.5.1.post0" },
     { name = "matplotlib", marker = "extra == 'trainers'", specifier = ">=3.10.3" },
     { name = "numpy", marker = "extra == 'trainers'", specifier = ">=2.3.0" },

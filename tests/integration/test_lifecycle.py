@@ -9,6 +9,7 @@ from __future__ import annotations
 
 import json
 import os
+import shutil
 import sys
 import threading
 import time
@@ -23,6 +24,7 @@ from sqlalchemy import Engine
 from dr_exp.config.identity import work_key as compute_work_key
 from dr_exp.config.job import JobConfig, SweepSpec, load_job_config
 from dr_exp.config.machine import MachineProfile, load_machine_profile
+from dr_exp.config.names import JOB_CONFIG_SCHEMA
 from dr_exp.execution.attempt import RESULT_FILENAME
 from dr_exp.platform import inspection
 from dr_exp.platform.drain import DrainSummary, capture_drain_baseline, drain_until
@@ -219,6 +221,29 @@ def test_resubmitting_the_same_run_reuses_its_work(
     assert len(states(engine)) == 2
 
 
+def test_resubmitting_with_a_new_priority_reuses_work(
+    profile: MachineProfile, engine: Engine
+) -> None:
+    """Priority is scheduling metadata; it must not change input_reference."""
+    first = submit_jobs(
+        (base_config(),),
+        campaign_key=CAMPAIGN,
+        run_key="priority-reuse",
+        profile=profile,
+        engine=engine,
+    )
+    second = submit_jobs(
+        (base_config().model_copy(update={"priority": 5, "tags": ("boosted",)}),),
+        campaign_key=CAMPAIGN,
+        run_key="priority-reuse-again",
+        profile=profile,
+        engine=engine,
+    )
+    assert second.work_keys == first.work_keys
+    assert second.receipt.created_work_count == 0
+    assert second.receipt.reused_work_count == 1
+
+
 def test_worker_runs_a_sweep_to_success(
     profile: MachineProfile, engine: Engine
 ) -> None:
@@ -242,6 +267,42 @@ def test_worker_runs_a_sweep_to_success(
         assert written["work_key"] == key
         assert written["epochs_completed"] == 1
         assert written["interrupted"] is False
+
+
+def test_input_reference_resolves_from_the_database_only(
+    profile: MachineProfile, engine: Engine
+) -> None:
+    """A worker must resolve the job config without a shared workspace."""
+    from dr_store import OBJECT_REFERENCE_PREFIX
+
+    config = base_config()
+    key = compute_work_key(config)
+    submit_jobs(
+        (config,),
+        campaign_key=CAMPAIGN,
+        run_key="object-store",
+        profile=profile,
+        engine=engine,
+    )
+
+    assert not (profile.workspace_root / "configs").exists()
+    members = inspection.run_members(engine, run_key="object-store")
+    assert len(members) == 1
+    assert members[0].input_reference.startswith(
+        f"{OBJECT_REFERENCE_PREFIX}:{JOB_CONFIG_SCHEMA}:"
+    )
+
+    profile.workspace_root.mkdir(parents=True)
+    shutil.rmtree(profile.workspace_root)
+    assert not profile.workspace_root.exists()
+
+    summary = run_bounded_worker(profile, engine, max_jobs=1)
+
+    assert summary.reached_limit, "worker did not finish after workspace deletion"
+    assert states(engine) == {key: StageExecutionState.SUCCEEDED}
+    written = json.loads((profile.workspace_for(key, 1) / RESULT_FILENAME).read_text())
+    assert written["work_key"] == key
+    assert written["epochs_completed"] == 1
 
 
 def test_failing_trainer_records_failure_evidence(

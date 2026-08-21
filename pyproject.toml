@@ -1,6 +1,6 @@
 [project]
 name = "dr-exp"
-version = "0.1.0"
+version = "0.1.1"
 description = "Durable experiment manager over dr-platform and dr-exec"
 readme = "README.md"
 authors = [
@@ -12,6 +12,7 @@ dependencies = [
     "dr-exec==0.1.12",
     "dr-platform==0.2.6",
     "dr-serialize==0.1.2",
+    "dr-store==0.2.5",
     "psycopg[binary]>=3.3.4",
     "pydantic>=2.11.5",
     "pyyaml>=6.0.2",
