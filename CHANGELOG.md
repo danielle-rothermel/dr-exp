@@ -39,6 +39,10 @@ Priority direction is dr-platform's: lower numbers run sooner and 0 is highest.
 dr-exp submits at a baseline of 100 so `dr_exp boost` can move work ahead.
 
 - Bump dr-exec to 0.1.12 and dr-platform to 0.2.6 (dr-store 0.2.5 transitively).
+- Job-config `input_reference` is a content-addressed dr-store object
+  (`dr_exp.job_config/v1`) on the platform database instead of a path under
+  `workspace_root/configs/`. Submitter and worker no longer need a shared
+  filesystem to resolve work.
 
 ## 2026-08-18 — Phase 1 strip
 

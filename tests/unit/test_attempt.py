@@ -28,7 +28,6 @@ from dr_exp.execution.attempt import (
     build_trainer_request,
     run_attempt,
 )
-from dr_exp.execution.store import load_job_config_reference, store_job_config
 from tests.unit.conftest import make_completion
 
 CONFIG = JobConfig(
@@ -220,23 +219,3 @@ async def test_attempt_creates_its_workspace(
     )
     assert outcome.workspace.is_dir()
     assert outcome.workspace == profile.workspace_for("abc", 4)
-
-
-def test_stored_config_round_trips_through_its_reference(
-    tmp_path: Path,
-) -> None:
-    reference = store_job_config(CONFIG, work_key="abc", workspace_root=tmp_path)
-    assert load_job_config_reference(reference) == CONFIG
-
-
-def test_stored_config_is_idempotent(tmp_path: Path) -> None:
-    first = store_job_config(CONFIG, work_key="abc", workspace_root=tmp_path)
-    second = store_job_config(CONFIG, work_key="abc", workspace_root=tmp_path)
-    assert first == second
-
-
-def test_missing_reference_is_a_config_error(tmp_path: Path) -> None:
-    from dr_exp.config.job import ConfigError
-
-    with pytest.raises(ConfigError, match="does not name a file"):
-        load_job_config_reference(str(tmp_path / "absent.json"))

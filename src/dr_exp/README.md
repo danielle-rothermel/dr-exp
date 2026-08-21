@@ -11,8 +11,8 @@ Subpackages:
   identity (`identity.py`), and machine profiles (`machine.py`).
 - `execution/` — running one attempt through dr-exec: job construction and
   outcome interpretation (`attempt.py`), shutdown fan-out to in-flight attempts
-  (`cancellation.py`), and durable storage behind an input reference
-  (`store.py`).
+  (`cancellation.py`), and content-addressed job-config objects behind an
+  input reference (`store.py`).
 - `platform/` — everything dr-platform-facing: the pipeline and its stage body
   (`pipeline.py`), the DBOS worker runtime (`worker.py`), submission, drain
   loops, inspection, database access, a submission-only registry, and the

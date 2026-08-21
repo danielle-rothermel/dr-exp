@@ -23,6 +23,7 @@ from dr_exp.config.names import (
     PIPELINE_VERSION,
     STAGE_KEY,
     TRAINER_CONTRACT,
+    JOB_CONFIG_SCHEMA,
     Accelerator,
     LabelKey,
     QueueName,
@@ -105,6 +106,7 @@ def test_string_vocabularies_are_pinned() -> None:
     assert PIPELINE_VERSION == 1
     assert STAGE_KEY == "train"
     assert TRAINER_CONTRACT == "dr-exp/importable-json/v1"
+    assert JOB_CONFIG_SCHEMA == "dr_exp.job_config/v1"
     assert [a.value for a in Accelerator] == ["cpu", "mps", "cuda"]
     assert [q.value for q in QueueName] == [
         "train-cpu",

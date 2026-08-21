@@ -39,7 +39,7 @@ interpreter.
 | `name` | Profile identity, for logs and messages. |
 | `accelerator` | `cpu`, `mps`, or `cuda`. Selects the queue this worker drains. |
 | `python_executable` | Absolute interpreter that runs training children. |
-| `workspace_root` | Root for stored configs and per-attempt workspaces. |
+| `workspace_root` | Root for per-attempt workspaces. |
 | `run_store_root` | Root for dr-exec's durable run records. |
 | `database_url` | Platform database. |
 | `system_database_url` | DBOS system database. Must be the same database. |
@@ -106,6 +106,15 @@ configuration into the same campaign reuses the existing work item.
 `execution_config_reference` records the pipeline and trainer-contract version
 on every run. Both digests are persisted identity and are pinned by golden
 tests in `tests/unit/test_identity.py`.
+
+### Input references
+
+Submission puts the resolved `JobConfig` into [dr-store](https://github.com/danielle-rothermel/dr-store)
+on the platform database under the schema `dr_exp.job_config/v1` and records
+the returned content-addressed object reference as the work item's
+`input_reference`. The worker stage body gets that object by reference and
+validates it back into a `JobConfig`. Submitter and worker need no shared
+filesystem: `workspace_root` holds attempt workspaces only.
 
 ## The trainer contract
 

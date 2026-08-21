@@ -122,10 +122,6 @@ class MachineProfile(BaseModel):
         """Return the per-attempt working directory for one work item."""
         return self.workspace_root / "runs" / work_key / f"attempt-{attempt}"
 
-    def config_document_path(self, work_key: str) -> Path:
-        """Return the stored ``JobConfig`` path for one work item."""
-        return self.workspace_root / "configs" / f"{work_key}.json"
-
 
 def profile_path(name: str, *, directory: Path | None = None) -> Path:
     """Return the YAML path for a machine profile addressed by name."""
