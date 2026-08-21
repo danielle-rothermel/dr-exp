@@ -42,7 +42,10 @@ dr-exp submits at a baseline of 100 so `dr_exp boost` can move work ahead.
 - Job-config `input_reference` is a content-addressed dr-store object
   (`dr_exp.job_config/v1`) on the platform database instead of a path under
   `workspace_root/configs/`. Submitter and worker no longer need a shared
-  filesystem to resolve work.
+  filesystem to resolve work. Hard cutover: dr-exp is 0.1.1 so leftover
+  PENDING work is failed as `stale_app_version`. Do not retry pre-cutover
+  failures; resubmit matching configs into a new campaign if the old one
+  still holds filesystem-path work items.
 
 ## 2026-08-18 — Phase 1 strip
 

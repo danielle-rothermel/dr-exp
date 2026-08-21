@@ -40,6 +40,10 @@ def _unresolved_input_reference(reference: str, cause: BaseException) -> ConfigE
     return ConfigError(f"input reference could not be resolved: {reference}: {cause}")
 
 
+def _looks_like_filesystem_reference(reference: str) -> bool:
+    return reference.startswith("/") or reference.endswith(".json")
+
+
 def _job_config_document(config: JobConfig) -> Jsonable:
     """Return the stored JobConfig payload.
 
@@ -63,6 +67,11 @@ def parse_job_config_reference(reference: str) -> ObjectReference:
     try:
         parsed = parse_object_reference(reference)
     except ReferenceValidationError as error:
+        if _looks_like_filesystem_reference(reference):
+            raise ConfigError(
+                "filesystem input references are no longer supported; drain "
+                f"or abandon pre-cutover work: {reference}"
+            ) from error
         raise ConfigError(
             f"input reference is not a dr-store object: {reference}: {error}"
         ) from error

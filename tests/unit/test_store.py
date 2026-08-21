@@ -54,7 +54,6 @@ def test_reference_changes_when_identity_fields_change() -> None:
 @pytest.mark.parametrize(
     "reference",
     [
-        "/workspace/configs/abc.json",
         "dr-store-object:v1:not-a-hash",
         f"{OBJECT_REFERENCE_PREFIX}:{JOB_CONFIG_SCHEMA}:zzzz",
         f"{OBJECT_REFERENCE_PREFIX}:{JOB_CONFIG_SCHEMA}:{'g' * 64}",
@@ -63,6 +62,11 @@ def test_reference_changes_when_identity_fields_change() -> None:
 def test_malformed_reference_is_a_config_error(reference: str) -> None:
     with pytest.raises(ConfigError, match="not a dr-store object"):
         parse_job_config_reference(reference)
+
+
+def test_filesystem_path_reference_is_rejected_as_unsupported() -> None:
+    with pytest.raises(ConfigError, match="filesystem input references are no longer"):
+        parse_job_config_reference("/workspace/configs/abc.json")
 
 
 def test_unknown_schema_is_a_config_error() -> None:
