@@ -139,7 +139,12 @@ def train(request: dict) -> dict: ...
   working directory and survives the run.
 - **SIGTERM means checkpoint and exit.** Cancellation and worker shutdown send
   SIGTERM, then SIGKILL after `termination_grace_seconds`. A trainer that wants
-  to resume should checkpoint within that window.
+  to resume should checkpoint within that window. Caveat: the workspace is
+  per-attempt, and nothing seeds attempt *n+1* from attempt *n*, so a
+  checkpoint survives DBOS recovery (which reuses the same attempt) but is
+  unreachable after `dr_exp retry`, which starts a fresh attempt directory.
+  Resume-after-`retry` is not currently supported — see D-3 in
+  `docs/validation/2026-08-21-mini-V3.md`.
 - **At-least-once.** A stage body can run again after recovery, so a trainer
   should tolerate re-execution of the same `work_key`.
 
@@ -177,8 +182,10 @@ Name every group you want: `--group` replaces the default selection rather
 than adding to it, so omitting `dev`/`test` uninstalls them.
 
 - The group is machine-local: it assumes the sibling checkout `../dr-vision`
-  exists. Plain `uv sync` and CI never install it, and dr-vision is not a
-  runtime dependency of dr-exp.
+  exists. It is not in the default group selection, so a plain `uv sync`
+  does not install it and any environment that syncs without `--group vision`
+  will not pull dr-vision or torch. dr-vision is not a runtime dependency of
+  dr-exp.
 - The install is editable, so a dr-vision edit is live on the next job with
   no reinstall.
 - When dr-vision publishes to PyPI, the group becomes a pinned release and the

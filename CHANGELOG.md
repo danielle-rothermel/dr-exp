@@ -49,8 +49,9 @@ dr-exp submits at a baseline of 100 so `dr_exp boost` can move work ahead.
 - Added a dev-only `vision` dependency group installing dr-vision editable
   from `../dr-vision` (`[tool.uv.sources]`), so the `mini` profile's
   interpreter can import a real trainer under `python -I`. It is not a
-  runtime dependency; plain `uv sync` and CI do not install it, and it
-  becomes a PyPI pin once dr-vision publishes.
+  runtime dependency and it is not in the default group selection, so a
+  plain `uv sync` does not install it; it becomes a PyPI pin once dr-vision
+  publishes.
 
 ## 2026-08-18 — Phase 1 strip
 
