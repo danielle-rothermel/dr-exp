@@ -41,10 +41,13 @@ def test_reference_uses_the_pinned_schema_and_prefix() -> None:
     assert parsed.schema == JOB_CONFIG_SCHEMA
 
 
-def test_reference_changes_when_the_stored_document_changes() -> None:
-    rescheduled = CONFIG.model_copy(update={"priority": 7})
+def test_reference_ignores_priority_and_tags() -> None:
+    rescheduled = CONFIG.model_copy(update={"priority": 7, "tags": ("rerun",)})
+    assert reference_for_job_config(rescheduled) == reference_for_job_config(CONFIG)
+
+
+def test_reference_changes_when_identity_fields_change() -> None:
     retargeted = CONFIG.model_copy(update={"params": {"epochs": 3}})
-    assert reference_for_job_config(rescheduled) != reference_for_job_config(CONFIG)
     assert reference_for_job_config(retargeted) != reference_for_job_config(CONFIG)
 
 
@@ -72,7 +75,7 @@ def test_unknown_schema_is_a_config_error() -> None:
 
 async def test_round_trip_put_get_is_identical_job_config() -> None:
     store = ObjectStore(MemoryBackend())
-    document = CONFIG.model_dump(mode="json")
+    document = store_module._job_config_document(CONFIG)
     stored, status = await store.put(JOB_CONFIG_SCHEMA, document)
     assert status is PutStatus.STORED
     loaded = await store.get(stored)
@@ -83,7 +86,7 @@ async def test_round_trip_put_get_is_identical_job_config() -> None:
 
 async def test_second_put_of_the_same_config_is_idempotent() -> None:
     store = ObjectStore(MemoryBackend())
-    document = CONFIG.model_dump(mode="json")
+    document = store_module._job_config_document(CONFIG)
     first, _ = await store.put(JOB_CONFIG_SCHEMA, document)
     second, status = await store.put(JOB_CONFIG_SCHEMA, document)
     assert status is PutStatus.IDEMPOTENT

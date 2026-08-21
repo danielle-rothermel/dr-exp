@@ -41,7 +41,14 @@ def _unresolved_input_reference(reference: str, cause: BaseException) -> ConfigE
 
 
 def _job_config_document(config: JobConfig) -> Jsonable:
-    return cast(Jsonable, config.model_dump(mode="json"))
+    """Return the stored JobConfig payload.
+
+    ``priority`` and ``tags`` are omitted: they are scheduling metadata, not
+    what the job computes. dr-platform treats ``input_reference`` as an
+    immutable fact of a ``work_key``, so the stored document must be stable
+    under the same identity or a resubmit with a new priority conflicts.
+    """
+    return cast(Jsonable, config.model_dump(mode="json", exclude={"priority", "tags"}))
 
 
 def reference_for_job_config(config: JobConfig) -> str:

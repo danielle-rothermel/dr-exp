@@ -221,6 +221,29 @@ def test_resubmitting_the_same_run_reuses_its_work(
     assert len(states(engine)) == 2
 
 
+def test_resubmitting_with_a_new_priority_reuses_work(
+    profile: MachineProfile, engine: Engine
+) -> None:
+    """Priority is scheduling metadata; it must not change input_reference."""
+    first = submit_jobs(
+        (base_config(),),
+        campaign_key=CAMPAIGN,
+        run_key="priority-reuse",
+        profile=profile,
+        engine=engine,
+    )
+    second = submit_jobs(
+        (base_config().model_copy(update={"priority": 5, "tags": ("boosted",)}),),
+        campaign_key=CAMPAIGN,
+        run_key="priority-reuse-again",
+        profile=profile,
+        engine=engine,
+    )
+    assert second.work_keys == first.work_keys
+    assert second.receipt.created_work_count == 0
+    assert second.receipt.reused_work_count == 1
+
+
 def test_worker_runs_a_sweep_to_success(
     profile: MachineProfile, engine: Engine
 ) -> None:
