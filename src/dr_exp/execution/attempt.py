@@ -53,13 +53,19 @@ DEFAULT_DEVICE_SLOT = "0"
 class AttemptRequest:
     """Everything one attempt needs, independent of dr-platform types."""
 
+    campaign_key: str
     work_key: str
     attempt: int
     config: JobConfig
 
     def workspace(self, profile: MachineProfile) -> Path:
-        """The per-attempt working directory on ``profile``."""
-        return profile.workspace_for(self.work_key, self.attempt)
+        """The working directory this work item's attempts share on ``profile``.
+
+        ``attempt`` still identifies the attempt in the trainer request and in
+        the ledger; it does not select a directory, so a checkpoint survives
+        into the next attempt.
+        """
+        return profile.workspace_for(self.campaign_key, self.work_key)
 
 
 @dataclass(frozen=True, slots=True)

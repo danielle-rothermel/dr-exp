@@ -221,6 +221,106 @@ def test_resubmitting_the_same_run_reuses_its_work(
     assert len(states(engine)) == 2
 
 
+def run_cli(profile: MachineProfile, tmp_path: Path, args: list[str]) -> Any:  # noqa: ANN401 -- click's Result
+    """Invoke the real CLI against ``profile``, addressed as a profile file.
+
+    ``--machine`` accepts a path as readily as a bundled name, so a test
+    profile reaches the command without registering anything global.
+    """
+    import yaml
+    from click.testing import CliRunner
+
+    from dr_exp.cli.main import cli
+
+    path = tmp_path / "test-profile.yaml"
+    path.write_text(yaml.safe_dump(profile.model_dump(mode="json")))
+    return CliRunner().invoke(cli, [args[0], "--machine", str(path), *args[1:]])
+
+
+def write_config(tmp_path: Path, name: str, config: JobConfig) -> list[str]:
+    """Write ``config`` where the CLI can read it, as a one-element argv tail."""
+    import yaml
+
+    path = tmp_path / name
+    path.write_text(yaml.safe_dump(config.model_dump(mode="json")))
+    return [str(path)]
+
+
+def test_a_second_submit_under_a_closed_run_key_is_an_error(
+    profile: MachineProfile, engine: Engine, tmp_path: Path
+) -> None:
+    """Different work under a used run key must not report success.
+
+    A run's membership is fixed once registration closes, so dr-platform
+    replays the second call idempotently and registers nothing -- correct, but
+    it returns the *original* run's receipt, which read as a successful new
+    submission before this check existed. Both configs are single-member, so
+    ``expected_member_count`` matches and dr-platform's provenance conflict
+    does not fire; only reading the recorded membership back distinguishes
+    them.
+    """
+    first = base_config(seed=1)
+    second = base_config(seed=2)
+    assert (
+        run_cli(
+            profile,
+            tmp_path,
+            [
+                "submit",
+                "--campaign",
+                CAMPAIGN,
+                "--run",
+                "closed",
+                *write_config(tmp_path, "first.yaml", first),
+            ],
+        ).exit_code
+        == 0
+    )
+
+    result = run_cli(
+        profile,
+        tmp_path,
+        [
+            "submit",
+            "--campaign",
+            CAMPAIGN,
+            "--run",
+            "closed",
+            *write_config(tmp_path, "second.yaml", second),
+        ],
+    )
+
+    assert result.exit_code == 1
+    assert "Traceback" not in result.output
+    assert "already closed" in result.output
+    assert compute_work_key(second)[:12] in result.output
+    # And the discarded config really is absent, so the error is not a
+    # false alarm on work that landed.
+    assert states(engine) == {compute_work_key(first): StageExecutionState.READY}
+
+
+def test_an_identical_replay_under_one_run_key_still_reports_reuse(
+    profile: MachineProfile, engine: Engine, tmp_path: Path
+) -> None:
+    """The closed-run check must not break the benign idempotent replay."""
+    config = base_config(seed=1)
+    args = [
+        "submit",
+        "--campaign",
+        CAMPAIGN,
+        "--run",
+        "replayed",
+        *write_config(tmp_path, "config.yaml", config),
+    ]
+    assert run_cli(profile, tmp_path, args).exit_code == 0
+
+    replay = run_cli(profile, tmp_path, args)
+
+    assert replay.exit_code == 0
+    assert "1 member(s)" in replay.output
+    assert states(engine) == {compute_work_key(config): StageExecutionState.READY}
+
+
 def test_resubmitting_with_a_new_priority_reuses_work(
     profile: MachineProfile, engine: Engine
 ) -> None:
@@ -262,7 +362,7 @@ def test_worker_runs_a_sweep_to_success(
     assert set(states(engine).values()) == {StageExecutionState.SUCCEEDED}
 
     for key in result.work_keys:
-        workspace = profile.workspace_for(key, 1)
+        workspace = profile.workspace_for(CAMPAIGN, key)
         written = json.loads((workspace / RESULT_FILENAME).read_text())
         assert written["work_key"] == key
         assert written["epochs_completed"] == 1
@@ -300,7 +400,9 @@ def test_input_reference_resolves_from_the_database_only(
 
     assert summary.reached_limit, "worker did not finish after workspace deletion"
     assert states(engine) == {key: StageExecutionState.SUCCEEDED}
-    written = json.loads((profile.workspace_for(key, 1) / RESULT_FILENAME).read_text())
+    written = json.loads(
+        (profile.workspace_for(CAMPAIGN, key) / RESULT_FILENAME).read_text()
+    )
     assert written["work_key"] == key
     assert written["epochs_completed"] == 1
 
@@ -339,7 +441,7 @@ def test_failing_trainer_records_failure_evidence(
     evidence = read_evidence(engine, reference)
     assert evidence["outcome"]["kind"] == "protocol_failed"
     assert evidence["attribution"]["owner"] == "payload"
-    workspace = profile.workspace_for(compute_work_key(config), 1)
+    workspace = profile.workspace_for(CAMPAIGN, compute_work_key(config))
     assert evidence["workspace"] == str(workspace)
 
 
@@ -395,11 +497,11 @@ def test_cancelling_an_in_flight_attempt_stops_its_child(
 
     # The trainer writes this file before it blocks on the gate, so its
     # presence is evidence the child is really running.
-    started = profile.workspace_for(key, 1) / STARTED_FILENAME
+    started = profile.workspace_for(CAMPAIGN, key) / STARTED_FILENAME
     wait_until(started.exists, what="the trainer child to start")
     # The trainer writes its PID before the started marker, so it is readable
     # by the time that marker exists.
-    child_pid = int((profile.workspace_for(key, 1) / PID_FILENAME).read_text())
+    child_pid = int((profile.workspace_for(CAMPAIGN, key) / PID_FILENAME).read_text())
     assert process_alive(child_pid), "the trainer child was gone before cancelling"
 
     item = inspection.resolve_work_item(engine, campaign_key=CAMPAIGN, work_key=key)
@@ -430,7 +532,76 @@ def test_cancelling_an_in_flight_attempt_stops_its_child(
     # The gate was never opened, so a surviving child would still be waiting
     # on it and could not have written a result.
     assert not gate.exists()
-    assert not (profile.workspace_for(key, 1) / RESULT_FILENAME).exists()
+    assert not (profile.workspace_for(CAMPAIGN, key) / RESULT_FILENAME).exists()
+
+
+def test_retry_reports_that_cancellation_is_permanent(
+    profile: MachineProfile, engine: Engine, tmp_path: Path
+) -> None:
+    """A cancelled item has no retry path, and the message must say why.
+
+    dr-platform's ``retry_stage`` accepts FAILED executions only, and
+    cancellation is terminal in its ledger, so there is nothing for dr-exp to
+    reopen. The previous message -- "has no failed stage to retry" -- read as a
+    missing prerequisite rather than as a permanent outcome, so the operator's
+    actual route back to the work has to be spelled out.
+
+    Cancelling a READY item exercises the same terminal state as cancelling a
+    running one, without needing a worker.
+    """
+    from dbos import DBOSClient
+    from dr_platform import cancel_work
+
+    config = base_config(seed=7)
+    key = compute_work_key(config)
+    submit_jobs(
+        (config,),
+        campaign_key=CAMPAIGN,
+        run_key="cancelled-ready",
+        profile=profile,
+        engine=engine,
+    )
+    item = inspection.resolve_work_item(engine, campaign_key=CAMPAIGN, work_key=key)
+    client = DBOSClient(system_database_url=profile.system_database_url)
+    try:
+        cancel_work(engine=engine, client=client, work_item_id=item.work_item_id)
+    finally:
+        client.destroy()
+    assert states(engine) == {key: StageExecutionState.CANCELLED}
+
+    result = run_cli(profile, tmp_path, ["retry", "--campaign", CAMPAIGN, key])
+
+    assert result.exit_code == 1
+    assert "Traceback" not in result.output
+    assert "cancellation is permanent" in result.output
+    assert "NEW campaign" in result.output
+    # The message points at the workspace to copy, which is the only way the
+    # new campaign can resume rather than restart.
+    assert str(profile.workspace_for(CAMPAIGN, key)) in result.output
+    # Nothing was reopened.
+    stages = inspection.work_item_stages(engine, work_item_id=item.work_item_id)
+    assert stages[0].execution.state is StageExecutionState.CANCELLED
+
+
+def test_retry_still_reports_a_plain_missing_failure_separately(
+    profile: MachineProfile, engine: Engine, tmp_path: Path
+) -> None:
+    """A READY item is not cancelled, so it must not get the terminal message."""
+    config = base_config(seed=8)
+    key = compute_work_key(config)
+    submit_jobs(
+        (config,),
+        campaign_key=CAMPAIGN,
+        run_key="never-ran",
+        profile=profile,
+        engine=engine,
+    )
+
+    result = run_cli(profile, tmp_path, ["retry", "--campaign", CAMPAIGN, key])
+
+    assert result.exit_code == 1
+    assert "no failed stage to retry" in result.output
+    assert "cancellation is permanent" not in result.output
 
 
 def declared_train_queues() -> frozenset[str]:
@@ -583,8 +754,10 @@ def test_priority_orders_admitted_work_on_a_single_slot_worker(
     assert priorities == [1, 200]
 
     # And the urgent job's trainer really started first.
-    urgent_started = single_slot.workspace_for(urgent_key, 1) / STARTED_FILENAME
-    background_started = single_slot.workspace_for(background_key, 1) / STARTED_FILENAME
+    urgent_started = single_slot.workspace_for(CAMPAIGN, urgent_key) / STARTED_FILENAME
+    background_started = (
+        single_slot.workspace_for(CAMPAIGN, background_key) / STARTED_FILENAME
+    )
     assert urgent_started.stat().st_mtime_ns < background_started.stat().st_mtime_ns
 
 
@@ -608,7 +781,7 @@ def test_boost_reprioritises_an_admitted_item_in_dbos(
         engine=engine,
     )
 
-    started = profile.workspace_for(key, 1) / STARTED_FILENAME
+    started = profile.workspace_for(CAMPAIGN, key) / STARTED_FILENAME
     wait_until(started.exists, what="the trainer child to start")
 
     rows = dbos_workflow_rows(engine)
@@ -669,6 +842,16 @@ def test_retry_creates_a_new_attempt_that_can_succeed(
     assert failed.execution.state is StageExecutionState.FAILED
     assert len(failed.attempts) == 1
 
+    # Read attempt 1's directory out of its own failure evidence, so the
+    # shared-workspace assertion below rests on where the attempt really ran
+    # rather than on re-deriving the same rule under test.
+    reference = inspection.failed_run_members(engine, run_key="retried")[
+        0
+    ].evidence_reference
+    assert reference is not None
+    workspace = Path(str(read_evidence(engine, reference)["workspace"]))
+    assert (workspace / STARTED_FILENAME).read_text() == "1"
+
     # Fix the trainer, then retry the failed stage.
     sentinel.write_text("fixed")
     result = retry_stage(failed.execution.stage_execution_id, engine=engine)
@@ -679,12 +862,16 @@ def test_retry_creates_a_new_attempt_that_can_succeed(
     assert summary.reached_limit, "the retried attempt did not finish"
     assert states(engine) == {key: StageExecutionState.SUCCEEDED}
 
-    # The retry ran as a genuinely separate attempt, in its own workspace.
+    # The retry ran as a genuinely separate attempt -- but in the workspace
+    # attempt 1 already used, which is what makes resume-after-retry possible.
     stages = inspection.work_item_stages(engine, work_item_id=item.work_item_id)
     assert len(stages[0].attempts) == 2
-    written = json.loads((profile.workspace_for(key, 2) / RESULT_FILENAME).read_text())
+    assert workspace == profile.workspace_for(CAMPAIGN, key)
+    written = json.loads((workspace / RESULT_FILENAME).read_text())
     assert written["attempt"] == 2
-    assert not (profile.workspace_for(key, 1) / RESULT_FILENAME).exists()
+    # Attempt 1's marker was overwritten in place rather than left in a
+    # directory attempt 2 never saw.
+    assert (workspace / STARTED_FILENAME).read_text() == "2"
 
 
 def test_mini_worker_runs_a_cpu_labelled_example_job(
@@ -720,7 +907,9 @@ def test_mini_worker_runs_a_cpu_labelled_example_job(
 
         assert summary.reached_limit, "mini worker did not finish the CPU-labelled job"
         assert states(engine) == {key: StageExecutionState.SUCCEEDED}
-        written = json.loads((mini.workspace_for(key, 1) / RESULT_FILENAME).read_text())
+        written = json.loads(
+            (mini.workspace_for(CAMPAIGN, key) / RESULT_FILENAME).read_text()
+        )
         assert written["work_key"] == key
         assert written["epochs_completed"] == config.params["epochs"]
     finally:
@@ -753,10 +942,12 @@ def test_worker_shutdown_tears_down_its_in_flight_child(
         engine=engine,
     )
 
-    started = profile.workspace_for(key, 1) / STARTED_FILENAME
+    started = profile.workspace_for(CAMPAIGN, key) / STARTED_FILENAME
     with worker_runtime(profile, with_dispatcher=True, forward_signals=False):
         wait_until(started.exists, what="the trainer child to start")
-        child_pid = int((profile.workspace_for(key, 1) / PID_FILENAME).read_text())
+        child_pid = int(
+            (profile.workspace_for(CAMPAIGN, key) / PID_FILENAME).read_text()
+        )
         assert process_alive(child_pid)
 
     # The gate never opened, so the only thing that can have ended this child

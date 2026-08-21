@@ -46,6 +46,29 @@ dr-exp submits at a baseline of 100 so `dr_exp boost` can move work ahead.
   PENDING work is failed as `stale_app_version`. Do not retry pre-cutover
   failures; resubmit matching configs into a new campaign if the old one
   still holds filesystem-path work items.
+- Attempt workspaces are keyed by `(campaign_key, work_key)` instead of by
+  `(work_key, attempt)`: `workspace_root/runs/<campaign_key>/<work_key>/`
+  replaces `workspace_root/runs/<work_key>/attempt-<n>/`. Every attempt of one
+  work item now shares a directory, so a checkpoint written by attempt *n* is
+  visible to attempt *n+1* and the trainer contract's at-least-once resume
+  language holds across attempts as well as across DBOS recovery. The attempt
+  number stays in the trainer request and in the ledger; it no longer selects a
+  directory. Two campaigns holding the same `work_key` — the same config
+  submitted twice — get separate workspaces, while resubmitting into the same
+  campaign still reuses the work item by dedupe. Hard cutover: existing
+  `runs/<work_key>/attempt-<n>/` directories are dev data and are not migrated;
+  work submitted before this change starts from an empty workspace.
+- `dr_exp retry` on a cancelled work item now explains that cancellation is
+  permanent and names the resubmit-into-a-new-campaign path and the workspace
+  to copy, instead of reporting "has no failed stage to retry" — which read as
+  a missing prerequisite rather than a terminal outcome. Exit 1, no traceback.
+- `dr_exp submit` and `dr_exp sweep` now fail when a run key's registration is
+  already closed and the submission would be discarded, naming the run and the
+  discarded work keys. Previously dr-platform's idempotent replay of a closed
+  run returned the *original* receipt and dr-exp printed it beside the locally
+  computed work keys, so a second submit of different configs under one run key
+  reported success while registering nothing. An identical replay is unchanged
+  and still reports reuse.
 - Added a dev-only `vision` dependency group installing dr-vision editable
   from `../dr-vision` (`[tool.uv.sources]`), so the `mini` profile's
   interpreter can import a real trainer under `python -I`. It is not a

@@ -122,6 +122,7 @@ async def _run_training_attempt(
 ) -> AttemptOutcome:
     config = load_job_config_reference(payload.input_reference, engine=context.engine)
     request = AttemptRequest(
+        campaign_key=payload.campaign_key.value,
         work_key=payload.work_key.value,
         attempt=payload.attempt_number,
         config=config,

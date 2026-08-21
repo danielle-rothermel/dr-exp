@@ -104,9 +104,19 @@ has written its first checkpoint, `dr_exp cancel` it.
 
 Validates: SIGTERM reaches the child, dr-vision checkpoints within the 30 s
 grace, the child PID is gone, ledger CANCELLED with `producer=cancellation` (no
-FAILED attempt). Then `dr_exp retry`: a new attempt starts, **resumes from the
-checkpoint** (round/epoch in `metrics.jsonl` continue rather than restart), and
-finishes SUCCEEDED. This is the at-least-once contract exercised for real.
+FAILED attempt).
+
+Then the resume half. Cancellation is terminal in dr-platform's ledger, so
+`dr_exp retry` is *not* the path back: it prints that cancellation is permanent
+and exits 1. The path is to resubmit the same config into a **new campaign**,
+which creates a new work item (dedupe is per campaign and work key, so the old
+campaign would resolve to the cancelled item). Workspaces are per
+`(campaign_key, work_key)`, so the new campaign starts empty: copy the
+cancelled item's workspace into the new campaign's before starting a worker.
+That new work item's attempt 1 then **resumes from the checkpoint** — its
+`result.json` carries a non-null `resumed_from` matching the checkpoint's
+round/epoch, `metrics.jsonl` continues from there rather than restarting, and
+it finishes SUCCEEDED. This is the at-least-once contract exercised for real.
 
 ### V4 — worker shutdown and recovery
 

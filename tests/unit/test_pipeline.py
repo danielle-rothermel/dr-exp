@@ -146,12 +146,14 @@ def test_submission_registry_declares_the_same_identity_and_routing() -> None:
     assert stage.label_queue_routes == LABEL_QUEUE_ROUTES
 
 
-def admission_payload(reference: str) -> Any:  # noqa: ANN401
+def admission_payload(
+    reference: str, *, campaign_key: str = "unit", attempt_number: int = 1
+) -> Any:  # noqa: ANN401
     """The dr-platform payload the stage body is invoked with."""
     from dr_platform import AdmissionPayload, CampaignKey, RunKey, StageKey, WorkKey
 
     return AdmissionPayload(
-        campaign_key=CampaignKey(value="unit"),
+        campaign_key=CampaignKey(value=campaign_key),
         work_key=WorkKey(value="abc"),
         work_item_id=1,
         origin_run_key=RunKey(value="run"),
@@ -161,13 +163,27 @@ def admission_payload(reference: str) -> Any:  # noqa: ANN401
         pipeline_version=PIPELINE_VERSION,
         stage_key=StageKey(value=STAGE_KEY),
         stage_index=0,
-        attempt_number=1,
+        attempt_number=attempt_number,
     )
 
 
-async def run_stage_body(context: StageContext, *, reference: str) -> None:
+async def run_stage_body(
+    context: StageContext,
+    *,
+    reference: str,
+    campaign_key: str = "unit",
+    attempt_number: int = 1,
+) -> Any:  # noqa: ANN401 -- dr-platform's StageCompletion
     """Invoke the stage body once; the patched executor supplies the outcome."""
-    await build_pipeline(context).stages[0].workflow(admission_payload(reference))
+    return (
+        await build_pipeline(context)
+        .stages[0]
+        .workflow(
+            admission_payload(
+                reference, campaign_key=campaign_key, attempt_number=attempt_number
+            )
+        )
+    )
 
 
 @pytest.fixture
@@ -184,6 +200,35 @@ def stored_config(monkeypatch: pytest.MonkeyPatch) -> str:
 
     monkeypatch.setattr(pipeline_module, "load_job_config_reference", load_fixture)
     return reference_for_job_config(config)
+
+
+async def test_the_stage_body_keys_the_workspace_by_campaign_not_attempt(
+    context: StageContext, stored_config: str, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """The workspace the stage body hands the trainer follows the payload.
+
+    ``output_reference`` is that workspace, so this reads the real path the
+    stage produced rather than re-deriving it. Attempt 2 of one work item must
+    land on attempt 1's directory -- otherwise the checkpoint written under
+    the trainer contract is unreachable -- while a second campaign holding the
+    same work key must not.
+    """
+    monkeypatch.setattr(
+        pipeline_module,
+        "build_executor",
+        lambda _profile: FakeExecutor(
+            [completion(ExitedOutcome(exit_code=0), payload={}) for _ in range(3)]
+        ),
+    )
+    first = await run_stage_body(context, reference=stored_config, attempt_number=1)
+    second = await run_stage_body(context, reference=stored_config, attempt_number=2)
+    other_campaign = await run_stage_body(
+        context, reference=stored_config, campaign_key="elsewhere"
+    )
+
+    assert first.output_reference == str(context.profile.workspace_for("unit", "abc"))
+    assert second.output_reference == first.output_reference
+    assert other_campaign.output_reference != first.output_reference
 
 
 async def test_a_cancelled_dr_exec_outcome_raises_cancelled_error(

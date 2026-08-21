@@ -118,9 +118,17 @@ class MachineProfile(BaseModel):
             for name, template in self.device_env.items()
         }
 
-    def workspace_for(self, work_key: str, attempt: int) -> Path:
-        """Return the per-attempt working directory for one work item."""
-        return self.workspace_root / "runs" / work_key / f"attempt-{attempt}"
+    def workspace_for(self, campaign_key: str, work_key: str) -> Path:
+        """Return the working directory shared by one work item's attempts.
+
+        Keyed by ``(campaign_key, work_key)`` rather than by attempt, so a
+        checkpoint written by attempt *n* is visible to attempt *n+1* and the
+        trainer contract's resume language is actually achievable. The campaign
+        is part of the key because ``work_key`` alone repeats across campaigns
+        -- the same config submitted twice is deliberately the same work key --
+        and two campaigns must not write over each other's artifacts.
+        """
+        return self.workspace_root / "runs" / campaign_key / work_key
 
 
 def profile_path(name: str, *, directory: Path | None = None) -> Path:

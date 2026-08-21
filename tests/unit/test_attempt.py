@@ -57,7 +57,9 @@ def profile(tmp_path: Path) -> MachineProfile:
 def test_trainer_request_carries_the_documented_fields(
     profile: MachineProfile,
 ) -> None:
-    request = AttemptRequest(work_key="abc", attempt=3, config=CONFIG)
+    request = AttemptRequest(
+        campaign_key="camp", work_key="abc", attempt=3, config=CONFIG
+    )
     workspace = request.workspace(profile)
     assert build_trainer_request(request, workspace=workspace) == {
         "params": {"epochs": 2},
@@ -70,7 +72,9 @@ def test_trainer_request_carries_the_documented_fields(
 def test_execution_job_grants_the_attempt_workspace(
     profile: MachineProfile,
 ) -> None:
-    request = AttemptRequest(work_key="abc", attempt=1, config=CONFIG)
+    request = AttemptRequest(
+        campaign_key="camp", work_key="abc", attempt=1, config=CONFIG
+    )
     workspace = request.workspace(profile)
     workspace.mkdir(parents=True)
     job = build_execution_job(request, profile=profile, workspace=workspace)
@@ -81,7 +85,9 @@ def test_execution_job_grants_the_attempt_workspace(
 def test_execution_job_targets_the_configured_entry_point(
     profile: MachineProfile,
 ) -> None:
-    request = AttemptRequest(work_key="abc", attempt=1, config=CONFIG)
+    request = AttemptRequest(
+        campaign_key="camp", work_key="abc", attempt=1, config=CONFIG
+    )
     workspace = request.workspace(profile)
     workspace.mkdir(parents=True)
     job = build_execution_job(request, profile=profile, workspace=workspace)
@@ -96,7 +102,9 @@ def test_execution_job_overlays_the_profile_device_env(
     cuda_profile = profile.model_copy(
         update={"device_env": {"CUDA_VISIBLE_DEVICES": "{device}"}}
     )
-    request = AttemptRequest(work_key="abc", attempt=1, config=CONFIG)
+    request = AttemptRequest(
+        campaign_key="camp", work_key="abc", attempt=1, config=CONFIG
+    )
     workspace = request.workspace(cuda_profile)
     workspace.mkdir(parents=True)
     job = build_execution_job(request, profile=cuda_profile, workspace=workspace)
@@ -108,7 +116,9 @@ def test_execution_job_overlays_the_profile_device_env(
 def test_execution_job_is_unbudgeted_without_declared_budgets(
     profile: MachineProfile,
 ) -> None:
-    request = AttemptRequest(work_key="abc", attempt=1, config=CONFIG)
+    request = AttemptRequest(
+        campaign_key="camp", work_key="abc", attempt=1, config=CONFIG
+    )
     workspace = request.workspace(profile)
     workspace.mkdir(parents=True)
     job = build_execution_job(request, profile=profile, workspace=workspace)
@@ -119,7 +129,9 @@ def test_execution_job_converts_a_wall_time_budget_to_nanoseconds(
     profile: MachineProfile,
 ) -> None:
     budgeted = CONFIG.model_copy(update={"budgets": Budgets(wall_time_seconds=1.5)})
-    request = AttemptRequest(work_key="abc", attempt=1, config=budgeted)
+    request = AttemptRequest(
+        campaign_key="camp", work_key="abc", attempt=1, config=budgeted
+    )
     workspace = request.workspace(profile)
     workspace.mkdir(parents=True)
     job = build_execution_job(request, profile=profile, workspace=workspace)
@@ -129,7 +141,9 @@ def test_execution_job_converts_a_wall_time_budget_to_nanoseconds(
 def test_each_attempt_mints_a_distinct_job_id(
     profile: MachineProfile,
 ) -> None:
-    request = AttemptRequest(work_key="abc", attempt=1, config=CONFIG)
+    request = AttemptRequest(
+        campaign_key="camp", work_key="abc", attempt=1, config=CONFIG
+    )
     workspace = request.workspace(profile)
     workspace.mkdir(parents=True)
     first = build_execution_job(request, profile=profile, workspace=workspace)
@@ -143,7 +157,9 @@ async def test_successful_attempt_writes_its_result(
     executor = FakeExecutor(
         [make_completion(ExitedOutcome(exit_code=0), payload={"loss": 0.5})]
     )
-    request = AttemptRequest(work_key="abc", attempt=1, config=CONFIG)
+    request = AttemptRequest(
+        campaign_key="camp", work_key="abc", attempt=1, config=CONFIG
+    )
     outcome = await run_attempt(
         request,
         profile=profile,
@@ -161,7 +177,7 @@ async def test_nonzero_exit_is_reported_as_a_failure(
 ) -> None:
     executor = FakeExecutor([make_completion(ExitedOutcome(exit_code=1))])
     outcome = await run_attempt(
-        AttemptRequest(work_key="abc", attempt=1, config=CONFIG),
+        AttemptRequest(campaign_key="camp", work_key="abc", attempt=1, config=CONFIG),
         profile=profile,
         executor=executor,
         cancellation=CancelToken(),
@@ -177,7 +193,7 @@ async def test_cancelled_attempt_is_reported_as_cancelled(
 ) -> None:
     executor = FakeExecutor([make_completion(CancelledOutcome())])
     outcome = await run_attempt(
-        AttemptRequest(work_key="abc", attempt=1, config=CONFIG),
+        AttemptRequest(campaign_key="camp", work_key="abc", attempt=1, config=CONFIG),
         profile=profile,
         executor=executor,
         cancellation=CancelToken(),
@@ -193,7 +209,7 @@ async def test_failure_evidence_is_strict_json(
 
     executor = FakeExecutor([make_completion(ExitedOutcome(exit_code=2))])
     outcome = await run_attempt(
-        AttemptRequest(work_key="abc", attempt=1, config=CONFIG),
+        AttemptRequest(campaign_key="camp", work_key="abc", attempt=1, config=CONFIG),
         profile=profile,
         executor=executor,
         cancellation=CancelToken(),
@@ -209,7 +225,9 @@ async def test_attempt_creates_its_workspace(
     profile: MachineProfile,
 ) -> None:
     executor = FakeExecutor([make_completion(ExitedOutcome(exit_code=0), payload={})])
-    request = AttemptRequest(work_key="abc", attempt=4, config=CONFIG)
+    request = AttemptRequest(
+        campaign_key="camp", work_key="abc", attempt=4, config=CONFIG
+    )
     assert not request.workspace(profile).exists()
     outcome = await run_attempt(
         request,
@@ -218,4 +236,34 @@ async def test_attempt_creates_its_workspace(
         cancellation=CancelToken(),
     )
     assert outcome.workspace.is_dir()
-    assert outcome.workspace == profile.workspace_for("abc", 4)
+    assert outcome.workspace == profile.workspace_for("camp", "abc")
+
+
+def test_attempts_of_one_work_item_share_a_workspace(
+    profile: MachineProfile,
+) -> None:
+    """A later attempt must land on the earlier attempt's checkpoint.
+
+    The attempt number stays in the trainer request and in the ledger; it no
+    longer selects a directory, which is what makes resume-after-retry and
+    resume-after-recovery reachable at all.
+    """
+    first = AttemptRequest(
+        campaign_key="camp", work_key="abc", attempt=1, config=CONFIG
+    )
+    second = AttemptRequest(
+        campaign_key="camp", work_key="abc", attempt=2, config=CONFIG
+    )
+    assert first.workspace(profile) == second.workspace(profile)
+
+
+def test_one_work_key_in_two_campaigns_does_not_share_a_workspace(
+    profile: MachineProfile,
+) -> None:
+    first = AttemptRequest(
+        campaign_key="first", work_key="abc", attempt=1, config=CONFIG
+    )
+    second = AttemptRequest(
+        campaign_key="second", work_key="abc", attempt=1, config=CONFIG
+    )
+    assert first.workspace(profile) != second.workspace(profile)

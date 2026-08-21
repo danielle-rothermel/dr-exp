@@ -125,11 +125,32 @@ def test_device_env_templates_render_the_device_slot(tmp_path: Path) -> None:
     assert profile.resolve_device_env("3") == {"CUDA_VISIBLE_DEVICES": "3"}
 
 
-def test_workspace_paths_are_per_work_key_and_attempt(tmp_path: Path) -> None:
+def test_workspace_paths_are_per_campaign_and_work_key(tmp_path: Path) -> None:
     profile = make_profile(tmp_path)
-    assert profile.workspace_for("abc", 2) == (
-        profile.workspace_root / "runs" / "abc" / "attempt-2"
+    assert profile.workspace_for("camp", "abc") == (
+        profile.workspace_root / "runs" / "camp" / "abc"
     )
+
+
+def test_two_campaigns_with_one_work_key_get_distinct_workspaces(
+    tmp_path: Path,
+) -> None:
+    """The same config in two campaigns hashes to one work key by design.
+
+    Campaigns are the unit an operator uses to start work over, so they must
+    not land on each other's checkpoints and artifacts.
+    """
+    profile = make_profile(tmp_path)
+    assert profile.workspace_for("first", "abc") != profile.workspace_for(
+        "second", "abc"
+    )
+
+
+def test_workspaces_do_not_collide_across_work_keys_in_one_campaign(
+    tmp_path: Path,
+) -> None:
+    profile = make_profile(tmp_path)
+    assert profile.workspace_for("camp", "abc") != profile.workspace_for("camp", "def")
 
 
 def test_bundled_mini_profile_is_valid_for_this_machine() -> None:
