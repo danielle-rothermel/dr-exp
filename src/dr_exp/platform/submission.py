@@ -6,10 +6,12 @@ from dataclasses import dataclass
 
 from dr_platform import (
     PipelineRegistry,
+    RegistrationClosureError,
     RunMemberInput,
     RunRegistrationDeclaration,
     SubmissionReceipt,
     WorkInput,
+    list_run_members,
     submit,
 )
 from sqlalchemy import Engine
@@ -81,9 +83,62 @@ def submit_jobs(
         registry=registry if registry is not None else submission_registry(),
         engine=engine,
     )
-    return SubmissionResult(
-        receipt=receipt,
-        work_keys=tuple(member.work.work_key.value for member in members),
+    submitted = tuple(member.work.work_key.value for member in members)
+    _require_membership_registered(
+        submitted, run_key=receipt.run_key.value, engine=engine
+    )
+    return SubmissionResult(receipt=receipt, work_keys=submitted)
+
+
+#: How many run members to read per page when verifying a submission landed.
+#: dr-platform's readers are bounded and cursor-paged, so a sweep larger than
+#: one page must be walked rather than truncated -- a truncated read would
+#: report the tail of a perfectly good submission as discarded.
+_MEMBERSHIP_PAGE_SIZE = 1000
+
+
+def _registered_work_keys(run_key: str, *, engine: Engine) -> frozenset[str]:
+    """Every work key recorded as a member of ``run_key``, across all pages."""
+    keys: set[str] = set()
+    cursor: int | None = None
+    while True:
+        page = list_run_members(
+            run_key, engine=engine, cursor=cursor, limit=_MEMBERSHIP_PAGE_SIZE
+        )
+        keys.update(member.work_key.value for member in page)
+        if len(page) < _MEMBERSHIP_PAGE_SIZE:
+            return frozenset(keys)
+        cursor = page[-1].member_ordinal
+
+
+def _require_membership_registered(
+    submitted: tuple[str, ...], *, run_key: str, engine: Engine
+) -> None:
+    """Refuse to report success for a submission the run discarded.
+
+    A run's membership is immutable once registration closes, and dr-platform
+    resolves a second ``submit`` under a closed run key as an idempotent replay:
+    it returns the *stored* receipt and registers nothing. That is correct for
+    an identical replay, but for a different membership it silently drops the
+    work, and the stored receipt describes the original registration, so
+    echoing it reads as a successful new submission.
+
+    dr-platform raises ``PipelineRunConflictError`` only when the run's
+    immutable provenance differs, and ``expected_member_count`` is the only
+    part of that provenance a differing membership changes -- so two submits of
+    one config each conflict on nothing and produce exactly this misreport.
+    Reading the recorded membership back is what distinguishes the two cases.
+    """
+    registered = _registered_work_keys(run_key, engine=engine)
+    discarded = [key for key in submitted if key not in registered]
+    if not discarded:
+        return
+    listed = ", ".join(key[:12] for key in discarded)
+    raise RegistrationClosureError(
+        f"run {run_key!r} is already closed, so this submission registered "
+        f"nothing: {len(discarded)} of {len(submitted)} configuration(s) were "
+        f"discarded ({listed}). A run's membership is fixed when it closes. "
+        f"Submit these configurations under a different --run key."
     )
 
 

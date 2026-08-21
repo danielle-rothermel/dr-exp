@@ -39,7 +39,7 @@ interpreter.
 | `name` | Profile identity, for logs and messages. |
 | `accelerator` | `cpu`, `mps`, or `cuda`. Selects the queue this worker drains. |
 | `python_executable` | Absolute interpreter that runs training children. |
-| `workspace_root` | Root for per-attempt workspaces. |
+| `workspace_root` | Root for work-item workspaces (`runs/<campaign_key>/<work_key>/`). |
 | `run_store_root` | Root for dr-exec's durable run records. |
 | `database_url` | Platform database. |
 | `system_database_url` | DBOS system database. Must be the same database. |
@@ -114,7 +114,7 @@ on the platform database under the schema `dr_exp.job_config/v1` and records
 the returned content-addressed object reference as the work item's
 `input_reference`. The worker stage body gets that object by reference and
 validates it back into a `JobConfig`. Submitter and worker need no shared
-filesystem: `workspace_root` holds attempt workspaces only. This is a hard
+filesystem: `workspace_root` holds work-item workspaces only. This is a hard
 cutover from path-based references: drain in-flight work before upgrading,
 do not `dr_exp retry` pre-cutover failures, and resubmit matching configs
 into a new `--campaign` if the old campaign still holds filesystem-path
@@ -136,12 +136,26 @@ def train(request: dict) -> dict: ...
   scalars, or non-finite floats. dr-exp writes it to `result.json` in the
   workspace.
 - **Artifacts** belong under `request["workspace"]`, which is also the child's
-  working directory and survives the run.
+  working directory and survives the run. The workspace is
+  `workspace_root/runs/<campaign_key>/<work_key>/` and is **shared by every
+  attempt of that work item**: `attempt` identifies the attempt in the request
+  and in the ledger, but it does not select a directory. So a checkpoint
+  written by attempt *n* is where attempt *n+1* looks for it, and a trainer
+  that resumes must key its checkpoints on its own params rather than assume
+  the directory is empty.
 - **SIGTERM means checkpoint and exit.** Cancellation and worker shutdown send
   SIGTERM, then SIGKILL after `termination_grace_seconds`. A trainer that wants
-  to resume should checkpoint within that window.
+  to resume should checkpoint within that window; the checkpoint is reachable
+  both by DBOS recovery of the same attempt and by the next attempt after
+  `dr_exp retry`.
 - **At-least-once.** A stage body can run again after recovery, so a trainer
   should tolerate re-execution of the same `work_key`.
+
+Two campaigns holding the same `work_key` get separate workspaces, because the
+same configuration deliberately hashes to the same work key everywhere and a
+new campaign is how an operator starts that work over. Nothing is copied
+between them: to continue a cancelled item's work in a new campaign, copy its
+workspace across before running a worker.
 
 The entry point must be importable by the profile's `python_executable`.
 dr-exec runs the child in isolated mode (`python -I`), so `PYTHONPATH` is
@@ -153,6 +167,40 @@ and smoke run use. Its `params` include switches that exist only to drive
 tests deterministically -- a gate file to hold an attempt in flight, a
 shutdown delay to model checkpointing, and failure injection -- so cancellation
 and retry can be exercised without timing guesses.
+
+### Local trainer packages
+
+Real trainers live in their own repositories and are installed into this
+venv, because the `mini` profile's `python_executable` is `.venv/bin/python`
+and `python -I` ignores `PYTHONPATH`. dr-vision is wired up that way as a
+dev-only dependency group with a path source:
+
+```toml
+[dependency-groups]
+vision = ["dr-vision"]
+
+[tool.uv.sources]
+dr-vision = { path = "../dr-vision", editable = true }
+```
+
+```bash
+uv sync --group dev --group test --group vision
+```
+
+Name every group you want: `--group` replaces the default selection rather
+than adding to it, so omitting `dev`/`test` uninstalls them.
+
+- The group is machine-local. Only `--group vision` *installs* dr-vision, so
+  a sync without it pulls neither dr-vision nor torch, and dr-vision is never
+  a runtime dependency of dr-exp. But uv resolves `[tool.uv.sources]`
+  regardless of group selection, so the sibling checkout `../dr-vision` must
+  exist for *every* `uv lock`, `uv sync`, and `uv run` in this repo — without
+  it they all fail with `Distribution not found at: .../dr-vision`. This repo
+  is developed only where that checkout is present.
+- The install is editable, so a dr-vision edit is live on the next job with
+  no reinstall.
+- When dr-vision publishes to PyPI, the group becomes a pinned release and the
+  `[tool.uv.sources]` entry goes away.
 
 ## Queues, capacity, and priority
 
@@ -210,6 +258,30 @@ Work keys accept a unique prefix. `--max-jobs` makes a worker exit once that
 many work items in the campaign are terminal, which is what the smoke run uses;
 without it a worker runs until SIGTERM or SIGINT, then drains its in-flight
 attempts and exits.
+
+**`retry` is for FAILED attempts only.** The three ways work stops have three
+different answers:
+
+| What happened | What to do |
+| --- | --- |
+| The attempt FAILED | `dr_exp retry` — a new attempt runs in the same workspace |
+| The worker crashed or was restarted | Nothing. DBOS recovery resumes the same attempt automatically, in the same workspace |
+| You ran `dr_exp cancel` | Submit the config into a **new campaign**. Cancellation is terminal |
+
+Cancellation is permanent because it is terminal in dr-platform's ledger:
+there is no reopen, and resubmitting into the *same* campaign deduplicates
+back onto the cancelled item (dedupe is per campaign and work key). A new
+campaign creates a new work item — and a new, empty workspace, so copy the
+cancelled item's workspace across first if you want to resume from its
+checkpoint rather than restart. `dr_exp retry` on a cancelled item prints this
+and exits 1.
+
+**A run key's membership is fixed once it registers.** A second `submit` or
+`sweep` under a run key that already exists is refused with an error naming the
+run and the discarded work keys, because dr-platform closes the run's
+membership at registration and would otherwise discard the new configurations
+silently. Submitting the *identical* membership again is a replay and still
+reports reuse. Give each batch its own `--run` key.
 
 `--with-dispatcher` runs admission, the run barrier, and the abandoned-work
 sweep in the same process, which is the normal single-machine setup.

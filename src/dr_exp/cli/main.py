@@ -40,6 +40,28 @@ DEFAULT_LOG_LEVEL = "INFO"
 _LOG_FORMAT = "%(asctime)s %(levelname)-7s %(name)s: %(message)s"
 _LOG_DATE_FORMAT = "%Y-%m-%dT%H:%M:%S"
 
+#: What ``retry`` says about a cancelled work item. Cancellation is terminal in
+#: dr-platform's ledger, so there is no reopen: the operator's route back to the
+#: work is a new campaign, and the message has to say why that is not just
+#: resubmitting into the same one (dedupe is per ``(campaign_key, work_key)``,
+#: so the same campaign would resolve to the cancelled item again). It also
+#: names the workspace, because a new campaign gets a new one: the cancelled
+#: attempt's checkpoint is reachable only by copying it across.
+_CANCELLATION_IS_TERMINAL = (
+    "{work_key} was cancelled, and cancellation is permanent: a cancelled "
+    "stage cannot be retried or reopened.\n"
+    "'retry' applies to FAILED attempts only; a worker crash resumes the same "
+    "attempt on its own, from the same workspace, and needs no command.\n"
+    "To continue this work, submit the same config into a NEW campaign "
+    "(not {campaign_key!r}): deduplication is per campaign and work key, so "
+    "resubmitting into {campaign_key!r} resolves to this same cancelled item.\n"
+    "Workspaces are per campaign and work key, so the new campaign starts "
+    "empty. To resume rather than restart, copy this item's workspace into "
+    "the new campaign's before running a worker:\n"
+    "  {workspace}\n"
+    "  -> {workspace_root}/runs/<new-campaign>/{full_work_key}"
+)
+
 _MACHINE_OPTION = click.option(
     "--machine",
     "machine",
@@ -465,14 +487,30 @@ def retry(machine: str, campaign_key: str, work_key: str) -> None:
     profile = _profile(machine)
     with engine_for(profile) as engine:
         item = _resolve(engine, campaign_key=campaign_key, work_key=work_key)
+        stages = inspection.work_item_stages(engine, work_item_id=item.work_item_id)
         failed = [
             stage.execution
-            for stage in inspection.work_item_stages(
-                engine, work_item_id=item.work_item_id
-            )
+            for stage in stages
             if stage.execution.state is StageExecutionState.FAILED
         ]
         if not failed:
+            cancelled = [
+                stage.execution
+                for stage in stages
+                if stage.execution.state is StageExecutionState.CANCELLED
+            ]
+            if cancelled:
+                raise click.ClickException(
+                    _CANCELLATION_IS_TERMINAL.format(
+                        work_key=item.work_key.value[:12],
+                        full_work_key=item.work_key.value,
+                        campaign_key=campaign_key,
+                        workspace=profile.workspace_for(
+                            campaign_key, item.work_key.value
+                        ),
+                        workspace_root=profile.workspace_root,
+                    )
+                )
             raise click.ClickException(
                 f"{item.work_key.value[:12]} has no failed stage to retry"
             )
