@@ -1,8 +1,9 @@
 """Fixtures for tests that need a real PostgreSQL database.
 
-The suite refuses any database whose name does not end in ``_test`` and
-destructively recreates its schemas between tests, mirroring dr-platform's own
-convention.
+The suite uses ``dr_platform.testing.validate_test_database_url`` to refuse any
+database whose name does not end in ``_test``. Reset stays local: this stack
+drops the ``dbos`` and ``public`` schemas and then runs production
+``initialize_schema``, which ``migrated_engine`` does not cover.
 """
 
 from __future__ import annotations
@@ -13,6 +14,7 @@ from collections.abc import Iterator
 from pathlib import Path
 
 import pytest
+from dr_platform.testing import validate_test_database_url
 from sqlalchemy import Engine, create_engine, text
 
 from dr_exp.config.machine import MachineProfile
@@ -24,11 +26,7 @@ DEFAULT_TEST_DATABASE_URL = "postgresql+psycopg:///dr_exp_test"
 def test_database_url() -> str:
     """The database this suite is allowed to destroy."""
     url = os.environ.get(DATABASE_URL_ENV, DEFAULT_TEST_DATABASE_URL)
-    name = url.rsplit("/", 1)[-1].split("?", 1)[0]
-    if not name.endswith("_test"):
-        raise RuntimeError(
-            f"{DATABASE_URL_ENV} must name a database ending in '_test', got {name!r}"
-        )
+    validate_test_database_url(url)
     return url
 
 
@@ -46,7 +44,7 @@ def database_url() -> str:
 
 
 @pytest.fixture
-def clean_database(database_url: str) -> Iterator[str]:
+def clean_database(database_url: str) -> str:
     engine = create_engine(database_url)
     try:
         reset_database(engine)
