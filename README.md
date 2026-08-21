@@ -176,6 +176,7 @@ dr_exp boost --machine mini --priority 5 <work-key>
 ## Commands
 
 ```bash
+dr_exp [--log-level DEBUG|INFO|WARNING|ERROR] <command> ...
 dr_exp init      --machine mini
 dr_exp submit    --machine mini --run <run> [--campaign C] [--priority N] <config.yaml>
 dr_exp sweep     --machine mini --run <run> [--campaign C] [--dry-run] <spec.yaml>
@@ -201,6 +202,11 @@ attempts and exits.
 sweep in the same process, which is the normal single-machine setup.
 `dr_exp dispatcher` runs those without declaring any queue, so it dispatches
 without executing work.
+
+`--log-level` (`DEBUG`, `INFO`, `WARNING`, `ERROR`; default `INFO`) goes before
+the command, as in `dr_exp --log-level DEBUG worker --machine mini`. It sets
+the verbosity of dr-exp and dr-platform log output on stderr; at `INFO` this
+includes the dispatcher's per-sweep reconciliation summary.
 
 ### Operational limits
 

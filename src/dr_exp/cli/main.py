@@ -7,6 +7,7 @@ default of its own.
 
 from __future__ import annotations
 
+import logging
 import sys
 from pathlib import Path
 from typing import Any
@@ -29,6 +30,15 @@ from dr_exp.platform.submission import submit_jobs
 
 #: Default campaign for commands invoked without an explicit one.
 DEFAULT_CAMPAIGN_KEY = "default"
+
+#: Log levels the CLI offers.
+LOG_LEVELS = ("DEBUG", "INFO", "WARNING", "ERROR")
+
+#: Default log level. INFO carries dr-platform's reconciliation summaries.
+DEFAULT_LOG_LEVEL = "INFO"
+
+_LOG_FORMAT = "%(asctime)s %(levelname)-7s %(name)s: %(message)s"
+_LOG_DATE_FORMAT = "%Y-%m-%dT%H:%M:%S"
 
 _MACHINE_OPTION = click.option(
     "--machine",
@@ -102,10 +112,59 @@ def _operator_message(error: Exception) -> str:
     return message
 
 
+class _CliStderrHandler(logging.StreamHandler[Any]):
+    """Root handler the CLI installs; rebound to the current stderr each invoke."""
+
+
+def _configure_logging(level: str) -> None:
+    """Send library log records to stderr at ``level``.
+
+    Only the CLI configures logging; dr-exp's library modules never do. Without
+    this, dr-platform's INFO reconciliation lines -- notably the dispatcher's
+    sweep summary -- go nowhere, and the terminal shows only DBOS's own logs.
+
+    The CLI-owned handler is rebound to the current ``sys.stderr`` on every
+    invoke so a second in-process call -- ``CliRunner``, an embedding -- does
+    not keep writing to the first invocation's capture stream. Foreign handlers
+    are left in place, so an embedding process keeps its own setup. DBOS is
+    unaffected either way, since it attaches a handler to its own ``dbos``
+    logger and turns propagation off.
+    """
+    root = logging.getLogger()
+    root.setLevel(level.upper())
+
+    owned = next(
+        (
+            handler
+            for handler in root.handlers
+            if isinstance(handler, _CliStderrHandler)
+        ),
+        None,
+    )
+    if owned is not None:
+        owned.setStream(sys.stderr)
+        return
+    if root.handlers:
+        return
+
+    handler = _CliStderrHandler(sys.stderr)
+    handler.setFormatter(logging.Formatter(_LOG_FORMAT, datefmt=_LOG_DATE_FORMAT))
+    root.addHandler(handler)
+
+
 @click.group(cls=_OperatorErrorGroup)
 @click.version_option(package_name="dr-exp")
-def cli() -> None:
+@click.option(
+    "--log-level",
+    "log_level",
+    type=click.Choice(LOG_LEVELS, case_sensitive=False),
+    default=DEFAULT_LOG_LEVEL,
+    show_default=True,
+    help="Verbosity of dr-exp and dr-platform log output on stderr.",
+)
+def cli(log_level: str) -> None:
     """dr_exp - durable experiment manager for local and cluster training."""
+    _configure_logging(log_level)
 
 
 @cli.command()
@@ -566,9 +625,7 @@ def worker(
     already_terminal = frozenset[str]()
     if max_jobs is not None:
         with engine_for(profile) as engine:
-            already_terminal = capture_drain_baseline(
-                engine, campaign_key=campaign_key
-            )
+            already_terminal = capture_drain_baseline(engine, campaign_key=campaign_key)
     with worker_runtime(profile, with_dispatcher=with_dispatcher) as runtime:
         summary = drain_until(
             engine=runtime.engine,
@@ -583,9 +640,7 @@ def worker(
         f"limit_reached={summary.reached_limit} "
         f"interrupted={summary.interrupted}"
     )
-    if _drain_failed(
-        summary, max_jobs=max_jobs, deadline_seconds=deadline_seconds
-    ):
+    if _drain_failed(summary, max_jobs=max_jobs, deadline_seconds=deadline_seconds):
         sys.exit(1)
 
 
@@ -615,9 +670,7 @@ def dispatcher(machine: str, deadline_seconds: float | None) -> None:
             deadline_seconds=deadline_seconds,
         )
     click.echo("Dispatcher stopped.")
-    if _drain_failed(
-        summary, max_jobs=None, deadline_seconds=deadline_seconds
-    ):
+    if _drain_failed(summary, max_jobs=None, deadline_seconds=deadline_seconds):
         sys.exit(1)
 
 

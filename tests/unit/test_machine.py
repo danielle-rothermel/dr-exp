@@ -73,6 +73,13 @@ def test_worker_concurrency_must_be_positive(tmp_path: Path) -> None:
         make_profile(tmp_path, worker_concurrency=0)
 
 
+@pytest.mark.parametrize("blank", ["", "   ", "\t\n"], ids=["empty", "spaces", "ws"])
+def test_executor_id_must_not_be_blank(tmp_path: Path, blank: str) -> None:
+    """A blank id fails as a profile error, not later inside DBOS config."""
+    with pytest.raises(ValidationError, match="executor_id|at least 1 character"):
+        make_profile(tmp_path, executor_id=blank)
+
+
 @pytest.mark.parametrize(
     ("accelerator", "queue_name", "dequeued"),
     [

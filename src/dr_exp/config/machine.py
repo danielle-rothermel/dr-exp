@@ -35,7 +35,7 @@ class MachineProfile(BaseModel):
     run_store_root: Path
     database_url: str
     system_database_url: str
-    executor_id: str
+    executor_id: Annotated[str, Field(min_length=1)]
     worker_concurrency: Annotated[int, Field(ge=1)]
     device_env: dict[str, str] = Field(default_factory=dict)
     termination_grace_seconds: Annotated[float, Field(gt=0)] = (
@@ -50,6 +50,20 @@ class MachineProfile(BaseModel):
         if not expanded.is_absolute():
             raise ValueError(f"path must be absolute, got {value}")
         return expanded
+
+    @field_validator("executor_id")
+    @classmethod
+    def _executor_id_is_a_real_name(cls, value: str) -> str:
+        """Reject a blank executor id at profile load.
+
+        ``executor_id`` becomes DBOS's executor identity, where a blank value
+        fails much later inside ``PlatformDbosConfig`` with a message that names
+        neither the profile nor its file. Catching it here keeps the failure
+        profile-shaped.
+        """
+        if not value.strip():
+            raise ValueError("executor_id must not be blank")
+        return value
 
     @model_validator(mode="after")
     def _roots_are_distinct(self) -> Self:
