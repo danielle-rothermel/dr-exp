@@ -7,6 +7,7 @@ summary among them -- are dropped before an operator can see them.
 
 from __future__ import annotations
 
+import io
 import logging
 from collections.abc import Iterator
 from contextlib import contextmanager
@@ -31,12 +32,11 @@ def runner() -> CliRunner:
 def bare_root_logger() -> Iterator[logging.Logger]:
     """Present an unconfigured root logger, then restore what was there.
 
-    ``basicConfig`` is a no-op once the root logger has handlers, so observing
-    what the CLI configures requires a bare root. pytest's logging plugin
-    attaches its capture handlers for the call phase, i.e. *after* fixture
-    setup, so this has to be entered from inside the test body rather than
-    supplied as a fixture. Handlers are restored intact, leaving log capture
-    working normally for every other test.
+    Observing what the CLI configures requires a bare root. pytest's logging
+    plugin attaches its capture handlers for the call phase, i.e. *after*
+    fixture setup, so this has to be entered from inside the test body rather
+    than supplied as a fixture. Handlers are restored intact, leaving log
+    capture working normally for every other test.
     """
     root = logging.getLogger()
     saved_handlers = root.handlers[:]
@@ -147,20 +147,48 @@ def test_the_level_choices_and_default_are_the_documented_ones() -> None:
 def test_configuring_twice_does_not_stack_handlers(
     runner: CliRunner, echo_command: str, probe: str
 ) -> None:
-    """``force`` is not used, so a second run reuses the installed handler.
+    """A second invoke reuses the installed handler and rebinds its stream.
 
-    Duplicated handlers would double every line an operator reads. Only the
-    level is re-applied, which is what makes ``--log-level`` still take effect.
+    Duplicated handlers would double every line an operator reads. The stream
+    is rebound so the second invocation's records reach its own stderr, not
+    the first invocation's capture. The level is also re-applied, which is
+    what makes ``--log-level`` still take effect.
     """
     with bare_root_logger() as root:
-        runner.invoke(cli, [echo_command])
+        first = runner.invoke(cli, [echo_command])
         installed = root.handlers[:]
         assert len(installed) == 1
+        assert "identity_unavailable=False" in first.output
 
-        runner.invoke(cli, ["--log-level", "DEBUG", echo_command])
+        second = runner.invoke(cli, ["--log-level", "DEBUG", echo_command])
 
         assert root.handlers == installed
         assert root.level == logging.DEBUG
+        assert "identity_unavailable=False" in second.output
+        assert "quiet detail" in second.output
+        assert second.output.count("identity_unavailable=False") == 1
+
+
+def test_a_second_configure_rebinds_the_owned_handler_to_current_stderr(
+    probe: str, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    first_stream = io.StringIO()
+    second_stream = io.StringIO()
+    logger = logging.getLogger(probe)
+
+    with bare_root_logger() as root:
+        monkeypatch.setattr("sys.stderr", first_stream)
+        _configure_logging("INFO")
+        logger.info("first invocation")
+
+        monkeypatch.setattr("sys.stderr", second_stream)
+        _configure_logging("INFO")
+        logger.info("second invocation")
+
+        assert len(root.handlers) == 1
+        assert "first invocation" in first_stream.getvalue()
+        assert "second invocation" in second_stream.getvalue()
+        assert "second invocation" not in first_stream.getvalue()
 
 
 def test_an_existing_logging_setup_is_left_alone() -> None:

@@ -112,6 +112,10 @@ def _operator_message(error: Exception) -> str:
     return message
 
 
+class _CliStderrHandler(logging.StreamHandler[Any]):
+    """Root handler the CLI installs; rebound to the current stderr each invoke."""
+
+
 def _configure_logging(level: str) -> None:
     """Send library log records to stderr at ``level``.
 
@@ -119,18 +123,33 @@ def _configure_logging(level: str) -> None:
     this, dr-platform's INFO reconciliation lines -- notably the dispatcher's
     sweep summary -- go nowhere, and the terminal shows only DBOS's own logs.
 
-    ``basicConfig`` is deliberately called without ``force``: it is a no-op once
-    the root logger has handlers, so an embedding process keeps its own setup.
-    DBOS is unaffected either way, since it attaches a handler to its own
-    ``dbos`` logger and turns propagation off.
+    The CLI-owned handler is rebound to the current ``sys.stderr`` on every
+    invoke so a second in-process call -- ``CliRunner``, an embedding -- does
+    not keep writing to the first invocation's capture stream. Foreign handlers
+    are left in place, so an embedding process keeps its own setup. DBOS is
+    unaffected either way, since it attaches a handler to its own ``dbos``
+    logger and turns propagation off.
     """
-    logging.basicConfig(
-        stream=sys.stderr,
-        format=_LOG_FORMAT,
-        datefmt=_LOG_DATE_FORMAT,
-        level=level.upper(),
+    root = logging.getLogger()
+    root.setLevel(level.upper())
+
+    owned = next(
+        (
+            handler
+            for handler in root.handlers
+            if isinstance(handler, _CliStderrHandler)
+        ),
+        None,
     )
-    logging.getLogger().setLevel(level.upper())
+    if owned is not None:
+        owned.setStream(sys.stderr)
+        return
+    if root.handlers:
+        return
+
+    handler = _CliStderrHandler(sys.stderr)
+    handler.setFormatter(logging.Formatter(_LOG_FORMAT, datefmt=_LOG_DATE_FORMAT))
+    root.addHandler(handler)
 
 
 @click.group(cls=_OperatorErrorGroup)
